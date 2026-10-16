@@ -81,6 +81,24 @@ describe('BrandingService', () => {
     expect(svc.gravatarEnabled()).toBe(true);
   });
 
+  it('reads the handbook link and the public ticket switch', () => {
+    expect(svc.wikiUrl()).toBe(BrandingService.DEFAULT_WIKI_URL);
+    expect(svc.ticketsPublic()).toBe(false);
+    svc.init();
+    http.expectOne('/api/site-config').flush({
+      version: 1,
+      help: { wikiUrl: 'https://wiki.example/x' },
+      tickets: { publicEnabled: true },
+    });
+    expect(svc.wikiUrl()).toBe('https://wiki.example/x');
+    expect(svc.ticketsPublic()).toBe(true);
+    // An older server without the blocks keeps the link and turns the form off.
+    svc.init();
+    http.expectOne('/api/site-config').flush({ version: 2 });
+    expect(svc.wikiUrl()).toBe('https://wiki.example/x');
+    expect(svc.ticketsPublic()).toBe(false);
+  });
+
   it('starts with the default confirmation window of 12 hours', () => {
     expect(svc.confirmTtlHours()).toBe(BrandingService.DEFAULT_CONFIRM_TTL_HOURS);
     expect(svc.confirmTtlHours()).toBe(12);

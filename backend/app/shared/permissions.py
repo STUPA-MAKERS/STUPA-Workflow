@@ -119,4 +119,7 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # MCP and agent access: issue OAuth tokens for API agents. An admin holds it through
     # the bypass. You can also assign it to a non-admin.
     "mcp.use",
+    # /tickets: read and work on the reported tickets (status, assignee, kind, notes).
+    # The reports carry the e-mail and the technical context of the reporter.
+    "ticket.manage",
 )

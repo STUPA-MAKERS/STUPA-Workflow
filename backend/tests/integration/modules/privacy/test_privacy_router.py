@@ -220,6 +220,178 @@ async def test_execute_applicant_erasure_anonymizes(
     assert again.status_code == 409
 
 
+async def test_execute_applicant_erasure_anonymizes_the_tickets_of_the_address(
+    app: FastAPI, client: TestClient, session: AsyncSession
+) -> None:
+    """A report without a session under the applicant's address goes with the erasure."""
+    from app.modules.tickets.models import Ticket
+
+    app_type, _, _ = await _seed_type(session)
+    application, _ = await ApplicationsService(session).create(_create_payload(app_type.id))
+    req = ErasureRequest(
+        subject_type="applicant",
+        application_id=application.id,
+        email="antrag@example.org",
+        status="open",
+    )
+    ticket = Ticket(
+        kind="bug",
+        title="t",
+        body="b",
+        status="new",
+        reporter_email="Antrag@Example.ORG",
+        context={"url": "https://x"},
+    )
+    other = Ticket(
+        kind="bug", title="t", body="b", status="new", reporter_email="else@example.org"
+    )
+    session.add_all([req, ticket, other])
+    await session.commit()
+
+    _as_dpo(app)
+    r = client.post(f"/api/admin/privacy/erasures/{req.id}/execute")
+    assert r.status_code == 200, r.text
+
+    await session.refresh(ticket)
+    await session.refresh(other)
+    assert (ticket.reporter_email, ticket.context) == (None, {})
+    assert ticket.anonymized_at is not None
+    assert other.reporter_email == "else@example.org"
+    assert other.anonymized_at is None
+
+
+async def test_execute_applicant_erasure_without_an_address_keeps_the_tickets(
+    app: FastAPI, client: TestClient, session: AsyncSession
+) -> None:
+    """Without an address on the request no ticket matches, so none changes."""
+    from app.modules.tickets.models import Ticket
+
+    app_type, _, _ = await _seed_type(session)
+    application, _ = await ApplicationsService(session).create(_create_payload(app_type.id))
+    req = ErasureRequest(
+        subject_type="applicant", application_id=application.id, status="open"
+    )
+    ticket = Ticket(
+        kind="bug", title="t", body="b", status="new", reporter_email="antrag@example.org"
+    )
+    session.add_all([req, ticket])
+    await session.commit()
+
+    _as_dpo(app)
+    r = client.post(f"/api/admin/privacy/erasures/{req.id}/execute")
+    assert r.status_code == 200, r.text
+
+    await session.refresh(ticket)
+    assert ticket.reporter_email == "antrag@example.org"
+    assert ticket.anonymized_at is None
+
+
+def test_erase_email_requires_privacy_manage(app: FastAPI, client: TestClient) -> None:
+    body = {"email": "gast@example.org"}
+    assert client.post("/api/admin/privacy/erase-email", json=body).status_code == 401
+    _as(app, {"audit.read"})
+    assert client.post("/api/admin/privacy/erase-email", json=body).status_code == 403
+
+
+def test_erase_email_rejects_an_invalid_address_422(
+    app: FastAPI, client: TestClient
+) -> None:
+    _as_dpo(app)
+    r = client.post("/api/admin/privacy/erase-email", json={"email": "kein-mail"})
+    assert r.status_code == 422
+    assert r.json()["code"] == "invalid_email"
+
+
+async def test_erase_email_anonymizes_the_applications_and_the_reports(
+    app: FastAPI, client: TestClient, session: AsyncSession
+) -> None:
+    """The address goes from its applications and its tickets; other rows stay."""
+    from app.modules.tickets.models import Ticket
+
+    app_type, _, _ = await _seed_type(session)
+    application, _ = await ApplicationsService(session).create(_create_payload(app_type.id))
+    reported = Ticket(
+        kind="bug",
+        title="t",
+        body="b",
+        status="new",
+        reporter_email="Antrag@Example.ORG",
+        context={"url": "https://x"},
+    )
+    done_at = datetime.now(UTC) - timedelta(days=1)
+    earlier = Ticket(
+        kind="bug",
+        title="t",
+        body="b",
+        status="new",
+        reporter_email=None,
+        anonymized_at=done_at,
+    )
+    other = Ticket(
+        kind="bug", title="t", body="b", status="new", reporter_email="else@example.org"
+    )
+    principal = await _seed_principal(session, email="antrag@example.org")
+    session.add_all([reported, earlier, other])
+    await session.commit()
+
+    _as_dpo(app)
+    r = client.post(
+        "/api/admin/privacy/erase-email", json={"email": "  ANTRAG@example.org "}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json() == {
+        "applications": 1,
+        "tickets": 1,
+        "principalId": str(principal.id),
+    }
+
+    applicant = (
+        await session.execute(
+            select(Applicant).where(Applicant.application_id == application.id)
+        )
+    ).scalar_one()
+    assert (applicant.email, applicant.name) == (None, None)
+    assert applicant.anonymized_at is not None
+    for row in (reported, earlier, other):
+        await session.refresh(row)
+    assert (reported.reporter_email, reported.context) == (None, {})
+    assert reported.anonymized_at is not None
+    assert earlier.anonymized_at == done_at
+    assert (other.reporter_email, other.anonymized_at) == ("else@example.org", None)
+    # The account stays; its erasure is a separate step.
+    await session.refresh(principal)
+    assert (principal.email, principal.active) == ("antrag@example.org", True)
+
+    entry = (
+        await session.scalars(
+            select(AuditEntry).where(
+                AuditEntry.action == "erasure_executed", AuditEntry.target_type == "email"
+            )
+        )
+    ).one()
+    assert entry.target_id is None
+    assert entry.data == {"applications": 1, "tickets": 1}
+
+    # A second run finds nothing left, because both rows are anonymized now.
+    again = client.post(
+        "/api/admin/privacy/erase-email", json={"email": "antrag@example.org"}
+    )
+    assert again.json() == {
+        "applications": 0,
+        "tickets": 0,
+        "principalId": str(principal.id),
+    }
+
+
+async def test_erase_email_without_matches_reports_zero(
+    app: FastAPI, client: TestClient, session: AsyncSession
+) -> None:
+    _as_dpo(app)
+    r = client.post("/api/admin/privacy/erase-email", json={"email": "niemand@example.org"})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"applications": 0, "tickets": 0, "principalId": None}
+
+
 async def test_execute_unknown_request_404(app: FastAPI, client: TestClient) -> None:
     _as_dpo(app)
     r = client.post(

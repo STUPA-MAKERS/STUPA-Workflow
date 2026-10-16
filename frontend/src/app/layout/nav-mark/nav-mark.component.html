@@ -4,9 +4,13 @@
   } @else if (live()) {
     <span class="mark__live" aria-hidden="true"></span>
   }
+} @else if (part() === 'count') {
+  @if (count() > 0) {
+    <span class="mark__count mark__count--inline" aria-hidden="true">{{ countLabel() }}</span>
+  }
 } @else {
   @if (count() > 0) {
-    <span class="sr-only">{{ 'shell.nav.tasksOpen' | t: { count: count() } }}</span>
+    <span class="sr-only">{{ countText() | t: { count: count() } }}</span>
   } @else if (live()) {
     <span class="sr-only">{{ 'shell.nav.live' | t }}</span>
   }

@@ -10,6 +10,15 @@ synchronously.
 ``finalize_scan`` runs after the worker scanned the object. It sets ``scanned=true`` and
 the result. On a finding it deletes the object and writes an audit entry (quarantine).
 
+The files of a ticket report and of a chat message (ticket note, to-do comment,
+application comment) have no application. ``owner_of`` names their owner, the router
+checks the read rule of that owner, and ``message_url`` / ``message_download_stream``
+apply the same quarantine gates. ``message_attachments`` lists the files of a set of
+messages in one query, and ``delete_for_messages`` removes them with their message.
+``drop_for_messages`` removes only the rows and returns the storage keys, and
+``remove_objects`` removes those objects after the commit of the caller, so a rollback
+never leaves a row whose object is gone.
+
 ``signed_url`` returns the app-relative ``/download`` route that the authorization layer
 gates. It does so only after a clean scan. The route carries no signature and does not
 expire. While the scan runs the method answers 409. After a removal it answers 410. There
@@ -23,22 +32,31 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
+from dataclasses import dataclass
+from typing import Literal
 
-from sqlalchemy import select
+from sqlalchemy import ColumnElement, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import InstrumentedAttribute
 from sqlalchemy.orm.exc import StaleDataError
 
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, Comment
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.files.mime import MimeRejected, sanitize_filename, validate_upload
 from app.modules.files.models import BOUND, MAX_ATTACHMENT_BYTES, Attachment
 from app.modules.files.queue import ScanQueue
 from app.modules.files.scanner import ScanVerdict
-from app.modules.files.schemas import AttachmentOut, SignedUrlOut
+from app.modules.files.schemas import (
+    AttachmentOut,
+    MessageAttachmentOut,
+    SignedUrlOut,
+    message_attachment_out,
+)
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.flow.models import State
+from app.modules.tickets.models import TicketNote
 from app.settings import Settings, get_settings
 from app.shared.errors import (
     ConflictError,
@@ -52,6 +70,25 @@ from app.shared.errors import (
 logger = logging.getLogger("app.files")
 
 SCAN_RESULT_CLEAN = "clean"
+
+#: The chat messages that own files.
+MessageOwner = Literal["ticket_note", "todo_comment", "comment"]
+#: Every owner of a bound attachment.
+OwnerKind = Literal["application", "ticket", "ticket_note", "todo_comment", "comment"]
+
+_OWNER_COLUMNS: dict[MessageOwner, InstrumentedAttribute[uuid.UUID | None]] = {
+    "ticket_note": Attachment.ticket_note_id,
+    "todo_comment": Attachment.todo_comment_id,
+    "comment": Attachment.comment_id,
+}
+
+
+@dataclass(frozen=True, slots=True)
+class AttachmentOwner:
+    """The owner of a bound attachment: its kind and its id."""
+
+    kind: OwnerKind
+    id: uuid.UUID
 
 
 def _is_infected(attachment: Attachment) -> bool:
@@ -199,7 +236,7 @@ class FilesService:
             return
         await self.queue.enqueue(attachment_id)
 
-    async def _assert_app_visible(
+    async def assert_app_visible(
         self, application_id: uuid.UUID, *, allow_unconfirmed: bool
     ) -> None:
         """Mirror the visibility of the application.
@@ -246,7 +283,7 @@ class FilesService:
         ``hidden`` removes each attachment for which it returns true. The router
         uses it for the attachments of the ``isPII`` fields (O21).
         """
-        await self._assert_app_visible(
+        await self.assert_app_visible(
             application_id, allow_unconfirmed=allow_unconfirmed
         )
         rows = (
@@ -283,7 +320,10 @@ class FilesService:
             ConflictError: The scan is not finished yet (HTTP 409).
             ServiceUnavailableError: Object storage is off (HTTP 503).
         """
-        attachment = await self.get_attachment(attachment_id)
+        return self._ready(await self.get_attachment(attachment_id))
+
+    def _ready(self, attachment: Attachment) -> Attachment:
+        """Apply the download gates to a loaded attachment (see ``_ready_attachment``)."""
         if _is_infected(attachment) or attachment.storage_key is None:
             raise GoneError("Attachment removed (failed virus scan).")
         # FAIL CLOSED. Do NOT invert this condition. The method refuses the download
@@ -315,7 +355,7 @@ class FilesService:
         or 503.
         """
         attachment = await self.get_attachment(attachment_id)
-        await self._assert_app_visible(
+        await self.assert_app_visible(
             application_id_of(attachment), allow_unconfirmed=allow_unconfirmed
         )
         await self._ready_attachment(attachment_id)
@@ -341,7 +381,7 @@ class FilesService:
             The bytes, the filename and the MIME type for the stream response.
         """
         loaded = await self.get_attachment(attachment_id)
-        await self._assert_app_visible(
+        await self.assert_app_visible(
             application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
         attachment = await self._ready_attachment(attachment_id)
@@ -373,12 +413,224 @@ class FilesService:
             size into ``Content-Length``.
         """
         loaded = await self.get_attachment(attachment_id)
-        await self._assert_app_visible(
+        await self.assert_app_visible(
             application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
         )
-        attachment = await self._ready_attachment(attachment_id)
-        # _ready_attachment guarantees both values, else it raises 410 or 503. The
-        # two asserts only help the type checker.
+        return await self._open_stream(await self._ready_attachment(attachment_id))
+
+    async def owner_of(self, attachment_id: uuid.UUID) -> AttachmentOwner | None:
+        """Name the owner of an attachment.
+
+        The download and URL routes dispatch on it. A draft and an unknown id give
+        None, so both answer 404 the same way.
+        """
+        row = (
+            await self.session.execute(
+                select(
+                    Attachment.application_id,
+                    Attachment.ticket_id,
+                    Attachment.ticket_note_id,
+                    Attachment.todo_comment_id,
+                    Attachment.comment_id,
+                ).where(Attachment.id == attachment_id)
+            )
+        ).first()
+        if row is None:
+            return None
+        kinds: tuple[OwnerKind, ...] = (
+            "application",
+            "ticket",
+            "ticket_note",
+            "todo_comment",
+            "comment",
+        )
+        for kind, owner_id in zip(kinds, row, strict=True):
+            if owner_id is not None:
+                return AttachmentOwner(kind=kind, id=owner_id)
+        return None
+
+    async def _get_owned(self, attachment_id: uuid.UUID) -> Attachment:
+        """Load an attachment that a ticket or a message owns. Any other row gives 404.
+
+        The router checks the read rule of the owner first, so the route is no
+        existence oracle.
+
+        Raises:
+            NotFoundError: No ticket or message attachment has this id (HTTP 404).
+        """
+        attachment = await self.session.get(Attachment, attachment_id)
+        if attachment is None or (
+            attachment.ticket_id is None
+            and attachment.ticket_note_id is None
+            and attachment.todo_comment_id is None
+            and attachment.comment_id is None
+        ):
+            raise NotFoundError(f"attachment {attachment_id} not found")
+        return attachment
+
+    async def message_url(self, attachment_id: uuid.UUID) -> SignedUrlOut:
+        """Return the download route of a ticket or message file after a clean scan.
+
+        The gates are those of ``signed_url``: 409 while the scan runs, 410 after a
+        finding, 503 without storage.
+        """
+        self._ready(await self._get_owned(attachment_id))
+        return SignedUrlOut(
+            url=f"/api/attachments/{attachment_id}/download",
+            expiresIn=self.settings.attachment_url_ttl_seconds,
+        )
+
+    async def message_download_stream(
+        self, attachment_id: uuid.UUID
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        """Stream a ticket or message file, with the gates of ``download_stream``."""
+        attachment = self._ready(await self._get_owned(attachment_id))
+        return await self._open_stream(attachment)
+
+    async def message_attachments(
+        self, owner: MessageOwner, ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, list[MessageAttachmentOut]]:
+        """Return the files of a set of messages, oldest first, in one query.
+
+        A message without files is missing from the result.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return {}
+        column = _OWNER_COLUMNS[owner]
+        rows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(column.in_(wanted))
+                .order_by(Attachment.created_at, Attachment.id)
+            )
+        ).all()
+        out: dict[uuid.UUID, list[MessageAttachmentOut]] = {}
+        for row in rows:
+            owner_id = getattr(row, column.key)
+            out.setdefault(owner_id, []).append(message_attachment_out(row))
+        return out
+
+    async def delete_for_messages(
+        self, owner: MessageOwner, ids: Sequence[uuid.UUID], *, actor: str
+    ) -> int:
+        """Remove the files of a set of messages, without a commit.
+
+        For each file the method deletes the row, writes an ``attachment_delete``
+        audit entry and removes the object as best effort. The caller commits, like
+        ``delete_for_ticket``.
+
+        Returns:
+            The number of removed files.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return 0
+        rows = await self._locked_rows(_OWNER_COLUMNS[owner].in_(wanted))
+        await self._remove_rows(rows, actor=actor)
+        return len(rows)
+
+    async def drop_for_messages(
+        self, owner: MessageOwner, ids: Sequence[uuid.UUID], *, actor: str
+    ) -> list[str]:
+        """Delete the file rows of a set of messages, without a commit or an object removal.
+
+        For each file the method deletes the row and writes an ``attachment_delete``
+        audit entry. The caller commits and then calls ``remove_objects`` with the
+        returned keys. The objects stay until that commit, because a rollback brings
+        the rows back and a row without its object is a broken download.
+
+        Returns:
+            The storage keys of the removed files.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return []
+        rows = await self._locked_rows(_OWNER_COLUMNS[owner].in_(wanted))
+        return await self._drop_rows(rows, actor=actor)
+
+    async def lock_for_messages(self, owner: MessageOwner, ids: Sequence[uuid.UUID]) -> None:
+        """Lock the file rows of a set of messages until the commit, in id order.
+
+        A caller that writes an audit entry before it removes the files of a message
+        calls this method before that entry. The first audit write takes the advisory
+        lock of the audit chain until the commit, and ``finalize_scan`` of an infected
+        file locks its row first and audits after it. A row lock after the first audit
+        entry could therefore close a deadlock cycle.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return
+        await self.session.execute(
+            select(Attachment.id)
+            .where(_OWNER_COLUMNS[owner].in_(wanted))
+            .order_by(Attachment.id)
+            .with_for_update()
+        )
+
+    async def remove_objects(self, storage_keys: Sequence[str]) -> None:
+        """Remove storage objects as best effort; a failure only logs a warning."""
+        if self.storage is None:
+            return
+        for storage_key in storage_keys:
+            try:
+                await self.storage.remove(storage_key)
+            except StorageError:
+                logger.warning("could not remove object %s of a removed attachment", storage_key)
+
+    async def _remove_rows(self, rows: Sequence[Attachment], *, actor: str) -> None:
+        await self.remove_objects(await self._drop_rows(rows, actor=actor))
+
+    async def _locked_rows(self, where: ColumnElement[bool]) -> Sequence[Attachment]:
+        """Load and lock the matching rows until the commit, in id order.
+
+        The lock comes before the first audit entry of ``_drop_rows``. The reason is
+        the one of ``lock_for_messages``. ``populate_existing`` reloads a row that the
+        session already holds, so a scan that committed while the lock waited shows
+        its NULL ``storage_key``.
+        """
+        return (
+            await self.session.scalars(
+                select(Attachment)
+                .where(where)
+                .order_by(Attachment.id)
+                .with_for_update()
+                .execution_options(populate_existing=True)
+            )
+        ).all()
+
+    async def _drop_rows(self, rows: Sequence[Attachment], *, actor: str) -> list[str]:
+        """Delete the rows, flush, and only then write an audit entry for each.
+
+        The flush takes every row lock before the first audit entry takes the lock of
+        the audit chain, so no row lock follows the chain lock (see
+        ``lock_for_messages``).
+        """
+        keys: list[str] = []
+        owners: list[tuple[uuid.UUID, dict[str, object]]] = []
+        for attachment in rows:
+            if attachment.storage_key is not None:
+                keys.append(attachment.storage_key)
+            owners.append((attachment.id, _owner_data(attachment)))
+            await self.session.delete(attachment)
+        if owners:
+            await self.session.flush()
+        for attachment_id, owner in owners:
+            await audit_record(
+                self.session,
+                actor=actor,
+                action=AuditAction.ATTACHMENT_DELETE,
+                target_type="attachment",
+                target_id=str(attachment_id),
+                data=owner,
+            )
+        return keys
+
+    async def _open_stream(
+        self, attachment: Attachment
+    ) -> tuple[AsyncIterator[bytes], str, str, int]:
+        # _ready guarantees both values, else it raises 410 or 503. The two asserts
+        # only help the type checker.
         assert attachment.storage_key is not None
         assert self.storage is not None
         try:
@@ -386,6 +638,35 @@ class FilesService:
         except StorageError as exc:
             raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
         return stream, attachment.filename, attachment.mime, attachment.size
+
+    async def list_for_ticket(self, ticket_id: uuid.UUID) -> list[AttachmentOut]:
+        """Return the attachments of a ticket, oldest first."""
+        rows = (
+            await self.session.scalars(
+                select(Attachment)
+                .where(Attachment.ticket_id == ticket_id)
+                .order_by(Attachment.created_at, Attachment.id)
+            )
+        ).all()
+        return [_attachment_out(a) for a in rows]
+
+    async def delete_for_ticket(self, ticket_id: uuid.UUID, *, actor: str) -> int:
+        """Remove the files of a ticket for its anonymization, without a commit.
+
+        These are the files of the report and the files of every note of the ticket
+        (also of a deleted note). For each file the method deletes the row, removes the
+        object as best effort and writes an ``attachment_delete`` audit entry. The
+        caller commits.
+
+        Returns:
+            The number of removed attachments.
+        """
+        notes = select(TicketNote.id).where(TicketNote.ticket_id == ticket_id)
+        rows = await self._locked_rows(
+            or_(Attachment.ticket_id == ticket_id, Attachment.ticket_note_id.in_(notes))
+        )
+        await self._remove_rows(rows, actor=actor)
+        return len(rows)
 
     async def assert_editable(self, application_id: uuid.UUID) -> None:
         """Make sure that the current state of the application allows data edits.
@@ -437,39 +718,22 @@ class FilesService:
     ) -> int:
         """Remove all attachments of an application for DSGVO anonymization.
 
-        For each attachment the method deletes the database row, removes the storage
-        object as best effort and writes an audit entry. It does not commit. The calling
-        anonymization routine commits the transaction atomically.
+        These are the files of the application (``BOUND``) and the files of all its
+        comments, internal and public. For each file the method deletes the database
+        row, removes the storage object as best effort and writes an audit entry. It
+        does not commit. The calling anonymization routine commits atomically.
 
         Returns:
             The number of removed attachments.
         """
-        rows = (
-            await self.session.scalars(
-                select(Attachment).where(
-                    BOUND, Attachment.application_id == application_id
-                )
+        comments = select(Comment.id).where(Comment.application_id == application_id)
+        rows = await self._locked_rows(
+            or_(
+                BOUND & (Attachment.application_id == application_id),
+                Attachment.comment_id.in_(comments),
             )
-        ).all()
-        for attachment in rows:
-            storage_key = attachment.storage_key
-            await self.session.delete(attachment)
-            if self.storage is not None and storage_key is not None:
-                try:
-                    await self.storage.remove(storage_key)
-                except StorageError:
-                    logger.warning(
-                        "could not remove object for anonymized attachment %s",
-                        attachment.id,
-                    )
-            await audit_record(
-                self.session,
-                actor=actor,
-                action=AuditAction.ATTACHMENT_DELETE,
-                target_type="attachment",
-                target_id=str(attachment.id),
-                data={"application_id": str(application_id)},
-            )
+        )
+        await self._remove_rows(rows, actor=actor)
         return len(rows)
 
     async def finalize_scan(
@@ -482,8 +746,8 @@ class FilesService:
         """Persist the scan result.
 
         On a finding the method deletes the object and writes an audit entry
-        (quarantine). The entry names the application of a bound file. For a draft
-        (Z4) it carries ``draft: true`` instead.
+        (quarantine). The entry names the application or the ticket of a bound file.
+        For a draft (Z4) it carries ``draft: true`` instead.
 
         The method loads the row again by id. A row that a delete, a draft purge or
         an anonymization removed during the scan is no error: the method skips it and
@@ -508,11 +772,7 @@ class FilesService:
         attachment.scan_result = signature
         storage_key = attachment.storage_key
         attachment.storage_key = None
-        owner: dict[str, object] = (
-            {"application_id": str(attachment.application_id)}
-            if attachment.application_id is not None
-            else {"draft": True}
-        )
+        owner = _owner_data(attachment)
         if not await self._commit_scan(
             attachment_id, actor=actor, quarantine={**owner, "signature": signature}
         ):
@@ -583,18 +843,22 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
     ``field_key``. The caller sends ``field_key`` as free text, so the data records
     only whether the upload has one (``hasFieldKey``).
     """
-    owner: dict[str, object] = (
-        {"application_id": str(attachment.application_id)}
-        if attachment.application_id is not None
-        else {"draft": True}
-    )
     return {
-        **owner,
+        **_owner_data(attachment),
         "hasFieldKey": attachment.field_key is not None,
         "isComparisonOffer": attachment.is_comparison_offer,
         "mime": attachment.mime,
         "size": attachment.size,
     }
+
+
+def _owner_data(attachment: Attachment) -> dict[str, object]:
+    """Name the owner of an attachment in an audit entry: application, ticket, message or draft."""
+    for key in ("application_id", "ticket_id", "ticket_note_id", "todo_comment_id", "comment_id"):
+        value = getattr(attachment, key)
+        if value is not None:
+            return {key: str(value)}
+    return {"draft": True}
 
 
 def _attachment_out(attachment: Attachment) -> AttachmentOut:

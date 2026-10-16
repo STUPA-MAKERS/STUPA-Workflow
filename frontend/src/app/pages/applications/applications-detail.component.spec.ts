@@ -9,6 +9,7 @@ import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService } from './applications-page.service';
+import { DraftAttachmentsService } from '../../features/apply/draft-attachments.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TestBed } from '@angular/core/testing';
 import { AuthService } from '@core/auth/auth.service';
@@ -25,6 +26,7 @@ import type {
   Transition,
   VersionOutWire,
 } from '@core/api/models';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -96,6 +98,7 @@ async function setup(
 ) {
   const view = await render(ApplicationsDetailComponent, {
     providers: [
+      NO_LINKED_TODOS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),
@@ -223,107 +226,28 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('hides the visibility toggle without application.manage and posts public', async () => {
-    const { http, detectChanges } = await setup(['application.read']);
+  it('marks an edited comment as "bearbeitet", from the list and from the edit answer', async () => {
+    const { http, detectChanges, cmp, container } = await setup();
+    flushTypes(http);
     http.expectOne(url('')).flush(appWire());
     http.expectOne(url('/versions')).flush(VERSIONS);
-    http.expectOne(url('/comments')).flush(COMMENTS);
-    detectChanges();
-
-    // The flow handles a status change. There is no manual UI and no manager option.
-    expect(screen.queryByRole('heading', { name: 'Statuswechsel' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radiogroup', { name: 'Sichtbarkeit' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('radio', { name: 'Intern' })).not.toBeInTheDocument();
-    // The comment still tells its visibility.
-    expect(document.querySelector('.ad__msgMeta')?.textContent).toContain('Öffentlich');
-
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Frage');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.body).toEqual({ body: 'Frage', visibility: 'public' });
-    post.flush(
-      { id: 'c3', author: null, authorKind: 'principal', body: 'Frage', visibility: 'public', at: '2026-06-05T13:00:00Z' },
-      { status: 201, statusText: 'Created' },
-    );
+    http.expectOne(url('/comments')).flush([
+      ...COMMENTS,
+      { ...COMMENTS[0], id: 'c2', body: 'Erledigt.', at: '2026-06-05T12:05:00Z', editedAt: '2026-06-05T12:30:00Z' },
+    ]);
+    for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
     flushForm(http);
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('posts a public comment by default', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
     detectChanges();
+    const edited = () => [...container.querySelectorAll('.chat__meta')].filter((m) => /bearbeitet/.test(m.textContent ?? ''));
+    expect(edited()).toHaveLength(1);
 
-    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
-    expect(within(group).getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Danke!');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.method).toBe('POST');
-    expect(post.request.body).toEqual({ body: 'Danke!', visibility: 'public' });
-    post.flush(
-      {
-        id: 'c2',
-        author: null,
-        authorKind: 'principal',
-        body: 'Danke!',
-        visibility: 'public',
-        at: '2026-06-05T13:00:00Z',
-      },
-      { status: 201, statusText: 'Created' },
-    );
+    (cmp as unknown as { editComment(e: { id: string; body: string }): void }).editComment({ id: 'c1', body: 'Neu' });
+    http
+      .expectOne((r) => r.method === 'PATCH' && r.url === '/api/applications/app-1/comments/c1')
+      .flush({ ...COMMENTS[0], body: 'Neu', editedAt: '2026-06-05T13:00:00Z' });
     detectChanges();
-    expect(screen.getByText('Danke!')).toBeInTheDocument();
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('posts an internal comment when the toggle says so, then resets it to public', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-
-    await userEvent.click(screen.getByRole('radio', { name: 'Intern' }));
-    detectChanges();
-    expect(screen.getByRole('radio', { name: 'Intern' })).toHaveAttribute('aria-checked', 'true');
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Nur für uns');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.body).toEqual({ body: 'Nur für uns', visibility: 'internal' });
-    post.flush(
-      { id: 'c4', author: null, authorKind: 'principal', body: 'Nur für uns', visibility: 'internal', at: '2026-06-05T13:00:00Z', isOwn: true },
-      { status: 201, statusText: 'Created' },
-    );
-    detectChanges();
-    // The new comment shows "Intern" in its meta line. The toggle is public again.
-    const metas = [...document.querySelectorAll('.ad__msgMeta')].map((el) => el.textContent ?? '');
-    expect(metas[0]).toContain('Öffentlich');
-    expect(metas[1]).toContain('Intern');
-    expect(screen.getByRole('radio', { name: 'Öffentlich' })).toHaveAttribute('aria-checked', 'true');
-    flushAttachments(http);
-    http.verify();
-  });
-
-  it('sends on Enter, keeps typing on Shift+Enter', async () => {
-    const { http, detectChanges } = await setup();
-    flushAll(http);
-    detectChanges();
-
-    const input = screen.getByLabelText('Kommentar hinzufügen');
-    // Shift+Enter keeps the newline local and fires no request.
-    await userEvent.type(input, 'Hallo{Shift>}{Enter}{/Shift}');
-    http.expectNone(url('/comments'));
-    await userEvent.type(input, '{Enter}');
-    const post = http.expectOne(url('/comments'));
-    expect(post.request.method).toBe('POST');
-    post.flush(
-      { id: 'c9', author: null, authorKind: 'principal', body: 'Hallo', visibility: 'public', at: '2026-06-05T13:00:00Z', isOwn: true },
-      { status: 201, statusText: 'Created' },
-    );
-    detectChanges();
+    expect(screen.getByText('Neu')).toBeInTheDocument();
+    expect(edited()).toHaveLength(2);
     flushAttachments(http);
     http.verify();
   });
@@ -414,23 +338,6 @@ describe('ApplicationsDetailComponent', () => {
     http.verify();
   });
 
-  it('toasts an error when posting a comment fails', async () => {
-    const { http, detectChanges, toast } = await setup();
-    flushAll(http);
-    detectChanges();
-    const error = jest.spyOn(toast, 'error');
-
-    await userEvent.type(screen.getByLabelText('Kommentar hinzufügen'), 'Hmm');
-    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
-    http
-      .expectOne(url('/comments'))
-      .flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
-
-    expect(error).toHaveBeenCalledWith('Kommentar konnte nicht gespeichert werden.');
-    flushAttachments(http);
-    http.verify();
-  });
-
   it('reloads when the route id changes on a reused component (paramMap, not snapshot)', async () => {
     const paramMap$ = new BehaviorSubject(convertToParamMap({ id: 'app-1' }));
     const { http, detectChanges } = await setup(
@@ -480,6 +387,7 @@ describe('ApplicationsDetailComponent', () => {
   it('draws the tabs while it loads in one column', async () => {
     const view = await render(ApplicationsDetailComponent, {
       providers: [
+        NO_LINKED_TODOS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -1481,25 +1389,6 @@ describe('ApplicationsDetailComponent', () => {
     ).toBe('Gremium');
   });
 
-  it('does not post an empty/whitespace comment and guards against double-submit', async () => {
-    const { http, detectChanges, cmp } = await setup();
-    flushAll(http);
-    detectChanges();
-    flushAttachments(http);
-    const evt = { preventDefault: jest.fn() } as unknown as Event;
-
-    cmp.newComment.set('   ');
-    cmp.submitComment(evt);
-    expect(evt.preventDefault).toHaveBeenCalled();
-    expect(cmp.posting()).toBe(false);
-
-    cmp.newComment.set('real');
-    cmp.posting.set(true);
-    cmp.submitComment(evt);
-    // The post stays in flight and no request goes out. The check below proves it.
-    http.verify();
-  });
-
   it('starts inline edit, cancels, and saves (success)', async () => {
     const { http, detectChanges, cmp, toast } = await setupWithFields(
       [{ key: 'title', type: 'text', label: { de: 'Titel' } }],
@@ -1620,6 +1509,142 @@ describe('ApplicationsDetailComponent', () => {
     cmp.savingEdit.set(true);
     cmp.saveEdit();
     http.verify();
+  });
+
+  it.each([
+    [422, 'Die Nachricht ist zu lang.', [{ field: 'body.body', msg: 'String should have at most 10000 characters' }]],
+    [403, 'Du darfst hier nicht schreiben.', []],
+    [500, 'Kommentar konnte nicht gespeichert werden.', []],
+  ])('toasts a failed comment %s and discards it on request', async (status, message, errors) => {
+    const { http, detectChanges, cmp, toast } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const error = jest.spyOn(toast, 'error');
+    cmp['sendComment']({ body: 'Hallo', visibility: 'internal' });
+    http
+      .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments')
+      .flush({ title: 'e', errors }, { status, statusText: 'x' });
+    expect(error).toHaveBeenCalledWith(message);
+    const failed = cmp.chatMessages().find((m) => m.state === 'failed');
+    expect(failed?.body).toBe('Hallo');
+    cmp['discardComment']({ id: failed!.id });
+    expect(cmp.chatMessages().some((m) => m.state === 'failed')).toBe(false);
+  });
+
+  it('reads the comments again when the chat asks, and keeps them on a failure', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const file = { id: 'f1', filename: 'plan.pdf', mime: 'application/pdf', size: 20 };
+    cmp.comments.set([{ ...cmp.comments()[0], attachments: [{ ...file, scanState: 'scanning' }] }]);
+    cmp['refreshComments']();
+    // Only the scan state comes from the read: the text on screen stays.
+    http.expectOne(url('/comments')).flush([{ ...COMMENTS[0], body: 'Alt', attachments: [{ ...file, scanState: 'clean' }] }]);
+    expect(cmp.comments().map((c) => c.body)).toEqual(['Bitte Kostenplan ergänzen.']);
+    expect(cmp.comments()[0].attachments?.[0].scanState).toBe('clean');
+    cmp['refreshComments']();
+    http.expectOne(url('/comments')).flush(null, { status: 500, statusText: 'x' });
+    expect(cmp.comments()[0].attachments?.[0].scanState).toBe('clean');
+    // An answer from before another load is dropped.
+    cmp['refreshComments']();
+    const late = http.expectOne(url('/comments'));
+    (cmp as unknown as { loadSeq: number }).loadSeq++;
+    late.flush([]);
+    expect(cmp.comments()).toHaveLength(1);
+  });
+
+  it('keeps a comment the outbox delivered while a background read was in flight, once', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    cmp['refreshComments']();
+    const stale = http.expectOne(url('/comments'));
+    cmp['sendComment']({ body: 'Neu' });
+    const created = { ...COMMENTS[0], id: 'c2', body: 'Neu' };
+    // The read was served after the send committed: it already holds c2.
+    stale.flush([...COMMENTS, created]);
+    expect(cmp.comments().map((c) => c.id)).toEqual(['c1']);
+    http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments').flush(created);
+    expect(cmp.comments().map((c) => c.id)).toEqual(['c1', 'c2']);
+  });
+
+  it('offers no paperclip on an anonymized application', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    cmp.app.update((a) => a && { ...a, applicant: { ...a.applicant!, anonymized: true } });
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+  });
+
+  it('hides the paperclip once the server refuses files, for a reader without the applicant block', async () => {
+    // A reader without the PII right gets no applicant block: the refusal is the only sign.
+    const id = 'app-nofiles';
+    const params = new BehaviorSubject(convertToParamMap({ id }));
+    const { http, detectChanges, cmp } = await setup(['application.read'], params);
+    const show = (appId: string) => {
+      http.expectOne(url('', appId)).flush({ ...appWire(), id: appId, applicant: null });
+      http.expectOne(url('/versions', appId)).flush(VERSIONS);
+      http.expectOne(url('/comments', appId)).flush(COMMENTS);
+      flushForm(http, appId);
+      detectChanges();
+      flushAttachments(http);
+      detectChanges();
+    };
+    const post = () => http.expectOne((r) => r.method === 'POST' && r.url === `/api/applications/${id}/comments`);
+    flushTypes(http);
+    show(id);
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    cmp['sendComment']({ body: 'Siehe Anhang', attachmentIds: ['d1'], draftToken: 'tok' });
+    post().flush({ code: 'application_anonymized', errors: [] }, { status: 422, statusText: 'x' });
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+    // Another failure keeps the paperclip as it is.
+    cmp['sendComment']({ body: 'Nochmal' });
+    post().flush(null, { status: 500, statusText: 'x' });
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+
+    // Another application takes files; the next visit of this one knows it without a refusal.
+    params.next(convertToParamMap({ id: 'app-takes' }));
+    show('app-takes');
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+    params.next(convertToParamMap({ id }));
+    show(id);
+    expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+  });
+
+  it('keeps the paperclip of a thread that takes files after another failed send', async () => {
+    const { http, detectChanges, cmp } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    cmp['sendComment']({ body: 'Text' });
+    http
+      .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/comments')
+      .flush({ code: 'validation_error', errors: [] }, { status: 422, statusText: 'x' });
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeInTheDocument();
+  });
+
+  it('keeps the composer files with the page when the layout switch re-creates the chat', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
+    const before = chat();
+    const drafts = before.injector.get(DraftAttachmentsService);
+    fixture.debugElement.injector.get(ApplicationsPageService).split.set(false);
+    detectChanges();
+    for (const req of http.match(() => true)) req.flush([]);
+    expect(chat().componentInstance).not.toBe(before.componentInstance);
+    expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
   });
 
   it.each([
@@ -1950,6 +1975,7 @@ describe('ApplicationsDetailComponent', () => {
     // layout until it arrives at once is the worst place for it.
     const view = await render(ApplicationsDetailComponent, {
       providers: [
+        NO_LINKED_TODOS,
         provideRouter([]),
         provideHttpClient(),
         provideHttpClientTesting(),
@@ -1996,6 +2022,45 @@ describe('ApplicationsDetailComponent', () => {
       detectChanges();
 
       expect(screen.getByRole('button', { name: /Aus Archiv holen/ })).toBeInTheDocument();
+    });
+
+    it('keeps the applicant block and the closed paperclip of an anonymized application after the archive', async () => {
+      // The archive answers without the applicant block.
+      const { http, detectChanges, cmp } = await setup(['application.read', 'application.manage', 'application.archive']);
+      flushTypes(http);
+      http.expectOne(url('')).flush({ ...appWire(), applicant: { email: null, name: null, anonymized: true } });
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) req.flush([]);
+      flushForm(http);
+      detectChanges();
+      flushAttachments(http);
+      expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: /Archivieren/ }));
+      http
+        .expectOne((r) => r.url.endsWith('/archive') && r.method === 'POST')
+        .flush({ ...appWire(), applicant: null, archivedAt: '2026-09-02T10:00:00Z' });
+      detectChanges();
+      expect(cmp.app()?.archivedAt).not.toBeNull();
+      expect(cmp.app()?.applicant?.anonymized).toBe(true);
+      expect(screen.queryByRole('button', { name: 'Datei anhängen' })).toBeNull();
+    });
+
+    it('takes the archive answer as it is when no applicant block was shown', async () => {
+      const { http, detectChanges, cmp } = await setup(['application.read', 'application.archive']);
+      flushTypes(http);
+      http.expectOne(url('')).flush({ ...appWire(), applicant: null });
+      http.expectOne(url('/versions')).flush(VERSIONS);
+      http.expectOne(url('/comments')).flush(COMMENTS);
+      flushForm(http);
+      detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: /Archivieren/ }));
+      http
+        .expectOne((r) => r.url.endsWith('/archive') && r.method === 'POST')
+        .flush({ ...appWire(), applicant: null, archivedAt: '2026-09-02T10:00:00Z' });
+      detectChanges();
+      expect(cmp.app()?.archivedAt).not.toBeNull();
+      expect(cmp.app()?.applicant).toBeNull();
     });
 
     it('says on the page that an application is archived', async () => {

@@ -15,6 +15,14 @@
 
 export type Uuid = string;
 export type IsoDateTime = string;
+
+/** A person on a card, a ticket, a note or an event. null/null = deleted person. */
+export interface PersonRef {
+  principalId: Uuid | null;
+  /** The name, else the account e-mail, else null. */
+  displayName: string | null;
+}
+
 export type Lang = 'de' | 'en';
 
 /** Configurable multilingual text (`*_i18n` JSONB). */
@@ -75,6 +83,10 @@ export interface PublicSiteConfig {
     /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
     gravatarEnabled?: boolean;
   } | null;
+  /** The handbook link of the help menu. Missing on an older server. */
+  help?: { wikiUrl: string };
+  /** Visitors without a session may send a ticket ("Problem melden"). */
+  tickets?: { publicEnabled: boolean };
 }
 
 /** Upload limits of the wizard (`attachmentLimits` of the public site config). */
@@ -371,6 +383,8 @@ export interface AgendaItem {
   id: Uuid;
   /** `null` for a free-text agenda item (no application). */
   applicationId: Uuid | null;
+  /** The to-do card that the item was made from, or `null`. */
+  todoId?: Uuid | null;
   title: string | null;
   /** Markdown text of this agenda item. Each item has its own editor. */
   body?: string | null;
@@ -452,6 +466,10 @@ export interface CommentOutWire {
   at: IsoDateTime;
   /** True if the viewer wrote this comment. The server decides. It aligns the chat. */
   isOwn?: boolean;
+  /** When the text was last changed; null or absent for a comment never edited. */
+  editedAt?: IsoDateTime | null;
+  /** The files of the comment, oldest first; absent on an older server. */
+  attachments?: MessageAttachment[];
 }
 
 /** `ApplicationTypeListItem`. */
@@ -574,7 +592,7 @@ export interface ApplicationCreateBody {
 }
 
 /** Body for `POST /applications/{id}/comments` (`CommentCreate`). */
-export interface CommentCreateBody {
+export interface CommentCreateBody extends MessageFiles {
   body: string;
   visibility: CommentVisibility;
 }
@@ -752,6 +770,10 @@ export interface ApplicationComment {
   /** True if the viewer wrote this comment. Own messages go right, others left and gray. */
   isOwn: boolean;
   at: IsoDateTime;
+  /** When the text was last changed: the chat says "bearbeitet". */
+  editedAt?: IsoDateTime | null;
+  /** The files of the comment, oldest first. */
+  attachments: MessageAttachment[];
 }
 
 /** Application type, frontend view, for the wizard selection. */
@@ -828,6 +850,26 @@ export interface ApplicationVersion {
  *   on a finding or a quarantine. The metadata alone does not show this state.
  */
 export type ScanState = 'scanning' | 'clean' | 'quarantined';
+
+/**
+ * The file of a chat message (ticket note, card comment, application comment). The
+ * server sets `scanState`: only a `clean` file downloads, streamed through the API.
+ */
+export interface MessageAttachment {
+  id: Uuid;
+  filename: string;
+  mime: string;
+  size: number;
+  scanState: ScanState;
+}
+
+/** The files of a message create: draft ids of `POST /apply/attachments` and their token. */
+export interface MessageFiles {
+  /** At most 5. */
+  attachmentIds?: Uuid[];
+  /** Required with `attachmentIds`. */
+  draftToken?: string | null;
+}
 
 /** Attachment, frontend view. `isComparisonOffer` is camelCase. `scanState` is derived. */
 export interface Attachment {
@@ -1647,7 +1689,9 @@ export type SearchKind =
   | 'expense'
   | 'budget'
   | 'gremium'
-  | 'principal';
+  | 'principal'
+  | 'ticket'
+  | 'todo';
 
 /**
  * One row of the global search (`GET /api/search`).

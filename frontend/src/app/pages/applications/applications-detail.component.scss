@@ -307,9 +307,6 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-.ad__none--row {
-  padding: var(--space-4);
-}
 
 /* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at
    least 11rem wide, which holds a medium date in DE and EN on one line. A narrower pair
@@ -419,94 +416,29 @@
 }
 
 /* ------------------------------------------------------------------ comments */
-.ad__msg {
-  display: flex;
-  gap: var(--space-3);
-  padding: 12px var(--space-3) 12px var(--space-4);
+/* The column scrolls as a whole, so the log of the chat scrolls inside a bound. On a
+   phone the tab holds the chat alone: the log takes the view between the tabs and the
+   composer and scrolls inside, so it opens at the newest message and follows new ones. */
+.ad__chat {
+  --chat-log-max: min(60vh, 36rem);
 }
-.ad__msgBody {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+/* The tab fills the page down to the bottom navigation: the panel, its section and the
+   chat grow, and the chat reaches over the bottom padding of the page, so the composer bar
+   sits on the navigation and runs from edge to edge. */
+.ad__panel--chat:not([hidden]):has(.chat--phone) {
+  flex: 1 1 0;
+  min-height: 0;
 }
-.ad__msgHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 24px;
+.ad__panel--chat .ad__sec:has(.chat--phone) {
+  flex: 1 1 0;
+  min-height: 0;
 }
-.ad__msgAuthor {
-  flex: 1 1 auto;
-  font-weight: var(--fw-semibold);
-}
-.ad__msgActions {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-  margin-block: -6px;
-}
-.ad__msgMeta {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
-}
-.ad__msgDot {
-  color: var(--color-text-subtle);
-}
-.ad__msgPublic {
-  color: var(--color-primary);
-}
-.ad__msgText {
-  margin: 4px 0 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.ad__composer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-}
-.ad__composerInput {
-  /* Below 10rem the toggle and the send button wrap to a second line. */
-  flex: 1 1 10rem;
-  min-width: 0;
-  min-height: var(--control-height);
-  max-height: 12rem;
-  padding: 10px 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  line-height: 1.4;
-  /* A plain field as on the board: no resize grip. It grows with its text where the
-     browser can (`field-sizing`), up to the max height, and then scrolls. */
-  resize: none;
-  field-sizing: content;
-  overflow-y: auto;
-}
-/* The toggle and the send button. They never split: on the second line they align
-   right as one group. */
-.ad__composerActions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-}
-.ad__composerVis {
-  flex: none;
-}
-.ad__composerInput:focus-visible {
-  outline: none;
-}
-/* The ring marks the text field. The toggle draws its own focus ring. */
-.ad__composer:has(.ad__composerInput:focus-visible) {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+.ad__chat.chat--phone {
+  flex: 1 1 0;
+  margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
+  --chat-log-min: 12rem;
+  --chat-log-max: none;
+  --chat-composer-bleed: var(--space-4);
 }
 
 /* ------------------------------------------------------------------ dialogs */
@@ -547,35 +479,6 @@
   display: block;
   margin-top: var(--space-3);
 }
-.ad__commentEdit {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-
-  span {
-    color: var(--color-text-muted);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
-  }
-
-  textarea {
-    width: 100%;
-    resize: vertical;
-    padding: var(--space-2) var(--space-3);
-    border: 0;
-    border-radius: var(--radius-field);
-    background: var(--color-surface-3);
-    color: var(--color-text);
-    font: inherit;
-    line-height: 1.4;
-  }
-
-  textarea:focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 1px;
-  }
-}
-
 /* Same affordance as the 404 page: a way out, styled as a button. */
 .ad__backLink {
   display: inline-flex;

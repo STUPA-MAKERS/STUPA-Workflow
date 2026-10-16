@@ -23,6 +23,13 @@
 .fs__chip--md:not(.on) app-icon {
   color: var(--color-text-muted);
 }
+/* Only the icon: a square of the chip height. */
+.fs__chip--icon {
+  flex: none;
+  justify-content: center;
+  width: var(--control-height-sm);
+  padding: 0;
+}
 .fs__chip:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
@@ -30,6 +37,11 @@
 .fs__text {
   flex: 1 1 auto;
   max-width: 18rem;
+  /* A chip that is wider than its text keeps the text beside the icon or the avatar. */
+  text-align: start;
+}
+.fs__av {
+  flex: none;
 }
 .fs__chev {
   flex: none;

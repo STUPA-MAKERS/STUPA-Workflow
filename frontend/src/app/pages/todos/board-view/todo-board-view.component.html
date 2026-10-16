@@ -1,0 +1,152 @@
+<p class="sr-only" aria-live="assertive">{{ announce() }}</p>
+
+@if (phone()) {
+  <div class="bv bv--phone">
+    <app-tabs
+      class="bv__tabs"
+      idPrefix="bv"
+      [ariaLabel]="board().name"
+      [tabs]="tabs()"
+      [active]="phoneCol()?.id ?? null"
+      (activeChange)="selectPhoneColumn($event)"
+    />
+    @if (phoneCol(); as col) {
+      <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
+        @for (card of list(col); track card.id) {
+          <app-todo-card-tile
+            role="listitem"
+            [card]="card"
+            [labels]="labels()"
+            [done]="col.isDone"
+            [today]="today()"
+            (open)="openCard.emit(card.id)"
+          />
+        } @empty {
+          <p class="bv__empty">{{ 'todos.board.columnEmpty' | t }}</p>
+        }
+        @if (more(col) > 0) {
+          <button type="button" class="bv__more" (click)="expand(col)">
+            {{ 'todos.board.more' | t: { n: more(col) } }}
+          </button>
+        }
+      </div>
+      @if (columns().length > 1) {
+        <div class="bv__dots" aria-hidden="true">
+          @for (c of columns(); track c.id; let i = $index) {
+            <span class="bv__dot" [class.bv__dot--on]="c.id === col.id"></span>
+          }
+        </div>
+      }
+    }
+  </div>
+} @else {
+  <div class="bv" cdkDropListGroup cdkScrollable>
+    @for (col of columns(); track col.id; let ci = $index) {
+      <section class="bv__col" [attr.aria-labelledby]="'bv-col-' + col.id">
+        <header class="bv__head">
+          <h2 class="bv__name" [id]="'bv-col-' + col.id">
+            {{ col.name }}
+            <span class="bv__count num">{{ count(col) }}</span>
+          </h2>
+          @if (col.isDone) {
+            <span class="bv__doneTag">
+              <app-icon name="check" [size]="12" />
+              {{ 'todos.board.doneColumn' | t }}
+            </span>
+          }
+          @if (columnMenu(col).length) {
+            <app-row-menu
+              class="bv__menu"
+              [label]="'todos.column.menu' | t: { name: col.name }"
+              [sections]="columnMenu(col)"
+              (selected)="onColumnMenu(col, $event)"
+            />
+          }
+        </header>
+
+        <div class="bv__scroll" cdkScrollable>
+        <div
+          class="bv__cards"
+          cdkDropList
+          role="list"
+          [attr.aria-label]="col.name"
+          [id]="'bv-list-' + col.id"
+          [cdkDropListData]="col.id"
+          [cdkDropListDisabled]="!canWrite()"
+          (cdkDropListEntered)="onEnter($event)"
+          (cdkDropListDropped)="drop($event)"
+        >
+          @for (card of list(col); track card.id; let i = $index) {
+            <div
+              class="bv__item"
+              role="listitem"
+              cdkDrag
+              cdkDragPreviewClass="bv__preview"
+              [cdkDragData]="card.id"
+              [cdkDragDisabled]="!canWrite()"
+              (cdkDragStarted)="onDragStart(col)"
+              (cdkDragEnded)="ptr.set(null)"
+              (keydown)="onTileKey($event, card, ci, i)"
+            >
+              <app-todo-card-tile
+                [card]="card"
+                [labels]="labels()"
+                [done]="col.isDone"
+                [today]="today()"
+                [lifted]="kb()?.cardId === card.id"
+                (open)="openCard.emit(card.id)"
+              />
+            </div>
+          }
+        </div>
+
+        @if (col.isDone && (more(col) > 0 || board().archivedCount)) {
+          <p class="bv__doneFoot">
+            @if (more(col) > 0) {
+              <button type="button" class="bv__link" (click)="expand(col)">
+                {{ 'todos.board.more' | t: { n: more(col) } }}
+              </button>
+            }
+            @if (more(col) > 0 && board().archivedCount) {
+              <span aria-hidden="true">·</span>
+            }
+            @if (board().archivedCount) {
+              <button type="button" class="bv__link" (click)="archive.emit()">
+                {{ 'todos.board.archive' | t }}
+                <app-icon name="chevron-right" [size]="15" />
+              </button>
+            }
+          </p>
+        }
+
+        @if (canWrite() && !col.isDone) {
+          @if (adding() === col.id) {
+            <div class="bv__quick">
+              <textarea
+                class="bv__quickInput"
+                rows="2"
+                maxlength="300"
+                [attr.data-quick]="col.id"
+                [attr.aria-label]="'todos.board.quickTitle' | t: { column: col.name }"
+                [ngModel]="draft()"
+                (ngModelChange)="draft.set($event)"
+                (keydown)="onAddKey($event, col)"
+              ></textarea>
+              <div class="bv__quickFoot">
+                <app-button variant="fill" size="sm" [disabled]="!draft().trim()" (click)="submitAdd(col)">
+                  {{ 'todos.board.create' | t }}
+                </app-button>
+              </div>
+            </div>
+          } @else {
+            <button type="button" class="bv__add" [attr.aria-label]="'todos.board.addCard' | t" (click)="startAdd(col)">
+              <app-icon name="plus" [size]="16" />
+              {{ 'todos.new.short' | t }}
+            </button>
+          }
+        }
+        </div>
+      </section>
+    }
+  </div>
+}

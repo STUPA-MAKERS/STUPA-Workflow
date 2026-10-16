@@ -9,6 +9,8 @@ the problem-detail message of the platform where the platform sends one.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import quote
 
@@ -82,6 +84,37 @@ class ApiClient:
             headers["Authorization"] = f"Bearer {token}"
             resp = await self._client.request(method, path, headers=headers, **kwargs)
         return self._unwrap(resp)
+
+    @asynccontextmanager
+    async def stream(
+        self, method: str, path: str, **kwargs: Any
+    ) -> AsyncIterator[httpx.Response]:
+        """Open a streamed response, for a binary download that must not sit in memory.
+
+        The path, the bearer token and the one 401 retry work as in `request`. A status
+        of 400 or more reads the (small) error body and raises `ApiError`, so the caller
+        only ever iterates a successful body.
+        """
+        path = _safe_path(path)
+        token = await self._token()
+        headers = {"Authorization": f"Bearer {token}", **kwargs.pop("headers", {})}
+        async with self._client.stream(method, path, headers=headers, **kwargs) as resp:
+            if resp.status_code != 401:
+                await self._raise_for_status(resp)
+                yield resp
+                return
+        # The server rejected the token. Get a fresh credential and retry once.
+        token = await self._token(force_login=True)
+        headers["Authorization"] = f"Bearer {token}"
+        async with self._client.stream(method, path, headers=headers, **kwargs) as resp:
+            await self._raise_for_status(resp)
+            yield resp
+
+    @classmethod
+    async def _raise_for_status(cls, resp: httpx.Response) -> None:
+        if resp.status_code >= 400:
+            await resp.aread()
+            cls._unwrap(resp)
 
     @staticmethod
     def _unwrap(resp: httpx.Response) -> Any:

@@ -615,3 +615,23 @@ async def test_another_db_error_is_not_masked(recorded: list[dict[str, Any]]) ->
     no_code = _Session(_pair(), fail_on=1, fail_with=DBAPIError("UPDATE", {}, _PgError()))
     with pytest.raises(DBAPIError):
         await _svc(no_code).merge(OLD, NEW, actor="admin")
+
+
+def test_the_merge_moves_the_tickets_of_the_source() -> None:
+    """Reporter, assignee, note author and event actor of a ticket follow the merge."""
+    from typing import get_args
+
+    from app.modules.admin.schemas import MergeArea
+
+    assert "tickets" in AREAS
+    assert "tickets" in get_args(MergeArea)
+    columns = {str(col) for area, col in merge_mod.ID_COLUMNS if area == "tickets"}
+    assert columns == {
+        "Ticket.reporter_principal_id",
+        "Ticket.assignee_id",
+        "TicketNote.author_id",
+        "TicketEvent.actor_id",
+        "TicketSenderBlock.created_by",
+    }
+    # A block of the source moves to the target, unless the target has one.
+    assert merge_mod.TicketSenderBlock.principal_id in merge_mod.COMBINED_COLUMNS

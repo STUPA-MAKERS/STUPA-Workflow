@@ -1539,6 +1539,7 @@ def _agenda_item(
         id=uuid4(),
         meeting_id=uuid4(),
         application_id=application_id,
+        todo_id=None,
         title=title,
         body=body,
         position=position,

@@ -1,0 +1,154 @@
+<app-dialog
+  [open]="help.reportOpen()"
+  [title]="(sentNumber() ? 'help.report.sentTitle' : 'help.report.title') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  @if (sentNumber(); as number) {
+    <div #sentBox class="rd__sent" role="status" tabindex="-1">
+      <span class="rd__sentIcon" aria-hidden="true"><app-icon name="check" [size]="26" /></span>
+      <p class="rd__sentText">
+        {{ 'help.report.sentNumber' | t }} <span class="mono rd__number">{{ number }}</span>.
+        {{ 'help.report.sentMail' | t }}
+      </p>
+    </div>
+  } @else {
+    <form class="rd" (submit)="$event.preventDefault(); send()" (paste)="onPaste($event)">
+      <a class="rd__wiki" [href]="branding.wikiUrl()" target="_blank" rel="noopener">
+        <app-icon name="book" [size]="18" />
+        <span>{{ 'help.wiki' | t }}</span>
+        <app-icon name="ext" [size]="15" />
+      </a>
+
+      <app-segmented
+        width="fill"
+        [ariaLabel]="'tickets.kind.label' | t"
+        [options]="kindOptions()"
+        [value]="kind()"
+        (valueChange)="setKind($event)"
+      />
+
+      <app-input
+        name="title"
+        [label]="'help.report.titleLabel' | t"
+        [required]="true"
+        [error]="titleError()"
+        [ngModel]="title()"
+        (ngModelChange)="title.set($event)"
+      />
+
+      <label class="rd__field" [class.rd__field--error]="bodyMissing()" for="rd-body">
+        <span class="rd__label">{{ 'help.report.bodyLabel' | t }}</span>
+        <textarea
+          id="rd-body"
+          class="rd__textarea"
+          name="body"
+          rows="4"
+          required
+          [attr.aria-invalid]="bodyMissing() || null"
+          [ngModel]="body()"
+          (ngModelChange)="body.set($event)"
+        ></textarea>
+      </label>
+      @if (bodyMissing()) {
+        <p class="rd__fieldError" role="alert">{{ 'help.report.required' | t }}</p>
+      }
+
+      @if (anonymous()) {
+        <app-input
+          name="email"
+          type="email"
+          [label]="'help.report.email' | t"
+          [required]="true"
+          [error]="emailError()"
+          [ngModel]="email()"
+          (ngModelChange)="email.set($event)"
+        />
+        <app-altcha (solved)="onAltcha($event)" (unavailable)="onAltchaOff()" />
+      }
+
+      <div class="rd__files" role="group" aria-labelledby="rd-files-cap">
+        <span id="rd-files-cap" class="rd__cap">{{ 'help.report.files' | t }}</span>
+        <div class="rd__chips">
+          @for (file of files(); track file.id) {
+            <span class="rd__chip" [class.rd__chip--failed]="file.failed">
+              <app-icon [name]="file.mime.startsWith('image/') ? 'image' : 'file'" [size]="18" />
+              <span class="rd__chipText">
+                <span class="mono rd__chipName">{{ file.filename }}</span>
+                <span class="rd__chipSub">
+                  {{ fileType(file.filename) }}{{ size(file.size) }} ·
+                  {{ (file.failed ? 'apply.files.lost' : scanKey(file)) | t }}
+                </span>
+              </span>
+              <button
+                type="button"
+                class="rd__chipX"
+                [attr.aria-label]="'apply.files.remove' | t: { name: file.filename }"
+                (click)="removeFile(file)"
+              >
+                <app-icon name="x" [size]="16" />
+              </button>
+            </span>
+          }
+          @for (p of pending(); track p.key) {
+            <span class="rd__chip rd__chip--pending" role="status">
+              <span class="rd__spinner" aria-hidden="true"></span>
+              <span class="rd__chipText">
+                <span class="mono rd__chipName">{{ p.filename }}</span>
+                <span class="rd__chipSub">{{ 'apply.files.uploading' | t }}</span>
+              </span>
+            </span>
+          }
+          @if (!full()) {
+            <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">
+              <app-icon name="clip" [size]="16" />
+              {{ 'help.report.attach' | t }}
+            </app-button>
+          }
+        </div>
+        <input
+          #fileInput
+          class="rd__fileInput"
+          type="file"
+          multiple
+          tabindex="-1"
+          aria-hidden="true"
+          [accept]="accept"
+          (change)="onPicked($event)"
+        />
+      </div>
+
+      <details class="rd__ctx" open>
+        <summary class="rd__ctxHead">
+          <app-icon class="rd__ctxChev" name="down" [size]="16" />
+          {{ 'help.report.context' | t }}
+        </summary>
+        <dl class="rd__ctxList">
+          @for (row of contextRows(); track row.label) {
+            <div class="rd__ctxRow">
+              <dt>{{ row.label | t }}</dt>
+              <dd>{{ row.value }}</dd>
+            </div>
+          }
+        </dl>
+      </details>
+
+      @if (error(); as e) {
+        <p class="rd__error" role="alert">{{ e | t }}</p>
+      }
+      <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
+    </form>
+  }
+
+  @if (sentNumber()) {
+    <app-button dialog-footer variant="fill" (click)="cancel()">{{ 'action.close' | t }}</app-button>
+  } @else {
+    <ng-container ngProjectAs="[dialog-footer]">
+      <app-button variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+      <app-button variant="fill" [loading]="sending()" [disabled]="drafts.busy()" (click)="send()">
+        <app-icon name="send" [size]="16" />
+        {{ 'help.report.send' | t }}
+      </app-button>
+    </ng-container>
+  }
+</app-dialog>

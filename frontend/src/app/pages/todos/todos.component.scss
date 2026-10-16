@@ -1,0 +1,179 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.td {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+.td__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+/* ------------------------------------------------------------------ bar */
+.td__bar {
+  flex: none;
+}
+.td__barRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.td__search {
+  flex: 0 1 18.75rem;
+  min-width: 12rem;
+}
+.td__chips {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.td__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding-inline: var(--space-3);
+}
+.td__chips > * {
+  flex: none;
+}
+.td__reset {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.td__reset:hover {
+  background: var(--color-surface-2);
+}
+.td__reset:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+/* ------------------------------------------------------------------ body */
+.td__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.td__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+}
+.td__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------ phone */
+.td--phone .td__search,
+.td--phone .td__chips {
+  flex-basis: 100%;
+  max-width: none;
+}
+.td__fab {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-md);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.td__fab:hover {
+  filter: brightness(1.08);
+}
+.td__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ drawer */
+.td__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  background: var(--color-scrim);
+}
+.td__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  width: min(65rem, calc(100vw - var(--space-8)));
+  padding: 0 var(--space-6) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top-left-radius: var(--radius-xl);
+  border-bottom-left-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-elevated);
+  outline: 0;
+}
+.td__drawer > app-todo-card-detail {
+  flex: 1 1 auto;
+}
+/* Phone: the drawer is the page and ends on the bottom bar, which stays visible. */
+@include bp.phone {
+  .td__scrim,
+  .td__drawer {
+    bottom: var(--app-bottom-inset, 0px);
+  }
+  .td__drawer {
+    width: 100vw;
+    padding: var(--space-3) var(--space-4) 0;
+    border-radius: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .td__drawer {
+    animation: td-in 180ms ease-out;
+  }
+}
+@keyframes td-in {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+}

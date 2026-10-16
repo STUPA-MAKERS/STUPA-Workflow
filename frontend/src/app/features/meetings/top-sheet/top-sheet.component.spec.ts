@@ -5,6 +5,7 @@ import type { AgendaItem, Meeting, Protocol } from '@core/api/models';
 import { MarkdownEditorComponent } from '@stupa-makers/ui-kit/markdown-editor';
 import { AGENDA, meeting, protocol } from '../../../../testing/meeting-fixtures';
 import { type SaveState, TopSheetComponent } from './top-sheet.component';
+import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
 
 interface Inputs {
   meeting: Meeting;
@@ -39,7 +40,7 @@ async function setup(over: Partial<Inputs> = {}) {
       ...over,
     },
     on: { bodyChange, finalize, startRename, cancelRename, renameTop },
-    providers: [provideRouter([])],
+    providers: [provideRouter([]), NO_LINKED_TODOS],
   });
   return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop };
 }
@@ -50,6 +51,14 @@ function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorCompon
 }
 
 describe('TopSheetComponent', () => {
+  it('lists the to-dos linked to the item, and leaves them out of the participant view', async () => {
+    const { container, fixture } = await setup();
+    expect(container.querySelector('app-todo-linked-list')).not.toBeNull();
+    fixture.componentRef.setInput('follow', true);
+    fixture.detectChanges();
+    expect(container.querySelector('app-todo-linked-list')).toBeNull();
+  });
+
   it('names the item, its kind and the save state', async () => {
     await setup();
     expect(screen.getByText('TOP 1')).toBeInTheDocument();

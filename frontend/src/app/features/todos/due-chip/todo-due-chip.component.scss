@@ -1,0 +1,28 @@
+:host {
+  display: inline-flex;
+  min-width: 0;
+}
+.dc {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.dc__chip {
+  gap: 6px;
+}
+.dc__chev {
+  color: var(--color-text-muted);
+}
+/* The native field gives only its calendar; it sits under the chip, invisible. */
+.dc__native {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}

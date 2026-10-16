@@ -1,0 +1,574 @@
+/* The host is a flex column: the log takes the space, the composer stays below it.
+   A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole) or
+   gives the host a height (a sheet), moves the pinned phone composer with
+   `--chat-composer-bottom`, carries its surface further down with
+   `--chat-composer-foot` and out over the side padding of the page with
+   `--chat-composer-bleed`; `--chat-composer-surface` is the fill of that bar. `--chat-bubble` is the fill of the messages of others. */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+/* The delete dialog and the phone menu open in the top layer. Out of the flow, their
+   hosts add no gap below the composer. */
+:host > app-dialog,
+:host > app-side-sheet {
+  position: absolute;
+}
+
+/* ------------------------------------------------------------------ log */
+.chat__logWrap {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Desktop: a rounded outline frames the log; no rule above the composer, no fade. */
+.chat__log {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 10px;
+  min-height: var(--chat-log-min, 10rem);
+  max-height: var(--chat-log-max, none);
+  padding: 12px var(--space-4) 14px;
+  /* Nothing in a message may scroll the log sideways. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+.chat__log:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+/* The content sits at the bottom while it is shorter than the log. */
+.chat__log > :first-child {
+  margin-top: auto;
+}
+/* Phone: the log runs edge to edge. */
+:host(.chat--phone) .chat__log {
+  padding: 4px 0 12px;
+  border: 0;
+  border-radius: 0;
+}
+
+.chat__sep {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 4px 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.chat__sep::before,
+.chat__sep::after {
+  flex: 1 1 0;
+  height: 1px;
+  background: var(--color-border);
+  content: '';
+}
+.chat__sep--new {
+  color: var(--color-primary);
+  font-weight: var(--fw-semibold);
+}
+.chat__sep--new::before,
+.chat__sep--new::after {
+  background: var(--color-accent);
+}
+.chat__event {
+  margin: 0;
+  padding: 2px 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.chat__dot {
+  padding: 0 6px;
+}
+.chat__empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  text-align: center;
+}
+
+/* ------------------------------------------------------------------ messages */
+.chat__row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+/* A group is tight; a new group keeps the gap of the log. */
+.chat__row:not(.chat__row--head) {
+  margin-top: -6px;
+}
+.chat__row--own {
+  justify-content: flex-end;
+}
+.chat__av,
+.chat__avSpace {
+  flex: none;
+  width: 32px;
+}
+/* The avatar sits beside the last bubble, above the time line. */
+.chat__row--tail .chat__av {
+  margin-bottom: 22px;
+}
+.chat__col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  max-width: 74%;
+}
+:host(.chat--phone) .chat__col {
+  max-width: 100%;
+}
+.chat__row--own .chat__col {
+  align-items: flex-end;
+}
+.chat__name {
+  padding-left: 2px;
+  color: var(--color-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.chat__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+.chat__bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 14px;
+  border-radius: 6px 16px 16px 6px;
+  /* A chat on a surface-2 sheet sets `--chat-bubble` one step up. */
+  background: var(--chat-bubble, var(--color-surface-2));
+  color: var(--color-text);
+}
+.chat__row--head .chat__bubble {
+  border-top-left-radius: 16px;
+}
+.chat__row--tail .chat__bubble {
+  border-bottom-left-radius: 4px;
+}
+.chat__row--own .chat__bubble {
+  border-radius: 16px 6px 6px 16px;
+  background: var(--color-accent-container);
+  color: var(--color-on-accent-container);
+}
+.chat__row--own.chat__row--head .chat__bubble {
+  border-top-right-radius: 16px;
+}
+.chat__row--own.chat__row--tail .chat__bubble {
+  border-bottom-right-radius: 4px;
+}
+/* Internal where a thread holds both kinds: a warning outline, no fill. */
+.chat__row .chat__bubble--internal {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--color-warning) 70%, transparent);
+  color: var(--color-text);
+}
+.chat__bubble--failed {
+  opacity: 0.75;
+}
+.chat__mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.chat__mark--internal {
+  color: var(--color-warning);
+}
+.chat__mark--public {
+  color: var(--color-primary);
+}
+.chat__text {
+  font-size: var(--fs-body);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.chat__text ::ng-deep {
+  p,
+  ul,
+  ol,
+  pre,
+  blockquote {
+    margin: 0;
+  }
+  * + p,
+  * + ul,
+  * + ol,
+  * + pre,
+  * + blockquote {
+    margin-top: 6px;
+  }
+  ul,
+  ol {
+    padding-left: 1.25rem;
+  }
+  a {
+    color: inherit;
+    text-decoration: underline;
+    overflow-wrap: anywhere;
+  }
+  code {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.92em;
+  }
+  pre {
+    white-space: pre-wrap;
+  }
+}
+.chat__files {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+/* A file is a tile: a type icon, the name in mono and "PNG · 96 KB" under it. */
+.chat__file {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  padding: 6px var(--space-3) 6px 6px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  color: inherit;
+  text-decoration: none;
+}
+.chat__file:hover .chat__fileName {
+  text-decoration: underline;
+}
+.chat__fileIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: var(--color-text-muted);
+}
+/* A file in the scan or in quarantine: the same tile, no link. */
+.chat__file--off {
+  cursor: default;
+}
+.chat__fileText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.chat__fileName {
+  font-size: var(--fs-small);
+  overflow-wrap: anywhere;
+}
+.chat__fileMeta {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+.chat__meta {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 6px;
+  padding-left: 2px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.chat__meta .chat__dot {
+  padding: 0;
+}
+.chat__failed {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-danger);
+  font-weight: var(--fw-semibold);
+}
+.chat__retry {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.chat__retry:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Edit and delete of an own message: visible on hover or focus. */
+/* The actions float over the top edge of the bubble, at its end: inside the bubble's
+   width, so they never leave the log, and absolute, so the hidden pill takes no width. */
+.chat__line {
+  position: relative;
+}
+.chat__acts {
+  position: absolute;
+  inset-block-start: -16px;
+  inset-inline-end: 0;
+  z-index: 1;
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+/* Over a message of another person (a moderator) the actions sit at the bubble's start,
+   so a short bubble does not push them over the avatar. */
+.chat__row:not(.chat__row--own) .chat__acts {
+  inset-inline-end: auto;
+  inset-inline-start: 0;
+}
+.chat__row:hover .chat__acts,
+.chat__acts:focus-within {
+  opacity: 1;
+}
+/* The message the actions belong to carries an accent edge while they show. */
+.chat__line:has(.chat__acts):hover .chat__bubble,
+.chat__line:has(.chat__acts:focus-within) .chat__bubble {
+  box-shadow: inset 0 0 0 1.5px var(--color-accent);
+}
+.chat__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: min(100%, 18rem);
+}
+.chat__editInput {
+  min-height: var(--control-height);
+  max-height: calc(6 * 1.45em + 18px);
+  padding: 9px 14px;
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.45;
+  resize: none;
+  field-sizing: content;
+  overflow-y: auto;
+}
+.chat__editInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.chat__editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.chat__pill {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+.chat__pill:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ composer */
+.chat__composer {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* Phone: a pinned bar above the bottom navigation, on its own surface. */
+:host(.chat--phone) .chat__composer {
+  position: sticky;
+  bottom: var(--chat-composer-bottom, var(--app-bottom-inset, 0px));
+  z-index: 2;
+  margin-inline: calc(-1 * var(--chat-composer-bleed, 0px));
+  padding: 12px var(--chat-composer-bleed, 0px);
+  border-top: 1px solid var(--color-border);
+  background: var(--chat-composer-surface, var(--color-surface));
+  /* A consumer whose chat ends the page carries the surface down to the navigation. */
+  box-shadow: 0 var(--chat-composer-foot, 0px) 0 0 var(--chat-composer-surface, var(--color-surface));
+}
+.chat__box {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  min-height: 52px;
+  padding: 6px 6px 6px 18px;
+  border-radius: 26px;
+  background: var(--color-surface-3);
+}
+.chat__box:has(.chat__input:focus-visible) {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+/* Grows with its text up to 6 lines, then scrolls. */
+.chat__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 40px;
+  max-height: calc(6 * 1.4em + 18px);
+  padding: 9px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.4;
+  resize: none;
+  field-sizing: content;
+  overflow-y: auto;
+}
+.chat__input:focus-visible {
+  outline: none;
+}
+.chat__send,
+.chat__attach {
+  flex: none;
+}
+.chat__attach {
+  color: var(--color-text-muted);
+}
+.chat__fileInput {
+  display: none;
+}
+
+/* The files of the composer: a chip per file above the text box. */
+.chat__drafts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chat__draft {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 100%;
+  min-height: 48px;
+  padding: 6px var(--space-1) 6px 6px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+}
+.chat__draft--pending {
+  padding-inline-end: var(--space-4);
+}
+.chat__draftX {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.chat__draftX:hover {
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  color: var(--color-text);
+}
+.chat__draftX:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.chat__spinner {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+}
+.chat__spinner::before {
+  content: '';
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--color-border-strong);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: chat-spin 0.8s linear infinite;
+}
+@keyframes chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat__spinner::before {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------ phone menu */
+.chat__menu {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-2);
+}
+.chat__menuItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  height: 52px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: left;
+  cursor: pointer;
+}
+.chat__menuItem:hover {
+  background: var(--color-surface-3);
+}
+.chat__menuItem:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.chat__menuItem--danger {
+  color: var(--color-danger);
+}

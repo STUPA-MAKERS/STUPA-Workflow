@@ -14,12 +14,29 @@
  */
 export { AvatarComponent, AvatarStackComponent, initials } from './avatar/avatar.component';
 export type { AvatarSize } from './avatar/avatar.component';
+export { ChatComponent } from './chat/chat.component';
+export { ChatDrafts } from './chat/chat-drafts';
+export { ChatOutbox, draftDropper, filesRefused, missingFiles, sendErrorKey } from './chat/chat-outbox';
+export { CHAT_MAX_FILES, appendOnce, chatFileUrl, toChatAttachments, withScanStates } from './chat/chat.util';
+export type {
+  ChatAttachment,
+  ChatEdit,
+  ChatEvent,
+  ChatMessage,
+  ChatMessageState,
+  ChatRef,
+  ChatSend,
+  ChatVisibility,
+} from './chat/chat.models';
 export { DateBlockComponent } from './date-block/date-block.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';
 export { FileDropZoneComponent, acceptsFile } from './file-drop-zone/file-drop-zone.component';
 export { FilterSelectComponent } from './filter-select/filter-select.component';
-export type { FilterSelectOption } from './filter-select/filter-select.component';
+export type {
+  FilterSelectOption,
+  FilterSelectPerson,
+} from './filter-select/filter-select.component';
 export { HistoryComponent } from './history/history.component';
 export type { HistoryChange, HistoryEntry } from './history/history.component';
 export {

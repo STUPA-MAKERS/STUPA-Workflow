@@ -5,6 +5,7 @@ import { RouterTestingHarness } from '@angular/router/testing';
 import { of, throwError } from 'rxjs';
 import { screen, within } from '@testing-library/angular';
 import { ApiClient } from '@core/api/api-client.service';
+import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { ApplicationListItem } from '@core/api/models';
 import { ApplicationsPageService } from '../applications/applications-page.service';
@@ -44,6 +45,34 @@ const THREE = [
 interface Opts {
   tasksError?: boolean;
   typesError?: boolean;
+  todos?: TodoMineItem[];
+  todosError?: boolean;
+}
+
+function todo(id: string, extra: Partial<TodoMineItem> = {}): TodoMineItem {
+  return {
+    id,
+    boardId: 'b-1',
+    columnId: 'c-1',
+    rank: 'a',
+    title: `To-Do ${id}`,
+    dueDate: null,
+    completedAt: null,
+    labelIds: [],
+    assignees: [],
+    checklist: { done: 0, total: 0 },
+    commentCount: 0,
+    primaryLink: null,
+    linkCount: 0,
+    version: 1,
+    createdAt: '2026-09-01T10:00:00Z',
+    updatedAt: '2026-09-01T10:00:00Z',
+    boardName: 'Studierendenparlament',
+    boardKind: 'gremium',
+    columnName: 'Offen',
+    labels: [],
+    ...extra,
+  };
 }
 
 /**
@@ -61,6 +90,11 @@ async function start(url: string, answers: ApplicationListItem[][], opts: Opts =
   const applicationTypes = opts.typesError
     ? jest.fn(() => throwError(() => new Error('boom')))
     : jest.fn(() => of([{ id: 't1', name: 'Förderantrag' }]));
+  const mine = jest.fn(() =>
+    opts.todosError
+      ? throwError(() => new Error('boom'))
+      : of({ items: opts.todos ?? [], dueSoonCount: 0 }),
+  );
   TestBed.configureTestingModule({
     providers: [
       provideRouter([
@@ -69,11 +103,13 @@ async function start(url: string, answers: ApplicationListItem[][], opts: Opts =
           component: TasksComponent,
           children: [
             { path: '', component: TasksNoneComponent },
+            { path: 'todo/:cardId', component: DetailStub },
             { path: ':id', component: DetailStub },
           ],
         },
       ]),
       { provide: ApiClient, useValue: { listTasks, applicationTypes } },
+      { provide: TodosApiService, useValue: { mine } },
     ],
   });
   const harness = await RouterTestingHarness.create();
@@ -86,7 +122,7 @@ async function start(url: string, answers: ApplicationListItem[][], opts: Opts =
     harness.detectChanges();
   };
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { harness, cmp: cmp as any, router, pageService, listTasks, applicationTypes, settle };
+  return { harness, cmp: cmp as any, router, pageService, listTasks, applicationTypes, settle, mine };
 }
 
 describe('TasksComponent', () => {
@@ -311,4 +347,100 @@ describe('TasksComponent', () => {
     // Without a currency the amount is in euro. Intl puts a no-break space before the sign.
     expect(c.money(task('x', { amount: '10', currency: null }))).toBe('10,00 €');
   });
+
+  describe('To-Dos', () => {
+    const TODOS = [
+      todo('k-1', { title: 'Protokoll gegenlesen', dueDate: '2026-10-03' }),
+      todo('k-2', { title: 'Raum buchen', dueDate: '2026-10-05' }),
+      todo('k-3', { title: 'Bus anfragen', dueDate: '2026-10-20', boardName: 'Fachschaft Informatik' }),
+      todo('k-4', { title: 'Steuer abholen', boardName: 'Meine To-Dos' }),
+    ];
+
+    it('lists my To-Dos below the applications with headings, counts and due dates', async () => {
+      await start('/tasks', [THREE], { todos: TODOS });
+      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 3');
+      expect(screen.getByRole('heading', { name: /^To-Dos/ })).toHaveTextContent('To-Dos 4');
+      const link = screen.getByRole('link', { name: 'Raum buchen' });
+      expect(link).toHaveAttribute('href', '/tasks/todo/k-2');
+      expect(screen.getByText('Fachschaft Informatik')).toBeInTheDocument();
+      expect(screen.getByText('03.10. · überfällig')).toHaveAttribute('data-tone', 'overdue');
+      expect(screen.getByText('05.10. · morgen')).toHaveAttribute('data-tone', 'soon');
+      expect(screen.getByText('20.10.')).toHaveAttribute('data-tone', 'normal');
+      expect(screen.getByText('ohne Datum')).toBeInTheDocument();
+    });
+
+    it('shows one group with "Anzeigen" and filters the To-Dos by due date', async () => {
+      const { cmp, harness } = await start('/tasks', [THREE], { todos: TODOS });
+      expect(cmp.showText()).toBe('Anzeigen: Alles');
+      cmp.setShow('todos');
+      harness.detectChanges();
+      expect(screen.queryByTestId('tasks-apps-head')).toBeNull();
+      expect(screen.queryByRole('link', { name: 'Erster' })).toBeNull();
+      cmp.setShow('applications');
+      harness.detectChanges();
+      expect(screen.queryByRole('heading', { name: /^To-Dos/ })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Erster' })).toBeInTheDocument();
+      cmp.setShow('odd');
+      expect(cmp.show()).toBe('all');
+      expect(cmp.dueText()).toBe('Fällig');
+      cmp.setDue('overdue');
+      harness.detectChanges();
+      expect(cmp.dueText()).toBe('Überfällig');
+      expect(cmp.todoRows().map((r: { item: TodoMineItem }) => r.item.id)).toEqual(['k-1']);
+      cmp.setDue('none');
+      expect(cmp.todoRows().map((r: { item: TodoMineItem }) => r.item.id)).toEqual(['k-4']);
+      cmp.setDue('week');
+      expect(cmp.todoRows()).toHaveLength(2);
+      cmp.setDue('odd');
+      expect(cmp.due()).toBe('');
+      cmp.todos.set([todo('k-9', { dueDate: '2026-12-24' })]);
+      cmp.setDue('overdue');
+      harness.detectChanges();
+      expect(screen.getByText('Keine To-Dos passen zu den Filtern.')).toBeInTheDocument();
+    });
+
+    it('shows the applications again when the last To-Do goes away under "Anzeigen: To-Dos"', async () => {
+      const { cmp, harness, mine } = await start('/tasks', [THREE], { todos: [TODOS[0]!] });
+      cmp.setShow('todos');
+      harness.detectChanges();
+      expect(screen.queryByRole('link', { name: 'Erster' })).toBeNull();
+      mine.mockReturnValueOnce(of({ items: [], dueSoonCount: 0 }) as never);
+      cmp.loadTodos();
+      harness.detectChanges();
+      expect(cmp.hasTodos()).toBe(false);
+      expect(cmp.showApplications()).toBe(true);
+      expect(screen.getByRole('link', { name: 'Erster' })).toBeInTheDocument();
+    });
+
+    it('shows the To-Dos without applications and the none pane asks to pick', async () => {
+      await start('/tasks', [[]], { todos: TODOS });
+      expect(screen.getByTestId('tasks-apps-head')).toHaveTextContent('Anträge 0');
+      expect(screen.getAllByText('Keine offenen Aufgaben.').length).toBeGreaterThan(0);
+      expect(screen.getByText('Keine Aufgabe geöffnet')).toBeInTheDocument();
+    });
+
+    it('opens a To-Do in the right pane and marks its row', async () => {
+      const { cmp } = await start('/tasks/todo/k-2', [THREE], { todos: TODOS });
+      expect(cmp.selectedTodo()).toBe('k-2');
+      expect(cmp.selectedId()).toBeNull();
+      expect(cmp.detailOpen()).toBe(true);
+      expect(screen.getByText('detail')).toBeInTheDocument();
+    });
+
+    it('leaves the group out when the To-Dos fail and drops a late answer', async () => {
+      const { cmp, mine } = await start('/tasks', [THREE], { todosError: true });
+      expect(cmp.hasTodos()).toBe(false);
+      expect(screen.queryByTestId('tasks-apps-head')).toBeNull();
+      const { Subject } = await import('rxjs');
+      const late = new Subject<{ items: TodoMineItem[]; dueSoonCount: number }>();
+      mine.mockReturnValueOnce(late as never);
+      cmp.loadTodos();
+      mine.mockReturnValueOnce(of({ items: TODOS, dueSoonCount: 0 }) as never);
+      cmp.loadTodos();
+      late.next({ items: [], dueSoonCount: 0 });
+      late.error(new Error('x'));
+      expect(cmp.todos()).toHaveLength(4);
+    });
+  });
 });
+

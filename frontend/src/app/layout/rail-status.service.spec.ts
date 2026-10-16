@@ -33,6 +33,7 @@ const MEMBER: Principal = {
 
 const TASKS = '/api/applications/tasks';
 const TIMELINE = '/api/meetings/timeline';
+const MINE = '/api/todos/mine';
 
 const meeting = (status: string) => ({
   id: 'm1',
@@ -69,8 +70,9 @@ function signIn(env: ReturnType<typeof setup>, principal: Principal = MEMBER): v
   TestBed.tick();
 }
 
-/** Answer one round of the two requests. */
-function answer(env: ReturnType<typeof setup>, tasks: number, status = 'planned'): void {
+/** Answer one round of the requests; `due` is the dueSoonCount of my To-Dos. */
+function answer(env: ReturnType<typeof setup>, tasks: number, status = 'planned', due = 0): void {
+  env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: due });
   env.http.expectOne((r) => r.url === TASKS).flush(Array.from({ length: tasks }, (_, i) => ({ id: `t${i}` })));
   env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [meeting(status)], nextCursor: null });
 }
@@ -91,6 +93,9 @@ describe('RailStatusService', () => {
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    const mine = env.http.expectOne((r) => r.url === MINE);
+    expect(mine.request.context.get(SKIP_LOADING)).toBe(true);
+    mine.flush({ items: [], dueSoonCount: 0 });
     const tasks = env.http.expectOne((r) => r.url === TASKS);
     const timeline = env.http.expectOne((r) => r.url === TIMELINE);
     expect(tasks.request.context.get(SKIP_LOADING)).toBe(true);
@@ -107,6 +112,7 @@ describe('RailStatusService', () => {
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 0 });
     env.http.expectOne((r) => r.url === TASKS).flush([]);
     const first = env.http.expectOne((r) => r.url === TIMELINE);
     expect(first.request.params.get('cursor')).toBeNull();
@@ -123,6 +129,7 @@ describe('RailStatusService', () => {
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 0 });
     env.http.expectOne((r) => r.url === TASKS).flush([]);
     for (let i = 0; i < LIVE_MAX_PAGES; i++) {
       env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [meeting('planned')], nextCursor: `c${i}` });
@@ -136,6 +143,7 @@ describe('RailStatusService', () => {
     const env = setup();
     signIn(env, { ...MEMBER, gremien: [] } as Principal);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 0 });
     env.http.expectOne((r) => r.url === TASKS).flush([]);
     env.http.expectNone((r) => r.url === TIMELINE);
     expect(env.svc.taskCount()).toBe(0);
@@ -200,6 +208,7 @@ describe('RailStatusService', () => {
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 1 });
     env.http.expectOne((r) => r.url === TASKS).flush(null, { status: 500, statusText: 'Error' });
     env.http.expectOne((r) => r.url === TIMELINE).flush(null, { status: 500, statusText: 'Error' });
     expect(env.svc.taskCount()).toBeNull();
@@ -223,5 +232,56 @@ describe('RailStatusService', () => {
     TestBed.tick();
     expect(env.svc.taskCount()).toBeNull();
     expect(env.svc.live()).toBe(false);
+  });
+
+  it('counts the new tickets only with ticket.manage, and forgets them at sign-out', () => {
+    const env = setup();
+    signIn(env, { ...MEMBER, permissions: ['ticket.manage'] } as Principal);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    const counts = env.http.expectOne((r) => r.url === '/api/tickets/counts');
+    expect(counts.request.context.get(SKIP_LOADING)).toBe(true);
+    counts.flush({ new: 2, inProgress: 1, done: 0, rejected: 0 });
+    answer(env, 1);
+    expect(env.svc.ticketCount()).toBe(2);
+
+    // A failed count shows no badge, the other marks stay.
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({}, { status: 500, statusText: 'x' });
+    answer(env, 4);
+    expect(env.svc.ticketCount()).toBeNull();
+    expect(env.svc.taskCount()).toBe(4);
+
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === '/api/tickets/counts').flush({ new: 5, inProgress: 0, done: 0, rejected: 0 });
+    answer(env, 4);
+    env.auth.handleUnauthorized();
+    TestBed.tick();
+    expect(env.svc.ticketCount()).toBeNull();
+  });
+
+  it('does not ask for the tickets without ticket.manage', () => {
+    const env = setup();
+    signIn(env);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    answer(env, 0);
+    env.http.expectNone((r) => r.url === '/api/tickets/counts');
+    expect(env.svc.ticketCount()).toBeNull();
+  });
+
+  it('adds my To-Dos due within 7 days to the task count; a failed read counts 0', () => {
+    const env = setup();
+    signIn(env);
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    answer(env, 2, 'planned', 3);
+    expect(env.svc.taskCount()).toBe(5);
+
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === MINE).flush(null, { status: 403, statusText: 'Forbidden' });
+    env.http.expectOne((r) => r.url === TASKS).flush([{ id: 'a' }]);
+    env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [], nextCursor: null });
+    expect(env.svc.taskCount()).toBe(1);
   });
 });

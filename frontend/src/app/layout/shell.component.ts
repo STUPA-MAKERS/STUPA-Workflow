@@ -7,6 +7,8 @@ import { PrefetchService } from '@core/cache/prefetch.service';
 import { SwUpdatePromptComponent } from '@core/pwa/sw-update-prompt.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { LoadingOverlayComponent, MEDIA, ToastComponent } from '@stupa-makers/ui-kit';
+import { HelpService } from '../features/help/help.service';
+import { ReportDialogComponent } from '../features/help/report-dialog/report-dialog.component';
 import { CommandPaletteComponent } from '../features/search/command-palette.component';
 import { BottomBarComponent } from './bottom-bar/bottom-bar.component';
 import { mediaQuerySignal } from './media-query';
@@ -47,6 +49,7 @@ export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
     SwUpdatePromptComponent,
     LoadingOverlayComponent,
     CommandPaletteComponent,
+    ReportDialogComponent,
     NavRailComponent,
     BottomBarComponent,
     PublicHeaderComponent,
@@ -62,6 +65,7 @@ export class ShellComponent {
   private readonly prefetch = inject(PrefetchService);
 
   readonly auth = inject(AuthService);
+  readonly help = inject(HelpService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 

@@ -1,0 +1,550 @@
+@use '../todo-labels' as lbl;
+
+@include lbl.colors;
+
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cd {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.cd--state {
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+}
+.cd__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------ head */
+.cd__head {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+.cd__back {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: 2px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.cd__boardLink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-end: var(--space-2);
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.cd__boardLink:hover {
+  text-decoration: underline;
+}
+.cd__title {
+  margin: 0;
+  font-size: 1.625rem;
+  font-weight: var(--fw-bold);
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+.cd__titleForm,
+.cd__itemForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cd__titleInput,
+.cd__itemInput {
+  flex: 1 1 14rem;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font: inherit;
+}
+.cd__titleInput {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+.cd__titleInput:focus-visible,
+.cd__itemInput:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.cd__created {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.cd__note {
+  margin-top: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ columns */
+.cd__cols {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 1.75rem;
+  min-height: 0;
+  padding-top: var(--space-5);
+}
+.cd__col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+.cd__col--details {
+  gap: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* The column reaches 10px past the content edge, so the end buttons below and the
+     scrollbar have room there without a sideways scroll. */
+  margin-inline-end: -10px;
+  padding-inline-end: 10px;
+}
+/* An icon or text button at the end of a row lines its glyph up with the content edge. */
+.cd__secHead > app-button {
+  margin-inline-end: calc(-1 * var(--space-2));
+}
+.cd__secHead > app-button.cd__secEnd--icon {
+  margin-inline-end: -10px;
+}
+:host(:not(.cd--phone):not(.cd--pane)) .cd__head app-sheet-bar {
+  margin-inline-end: -10px;
+}
+.cd__col--chat .cd__chat {
+  flex: 1 1 auto;
+}
+/* The pane of "Aufgaben" scrolls as a whole; the thread keeps a bounded height. */
+:host(.cd--pane) .cd__chat {
+  --chat-log-max: max(20rem, calc(100dvh - 21.5rem));
+}
+/* The thread column is as tall as its thread, so the composer follows the log. */
+:host(.cd--pane) .cd__col--chat {
+  align-self: start;
+}
+
+.cd__secTitle {
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.cd__secTitle--accent {
+  margin-bottom: var(--space-3);
+  font-size: 0.84375rem;
+  color: var(--color-accent-text);
+}
+.cd__sec {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.cd__secHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 36px;
+}
+
+/* ------------------------------------------------------------------ fields */
+.cd__fields {
+  display: grid;
+  /* The values start on one line, a label column of at least 5.25rem. */
+  grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
+  gap: var(--space-3) var(--space-5);
+  margin: 0;
+}
+.cd__field {
+  display: contents;
+}
+.cd__field dt {
+  padding-top: 7px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.cd__field dd {
+  margin: 0;
+  min-width: 0;
+}
+.cd__chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.cd__person,
+.cd__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 1px 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-regular);
+}
+.cd__label {
+  gap: 5px;
+  padding-inline-start: 10px;
+}
+.cd__chips .cd__x {
+  width: 22px;
+  height: 22px;
+}
+.cd__dot {
+  @include lbl.dot;
+}
+.cd__muted {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.cd__x {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.cd__x:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.cd__x:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+/* ------------------------------------------------------------------ links */
+.cd__pickerAnchor {
+  position: relative;
+}
+/* The picker floats over the head of its section, as wide as the column. */
+.cd__pickerAnchor {
+  height: 0;
+  margin-bottom: calc(-1 * var(--space-2));
+}
+.cd__picker {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: var(--z-dropdown);
+}
+.cd__links {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cd__linkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 6px var(--space-3);
+  border-radius: 0;
+  background: var(--color-surface-2);
+}
+.cd__linkRow:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.cd__linkRow:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+.cd__linkIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.cd__linkText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.cd__linkTitle {
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+a.cd__linkTitle:hover {
+  text-decoration: underline;
+}
+.cd__linkTitle--muted {
+  color: var(--color-text-muted);
+}
+.cd__linkSub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+/* A row with a target ends with a chevron. Where a pointer can hover, the remove button
+   takes the place of the chevron on hover and while the row holds the focus; on a touch
+   screen the remove button stays, because there is no hover to reveal it. */
+.cd__linkChev {
+  flex: none;
+  color: var(--color-text-muted);
+}
+@media (hover: hover) {
+  .cd__linkX {
+    display: none;
+  }
+  .cd__linkRow:hover .cd__linkX,
+  .cd__linkRow:focus-within .cd__linkX {
+    display: grid;
+  }
+  .cd__linkRow:hover .cd__linkChev,
+  .cd__linkRow:focus-within .cd__linkChev {
+    display: none;
+  }
+}
+@media (hover: none) {
+  .cd__linkChev {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------------------ description */
+.cd__desc {
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.cd__area {
+  display: block;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+}
+.cd__area:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+}
+.cd__areaInput {
+  display: block;
+  width: 100%;
+  min-height: 7rem;
+  padding: var(--space-3);
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.375rem;
+  resize: vertical;
+}
+.cd__formFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ checklist */
+.cd__progress {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.cd__bar-track {
+  width: 64px;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--color-surface-3);
+}
+.cd__bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+.cd__items {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.cd__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding-inline-end: var(--space-1);
+  border-radius: var(--radius-md);
+}
+.cd__item:hover {
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+}
+.cd__item .cd__itemForm {
+  flex: 1 1 auto;
+}
+.cd__check {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.cd__check:disabled {
+  cursor: default;
+}
+.cd__check:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.cd__check app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.cd__itemText {
+  overflow-wrap: anywhere;
+}
+.cd__item--done .cd__itemText {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+.cd__item--done .cd__check app-icon {
+  color: var(--color-accent-text);
+}
+.cd__itemActions {
+  display: inline-flex;
+  flex: none;
+}
+@media (hover: hover) {
+  .cd__itemActions {
+    opacity: 0;
+  }
+  .cd__item:hover .cd__itemActions,
+  .cd__itemActions:focus-within {
+    opacity: 1;
+  }
+}
+.cd__toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.cd__toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+/* ------------------------------------------------------------------ phone */
+.cd__tabs {
+  flex: none;
+  margin-top: var(--space-2);
+}
+/* Two tabs of equal width that fill the row. */
+.cd__tabs ::ng-deep .tabs {
+  gap: 0;
+}
+.cd__tabs ::ng-deep .tabs__tab {
+  flex: 1 1 0;
+  justify-content: center;
+}
+:host(.cd--phone) .cd__title {
+  font-size: var(--fs-h1);
+}
+.cd__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-top: var(--space-4);
+}
+.cd__panel[hidden] {
+  display: none;
+}
+:host(.cd--phone) .cd__head {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+/* Under the back link the kicker line needs only the height of its 40px buttons. */
+:host(.cd--phone) .cd__head app-sheet-bar {
+  min-height: 40px;
+}
+/* The tab "Aktivität" fills the drawer down to the bottom navigation: the log takes the
+   height between the tabs and the composer and scrolls inside, so it opens at the newest
+   message, and the composer bar sits on the navigation. */
+:host(.cd--phone) .cd__panel--chat:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 0;
+}
+:host(.cd--phone) .cd__chat {
+  flex: 1 1 auto;
+  --chat-log-min: 12rem;
+  --chat-log-max: none;
+  --chat-composer-bottom: 0px;
+  --chat-composer-bleed: var(--space-4);
+}
+.cd__bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+  padding: var(--space-3) 0;
+  background: var(--color-surface);
+}

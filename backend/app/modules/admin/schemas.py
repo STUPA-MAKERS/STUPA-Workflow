@@ -14,7 +14,12 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.modules.admin.branding import Branding
+from app.modules.admin.branding import (
+    DEFAULT_WIKI_URL,
+    Branding,
+    PublicBranding,
+    check_http_url,
+)
 from app.modules.admin.cd_logos import CdBaseVariant, LogoSlot, RenderSlot, VendoredLogoName
 from app.modules.applications.models import (
     DEFAULT_CONFIRM_TTL_HOURS,
@@ -489,6 +494,8 @@ MergeArea = Literal[
     "sessions",
     "memberships",
     "calendar",
+    "tickets",
+    "todos",
 ]
 
 # A real conflict blocks the merge. Each kind names a rule that the merged data would
@@ -829,6 +836,38 @@ class AttachmentLimitsOut(_CamelModel):
     max_draft_bytes: int = Field(serialization_alias="maxDraftBytes")
 
 
+class PublicHelpOut(_CamelModel):
+    """The public part of the help settings: the handbook link."""
+
+    wiki_url: str = Field(serialization_alias="wikiUrl")
+
+
+class PublicTicketsOut(_CamelModel):
+    """The public part of the ticket settings: may a person without a session report."""
+
+    public_enabled: bool = Field(serialization_alias="publicEnabled")
+
+
+class HelpTicketsSettings(BaseModel):
+    """The admin page "Hilfe & Tickets" (``GET``/``PUT /admin/help-tickets``).
+
+    ``wikiUrl`` takes http(s) only. ``retentionMonths`` is 1..120 or null (never
+    anonymize).
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    wiki_url: str = Field(default=DEFAULT_WIKI_URL, alias="wikiUrl", max_length=2048)
+    public_enabled: bool = Field(default=True, alias="publicEnabled")
+    notify_new: bool = Field(default=True, alias="notifyNew")
+    retention_months: int | None = Field(default=12, alias="retentionMonths", ge=1, le=120)
+
+    @field_validator("wiki_url")
+    @classmethod
+    def _http_only(cls, v: str) -> str:
+        return check_http_url(v)
+
+
 class PublicSiteConfigOut(_CamelModel):
     """Public (auth-free) active branding config for frontend rendering.
 
@@ -836,11 +875,12 @@ class PublicSiteConfigOut(_CamelModel):
     confirmation page of the wizard shows it. ``linkTtlDays`` is the lifetime of a
     new magic link in days; null means that the link does not expire. The
     confirmation page and the status page show it. ``attachmentLimits`` holds the
-    upload limits of the wizard.
+    upload limits of the wizard. ``help`` and ``tickets`` hold the public part of the
+    help and ticket settings; ``branding`` omits both.
     """
 
     version: int
-    branding: Branding
+    branding: PublicBranding
     confirm_ttl_hours: int = Field(
         default=DEFAULT_CONFIRM_TTL_HOURS, serialization_alias="confirmTtlHours"
     )
@@ -848,6 +888,8 @@ class PublicSiteConfigOut(_CamelModel):
     attachment_limits: AttachmentLimitsOut | None = Field(
         default=None, serialization_alias="attachmentLimits"
     )
+    help: PublicHelpOut | None = None
+    tickets: PublicTicketsOut | None = None
 
 
 # The API caps the link lifetime at ten years. A larger value adds nothing, and a

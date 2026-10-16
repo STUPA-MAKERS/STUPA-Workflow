@@ -1,0 +1,436 @@
+@if (loading()) {
+  <div class="cd cd--state" aria-busy="true">
+    <app-skeleton variant="lines" [count]="6" [label]="'todos.card.loading' | t" />
+  </div>
+} @else if (notFound()) {
+  <div class="cd cd--state">
+    <app-empty-state icon="circleok" [heading]="'todos.card.notFound' | t" />
+    @if (mode() === 'drawer') {
+      <app-button variant="text" (click)="closed.emit()">{{ 'todos.card.back' | t }}</app-button>
+    }
+  </div>
+} @else if (error()) {
+  <div class="cd cd--state">
+    <p class="cd__error" role="alert">{{ 'todos.card.error' | t }}</p>
+    <app-button variant="tonal" (click)="reload()">{{ 'todos.card.retry' | t }}</app-button>
+  </div>
+} @else if (card(); as card) {
+  <article class="cd" aria-labelledby="cd-title">
+    <header class="cd__head">
+      @if (phone() && mode() === 'drawer') {
+        <button type="button" class="cd__back" (click)="closed.emit()">
+          <app-icon name="chevron-left" [size]="18" />
+          {{ 'todos.card.back' | t }}
+        </button>
+      }
+      <app-sheet-bar [kicker]="kicker()" [bleed]="mode() === 'pane'">
+        @if (mode() === 'pane' && boardLink(); as link) {
+          <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
+            {{ 'todos.card.openInBoard' | t }}
+            <app-icon name="arrow" [size]="16" />
+          </a>
+        }
+        @if (!phone() && mode() === 'drawer') {
+          <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.copyLink' | t" (click)="copyLink()">
+            <app-icon name="link" [size]="19" />
+          </app-button>
+        }
+        @if (menuSections().length) {
+          <app-row-menu [label]="'todos.card.menu' | t" [sections]="menuSections()" (selected)="onMenu($event)" />
+        }
+        @if (mode() === 'drawer' && !phone()) {
+          <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
+            <app-icon name="x" [size]="20" />
+          </app-button>
+        }
+      </app-sheet-bar>
+
+      @if (editingTitle()) {
+        <h2 id="cd-title" class="sr-only">{{ card.title }}</h2>
+        <form class="cd__titleForm" (submit)="$event.preventDefault(); saveTitle()">
+          <input
+            class="cd__titleInput"
+            name="title"
+            maxlength="300"
+            [attr.aria-label]="'todos.card.titleLabel' | t"
+            [ngModel]="titleDraft()"
+            (ngModelChange)="titleDraft.set($event)"
+            (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); editingTitle.set(false)"
+          />
+          <app-button variant="text" (click)="editingTitle.set(false)">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="fill" [loading]="busy()" [disabled]="!titleDraft().trim()" (click)="saveTitle()">
+            {{ 'action.save' | t }}
+          </app-button>
+        </form>
+      } @else {
+        <h2 id="cd-title" class="cd__title">{{ card.title }}</h2>
+      }
+      <p class="cd__created">{{ createdLine() }}</p>
+      @if (archivedLine(); as day) {
+        <app-note class="cd__note" icon="archive">{{ 'todos.card.archivedOn' | t: { date: day } }}</app-note>
+      }
+    </header>
+
+    @if (phone()) {
+      <app-tabs
+        #tabBar
+        class="cd__tabs"
+        idPrefix="cd"
+        [ariaLabel]="card.title"
+        [tabs]="tabs()"
+        [active]="tab()"
+        (activeChange)="selectTab($event ?? 'details')"
+      />
+      <section
+        class="cd__panel"
+        role="tabpanel"
+        [id]="tabBar.panelId('details')"
+        [attr.aria-labelledby]="tabBar.tabId('details')"
+        [hidden]="tab() !== 'details'"
+      >
+        <ng-container *ngTemplateOutlet="details; context: { $implicit: card }" />
+      </section>
+      <section
+        class="cd__panel cd__panel--chat"
+        role="tabpanel"
+        [id]="tabBar.panelId('activity')"
+        [attr.aria-labelledby]="tabBar.tabId('activity')"
+        [hidden]="tab() !== 'activity'"
+      >
+        <ng-container *ngTemplateOutlet="activity" />
+      </section>
+      @if (canWrite() && tab() === 'details') {
+        <div class="cd__bar">
+          <app-button class="btn-block" variant="tonal" [disabled]="busy()" (click)="moveOpen.set(true)">
+            <app-icon name="swap" [size]="17" />
+            {{ 'todos.card.move' | t }}
+          </app-button>
+          <app-button class="btn-block" variant="fill" [disabled]="busy()" (click)="toggleDone()">
+            <app-icon [name]="isDone() ? 'undo' : 'check'" [size]="17" />
+            {{ (isDone() ? 'todos.card.reopen' : 'todos.card.done') | t }}
+          </app-button>
+        </div>
+      }
+    } @else {
+      <div class="cd__cols">
+        <section class="cd__col cd__col--chat" aria-labelledby="cd-activity">
+          <h3 id="cd-activity" class="sec cd__secTitle cd__secTitle--accent">{{ 'todos.card.activity' | t }}</h3>
+          <ng-container *ngTemplateOutlet="activity" />
+        </section>
+        <div class="cd__col cd__col--details">
+          <ng-container *ngTemplateOutlet="details; context: { $implicit: card }" />
+        </div>
+      </div>
+    }
+  </article>
+
+  <app-todo-move-sheet
+    [(open)]="moveOpen"
+    [columns]="moveColumns()"
+    [current]="card.columnId"
+    [cardTitle]="card.title"
+    (moved)="moveTo($event)"
+  />
+}
+
+<ng-template #activity>
+  <app-chat
+    class="cd__chat"
+    [draftKey]="'todo.' + cardId()"
+    [messages]="messages()"
+    [events]="events()"
+    [canPost]="canWrite()"
+    [canAttach]="canWrite()"
+    placeholder="todos.card.commentPlaceholder"
+    (send)="sendComment($event)"
+    (retry)="retryComment($event)"
+    (discard)="discardComment($event)"
+    (edit)="editComment($event)"
+    (delete)="deleteComment($event)"
+    (refresh)="refreshComments()"
+  />
+</ng-template>
+
+<ng-template #details let-card>
+  <dl class="cd__fields">
+    <div class="cd__field">
+      <dt>{{ 'todos.card.column' | t }}</dt>
+      <dd>
+        @if (canWrite()) {
+          <app-filter-select
+            [label]="'todos.card.column' | t"
+            [options]="columnOptions()"
+            [value]="card.columnId"
+            (valueChange)="setColumn($event)"
+          />
+        } @else {
+          {{ columnName() }}
+        }
+      </dd>
+    </div>
+    <div class="cd__field">
+      <dt>{{ 'todos.card.assignees' | t }}</dt>
+      <dd class="cd__chips">
+        @for (person of card.assignees; track person.principalId ?? $index) {
+          <span class="cd__person">
+            <app-avatar size="xs" [name]="name(person)" [principalId]="person.principalId" [decorative]="true" />
+            <span>{{ name(person) }}</span>
+            @if (canWrite() && person.principalId) {
+              <button
+                type="button"
+                class="cd__x"
+                [attr.aria-label]="'todos.card.removeAssignee' | t: { name: name(person) }"
+                (click)="removeAssignee(person.principalId)"
+              >
+                <app-icon name="x" [size]="13" />
+              </button>
+            }
+          </span>
+        }
+        @if (canWrite()) {
+          <app-filter-select
+            icon="plus"
+            [chevron]="false"
+            [iconOnly]="true"
+            [label]="'todos.card.addAssignee' | t"
+            [options]="memberOptions()"
+            [emptyText]="'todos.card.noMembers' | t"
+            (valueChange)="addAssignee($event)"
+          />
+        } @else if (!card.assignees.length) {
+          <span class="cd__muted">{{ 'todos.card.nobody' | t }}</span>
+        }
+      </dd>
+    </div>
+    <div class="cd__field">
+      <dt>{{ 'todos.card.due' | t }}</dt>
+      <dd class="cd__chips">
+        <app-todo-due-chip [value]="card.dueDate" [disabled]="!canWrite()" (changed)="setDue($event)" />
+        @if (dueRelative()) {
+          <span class="cd__muted">{{ dueRelative() }}</span>
+        }
+      </dd>
+    </div>
+    <div class="cd__field">
+      <dt>{{ 'todos.card.labels' | t }}</dt>
+      <dd class="cd__chips">
+        @for (label of card.labels; track label.id) {
+          <span class="cd__label" [attr.data-color]="label.color">
+            <span class="cd__dot" aria-hidden="true"></span>
+            {{ label.name }}
+            @if (canWrite()) {
+              <button
+                type="button"
+                class="cd__x"
+                [attr.aria-label]="'todos.card.removeLabel' | t: { name: label.name }"
+                (click)="removeLabel(label.id)"
+              >
+                <app-icon name="x" [size]="13" />
+              </button>
+            }
+          </span>
+        }
+        @if (canWrite()) {
+          <app-filter-select
+            icon="plus"
+            [chevron]="false"
+            [label]="'todos.card.addLabel' | t"
+            [text]="'todos.card.label' | t"
+            [options]="labelOptions()"
+            [emptyText]="'todos.card.noLabels' | t"
+            (valueChange)="addLabel($event)"
+          />
+        }
+      </dd>
+    </div>
+  </dl>
+
+  <section class="cd__sec" aria-labelledby="cd-links">
+    <div class="cd__pickerAnchor">
+      <app-todo-link-picker
+        class="cd__picker"
+        [(open)]="pickerOpen"
+        [excludeCardId]="card.id"
+        [linked]="linkedKeys()"
+        (picked)="pickLink($event)"
+      />
+    </div>
+    <div class="cd__secHead">
+      <h3 id="cd-links" class="cd__secTitle">{{ 'todos.card.links' | t }}</h3>
+      @if (canWrite()) {
+        <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+          <app-icon name="plus" [size]="16" />
+          {{ 'todos.card.link' | t }}
+        </app-button>
+      }
+    </div>
+    @if (card.links.length) {
+      <ul class="cd__links">
+        @for (link of card.links; track link.id) {
+          <li class="cd__linkRow">
+            <app-icon class="cd__linkIcon" [name]="linkIcon(link)" [size]="18" />
+            <span class="cd__linkText">
+              @if (link.url) {
+                <a class="cd__linkTitle" [routerLink]="route(link.url).path" [queryParams]="route(link.url).query">{{ linkTitle(link) }}</a>
+              } @else {
+                <span class="cd__linkTitle cd__linkTitle--muted">{{ linkTitle(link) }}</span>
+              }
+              <span class="cd__linkSub">{{ linkSub(link) }}</span>
+            </span>
+            @if (link.url) {
+              <app-icon class="cd__linkChev" name="chevron-right" [size]="16" />
+            }
+            @if (canWrite()) {
+              <button
+                type="button"
+                class="cd__x cd__linkX"
+                [attr.aria-label]="'todos.card.unlink' | t: { title: linkTitle(link) }"
+                (click)="removeLink(link)"
+              >
+                <app-icon name="x" [size]="14" />
+              </button>
+            }
+          </li>
+        }
+      </ul>
+    }
+  </section>
+
+  <section class="cd__sec" aria-labelledby="cd-desc">
+    <div class="cd__secHead">
+      <h3 id="cd-desc" class="cd__secTitle">{{ 'todos.card.description' | t }}</h3>
+      @if (canWrite() && !editingDesc()) {
+        <app-button
+          class="cd__secEnd--icon"
+          data-focus="desc-edit"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'todos.card.editDescription' | t"
+          (click)="startDesc()"
+        >
+          <app-icon name="edit" [size]="18" />
+        </app-button>
+      }
+    </div>
+    @if (editingDesc()) {
+      <label class="cd__area">
+        <span class="sr-only">{{ 'todos.card.description' | t }}</span>
+        <textarea
+          class="cd__areaInput"
+          data-focus="desc-input"
+          rows="6"
+          maxlength="20000"
+          [ngModel]="descDraft()"
+          (ngModelChange)="descDraft.set($event)"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelDesc()"
+        ></textarea>
+      </label>
+      <div class="cd__formFoot">
+        <app-button variant="text" (click)="cancelDesc()">{{ 'action.cancel' | t }}</app-button>
+        <app-button variant="fill" [loading]="busy()" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
+      </div>
+    } @else if (card.descriptionMd) {
+      <app-markdown-view class="cd__desc" [src]="card.descriptionMd" />
+    }
+  </section>
+
+  <section class="cd__sec" aria-labelledby="cd-check">
+    <div class="cd__secHead">
+      <h3 id="cd-check" class="cd__secTitle">{{ 'todos.card.checklist' | t }}</h3>
+      @if (items().length) {
+        <span class="cd__progress">
+          <span class="num">{{ doneItems().length }}/{{ items().length }}</span>
+          <span class="cd__bar-track" aria-hidden="true"><span class="cd__bar-fill" [style.width.%]="progress()"></span></span>
+        </span>
+      }
+    </div>
+    <ul class="cd__items">
+      @if (showDone()) {
+        @for (item of doneItems(); track item.id) {
+          <ng-container *ngTemplateOutlet="itemRow; context: { $implicit: item }" />
+        }
+      }
+      @for (item of openItems(); track item.id) {
+        <ng-container *ngTemplateOutlet="itemRow; context: { $implicit: item }" />
+      }
+    </ul>
+    @if (doneItems().length) {
+      <button type="button" class="cd__toggle" [attr.aria-expanded]="showDone()" (click)="showDone.set(!showDone())">
+        <app-icon [name]="showDone() ? 'up' : 'down'" [size]="15" />
+        {{ (showDone() ? 'todos.card.hideDone' : 'todos.card.showDone') | t: { n: doneItems().length } }}
+      </button>
+    }
+    @if (canWrite()) {
+      @if (addingItem()) {
+        <form class="cd__itemForm" (submit)="$event.preventDefault(); addItem()">
+          <input
+            class="cd__itemInput"
+            data-focus="item-new"
+            name="item"
+            maxlength="500"
+            [attr.aria-label]="'todos.card.newItem' | t"
+            [ngModel]="itemDraft()"
+            (ngModelChange)="itemDraft.set($event)"
+            (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelItem()"
+          />
+          <app-button variant="text" (click)="cancelItem()">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="fill" [disabled]="!itemDraft().trim()" (click)="addItem()">{{ 'todos.card.addItem' | t }}</app-button>
+        </form>
+      } @else {
+        <button type="button" class="cd__toggle" data-focus="item-add" (click)="startAddItem()">
+          <app-icon name="plus" [size]="15" />
+          {{ 'todos.card.addItem' | t }}
+        </button>
+      }
+    }
+  </section>
+</ng-template>
+
+<ng-template #itemRow let-item>
+  <li class="cd__item" [class.cd__item--done]="item.done">
+    @if (editingItem() === item.id) {
+      <form class="cd__itemForm" (submit)="$event.preventDefault(); renameItem(item)">
+        <input
+          class="cd__itemInput"
+          data-focus="item-edit"
+          name="itemEdit"
+          maxlength="500"
+          [attr.aria-label]="'todos.card.itemText' | t"
+          [ngModel]="itemEditDraft()"
+          (ngModelChange)="itemEditDraft.set($event)"
+          (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelRename(item)"
+        />
+        <app-button variant="fill" size="sm" (click)="renameItem(item)">{{ 'action.save' | t }}</app-button>
+      </form>
+    } @else {
+      <button
+        type="button"
+        class="cd__check"
+        role="checkbox"
+        [attr.data-item]="item.id"
+        [attr.aria-checked]="item.done"
+        [disabled]="!canWrite()"
+        (click)="toggleItem(item)"
+      >
+        <app-icon [name]="item.done ? 'check' : 'box'" [size]="17" />
+        <span class="cd__itemText">{{ item.text }}</span>
+      </button>
+      @if (canWrite()) {
+        <span class="cd__itemActions">
+          <button
+            type="button"
+            class="cd__x"
+            [attr.data-rename]="item.id"
+            [attr.aria-label]="'todos.card.renameItem' | t: { text: item.text }"
+            (click)="startItem(item)"
+          >
+            <app-icon name="edit" [size]="15" />
+          </button>
+          <button type="button" class="cd__x" [attr.aria-label]="'todos.card.deleteItem' | t: { text: item.text }" (click)="deleteItem(item)">
+            <app-icon name="trash" [size]="15" />
+          </button>
+        </span>
+      }
+    }
+  </li>
+</ng-template>

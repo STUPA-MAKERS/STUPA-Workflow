@@ -32,6 +32,7 @@ from app.modules.applications.schemas import (
     VersionOut,
 )
 from app.modules.auth.principal import Applicant, Principal
+from app.modules.files.schemas import MessageAttachmentOut
 from app.shared.paging import Page
 
 _NOW = datetime(2026, 6, 5, tzinfo=UTC)
@@ -206,13 +207,24 @@ class _FakeService:
         return {}, {}
 
     async def add_comment(  # noqa: ANN001
-        self, application_id, *, author, author_kind, body, visibility, allow_unconfirmed=True
+        self,
+        application_id,
+        *,
+        author,
+        author_kind,
+        body,
+        visibility,
+        allow_unconfirmed=True,
+        attachment_ids=(),
+        draft_token=None,
+        pepper="",
     ):
         self.comment_args = {
             "author": author,
             "author_kind": author_kind,
             "visibility": visibility,
         }
+        self.comment_files = (list(attachment_ids), draft_token, pepper)
         return CommentOut(
             id=uuid4(),
             author=author,
@@ -220,6 +232,13 @@ class _FakeService:
             body=body,
             visibility=visibility,
             at=_NOW,
+            attachments=[
+                MessageAttachmentOut(
+                    id=aid, filename=f"f{i}.pdf", mime="application/pdf", size=1,
+                    scan_state="scanning",
+                )
+                for i, aid in enumerate(attachment_ids)
+            ],
         )
 
     async def list_comments(  # noqa: ANN001
@@ -276,6 +295,7 @@ class _FakeService:
         viewer_is_applicant,
         can_manage,
         allow_unconfirmed=True,
+        files=None,
     ):
         self.comment_write_args = {
             "comment_id": comment_id,
@@ -283,6 +303,7 @@ class _FakeService:
             "viewer_sub": viewer_sub,
             "viewer_is_applicant": viewer_is_applicant,
             "can_manage": can_manage,
+            "files": files,
         }
 
 
@@ -840,6 +861,42 @@ def test_comment_principal_internal_ok(
     }
 
 
+def test_comment_with_files_only_mails_the_file_names(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    mails: list[tuple[object, ...]] = []
+
+    async def _record(*args: object) -> None:
+        mails.append(args)
+
+    app.dependency_overrides[get_comment_mail_sender] = lambda: _record
+    _as_principal(app, "application.read")
+    ids = [uuid4(), uuid4()]
+    r = client.post(
+        f"/api/applications/{uuid4()}/comments",
+        json={
+            "body": "",
+            "visibility": "public",
+            "attachmentIds": [str(i) for i in ids],
+            "draftToken": "tok",
+        },
+    )
+    assert r.status_code == 201
+    assert [a["scanState"] for a in r.json()["attachments"]] == ["scanning", "scanning"]
+    assert fake_service.comment_files[:2] == (ids, "tok")
+    assert fake_service.comment_files[2]
+    assert mails[0][5] == "f0.pdf, f1.pdf"
+
+
+def test_comment_needs_a_text_or_a_file(app: FastAPI, client: TestClient) -> None:
+    _as_principal(app, "application.read")
+    r = client.post(f"/api/applications/{uuid4()}/comments", json={"body": "  "})
+    assert r.status_code == 422
+    assert r.json()["errors"][0]["field"] == "body"
+    too_many = {"body": "x", "attachmentIds": [str(uuid4()) for _ in range(6)]}
+    assert client.post(f"/api/applications/{uuid4()}/comments", json=too_many).status_code == 422
+
+
 def test_comment_applicant_internal_forbidden(app: FastAPI, client: TestClient) -> None:
     app_id = uuid4()
     _as_applicant(app, app_id, "view")
@@ -1000,6 +1057,7 @@ def test_delete_comment_204(
     assert r.status_code == 204
     assert fake_service.comment_write_args is not None
     assert fake_service.comment_write_args["comment_id"] == cid
+    assert fake_service.comment_write_args["files"] is not None
 
 
 def test_delete_comment_requires_read_access_403(app: FastAPI, client: TestClient) -> None:

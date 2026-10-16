@@ -10,10 +10,11 @@ import {
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { catchError, forkJoin, of } from 'rxjs';
 import { FormlyForm, type FormlyFieldConfig } from '@ngx-formly/core';
 import { ApiClient } from '@core/api/api-client.service';
+import { API_BASE_URL } from '@core/api/api.config';
 import { LOCATION } from '@core/browser/location.token';
 import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -42,6 +43,10 @@ import { flowColorKind } from '@shared/status-kind.util';
 import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
+import { ChatComponent } from '@shared/ui/chat/chat.component';
+import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
+import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
+import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
@@ -78,8 +83,8 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
  * config loaded, and as the current setting: the verify response has no expiry of the
  * link).
  *
- * The comment composer sends on Enter; Shift+Enter makes a line break, as in the
- * chat of the internal detail page.
+ * The comments run in `app-chat`, the same chat as on the internal detail page. The
+ * applicant writes public comments only, and edits or deletes an own comment.
  */
 @Component({
   selector: 'app-status-timeline',
@@ -94,6 +99,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     HistoryComponent,
     RowMenuComponent,
     SideSheetComponent,
+    ChatComponent,
     StatusTextComponent,
     ButtonComponent,
     DialogComponent,
@@ -110,6 +116,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
 })
 export class StatusTimelineComponent {
   private readonly api = inject(ApiClient);
+  private readonly apiBase = inject(API_BASE_URL);
   private readonly location = inject(LOCATION);
   private readonly branding = inject(BrandingService);
   private readonly i18n = inject(I18nService);
@@ -146,11 +153,18 @@ export class StatusTimelineComponent {
   /** Magic-link scope: `view` locks editing regardless of status (old links only). */
   private readonly editScope = signal(true);
 
-  readonly commentBody = new FormControl('', {
-    nonNullable: true,
-    validators: [Validators.required],
-  });
-  readonly postingComment = signal(false);
+  /** Optimistic send: a new comment shows at once, the server answer replaces it. */
+  private readonly outbox = new ChatOutbox<ApplicationComment>(
+    (req) => this.api.addComment(this.application()?.id ?? '', req.body, 'public', req),
+    (created) => this.comments.update((list) => appendOnce(list, created)),
+    (err) => this.toast.error(this.i18n.translate(sendErrorKey(err, 'status.toast.commentFailed'))),
+    draftDropper(this.api),
+  );
+  /** The comments as chat messages, the pending ones last. */
+  readonly chatMessages = computed<ChatMessage[]>(() => [
+    ...this.comments().map((c) => this.toChatMessage(c)),
+    ...this.outbox.messages(),
+  ]);
 
   /** GDPR Art. 17: request anonymization of one's own application data. */
   readonly confirmErase = signal(false);
@@ -344,6 +358,21 @@ export class StatusTimelineComponent {
     }
   }
 
+  /**
+   * Read the comments again in the background, for the scan state of their files. Only
+   * the scan states change, because the read can be older than a send, an edit or a
+   * delete. A failure keeps the thread as it is; an answer for another application is
+   * dropped.
+   */
+  protected refreshComments(appId: Uuid): void {
+    this.api.comments(appId, { quiet: true }).subscribe({
+      next: (comments) => {
+        if (this.application()?.id === appId) this.comments.update((list) => withScanStates(list, comments));
+      },
+      error: () => undefined,
+    });
+  }
+
   private load(appId: Uuid): void {
     if (!appId) {
       this.phase.set('error');
@@ -405,6 +434,20 @@ export class StatusTimelineComponent {
       });
     }
     return note;
+  }
+
+  /** A comment as a chat message. The applicant view carries no account id, so the
+   *  others show initials. */
+  private toChatMessage(comment: ApplicationComment): ChatMessage {
+    return {
+      id: comment.id,
+      author: { principalId: null, displayName: this.authorName(comment) },
+      body: comment.body,
+      at: comment.at,
+      editedAt: comment.editedAt,
+      own: comment.isOwn,
+      attachments: toChatAttachments(this.apiBase, comment.attachments),
+    };
   }
 
   /** Display name of a comment: "Du" for the own ones, else the author or the Gremium. */
@@ -541,21 +584,51 @@ export class StatusTimelineComponent {
     });
   }
 
-  addComment(): void {
+  /** The applicant writes public comments only; the files go along. */
+  sendComment(req: ChatSend): void {
+    const comment: ChatSend = { ...req };
+    delete comment.visibility;
+    this.outbox.send(comment);
+  }
+
+  retryComment(ref: ChatRef): void {
+    this.outbox.retry(ref.id);
+  }
+
+  discardComment(ref: ChatRef): void {
+    this.outbox.discard(ref.id);
+  }
+
+  /** Translation key for a failed comment change. 403 and 404 read as reasons. */
+  private commentErrorKey(status: number | undefined): TranslationKey {
+    if (status === 403) return 'applications.comments.forbidden';
+    if (status === 404) return 'applications.comments.gone';
+    return 'status.toast.commentFailed';
+  }
+
+  editComment(change: ChatEdit): void {
     const app = this.application();
-    if (!app || this.commentBody.invalid || this.postingComment()) return;
-    const body = this.commentBody.value.trim();
-    if (!body) return;
-    this.postingComment.set(true);
-    this.api.addComment(app.id, body).subscribe({
-      next: () => {
-        this.commentBody.reset();
-        this.postingComment.set(false);
-        this.api.comments(app.id, { quiet: true }).subscribe((c) => this.comments.set(c));
+    if (!app) return;
+    this.api.updateComment(app.id, change.id, change.body).subscribe({
+      next: (updated) => {
+        this.comments.update((list) => list.map((c) => (c.id === updated.id ? updated : c)));
       },
-      error: () => {
-        this.postingComment.set(false);
-        this.toast.error(this.i18n.translate('status.toast.commentFailed'));
+      error: (err: { status?: number }) => {
+        change.restore?.();
+        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
+      },
+    });
+  }
+
+  deleteComment(ref: ChatRef): void {
+    const app = this.application();
+    if (!app) return;
+    this.api.deleteComment(app.id, ref.id).subscribe({
+      next: () => {
+        this.comments.update((list) => list.filter((c) => c.id !== ref.id));
+      },
+      error: (err: { status?: number }) => {
+        this.toast.error(this.i18n.translate(this.commentErrorKey(err.status)));
       },
     });
   }

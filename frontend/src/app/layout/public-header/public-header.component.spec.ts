@@ -82,4 +82,11 @@ describe('PublicHeaderComponent', () => {
     expect(i18n.locale()).toBe('en');
     expect(location.reload).toHaveBeenCalled();
   });
+
+  it('offers the help menu with the handbook', async () => {
+    const { fixture } = await setup();
+    await userEvent.click(screen.getByRole('button', { name: 'Hilfe' }));
+    fixture.detectChanges();
+    expect(screen.getByRole('link', { name: /Handbuch im Wiki/ })).toHaveAttribute('target', '_blank');
+  });
 });

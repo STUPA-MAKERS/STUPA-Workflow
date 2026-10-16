@@ -18,11 +18,12 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `queue.py` — `MailQueue` protocol. `ArqMailQueue` (enqueues the `send_mail` job, `_job_id = idempotency_key` → dedup) or `DirectMailQueue` (inline, tests).
 - `provider.py` — best-effort arq pool lifecycle. `mail_queue_from_pool` returns None when there is no Redis.
 - `layout.py` — `render_layout` branded HTML wrapper (optional `action_url` button) + per-kind footer reason text + `text_to_html`/`_linkify` + `append_link_text`.
-- `links.py` — `MailLink` (url + target → label DE/EN) and the URL builders: `application_link` (`/applications/{id}`, a guest applicant `/antrag/{id}`), `task_link` (`/tasks/{id}`), `meeting_link`, `protocol_link` (`/meetings/{id}`), `public_protocol_url` (`/protokolle/{id}`), `privacy_admin_link`.
+- `links.py` — `MailLink` (url + target → label DE/EN) and the URL builders: `application_link` (`/applications/{id}`, a guest applicant `/antrag/{id}`), `task_link` (`/tasks/{id}`), `meeting_link`, `protocol_link` (`/meetings/{id}`), `public_protocol_url` (`/protokolle/{id}`), `privacy_admin_link`, `ticket_link` (`/tickets/{id}`).
 - `action_dispatcher.py` — `NotificationActionDispatcher` implements the flow `ActionDispatcher`. It handles `notify` + `taskNotify` and logs other action types. `flow.dispatch.build_worker_dispatcher` builds it for the API and the worker.
 - `auto.py` — `AutoMailer` background best-effort mails: meeting created, delegation granted/revoked. The role mails (`role_assigned`/`role_revoked`) are gone: since the OIDC-only memberships no route assigns a role, so nothing sent them (F10).
 - `comments.py` — `send_comment_notifications` (applicant↔team, #4-1). The mail to the applicant names the Gremium of the application as the author, never the member (A12, O16). Only the team mail uses the display name.
 - `privacy.py` — GDPR erasure mails (requested/executed/rejected).
+- `tickets.py` — `ticket_created` (holders of `ticket.manage`, while `tickets.notifyNew`) and `ticket_received` (confirmation to the reporter; its kind is not in `NOTIFICATION_KINDS`, so it cannot be switched off). See be-tickets.
 - `captured.py` — `notify_application_captured`: the mail `application_captured` to the applicant of an application captured on their behalf (#11). An account gets the normal link `/applications/{id}`, a guest a magic link through `auth.service.request_magic_link`. Idempotency key = the application. Its kind is not in `NOTIFICATION_KINDS`, so nobody can switch it off (like `magic_link`).
 - `models.py` — SQLAlchemy tables. `router.py`/`schemas.py` — API + camelCase DTOs.
 
@@ -31,7 +32,7 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `notification_preference` (`NotificationPreference`): PK `(principal_id, kind)`, `enabled`. Opt-out store: the table holds only deviations from the all-enabled default. `kind ∈ NOTIFICATION_KINDS`.
 - `notification_settings` (`NotificationSettings`): single row (`CheckConstraint id=1`), `task_reminder_enabled`, `task_reminder_after_days` (≥1), `task_reminder_repeat_days` (≥0, 0=once per state stay).
 - `task_reminder_log` (`TaskReminderLog`): PK `application_id`, `status_event_id` (binds the reminder to a state stay, a state change restarts the count), `reminded_at`.
-- `NOTIFICATION_KINDS`: status_update, comment, task, task_reminder, meeting, delegation, protocol, deadline, privacy. The kinds `vote` and `role_change` are removed, because no code sent them (F10). Migration `1a9feecb23a5` deleted their stored preferences and the `role_assigned`/`role_revoked` overrides. A save of them gives 422.
+- `NOTIFICATION_KINDS`: status_update, comment, task, task_reminder, meeting, delegation, protocol, deadline, privacy, ticket_created. The kinds `vote` and `role_change` are removed, because no code sent them (F10). Migration `1a9feecb23a5` deleted their stored preferences and the `role_assigned`/`role_revoked` overrides. A save of them gives 422.
 - Recipient spec kinds: `group` (oidc_groups), `role` (active RoleAssignment), `gremium` (active members), `applicant` (non-anonymized applicant email), `email` (literal), `permission` (holders of a permission, admin role always counts).
 - Mail template keys (catalog): status_update, task_new, task_reminder, deadline_approaching, comment_applicant, comment_team, meeting_created, delegation_granted, delegation_revoked, magic_link, application_captured, erasure_requested, erasure_executed, erasure_rejected.
 
@@ -61,4 +62,4 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `events.EVENTS` is the **webhook** event whitelist, not the mail catalog — do not conflate it with `kinds`/template keys.
 - `router.py` exposes three routers (`router`, `admin_router`, `templates_router`). `main.py` includes each one separately.
 
-**Related:** be-flow, be-webhooks, be-auth, be-admin, be-applications, be-livevote, be-delegations, be-audit
+**Related:** be-flow, be-webhooks, be-auth, be-admin, be-applications, be-livevote, be-delegations, be-audit, be-tickets

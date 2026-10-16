@@ -1,0 +1,169 @@
+<app-dialog [open]="open()" [title]="'todos.settings.title' | t" [closeLabel]="'action.close' | t" (closed)="open.set(false)">
+  <div class="bs">
+    <app-input
+      name="boardName"
+      [label]="'todos.settings.name' | t"
+      [ngModel]="name()"
+      (ngModelChange)="name.set($event)"
+      (focusout)="saveName()"
+      (keydown.enter)="saveName()"
+    />
+
+    <section class="bs__sec" aria-labelledby="bs-cols">
+      <div class="bs__secHead">
+        <h3 id="bs-cols" class="bs__title">{{ 'todos.settings.columns' | t }}</h3>
+        <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
+          <app-icon name="plus" [size]="15" />
+          {{ 'todos.settings.addColumnShort' | t }}
+        </app-button>
+      </div>
+      <ul class="bs__cols" cdkDropList [cdkDropListDisabled]="busy()" (cdkDropListDropped)="drop($event)">
+        @for (col of columns(); track col.id; let i = $index) {
+          <li class="bs__col" cdkDrag cdkDragLockAxis="y">
+            <span class="bs__grip" cdkDragHandle [attr.aria-hidden]="true"><app-icon name="grip" [size]="16" /></span>
+            @if (renaming() === col.id) {
+              <form class="bs__inline" (submit)="$event.preventDefault(); saveRename(col)">
+                <input
+                  class="bs__input"
+                  name="colName"
+                  maxlength="60"
+                  [attr.aria-label]="'todos.settings.columnName' | t"
+                  [ngModel]="renameDraft()"
+                  (ngModelChange)="renameDraft.set($event)"
+                  (keydown.escape)="renaming.set(null)"
+                />
+                <app-button variant="fill" size="sm" (click)="saveRename(col)">{{ 'action.save' | t }}</app-button>
+              </form>
+            } @else {
+              <span class="bs__colName">{{ col.name }}</span>
+              @if (col.isDone) {
+                <span class="bs__doneTag"><app-icon name="check" [size]="12" />{{ 'todos.board.doneColumn' | t }}</span>
+              }
+              <span class="bs__cards num">{{ 'todos.settings.cards' | t: { n: col.cardCount } }}</span>
+              <app-row-menu
+                [label]="'todos.column.menu' | t: { name: col.name }"
+                [sections]="columnMenu(col, i)"
+                (selected)="onColumnMenu(col, i, $event)"
+              />
+            }
+          </li>
+        }
+      </ul>
+      @if (newColumn() !== null) {
+        <form class="bs__inline" (submit)="$event.preventDefault(); addColumn()">
+          <input
+            class="bs__input"
+            name="newColumn"
+            maxlength="60"
+            [attr.aria-label]="'todos.settings.columnName' | t"
+            [ngModel]="newColumn()"
+            (ngModelChange)="newColumn.set($event)"
+            (keydown.escape)="newColumn.set(null)"
+          />
+          <app-button variant="text" size="sm" (click)="newColumn.set(null)">{{ 'action.cancel' | t }}</app-button>
+          <app-button variant="fill" size="sm" [disabled]="!newColumn()?.trim()" (click)="addColumn()">
+            {{ 'todos.settings.add' | t }}
+          </app-button>
+        </form>
+      }
+      @if (deleting(); as col) {
+        <div class="bs__confirm" role="group" [attr.aria-label]="'todos.settings.deleteColumn' | t">
+          <p class="bs__confirmText">{{ 'todos.settings.deleteMove' | t: { name: col.name, n: col.cardCount } }}</p>
+          <app-select
+            name="moveTo"
+            [label]="'todos.settings.moveTo' | t"
+            [options]="moveOptions()"
+            [ngModel]="moveTo()"
+            (ngModelChange)="moveTo.set($event)"
+          />
+          <div class="bs__confirmFoot">
+            <app-button variant="text" size="sm" (click)="deleting.set(null)">{{ 'action.cancel' | t }}</app-button>
+            <app-button variant="danger" size="sm" [disabled]="!moveTo()" (click)="confirmDelete()">
+              {{ 'todos.settings.deleteColumn' | t }}
+            </app-button>
+          </div>
+        </div>
+      }
+    </section>
+
+    <section class="bs__sec" aria-labelledby="bs-labels">
+      <div class="bs__secHead">
+        <h3 id="bs-labels" class="bs__title">{{ 'todos.settings.labels' | t }}</h3>
+        <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addLabel' | t" (click)="editLabel(null)">
+          <app-icon name="plus" [size]="15" />
+          {{ 'todos.settings.addLabelShort' | t }}
+        </app-button>
+      </div>
+      <div class="bs__labels">
+        @for (label of board().labels; track label.id) {
+          <button
+            type="button"
+            class="chip bs__label"
+            [class.on]="labelEdit() === label.id"
+            [attr.data-color]="label.color"
+            [attr.aria-label]="'todos.settings.editLabel' | t: { name: label.name }"
+            (click)="editLabel(label)"
+          >
+            <span class="bs__dot" aria-hidden="true"></span>
+            {{ label.name }}
+          </button>
+        }
+      </div>
+      @if (labelEdit() !== null) {
+        <form class="bs__labelForm" (submit)="$event.preventDefault(); saveLabel()">
+          <input
+            class="bs__input"
+            name="labelName"
+            maxlength="40"
+            [attr.aria-label]="'todos.settings.labelName' | t"
+            [ngModel]="labelName()"
+            (ngModelChange)="labelName.set($event)"
+            (keydown.escape)="labelEdit.set(null)"
+          />
+          <div class="bs__swatches" role="radiogroup" [attr.aria-label]="'todos.settings.labelColor' | t">
+            @for (color of colors; track color) {
+              <button
+                type="button"
+                class="bs__swatch"
+                role="radio"
+                [attr.data-color]="color"
+                [attr.aria-checked]="labelColor() === color"
+                [attr.aria-label]="colorName(color)"
+                [title]="colorName(color)"
+                (click)="labelColor.set(color)"
+              ></button>
+            }
+          </div>
+          <div class="bs__confirmFoot">
+            @if (labelEdit()) {
+              <app-button variant="danger" size="sm" (click)="deleteLabel()">{{ 'todos.settings.deleteLabel' | t }}</app-button>
+            }
+            <app-button variant="text" size="sm" (click)="labelEdit.set(null)">{{ 'action.cancel' | t }}</app-button>
+            <app-button variant="fill" size="sm" [disabled]="!labelName().trim()" (click)="saveLabel()">
+              {{ 'action.save' | t }}
+            </app-button>
+          </div>
+        </form>
+      }
+    </section>
+
+    <div class="bs__archive">
+      <app-switch [checked]="archiveOn()" (checkedChange)="setArchive($event)">
+        {{ 'todos.settings.archive' | t: { n: board().archiveAfterDays ?? days() } }}
+      </app-switch>
+      @if (archiveOn()) {
+        <app-input
+          class="bs__days"
+          type="number"
+          name="days"
+          [label]="'todos.settings.days' | t"
+          [ngModel]="days()"
+          (ngModelChange)="days.set($event)"
+          (focusout)="saveDays()"
+          (keydown.enter)="saveDays()"
+        />
+      }
+    </div>
+  </div>
+  <app-button dialog-footer variant="fill" (click)="open.set(false)">{{ 'todos.settings.done' | t }}</app-button>
+</app-dialog>

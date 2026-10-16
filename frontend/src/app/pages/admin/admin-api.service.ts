@@ -39,6 +39,7 @@ import {
   type NotificationSettings,
   type GuestSettings,
   type MeetingSettings,
+  type HelpTicketsSettings,
   type LoginSettings,
   type AuditPage,
   type Branding,
@@ -111,6 +112,7 @@ import {
   MOCK_GROUP_MAPPINGS,
   MOCK_GUEST_SETTINGS,
   MOCK_MEETING_SETTINGS,
+  MOCK_HELP_TICKETS,
   MOCK_LOGIN_SETTINGS,
   MOCK_MAIL_TEMPLATES,
   MOCK_PERMISSIONS,
@@ -167,6 +169,7 @@ export class AdminApiService {
     guestSettings: structuredCopy(MOCK_GUEST_SETTINGS) as GuestSettings,
     meetingSettings: structuredCopy(MOCK_MEETING_SETTINGS) as MeetingSettings,
     loginSettings: structuredCopy(MOCK_LOGIN_SETTINGS) as LoginSettings,
+    helpTickets: structuredCopy(MOCK_HELP_TICKETS) as HelpTicketsSettings,
     cdVariants: structuredCopy(MOCK_CD_VARIANTS) as CdVariant[],
     mailTemplates: structuredCopy(MOCK_MAIL_TEMPLATES) as MailTemplate[],
     erasures: structuredCopy(MOCK_ERASURES) as ErasureRequest[],
@@ -1310,6 +1313,24 @@ export class AdminApiService {
       return of(structuredCopy(this.store.loginSettings));
     }
     return this.http.put<LoginSettings>(`${this.base}/admin/login-settings`, body);
+  }
+
+  // "Hilfe & Tickets". Both routes need P(admin.site).
+  /** GET /admin/help-tickets — the handbook link and the ticket settings. */
+  getHelpTickets(): Observable<HelpTicketsSettings> {
+    if (this.mock) return of(structuredCopy(this.store.helpTickets));
+    return this.http.get<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, {
+      context: skipLoading(),
+    });
+  }
+
+  /** PUT /admin/help-tickets — writes a new active site-config version. */
+  putHelpTickets(body: HelpTicketsSettings): Observable<HelpTicketsSettings> {
+    if (this.mock) {
+      this.store.helpTickets = { ...body };
+      return of(structuredCopy(this.store.helpTickets));
+    }
+    return this.http.put<HelpTicketsSettings>(`${this.base}/admin/help-tickets`, body);
   }
 
   // Every DSGVO/privacy endpoint below needs P(privacy.manage).

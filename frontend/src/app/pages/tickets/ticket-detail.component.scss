@@ -1,0 +1,400 @@
+@use 'breakpoints' as bp;
+
+/* The geometry of the application detail (applications-detail.component.scss). */
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.td {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.td--split {
+  padding: 0 var(--space-6) var(--space-6);
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.td--split[aria-busy='true'] {
+  padding-top: var(--space-6);
+}
+.td--center {
+  align-items: center;
+  justify-content: center;
+}
+.td__error {
+  margin: 0;
+  padding: var(--space-5) 0;
+  color: var(--color-danger);
+}
+.td__backLink {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.td__backLink:hover {
+  background: var(--color-surface-4);
+}
+
+/* ------------------------------------------------------------------ header */
+.td__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sheet-head-gap);
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.td__title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+.td__line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+}
+.td__dot {
+  margin-inline: 8px;
+  color: var(--color-text-subtle);
+}
+.td__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.td__actions app-icon {
+  margin-inline-end: 6px;
+}
+.td__note {
+  margin-top: var(--space-2);
+}
+.td__link {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+
+/* ------------------------------------------------------------------ body */
+/* Two columns: the thread is the wider one. Below about 740px the columns stack. */
+.td__cols {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  align-items: flex-start;
+  min-height: 0;
+}
+.td__col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.td__col:first-child {
+  flex: 1.4 1 0;
+  min-width: min(100%, 22.5rem);
+}
+.td__col:last-child {
+  flex: 1 1 0;
+  min-width: min(100%, 20rem);
+}
+.td__tabs {
+  margin-top: calc(-1 * var(--space-5));
+}
+/* One column: two tabs of equal width that fill the row, and the two actions share it. */
+.td__tabs ::ng-deep .tabs {
+  gap: 0;
+}
+.td__tabs ::ng-deep .tabs__tab {
+  flex: 1 1 0;
+  justify-content: center;
+}
+.td:not(.td--split) .td__actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+.td:not(.td--split) .td__act {
+  display: flex;
+}
+.td:not(.td--split) .td__act ::ng-deep .btn {
+  width: 100%;
+}
+.td__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.td__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.td__secTitle {
+  padding: 0 var(--space-1);
+}
+.td__secHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+}
+.td__secHead app-icon {
+  margin-inline-end: 4px;
+}
+.td__none {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* Two fields side by side, each on its own surface like a row of the group. */
+.td__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2px;
+  background: transparent;
+}
+.td__pair > * {
+  border-radius: 4px;
+  background: var(--color-surface-2);
+}
+.td__pair:first-child > :first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+.td__pair:first-child > :last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+.td__pair:last-child > :first-child {
+  border-bottom-left-radius: var(--radius-lg);
+}
+.td__pair:last-child > :last-child {
+  border-bottom-right-radius: var(--radius-lg);
+}
+.td__pair time {
+  white-space: nowrap;
+}
+/* An e-mail address and a URL are never cut: they wrap and stay selectable. */
+.td__mail,
+.td__url {
+  display: inline;
+  color: var(--color-accent-text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.td__mail:hover,
+.td__url:hover {
+  text-decoration: underline;
+}
+/* An inline select: the value at the start, the chevron at the end of the field. */
+.td__select {
+  display: block;
+}
+.td__select ::ng-deep .fs__chip {
+  justify-content: flex-start;
+  width: 100%;
+  max-width: none;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-regular);
+}
+.td__select ::ng-deep .fs__text {
+  max-width: none;
+}
+
+/* The linked to-dos: a circle, the title over "Board · Spalte · fällig", the people. */
+.td__todos {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.td__todo {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.td__todoIcon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.td__todo--done .td__todoIcon {
+  color: var(--color-accent-text);
+}
+.td__todoText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.td__todoTitle {
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+  text-decoration: none;
+}
+/* The whole row opens the card. */
+.td__todoTitle::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+.td__todoTitle:hover {
+  text-decoration: underline;
+}
+.td__todoTitle:focus-visible {
+  outline: none;
+}
+.td__todo:focus-within {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.td__todoSub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* ------------------------------------------------------------------ thread */
+/* The thread fills the pane down to the composer at the bottom of the card. */
+.td__chat {
+  --chat-log-max: max(20rem, calc(100dvh - 25.5rem));
+}
+.td__chat.chat--phone {
+  flex: 1 1 0;
+  margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
+  --chat-log-min: 12rem;
+  --chat-log-max: none;
+  --chat-composer-bleed: var(--space-4);
+}
+
+/* ------------------------------------------------------------------ dialogs */
+.td__closeBox {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-2);
+}
+.td__closeLabel {
+  font-weight: var(--fw-medium);
+}
+/* The open to-dos: plain lines under the label of the checkbox. */
+.td__closeList {
+  margin: 0;
+  /* The lines start where the label starts: the box of the checkbox and its gap. */
+  padding-inline-start: calc(18px + var(--space-2));
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.td__dup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.td__dupList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.td__dupHit {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.td__dupHit:hover {
+  background: var(--color-surface-3);
+}
+.td__dupHit:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.td__dupNo {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.td__dupTitle {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.td__dupState {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+
+/* Phone: the page is as high as the view. The header and the tabs stay at the top, and
+   the tab below them takes the rest down to the bottom navigation. "Verlauf" gives it to
+   the log of the chat, which scrolls inside and opens at the newest message; "Details"
+   scrolls as a whole under the header. */
+@include bp.phone {
+  .td:not(.td--split) {
+    min-height: 0;
+  }
+  .td__panel:not([hidden]) {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .td__panel--log .td__sec {
+    flex: 1 1 0;
+    min-height: 0;
+  }
+  .td__panel--details {
+    margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-4)) calc(-1 * var(--main-pad-bottom, 0px));
+    padding: var(--space-5) var(--space-4) var(--main-pad-bottom, 0px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .td__title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
+  }
+  .td__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* Header = title + one action row; the two main actions share the width. */
+  .td__actions app-button {
+    flex: 1 1 0;
+  }
+}

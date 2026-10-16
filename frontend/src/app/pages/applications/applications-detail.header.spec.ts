@@ -28,6 +28,7 @@ import { provideFormly } from '@shared/formly/formly.providers';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { ApplicationsDetailComponent } from './applications-detail.component';
 import { ApplicationsPageService, type ApplicationChange } from './applications-page.service';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 const SUBMITTED: StateOutWire = {
   id: 's1',
@@ -110,6 +111,7 @@ async function setup(opts: Opts = {}) {
   }
   const view = await render(ApplicationsDetailComponent, {
     providers: [
+      NO_LINKED_TODOS,
       provideRouter([]),
       provideHttpClient(),
       provideHttpClientTesting(),

@@ -55,6 +55,8 @@ const KIND_ICON: Record<SearchKind, IconName> = {
   budget: 'pie',
   gremium: 'parliament',
   principal: 'user',
+  ticket: 'ticket',
+  todo: 'circleok',
 };
 
 /**

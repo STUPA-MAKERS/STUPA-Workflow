@@ -1294,6 +1294,25 @@ export interface Branding {
   freetexts: SiteFreetexts;
   /** Show the Gravatar images of the avatars. Missing (an older config) = on. */
   gravatarEnabled?: boolean;
+  /** The handbook link of the help menu (page "Hilfe & Tickets"). */
+  help?: { wikiUrl: string };
+  /** The ticket settings (page "Hilfe & Tickets"). */
+  tickets?: { publicEnabled: boolean; notifyNew: boolean; retentionMonths: number | null };
+}
+
+/**
+ * The page "Hilfe & Tickets" (`GET`/`PUT /admin/help-tickets`, permission `admin.site`).
+ * A save writes a new active site-config version.
+ */
+export interface HelpTicketsSettings {
+  /** http(s) only. */
+  wikiUrl: string;
+  /** Visitors without an account may send a ticket. */
+  publicEnabled: boolean;
+  /** A new ticket mails the holders of `ticket.manage`. */
+  notifyNew: boolean;
+  /** Months after the close until the reporter is anonymized (1 to 120); null = never. */
+  retentionMonths: number | null;
 }
 
 /** Versioned site config: active version + editable draft. */

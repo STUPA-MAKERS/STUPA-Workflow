@@ -395,6 +395,13 @@ describe('ApiClient', () => {
     req.flush(wire, { status: 201, statusText: 'Created' });
   });
 
+  it('POSTs the files of a comment', () => {
+    api.addComment('app-3', '', 'internal', { attachmentIds: ['d1'], draftToken: 'tok' }).subscribe();
+    const req = http.expectOne('/api/applications/app-3/comments');
+    expect(req.request.body).toEqual({ body: '', visibility: 'internal', attachmentIds: ['d1'], draftToken: 'tok' });
+    req.flush({ id: 'c', authorKind: 'principal', body: '', visibility: 'internal', at: '2026-06-05T13:00:00Z' });
+  });
+
   it('GETs a vote state + tally from /votes/{id}', (done) => {
     api.getVote('v1').subscribe((vote) => {
       expect(vote.status).toBe('open');
@@ -932,6 +939,18 @@ describe('ApiClient', () => {
     const req = http.expectOne('/api/meetings/m-1/agenda');
     expect(req.request.body).toEqual({ title: 'Personal', nonPublic: true });
     req.flush([]);
+  });
+
+  it('puts a to-do on the agenda', () => {
+    api.addAgendaTodo('m-1', 'k-1').subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ todoId: 'k-1', nonPublic: false });
+    req.flush([]);
+    api.addAgendaTodo('m-1', 'k-1', true).subscribe();
+    const np = http.expectOne('/api/meetings/m-1/agenda');
+    expect(np.request.body).toEqual({ todoId: 'k-1', nonPublic: true });
+    np.flush([]);
   });
 
   it('removes an agenda item', () => {

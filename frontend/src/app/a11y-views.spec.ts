@@ -204,6 +204,8 @@ describe('Kern-Views a11y (axe)', () => {
       const view = await render(LiveVoteHost, {
         providers: [
           provideRouter([]),
+          provideHttpClient(),
+          provideHttpClientTesting(),
           { provide: LIVE_VOTE_SOURCE, useValue: source },
           {
             provide: ApiClient,

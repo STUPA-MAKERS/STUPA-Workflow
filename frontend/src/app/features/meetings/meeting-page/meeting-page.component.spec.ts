@@ -30,7 +30,7 @@ const OUTPUTS = [
   'voteDelete', 'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
-  'dragStart', 'dragOver', 'dropAt', 'setProtokollant', 'pickHandover', 'cancelHandover',
+  'setProtokollant', 'pickHandover', 'cancelHandover',
   'attendanceConflictResolved',
 ] as const;
 
@@ -431,12 +431,6 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(within(rows[1]).getByRole('button', { name: /Aktionen für/ }));
       await userEvent.click(await screen.findByRole('menuitem', { name: 'TOP entfernen' }));
       expect(on.removeFromAgenda).toHaveBeenCalledWith('t-2');
-      rows[0].dispatchEvent(new Event('dragstart'));
-      rows[1].dispatchEvent(new Event('dragover'));
-      rows[1].dispatchEvent(new Event('drop'));
-      expect(on.dragStart).toHaveBeenCalledWith(0);
-      expect(on.dragOver).toHaveBeenCalled();
-      expect(on.dropAt).toHaveBeenCalledWith(1);
     });
 
     it('passes on no native event that bubbles out of the agenda as a value', async () => {
@@ -445,12 +439,6 @@ describe('MeetingPageComponent', () => {
       const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
       input.dispatchEvent(new Event('select', { bubbles: true }));
       expect(on.selectTop).not.toHaveBeenCalled();
-      // A native `drop` bubbles out of the row after the row gave its index.
-      const rows = screen.getAllByRole('listitem');
-      rows[1].dispatchEvent(new Event('dragstart', { bubbles: true }));
-      rows[2].dispatchEvent(new Event('drop', { bubbles: true }));
-      expect(on.dropAt).toHaveBeenCalledTimes(1);
-      expect(on.dropAt).toHaveBeenCalledWith(2);
     });
 
     it('passes the inline rename on', async () => {

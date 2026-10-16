@@ -39,6 +39,9 @@ from app.shared.errors import ConflictError, NotFoundError
 #   protocol.write  — assignable as minute-taker / write the protocol
 #   protocol.finalize — finalize and send the protocol (together with the
 #                     write access to the meeting)
+#   todo.write      — read and work on the to-do board of the gremium (cards,
+#                     moves, comments, checklists, links)
+#   todo.configure  — edit the name, the columns and the labels of that board
 # An OAuth token caps these permissions through its scope. See
 # ``gremium_ids_for``.
 GREMIUM_PERMISSIONS: tuple[str, ...] = (
@@ -47,18 +50,20 @@ GREMIUM_PERMISSIONS: tuple[str, ...] = (
     "vote.cast",
     "protocol.write",
     "protocol.finalize",
+    "todo.write",
+    "todo.configure",
 )
 _ALL_PERMS: list[str] = list(GREMIUM_PERMISSIONS)
 
 # Forced gremium roles exist in EVERY gremium and nobody can delete them.
 # ``vorstand`` and ``manager`` get all permissions by default. ``member`` gets
-# vote.cast only. The service creates them together with the gremium and
+# vote.cast and todo.write. The service creates them together with the gremium and
 # backfills them idempotently on a listing. Migration 0040 backfilled the
 # gremien that already existed.
 FORCED_GREMIUM_ROLES: tuple[tuple[str, dict[str, str], list[str]], ...] = (
     ("vorstand", {"de": "Vorstand", "en": "Board"}, list(_ALL_PERMS)),
     ("manager", {"de": "Manager", "en": "Manager"}, list(_ALL_PERMS)),
-    ("member", {"de": "Mitglied", "en": "Member"}, ["vote.cast"]),
+    ("member", {"de": "Mitglied", "en": "Member"}, ["vote.cast", "todo.write"]),
 )
 FORCED_ROLE_KEYS: frozenset[str] = frozenset(key for key, _, _ in FORCED_GREMIUM_ROLES)
 FORCED_ROLE_DEFAULT_PERMS: dict[str, list[str]] = {

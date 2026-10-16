@@ -18,6 +18,8 @@ import {
   switchMap,
 } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
+import { TicketsApiService } from '@core/api/tickets.service';
+import { TodosApiService } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
 import { NavService } from './nav.service';
@@ -48,7 +50,10 @@ export const LIVE_MAX_PAGES = 4;
  * The marks of the navigation: the number of open tasks and whether a meeting runs now.
  *
  * Sources:
- * - tasks: `GET /applications/tasks` (the length of the list);
+ * - tasks: `GET /applications/tasks` (the length of the list) plus `dueSoonCount` of
+ *   `GET /todos/mine` (my open To-Dos due within 7 days). A failed To-Do read counts 0;
+ *   a failed task read gives no count;
+ * - tickets: `GET /tickets/counts` (the new tickets), only with `ticket.manage`;
  * - live: `GET /meetings/timeline?direction=upcoming`, where every live meeting is
  *   upcoming (backend `listing.py`), only if the principal sees the meetings entry. The
  *   service follows `nextCursor` until a live meeting shows up (see
@@ -66,12 +71,17 @@ export class RailStatusService {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly nav = inject(NavService);
+  private readonly tickets = inject(TicketsApiService);
+  private readonly todos = inject(TodosApiService);
 
   private readonly _taskCount = signal<number | null>(null);
+  private readonly _ticketCount = signal<number | null>(null);
   private readonly _live = signal(false);
 
   /** Open tasks, or `null` before the first answer and after a failed one. */
   readonly taskCount = this._taskCount.asReadonly();
+  /** New tickets, or `null` without `ticket.manage`, before the first answer and after a failed one. */
+  readonly ticketCount = this._ticketCount.asReadonly();
   /** A meeting the principal can see runs now. */
   readonly live = this._live.asReadonly();
 
@@ -93,8 +103,9 @@ export class RailStatusService {
         switchMap(() => this.load()),
         takeUntilDestroyed(),
       )
-      .subscribe(({ tasks, live }) => {
+      .subscribe(({ tasks, tickets, live }) => {
         this._taskCount.set(tasks);
+        this._ticketCount.set(tickets);
         this._live.set(live);
       });
 
@@ -106,6 +117,7 @@ export class RailStatusService {
           this.manual.next();
         } else {
           this._taskCount.set(null);
+          this._ticketCount.set(null);
           this._live.set(false);
         }
       });
@@ -120,13 +132,23 @@ export class RailStatusService {
     this.manual.next();
   }
 
-  private load(): Observable<{ tasks: number | null; live: boolean }> {
-    const tasks = this.api.listTasks().pipe(
-      map((items) => items.length),
+  private load(): Observable<{ tasks: number | null; tickets: number | null; live: boolean }> {
+    const todos = this.todos.mine().pipe(
+      map((m) => m.dueSoonCount),
+      catchError(() => of(0)),
+    );
+    const tasks = forkJoin({ items: this.api.listTasks(), todos }).pipe(
+      map(({ items, todos: due }) => items.length + due),
       catchError(() => of(null)),
     );
+    const tickets = this.auth.can('ticket.manage')
+      ? this.tickets.counts().pipe(
+          map((c) => c.new),
+          catchError(() => of(null)),
+        )
+      : of(null);
     const live = this.nav.meetingsVisible() ? this.anyLive() : of(false);
-    return forkJoin({ tasks, live });
+    return forkJoin({ tasks, tickets, live });
   }
 
   /** `true` as soon as one page of the upcoming timeline holds a live meeting. */

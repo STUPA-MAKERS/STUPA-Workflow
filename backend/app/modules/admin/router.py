@@ -81,6 +81,7 @@ from app.modules.admin.schemas import (
     GroupMappingUpdate,
     GuestSettingsOut,
     GuestSettingsUpdate,
+    HelpTicketsSettings,
     LoginSettingsOut,
     LoginSettingsUpdate,
     MeetingSettingsOut,
@@ -129,8 +130,10 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
     return {code: _PROBLEM for code in codes}
 
 
-def get_config_service(session: DbSession) -> ConfigService:
-    return ConfigService(session)
+def get_config_service(session: DbSession, request: Request) -> ConfigService:
+    # The storage removes the file objects of the to-do comments of a deleted
+    # gremium. Without MinIO only the rows go.
+    return ConfigService(session, storage=getattr(request.app.state, "object_storage", None))
 
 
 def get_site_config_service(session: DbSession) -> SiteConfigService:
@@ -1397,6 +1400,34 @@ async def put_site_config_draft(
 async def activate_site_config(service: SiteServiceDep, principal: SiteAdmin) -> SiteConfigOut:
     """Activate the draft as a new active version (version bump, audited)."""
     return await service.activate(principal.sub)
+
+
+# The page "Hilfe & Tickets" saves directly, without draft and activate.
+@router.get(
+    "/help-tickets",
+    response_model=HelpTicketsSettings,
+    dependencies=[_SITE],
+    responses=_errors(401, 403),
+)
+async def get_help_tickets(service: SiteServiceDep) -> HelpTicketsSettings:
+    """The help and ticket settings of the active branding."""
+    return await service.help_tickets()
+
+
+@router.put(
+    "/help-tickets",
+    response_model=HelpTicketsSettings,
+    responses=_errors(401, 403, 422),
+)
+async def put_help_tickets(
+    payload: HelpTicketsSettings, service: SiteServiceDep, principal: SiteAdmin
+) -> HelpTicketsSettings:
+    """Save the help and ticket settings as a new active site-config version.
+
+    A ``wikiUrl`` that is not http(s) or a ``retentionMonths`` out of 1..120 gives
+    422. An open branding draft keeps its other changes and takes the new values.
+    """
+    return await service.put_help_tickets(payload, principal.sub)
 
 
 @public_router.get("/site-config", response_model=PublicSiteConfigOut)

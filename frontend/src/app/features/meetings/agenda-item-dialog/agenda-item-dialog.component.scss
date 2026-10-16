@@ -81,3 +81,55 @@
 .aid__list {
   @include fade.fade-y(var(--space-5));
 }
+
+/* A to-do: a ring that fills with a check when picked, the title over its column and due
+   date. The radio stays for the keyboard and the screen reader; the ring shows the pick. */
+.aid__row--todo {
+  position: relative;
+  padding-block: 6px;
+  border-radius: var(--radius-lg);
+  background: transparent;
+}
+.aid__row--todo:hover {
+  background: var(--color-surface-2);
+}
+.aid__row--todo.aid__row--on {
+  background: var(--color-selected);
+}
+.aid__list:has(.aid__row--todo) {
+  max-height: 22rem;
+}
+.aid__cap--todo {
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  color: var(--color-text-muted);
+}
+.aid__radio--hidden {
+  position: absolute;
+  inset-inline-start: 14px;
+  opacity: 0;
+}
+.aid__row--todo:has(.aid__radio:focus-visible) {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.aid__mark {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.aid__row--on .aid__mark {
+  color: var(--color-accent-text);
+}
+.aid__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.aid__sub {
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+.aid__row--on .aid__sub {
+  color: inherit;
+}

@@ -28,6 +28,9 @@ from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.files.service import FilesService
+from app.modules.todos.boards import ensure_gremium_board
+from app.modules.todos.models import TodoBoard, TodoCard, TodoComment
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -114,6 +117,8 @@ class GremiumOps(ConfigServiceBase):
         await self.session.flush()
         # Every new gremium gets the forced roles chair and secretary.
         await GremiumRoleService(self.session).ensure_forced_roles(row.id)
+        # ... and its to-do board with the four default columns.
+        await ensure_gremium_board(self.session, row.id, row.name)
         await self._audit(
             actor,
             AuditAction.CONFIG_CHANGE,
@@ -232,8 +237,8 @@ class GremiumOps(ConfigServiceBase):
             ForbiddenError: A meeting of the gremium has a final protocol, and the
                 caller does not hold ``meeting.delete_finalized``
                 (``meeting_finalized``, 403).
-            ConflictError: An application type of this gremium still has
-                applications, the gremium decides the running vote of an
+            ConflictError: An application of this gremium or of one of its
+                application types still exists, the gremium decides the running vote of an
                 application (`gremium_decides_vote`), or a vote of the gremium
                 is open (`open_vote`) (409).
         """
@@ -245,23 +250,27 @@ class GremiumOps(ConfigServiceBase):
         )
         if row is None:
             raise NotFoundError(f"gremium {gremium_id} not found")
-        # application_type.gremium_id cascades, but application.type_id is RESTRICT.
-        # A delete of a gremium whose types still hold applications breaks the FK and
-        # ends in a 500. This pre-check returns 409 instead, so no audit entry is
-        # written for a doomed delete.
+        # application_type.gremium_id cascades, but application.type_id is RESTRICT,
+        # and application.gremium_id has no ON DELETE. A type can move to another
+        # gremium, so an application can name this gremium while its type does not.
+        # A delete of a gremium that still holds applications by either way breaks an
+        # FK and ends in a 500. This pre-check returns 409 instead, so no audit entry
+        # is written for a doomed delete.
         from app.modules.applications.models import Application
 
         in_use = await self.session.scalar(
             select(Application.id)
             .join(ApplicationType, Application.type_id == ApplicationType.id)
-            .where(ApplicationType.gremium_id == gremium_id)
+            .where(
+                or_(
+                    ApplicationType.gremium_id == gremium_id,
+                    Application.gremium_id == gremium_id,
+                )
+            )
             .limit(1)
         )
         if in_use is not None:
-            raise ConflictError(
-                "gremium has application types with existing applications "
-                "and cannot be deleted"
-            )
+            raise ConflictError("gremium has existing applications and cannot be deleted")
         # The Gremium decides a running vote (`application.vote_gremium_id`). A delete
         # would leave the application in its vote state without a deciding Gremium.
         deciding = await self.session.scalar(
@@ -273,10 +282,52 @@ class GremiumOps(ConfigServiceBase):
                 "application out of its vote state first.",
                 code="gremium_decides_vote",
             )
+        comment_ids = await self._lock_gremium_todos(gremium_id)
+        # The file rows are locked before the first audit entry of the vote delete,
+        # because ``finalize_scan`` of an infected file locks its row first and then
+        # waits for the lock of the audit chain (``FilesService.lock_for_messages``).
+        files = FilesService(self.session, storage=self.storage)
+        await files.lock_for_messages("todo_comment", comment_ids)
         await self._delete_gremium_votes(gremium_id, principal)
+        # The board cascade deletes the attachment rows of the to-do comments, but not
+        # their objects, which can hold personal data. The rows go first, with an
+        # audit entry each. The objects go only after the commit, because a failed
+        # commit brings the rows back, and a row without its object is a broken file.
+        storage_keys = await files.drop_for_messages(
+            "todo_comment", comment_ids, actor=principal.sub
+        )
         await self.session.delete(row)
         await self._audit(principal.sub, AuditAction.CONFIG_CHANGE, "gremium", gremium_id)
         await self.session.commit()
+        await files.remove_objects(storage_keys)
+
+    async def _lock_gremium_todos(self, gremium_id: UUID) -> list[UUID]:
+        """Lock the to-do board of a gremium and its cards, and return its comment ids.
+
+        The board goes first and then the cards, the order of every to-do write. The
+        card lock is ``FOR UPDATE``, which waits for the key-share lock of a comment
+        insert. A comment that binds files therefore commits before the ids are read,
+        or its insert waits and then fails on the deleted card. Otherwise its files
+        would lose their row through the cascade and keep their object.
+        """
+        boards = select(TodoBoard.id).where(TodoBoard.gremium_id == gremium_id)
+        await self.session.execute(boards.order_by(TodoBoard.id).with_for_update())
+        await self.session.execute(
+            select(TodoCard.id)
+            .where(TodoCard.board_id.in_(boards))
+            .order_by(TodoCard.id)
+            .with_for_update()
+        )
+        return list(
+            (
+                await self.session.scalars(
+                    select(TodoComment.id)
+                    .join(TodoCard, TodoCard.id == TodoComment.card_id)
+                    .where(TodoCard.board_id.in_(boards))
+                    .order_by(TodoComment.id)
+                )
+            ).all()
+        )
 
     async def _delete_gremium_votes(self, gremium_id: UUID, principal: Principal) -> None:
         """Delete the meetings of a gremium and their votes by their own rules, without a commit.

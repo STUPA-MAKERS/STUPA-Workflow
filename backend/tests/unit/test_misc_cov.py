@@ -49,7 +49,7 @@ from app.middleware import (
     CsrfMiddleware,
     DefaultWriteRateLimitMiddleware,
 )
-from app.modules.admin.branding import Branding
+from app.modules.admin.branding import Branding, PublicBranding
 from app.modules.admin.router import (
     get_config_service,
     get_gremium_role_service,
@@ -450,7 +450,8 @@ def test_admin_service_factories_construct() -> None:
     from app.modules.admin.site_config_service import SiteConfigService
 
     sess = SimpleNamespace()
-    assert isinstance(get_config_service(sess), ConfigService)  # type: ignore[arg-type]
+    req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+    assert isinstance(get_config_service(sess, req), ConfigService)  # type: ignore[arg-type]
     assert isinstance(get_site_config_service(sess), SiteConfigService)  # type: ignore[arg-type]
     assert isinstance(get_gremium_role_service(sess), GremiumRoleService)  # type: ignore[arg-type]
 
@@ -531,7 +532,7 @@ class _SiteFake:
         )
 
     async def public(self) -> PublicSiteConfigOut:
-        return PublicSiteConfigOut(version=1, branding=Branding())
+        return PublicSiteConfigOut(version=1, branding=PublicBranding())
 
 
 @pytest.fixture

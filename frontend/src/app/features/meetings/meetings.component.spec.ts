@@ -167,6 +167,8 @@ async function setup(
     userId?: string | null;
     /** Do NOT auto-answer the initial timeline requests. The test flushes them itself. */
     skipTimelineFlush?: boolean;
+    /** The `?item=` of a link to an agenda item. */
+    item?: string;
   } = {},
 ) {
   const perms = opts.perms ?? ['admin', 'protocol.write'];
@@ -186,7 +188,7 @@ async function setup(
         provide: ActivatedRoute,
         useValue: {
           paramMap: of(convertToParamMap(id ? { id } : {})),
-          queryParamMap: of(convertToParamMap({})),
+          queryParamMap: of(convertToParamMap(opts.item ? { item: opts.item } : {})),
         },
       },
     ],
@@ -414,6 +416,20 @@ describe('MeetingsComponent', () => {
     // The locked protocol leaves no row menu.
     expect(within(agendaSheet).queryByRole('button', { name: /Aktionen für/ })).toBeNull();
     void container;
+  });
+
+  it('opens the agenda item that the link names, not the first one', async () => {
+    const { http, fixture } = await setup({ item: 't-2' });
+    http.expectOne('/api/meetings/m-1').flush(MEETING);
+    http.expectOne('/api/meetings/m-1/protocol').flush(PROTOCOL);
+    http.expectOne('/api/meetings/m-1/attendance').flush([]);
+    http.expectOne('/api/meetings/m-1/agenda').flush([
+      { id: 't-1', applicationId: null, title: 'Erster', body: '', position: 0 },
+      { id: 't-2', applicationId: null, title: 'Zweiter', body: '', position: 1 },
+    ]);
+    flushDelegationContext(http);
+    const cmp = fixture.componentInstance as Cmp;
+    expect(cmp.selectedTopId()).toBe('t-2');
   });
 
   it('tags the non-public TOP while the meeting is still live', async () => {
@@ -798,7 +814,7 @@ describe('MeetingsComponent — methods', () => {
       expect(screen.getByRole('dialog', { name: 'TOP hinzufügen' })).toBeInTheDocument();
       http.expectOne('/api/meetings/m-1/agenda/assignable').flush([]);
       fixture.detectChanges();
-      await userEvent.click(screen.getByRole('radio', { name: 'Freitext-TOP' }));
+      await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
       await userEvent.type(screen.getByLabelText(/Titel/), 'Verschiedenes');
       const submit = screen
         .getAllByRole('button', { name: 'TOP hinzufügen' })
@@ -1104,7 +1120,7 @@ describe('MeetingsComponent — methods', () => {
     });
   });
 
-  describe('drag & drop reorder', () => {
+  describe('agenda reorder', () => {
     it('reorders TOPs and persists via PUT', async () => {
       const { cmp, http } = await loaded();
       cmp.agenda.set([
@@ -1112,8 +1128,7 @@ describe('MeetingsComponent — methods', () => {
         AGENDA_ITEM({ id: 't-2', position: 1 }),
         AGENDA_ITEM({ id: 't-3', position: 2 }),
       ] as never);
-      cmp.onTopDragStart(0);
-      cmp.onTopDrop(2); // t-1 to the end
+      cmp.moveTop(0, 2); // t-1 to the end
       expect(cmp.agenda().map((a) => a.id)).toEqual(['t-2', 't-3', 't-1']);
       const req = http.expectOne('/api/meetings/m-1/agenda/order');
       expect(req.request.method).toBe('PUT');
@@ -1125,19 +1140,9 @@ describe('MeetingsComponent — methods', () => {
     it('reloads the agenda when the reorder fails', async () => {
       const { cmp, http } = await loaded();
       cmp.agenda.set([AGENDA_ITEM({ id: 't-1' }), AGENDA_ITEM({ id: 't-2' })] as never);
-      cmp.onTopDragStart(0);
-      cmp.onTopDrop(1);
+      cmp.moveTop(0, 1);
       http.expectOne('/api/meetings/m-1/agenda/order').flush(null, { status: 500, statusText: 'e' });
       http.expectOne('/api/meetings/m-1/agenda').flush([AGENDA_ITEM()]);
-    });
-
-    it('ignores a drop onto the same index or without a drag source', async () => {
-      const { cmp, http } = await loaded();
-      cmp.agenda.set([AGENDA_ITEM({ id: 't-1' })] as never);
-      cmp.onTopDrop(0); // dragTopIndex null → return
-      cmp.onTopDragStart(0);
-      cmp.onTopDrop(0); // from === index → return
-      http.verify();
     });
 
     it('moves a TOP up and down from the row menu', async () => {
@@ -1158,16 +1163,6 @@ describe('MeetingsComponent — methods', () => {
       cmp.meeting.set(null);
       cmp.moveTop(1, 0);
       http.verify();
-    });
-
-    it('preventDefault only while dragging', async () => {
-      const { cmp } = await loaded();
-      const prevent = jest.fn();
-      cmp.onTopDragOver({ preventDefault: prevent } as unknown as DragEvent);
-      expect(prevent).not.toHaveBeenCalled();
-      cmp.onTopDragStart(0);
-      cmp.onTopDragOver({ preventDefault: prevent } as unknown as DragEvent);
-      expect(prevent).toHaveBeenCalled();
     });
   });
 
@@ -2226,7 +2221,7 @@ describe('MeetingsComponent — methods', () => {
           { provide: AuthService, useValue: fakeAuth(['admin', 'protocol.write']) },
           { provide: WsService, useValue: ws },
           { provide: Router, useValue: routerStub() },
-          { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) } },
+          { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })), queryParamMap: of(convertToParamMap({})) } },
         ],
       });
       const http = view.fixture.debugElement.injector.get(HttpTestingController);

@@ -1,0 +1,97 @@
+<app-dialog
+  [open]="open()"
+  [title]="'todos.new.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancel()"
+>
+  <form class="tn" (submit)="$event.preventDefault(); save()">
+    <app-input
+      name="title"
+      [label]="'todos.new.cardTitle' | t"
+      [required]="true"
+      [error]="titleError()"
+      [ngModel]="title()"
+      (ngModelChange)="title.set($event)"
+    />
+
+    @if (noBoard()) {
+      <p class="tn__error" role="alert">{{ 'todos.new.noBoard' | t }}</p>
+    } @else {
+      <div class="tn__pair">
+        <app-select
+          name="board"
+          [label]="'todos.new.board' | t"
+          [options]="boardOptions()"
+          [ngModel]="selectedBoard()"
+          (ngModelChange)="setBoard($event)"
+        />
+        <app-select
+          name="column"
+          [label]="'todos.new.column' | t"
+          [options]="columnOptions()"
+          [ngModel]="column()"
+          (ngModelChange)="column.set($event)"
+        />
+      </div>
+      <div class="tn__pair">
+        <app-select
+          name="assignee"
+          [label]="'todos.new.assignee' | t"
+          [options]="memberOptions()"
+          [ngModel]="assignee()"
+          (ngModelChange)="assignee.set($event)"
+        />
+        <app-datepicker
+          name="due"
+          [label]="'todos.new.due' | t"
+          [ngModel]="due()"
+          (ngModelChange)="due.set($event ?? '')"
+        />
+      </div>
+    }
+
+    <div class="tn__links" role="group" aria-labelledby="tn-links">
+      <span id="tn-links" class="tn__cap">{{ 'todos.new.linked' | t }}</span>
+      @for (link of links(); track link.kind + link.targetId) {
+        <span class="tn__chip">
+          <app-icon [name]="icon(link.kind)" [size]="15" />
+          <span class="tn__chipText">{{ link.label }}</span>
+          <button
+            type="button"
+            class="tn__chipX"
+            [attr.aria-label]="'todos.new.unlink' | t: { label: link.label }"
+            (click)="unlink(link)"
+          >
+            <app-icon name="x" [size]="14" />
+          </button>
+        </span>
+      }
+      <div class="tn__add">
+        <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
+          <app-icon name="plus" [size]="15" />
+          {{ 'todos.new.link' | t }}
+        </app-button>
+      </div>
+      <div class="tn__picker">
+        <app-todo-link-picker [(open)]="pickerOpen" [linked]="linkedKeys()" (picked)="pickLink($event)" />
+      </div>
+    </div>
+
+    <label class="tn__field" for="tn-desc">
+      <span class="tn__label">{{ 'todos.new.description' | t }}</span>
+      <textarea
+        id="tn-desc"
+        class="tn__textarea"
+        name="description"
+        rows="3"
+        maxlength="20000"
+        [ngModel]="description()"
+        (ngModelChange)="description.set($event)"
+      ></textarea>
+    </label>
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" [loading]="saving()" [disabled]="!canSave()" (click)="save()">
+    {{ 'todos.new.create' | t }}
+  </app-button>
+</app-dialog>

@@ -13,6 +13,7 @@ from app.modules.notifications.links import (
     protocol_link,
     public_protocol_url,
     task_link,
+    ticket_link,
 )
 from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.service import NotificationService
@@ -33,6 +34,9 @@ def test_url_builders_point_at_the_frontend_routes() -> None:
     assert protocol_link(SETTINGS, ID).target == "protocol"
     assert public_protocol_url(SETTINGS, ID) == f"{BASE}/protokolle/{ID}"
     assert privacy_admin_link(SETTINGS).url == f"{BASE}/admin/privacy"
+    ticket = ticket_link(SETTINGS, "t-1")
+    assert (ticket.url, ticket.target) == (f"{BASE}/tickets/t-1", "ticket")
+    assert ticket.label("en") == "Open the ticket"
 
 
 def test_label_follows_the_language_with_a_german_fallback() -> None:

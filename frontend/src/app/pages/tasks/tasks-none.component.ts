@@ -25,6 +25,6 @@ export class TasksNoneComponent {
   protected readonly state = computed<'busy' | 'empty' | 'pick'>(() => {
     const page = this.page;
     if (!page || page.loading() || page.error()) return 'busy';
-    return page.tasks().length ? 'pick' : 'empty';
+    return page.tasks().length || page.todos().length ? 'pick' : 'empty';
   });
 }

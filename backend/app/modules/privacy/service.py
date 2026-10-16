@@ -6,12 +6,13 @@ module sends none.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
-from sqlalchemy import delete, or_, select, update
+from sqlalchemy import ColumnElement, delete, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.membership_sync import sync_principal_memberships
@@ -32,6 +33,14 @@ from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAttendance
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
+from app.modules.tickets.models import Ticket
+from app.modules.tickets.service import (
+    TicketService,
+    erase_sender_blocks,
+    format_number,
+    sender_blocks_of,
+)
+from app.modules.todos.privacy import erase_todos, lock_personal_todos, todo_export
 from app.modules.voting.erasure import erase_candidacies
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -51,14 +60,37 @@ class PrincipalService:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.storage_keys: list[str] = []
 
     async def erase(
-        self, principal_id: UUID, *, actor: str, commit: bool = True
+        self,
+        principal_id: UUID,
+        *,
+        actor: str,
+        commit: bool = True,
+        files: FilesService | None = None,
     ) -> Principal:
         """Null the PII fields, deactivate the principal, and drop the sessions.
 
         The `sub` stays as a pseudonym for the audit chain. The IdP deletes the user
         out of band. The pseudonymity that remains depends on that deletion.
+
+        The tickets that the principal reported get the ticket anonymization: no
+        reporter, no context, no attachments. This covers the reports of the account
+        and the reports without a session under the e-mail of the account. With an
+        object storage in `files` the attachment objects go too. Notes and events keep
+        the principal id, so they show a deleted person; only the ``created`` event
+        loses its actor.
+
+        The to-do assignments of the principal go, and so does the personal board
+        with the files of its comments. Cards, comments, their files and events on the
+        shared boards keep the principal id and show "Gelöschte Person". The objects
+        of those comment files go only after the commit, because a rollback brings the
+        rows back and a row without its object is a broken download. With
+        ``commit=False`` the keys collect in ``storage_keys``, and the caller removes
+        them after its own commit.
+
+        The sender blocks of the account and of its e-mail go too.
 
         Raises:
             NotFoundError: No principal has this id.
@@ -82,6 +114,11 @@ class PrincipalService:
                 "The account is merged into another account. Erase that account instead.",
                 code="erase_merged",
             )
+        # The to-do rows and the comment files are locked before the first audit
+        # entry, because ``finalize_scan`` of an infected file locks its row first
+        # and then waits for the lock of the audit chain.
+        todo_comment_ids = await lock_personal_todos(self.session, principal_id, files=files)
+        address = principal.email
         principal.email = None
         principal.display_name = None
         principal.calendar_token = None
@@ -104,6 +141,13 @@ class PrincipalService:
         # text, unless the principal was elected (a documented resolution).
         erased = await erase_candidacies(self.session, principal_id)
         await erase_candidate_names(self.session, erased)
+        await anonymize_reported_tickets(
+            self.session, actor=actor, files=files, principal_id=principal_id, email=address
+        )
+        await erase_sender_blocks(self.session, principal_id=principal_id, email=address)
+        storage_keys = await erase_todos(
+            self.session, principal_id, files=files, actor=actor, comment_ids=todo_comment_ids
+        )
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -116,9 +160,125 @@ class PrincipalService:
         )
         if commit:
             await self.session.commit()
+            if files is not None:
+                await files.remove_objects(storage_keys)
         else:
             await self.session.flush()
+            self.storage_keys.extend(storage_keys)
         return principal
+
+
+async def anonymize_reported_tickets(
+    session: AsyncSession,
+    *,
+    actor: str,
+    files: FilesService | None = None,
+    principal_id: UUID | None = None,
+    email: str | None = None,
+) -> int:
+    """Anonymize the tickets of one reporter, without a commit.
+
+    A ticket matches when the account reported it (``principal_id``) or when a report
+    without a session gave the address (``email``, a citext compare). Already
+    anonymized tickets do not change.
+
+    The tickets are read ``FOR UPDATE``, in id order, as ``add_note`` and the
+    retention cron read them. A note that binds files waits for the anonymization or
+    finishes before it, because otherwise its files stay on an anonymized ticket that
+    no later step cleans up.
+
+    Returns:
+        The number of anonymized tickets.
+    """
+    reporter: list[ColumnElement[bool]] = []
+    if principal_id is not None:
+        reporter.append(Ticket.reporter_principal_id == principal_id)
+    if email:
+        reporter.append(Ticket.reporter_email == email)
+    if not reporter:
+        return 0
+    reported = (
+        await session.scalars(
+            select(Ticket)
+            .where(or_(*reporter), Ticket.anonymized_at.is_(None))
+            .order_by(Ticket.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+    ).all()
+    tickets = TicketService(session, files=files or FilesService(session))
+    for ticket in reported:
+        await tickets.anonymize(ticket, actor=actor)
+    return len(reported)
+
+
+async def erase_email(
+    session: AsyncSession,
+    email: str,
+    *,
+    actor: str,
+    files: FilesService | None = None,
+) -> dict[str, Any]:
+    """Erase the data of one e-mail address that has no account behind it, and commit.
+
+    A person can reach the platform without an account: as an applicant, or as the
+    reporter of a ticket without a session. Neither path files an erasure request
+    for a ticket, so this is the erasure for such an address. Every application
+    whose applicant has the address gets the applicant anonymization, and every
+    ticket with the address as ``reporter_email`` gets the ticket anonymization. The
+    compare is citext, as in the Auskunft. Rows that are already anonymized do not
+    change. A sender block of the address goes.
+
+    An account under the address stays: its erasure deactivates the account, so it
+    stays a separate step. ``principalId`` names that account.
+
+    The audit entry holds the counts and no address, because the address is the data
+    that goes.
+
+    Returns:
+        ``applications`` and ``tickets`` (the anonymized counts) and ``principalId``.
+    """
+    app_ids = list(
+        (
+            await session.scalars(
+                select(Applicant.application_id).where(
+                    Applicant.email == email, Applicant.anonymized_at.is_(None)
+                )
+            )
+        ).all()
+    )
+    applications = ApplicationsService(session)
+    for application_id in app_ids:
+        await applications.anonymize(
+            application_id, files=files, actor=actor, commit=False
+        )
+        await audit_record(
+            session,
+            actor=actor,
+            action=AuditAction.ANONYMIZATION,
+            target_type="application",
+            target_id=str(application_id),
+        )
+    tickets = await anonymize_reported_tickets(
+        session, actor=actor, files=files, email=email
+    )
+    await erase_sender_blocks(session, email=email)
+    principal_id = await session.scalar(
+        select(Principal.id).where(Principal.email == email)
+    )
+    await audit_record(
+        session,
+        actor=actor,
+        action=AuditAction.ERASURE_EXECUTED,
+        target_type="email",
+        data={"applications": len(app_ids), "tickets": tickets},
+    )
+    await session.commit()
+    return {
+        "applications": len(app_ids),
+        "tickets": tickets,
+        "principalId": principal_id,
+    }
 
 
 class PrivacySettingsService:
@@ -231,6 +391,7 @@ class ErasureRequestService:
             ConflictError: The request is not open, or it has no resolvable subject.
         """
         request = await self._require_open(request_id)
+        storage_keys: list[str] = []
         if request.subject_type == "applicant" and request.application_id is not None:
             await ApplicationsService(self.session).anonymize(
                 request.application_id, files=files, actor=actor, commit=False
@@ -242,10 +403,16 @@ class ErasureRequestService:
                 target_type="application",
                 target_id=str(request.application_id),
             )
-        elif request.subject_type == "principal" and request.principal_id is not None:
-            await PrincipalService(self.session).erase(
-                request.principal_id, actor=actor, commit=False
+            # The applicant can also have reported a ticket without a session under
+            # the same address; the Auskunft lists those tickets, so they go too.
+            await anonymize_reported_tickets(
+                self.session, actor=actor, files=files, email=request.email
             )
+            await erase_sender_blocks(self.session, email=request.email)
+        elif request.subject_type == "principal" and request.principal_id is not None:
+            principals = PrincipalService(self.session)
+            await principals.erase(request.principal_id, actor=actor, commit=False, files=files)
+            storage_keys = principals.storage_keys
         else:
             raise ConflictError(
                 "erasure request has no resolvable subject", code="erasure_no_subject"
@@ -261,6 +428,8 @@ class ErasureRequestService:
             target_id=str(request.id),
         )
         await self.session.commit()
+        if files is not None:
+            await files.remove_objects(storage_keys)
         await self.session.refresh(request)
         return request
 
@@ -405,6 +574,16 @@ class AuskunftService:
                     )
                 ).all()
             )
+            names: dict[UUID, list[str]] = {}
+            if crows:
+                for comment_id, filename in (
+                    await self.session.execute(
+                        select(Attachment.comment_id, Attachment.filename)
+                        .where(Attachment.comment_id.in_([c.id for c in crows]))
+                        .order_by(Attachment.created_at, Attachment.id)
+                    )
+                ).all():
+                    names.setdefault(cast(UUID, comment_id), []).append(filename)
             comments = [
                 {
                     "applicationId": c.application_id,
@@ -412,6 +591,7 @@ class AuskunftService:
                     "visibility": c.visibility,
                     "body": c.body,
                     "at": c.at,
+                    "attachments": names.get(c.id, []),
                 }
                 for c in crows
             ]
@@ -476,6 +656,63 @@ class AuskunftService:
                 }
                 for rec, meeting in arows
             ]
+        # The tickets that the address reported: as the e-mail of a report without a
+        # session, or through the account.
+        reporter = [Ticket.reporter_email == email]
+        if principal_row is not None:
+            reporter.append(Ticket.reporter_principal_id == principal_row.id)
+        trows = (
+            await self.session.scalars(
+                select(Ticket).where(or_(*reporter)).order_by(Ticket.number)
+            )
+        ).all()
+        tickets = [
+            {
+                "number": format_number(t.number),
+                "title": t.title,
+                "status": t.status,
+                "createdAt": t.created_at,
+                "body": t.body,
+                "context": t.context,
+            }
+            for t in trows
+        ]
+        if trows:
+            # The attachments of the reported tickets: metadata only, as above.
+            number_by_ticket = {t.id: format_number(t.number) for t in trows}
+            tarows = (
+                await self.session.scalars(
+                    select(Attachment)
+                    .where(Attachment.ticket_id.in_(list(number_by_ticket)))
+                    .order_by(Attachment.ticket_id, Attachment.created_at)
+                )
+            ).all()
+            attachments.extend(
+                {
+                    "ticketNumber": number_by_ticket.get(at.ticket_id) if at.ticket_id else None,
+                    "filename": at.filename,
+                    "mime": at.mime,
+                    "size": at.size,
+                    "createdAt": at.created_at,
+                }
+                for at in tarows
+            )
+        todos = await todo_export(
+            self.session, [principal_row.id] if principal_row is not None else []
+        )
+        blocks = [
+            {
+                "kind": "principal" if b.principal_id is not None else "email",
+                "createdAt": b.created_at,
+                "hitCount": b.hit_count,
+                "lastHitAt": b.last_hit_at,
+            }
+            for b in await sender_blocks_of(
+                self.session,
+                principal_id=principal_row.id if principal_row is not None else None,
+                email=email,
+            )
+        ]
         principal = (
             {
                 "sub": principal_row.sub,
@@ -494,6 +731,10 @@ class AuskunftService:
             "comments": comments,
             "attachments": attachments,
             "attendance": attendance,
+            "tickets": tickets,
+            "todos": todos["cards"],
+            "todo_comments": todos["comments"],
+            "sender_blocks": blocks,
             "principal": principal,
         }
 
@@ -511,12 +752,20 @@ def build_auskunft_workbook(
     comments: Sequence[Mapping[str, Any]] = (),
     attachments: Sequence[Mapping[str, Any]] = (),
     attendance: Sequence[Mapping[str, Any]] = (),
+    tickets: Sequence[Mapping[str, Any]] = (),
+    todos: Sequence[Mapping[str, Any]] = (),
+    todo_comments: Sequence[Mapping[str, Any]] = (),
+    sender_blocks: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    three sheets: the comments that the subject can see, the attachment metadata, and
-    the meeting attendance with the reason of an excuse.
+    seven sheets: the comments that the subject can see (with the names of their
+    files), the attachment metadata of the applications and the reported tickets, the
+    meeting attendance with the reason of an excuse, the reported tickets with their
+    text and technical context, the to-dos that the subject created or is assigned to
+    (with the description of the own cards), the own to-do comments (with the names of
+    their files), and the sender blocks of the account or the address.
     """
     from io import BytesIO
 
@@ -559,7 +808,7 @@ def build_auskunft_workbook(
 
     _add_sheet(
         "Kommentare",
-        ["Antrags-ID", "Autor-Art", "Sichtbarkeit", "Zeitpunkt", "Text"],
+        ["Antrags-ID", "Autor-Art", "Sichtbarkeit", "Zeitpunkt", "Text", "Anhänge"],
         [
             [
                 str(c.get("applicationId") or ""),
@@ -567,16 +816,17 @@ def build_auskunft_workbook(
                 c.get("visibility") or "",
                 _fmt_dt(c.get("at")),
                 c.get("body") or "",
+                "; ".join(c.get("attachments") or []),
             ]
             for c in comments
         ],
     )
     _add_sheet(
         "Anhänge",
-        ["Antrags-ID", "Dateiname", "Typ", "Größe (Bytes)", "Hochgeladen"],
+        ["Antrag / Ticket", "Dateiname", "Typ", "Größe (Bytes)", "Hochgeladen"],
         [
             [
-                str(at.get("applicationId") or ""),
+                str(at.get("applicationId") or at.get("ticketNumber") or ""),
                 at.get("filename") or "",
                 at.get("mime") or "",
                 at.get("size"),
@@ -598,6 +848,66 @@ def build_auskunft_workbook(
                 a.get("note") or "",
             ]
             for a in attendance
+        ],
+    )
+
+    _add_sheet(
+        "Tickets",
+        ["Nummer", "Titel", "Status", "Gemeldet", "Text", "Technischer Kontext"],
+        [
+            [
+                t.get("number") or "",
+                t.get("title") or "",
+                t.get("status") or "",
+                _fmt_dt(t.get("createdAt")),
+                t.get("body") or "",
+                json.dumps(t["context"], ensure_ascii=False, sort_keys=True)
+                if t.get("context")
+                else "",
+            ]
+            for t in tickets
+        ],
+    )
+    _add_sheet(
+        "To-Dos",
+        ["Board", "Titel", "Spalte", "Fällig", "Erstellt", "Beschreibung"],
+        [
+            [
+                t.get("board") or "",
+                t.get("title") or "",
+                t.get("column") or "",
+                t["dueDate"].isoformat() if t.get("dueDate") else "",
+                _fmt_dt(t.get("createdAt")),
+                t.get("description") or "",
+            ]
+            for t in todos
+        ],
+    )
+    _add_sheet(
+        "To-Do-Kommentare",
+        ["To-Do", "Zeitpunkt", "Gelöscht", "Text", "Anhänge"],
+        [
+            [
+                c.get("card") or "",
+                _fmt_dt(c.get("createdAt")),
+                _fmt_dt(c.get("deletedAt")),
+                c.get("body") or "",
+                "; ".join(c.get("attachments") or []),
+            ]
+            for c in todo_comments
+        ],
+    )
+    _add_sheet(
+        "Ticket-Sperren",
+        ["Art", "gesperrt am", "abgefangene Meldungen", "letzter Versuch"],
+        [
+            [
+                "Konto" if b.get("kind") == "principal" else "E-Mail-Adresse",
+                _fmt_dt(b.get("createdAt")),
+                b.get("hitCount") or 0,
+                _fmt_dt(b.get("lastHitAt")),
+            ]
+            for b in sender_blocks
         ],
     )
 

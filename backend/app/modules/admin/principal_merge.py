@@ -16,10 +16,13 @@ What the merge does with each reference:
   That covers applications (creator, archiver, capturer, share links), versions, the timeline,
   comments, ballots and the voted markers of secret votes, delegations, the substitute
   pool, attendance, meetings (creator, minute-taker, keeper periods), protocols, budget
-  bookings and invoices, config versions, role assignments, privacy requests, backups
-  and the stored audit checks.
-- It combines harmless duplicates: a notification preference, a pool entry or an
-  equal attendance that the target already has. The row
+  bookings and invoices, config versions, role assignments, privacy requests, backups,
+  the stored audit checks, tickets and to-dos (cards, comments with their mentions,
+  events, links).
+- It moves the personal to-do board of the source to the target. When the target has
+  one already, the cards of the source board move into it (``todos/merge.py``).
+- It combines harmless duplicates: a notification preference, a pool entry, an
+  equal attendance or a to-do assignment that the target already has. The row
   of the target wins, the row of the source goes. A pool entry in which one account
   substitutes for the other goes too, because a person never substitutes for themselves.
 - It removes the sessions and the OAuth codes and tokens of the source, its feed token,
@@ -122,6 +125,16 @@ from app.modules.livevote.models import (
 from app.modules.notifications.models import NotificationPreference
 from app.modules.privacy.models import ErasureRequest
 from app.modules.protocol.models import Protocol
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
+from app.modules.todos.merge import fold_personal_board, rewrite_mentions
+from app.modules.todos.models import (
+    TodoAssignee,
+    TodoBoard,
+    TodoCard,
+    TodoComment,
+    TodoEvent,
+    TodoLink,
+)
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.shared.errors import ConflictError, FieldError, NotFoundError, ValidationProblem
 
@@ -151,6 +164,8 @@ AREAS: tuple[MergeArea, ...] = (
     "sessions",
     "memberships",
     "calendar",
+    "tickets",
+    "todos",
 )
 
 # Every text column that stores the ``sub`` of a principal, by area. The merge rewrites
@@ -207,6 +222,15 @@ ID_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("meetings", MeetingGuest.decided_by),
     # Never written so far, but it holds a principal id.
     ("config", FormVersion.created_by),
+    ("tickets", Ticket.reporter_principal_id),
+    ("tickets", Ticket.assignee_id),
+    ("tickets", TicketNote.author_id),
+    ("tickets", TicketEvent.actor_id),
+    ("tickets", TicketSenderBlock.created_by),
+    ("todos", TodoCard.created_by),
+    ("todos", TodoComment.author_id),
+    ("todos", TodoEvent.actor_id),
+    ("todos", TodoLink.created_by),
 )
 
 # The rows of the source that the merge deletes, by area.
@@ -227,6 +251,8 @@ COMBINED_COLUMNS: tuple[InstrumentedAttribute[Any], ...] = (
     MeetingAttendance.principal_id,
     DelegationSubstitute.member_principal_id,
     DelegationSubstitute.substitute_principal_id,
+    TodoAssignee.principal_id,
+    TicketSenderBlock.principal_id,
 )
 
 # The principal columns that the merge leaves alone on purpose, with the reason. A guard
@@ -237,6 +263,7 @@ EXCLUDED_COLUMNS: dict[str, str] = {
     "config_revision.created_by": "append-only (trigger); the display follows merged_into",
     "erasure_request.principal_id": "the proof of the request; an open one blocks",
     "gremium_membership.principal_id": "derived from OIDC; the sync deletes the rows",
+    "todo_board.owner_id": "one personal board per person; `_todos` moves or folds it",
 }
 
 
@@ -736,6 +763,29 @@ class PrincipalMergeService:
             tally,
             apply=apply,
         )
+        # To-do assignments: the target is already assigned to the same card.
+        ta = aliased(TodoAssignee)
+        await self._combine(
+            "todos",
+            TodoAssignee.principal_id,
+            old,
+            new,
+            exists().where(ta.principal_id == new, ta.card_id == TodoAssignee.card_id),
+            tally,
+            apply=apply,
+        )
+        # Sender blocks: a block of the target already holds the account.
+        tsb = aliased(TicketSenderBlock)
+        await self._combine(
+            "tickets",
+            TicketSenderBlock.principal_id,
+            old,
+            new,
+            exists().where(tsb.principal_id == new),
+            tally,
+            apply=apply,
+        )
+
         # The substitute side: the target already substitutes for the same member (or
         # gremium-wide) in the gremium.
         other = aliased(DelegationSubstitute)
@@ -752,6 +802,48 @@ class PrincipalMergeService:
             tally,
             apply=apply,
         )
+
+    async def _todos(
+        self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
+    ) -> None:
+        """Move the personal board and the mentions of the source to the target.
+
+        Without a personal board of the target the board of the source changes its
+        owner. With one, ``fold_personal_board`` moves the cards of the source board
+        into it and deletes the source board (one combined row).
+        """
+        mentions = await rewrite_mentions(self.session, source.id, target.id, apply=apply)
+        tally.add("todos", rewritten=mentions)
+        rows = (
+            await self.session.execute(
+                select(TodoBoard.id, TodoBoard.owner_id).where(
+                    TodoBoard.kind == "personal",
+                    TodoBoard.owner_id.in_([source.id, target.id]),
+                )
+            )
+        ).all()
+        boards = {owner: board_id for board_id, owner in rows}
+        mine = boards.get(source.id)
+        if mine is None:
+            return
+        theirs = boards.get(target.id)
+        if theirs is None:
+            tally.add("todos", rewritten=1)
+            if apply:
+                await self.session.execute(
+                    update(TodoBoard)
+                    .where(TodoBoard.id == mine)
+                    .values(owner_id=target.id)
+                    .execution_options(synchronize_session=False)
+                )
+            return
+        if apply:
+            moved = await fold_personal_board(self.session, mine, theirs)
+        else:
+            moved = await self._count(
+                select(func.count()).select_from(TodoCard).where(TodoCard.board_id == mine)
+            )
+        tally.add("todos", rewritten=moved, combined=1)
 
     async def _source_row(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
@@ -800,6 +892,7 @@ class PrincipalMergeService:
         tally = _Tally()
         await self._plain_columns(source, target, tally, apply=False)
         await self._combined_tables(source, target, tally, apply=False)
+        await self._todos(source, target, tally, apply=False)
         await self._source_row(source, target, tally, apply=False)
         return MergePreviewOut(
             source=_principal_out(source),
@@ -849,6 +942,7 @@ class PrincipalMergeService:
             tally = _Tally()
             await self._combined_tables(source, target, tally, apply=True)
             await self._plain_columns(source, target, tally, apply=True)
+            await self._todos(source, target, tally, apply=True)
             merged_at = await self._source_row(source, target, tally, apply=True)
             assert merged_at is not None
             await AuditService(self.session).record(

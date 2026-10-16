@@ -8,5 +8,5 @@
   />
 }
 @if (rest() > 0) {
-  <span class="stack__av stack__rest" [class.av--sm]="size() === 'sm'" aria-hidden="true">+{{ rest() }}</span>
+  <span class="stack__av stack__rest" [class.av--sm]="size() === 'sm'" [class.av--xs]="size() === 'xs'" aria-hidden="true">+{{ rest() }}</span>
 }

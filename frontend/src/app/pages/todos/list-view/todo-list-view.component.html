@@ -1,0 +1,87 @@
+<div class="lv" role="table" [attr.aria-label]="board().name">
+  <div class="lv__head" role="rowgroup">
+    <div class="lv__row lv__row--head" role="row">
+      <span class="lv__c lv__c--check" role="columnheader"><span class="sr-only">{{ 'todos.list.done' | t }}</span></span>
+      <span class="lv__c lv__c--title cap" role="columnheader">{{ 'todos.list.title' | t }}</span>
+      <span class="lv__c lv__c--link cap" role="columnheader">{{ 'todos.list.linked' | t }}</span>
+      <span class="lv__c lv__c--label cap" role="columnheader">{{ 'todos.list.label' | t }}</span>
+      <span class="lv__c lv__c--due cap" role="columnheader" [attr.aria-sort]="ariaSort()">
+        <button type="button" class="lv__sort" (click)="nextSort()">
+          {{ 'todos.list.due' | t }}
+          <app-icon [name]="sort() === 'asc' ? 'up' : 'down'" [size]="13" [class.lv__sortIdle]="sort() === 'none'" />
+        </button>
+      </span>
+      <span class="lv__c lv__c--who cap" role="columnheader">{{ 'todos.list.who' | t }}</span>
+    </div>
+  </div>
+
+  @for (group of groups(); track group.column.id) {
+    <div class="lv__group" role="rowgroup" [attr.aria-label]="group.column.name">
+      <div role="row" class="lv__groupRow">
+        <span role="rowheader" class="lv__groupHead">
+          @if (group.column.isDone) {
+            <button type="button" class="lv__groupBtn" [attr.aria-expanded]="!folded(group)" (click)="toggleGroup(group)">
+              {{ group.column.name }}
+              <span class="lv__count num">{{ group.rows.length }}</span>
+              <app-icon [name]="folded(group) ? 'down' : 'up'" [size]="15" />
+            </button>
+          } @else {
+            {{ group.column.name }}
+            <span class="lv__count num">{{ group.rows.length }}</span>
+          }
+        </span>
+      </div>
+      @if (!folded(group)) {
+        @for (row of group.rows; track row.card.id) {
+          <div class="lv__row" role="row">
+            <span class="lv__c lv__c--check" role="cell">
+              <button
+                type="button"
+                class="lv__circle"
+                role="checkbox"
+                [attr.aria-checked]="group.column.isDone"
+                [attr.aria-label]="(group.column.isDone ? 'todos.list.reopen' : 'todos.list.markDone') | t: { title: row.card.title }"
+                [disabled]="!board().canWrite"
+                (click)="toggleDone.emit(row.card)"
+              >
+                <app-icon [name]="group.column.isDone ? 'circleok' : 'circle'" [size]="19" />
+              </button>
+            </span>
+            <span class="lv__c lv__c--title" role="cell">
+              <button type="button" class="lv__open" [attr.data-card-id]="row.card.id" (click)="openCard.emit(row.card.id)">
+                {{ row.card.title }}
+              </button>
+            </span>
+            <span class="lv__c lv__c--link" role="cell">
+              @if (row.link) {
+                <span class="ell" [title]="row.link">{{ row.link }}</span>
+              }
+            </span>
+            <span class="lv__c lv__c--label" role="cell">
+              @for (label of row.labels; track label.id) {
+                <span class="lv__label" [attr.data-color]="label.color"><span class="lv__dot" aria-hidden="true"></span>{{ label.name }}</span>
+              }
+            </span>
+            <span class="lv__c lv__c--due" role="cell">
+              @if (row.due; as due) {
+                <span class="lv__due" [class.lv__due--overdue]="due.tone === 'overdue'" [class.lv__due--soon]="due.tone === 'soon'">
+                  <app-icon name="cal" [size]="14" />
+                  <span class="num">{{ due.date }}@if (due.note) { · {{ due.note }}}</span>
+                </span>
+              }
+            </span>
+            <span class="lv__c lv__c--who" role="cell">
+              @if (row.names.length) {
+                <app-avatar-stack [names]="row.names" [principalIds]="row.ids" [max]="3" size="xs" />
+              } @else {
+                <span class="lv__nobody" role="img" [attr.aria-label]="'todos.tile.nobody' | t"><app-icon name="user" [size]="13" /></span>
+              }
+            </span>
+          </div>
+        } @empty {
+          <div role="row" class="lv__emptyRow"><span role="cell">{{ 'todos.board.columnEmpty' | t }}</span></div>
+        }
+      }
+    </div>
+  }
+</div>

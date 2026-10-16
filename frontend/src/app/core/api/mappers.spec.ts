@@ -14,6 +14,7 @@ import {
   mapTimelineEvent,
   mapTransition,
   mapVersion,
+  messageFiles,
   toApplicationCreateBody,
 } from './mappers';
 import type {
@@ -291,7 +292,34 @@ describe('mapComment', () => {
       isPublic: true,
       isOwn: false,
       at: '2026-06-05T13:00:00Z',
+      editedAt: null,
+      attachments: [],
     });
+  });
+
+  it('maps the files of a comment', () => {
+    const files = [{ id: 'f', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanState: 'clean' as const }];
+    const wire: CommentOutWire = {
+      id: 'c5',
+      authorKind: 'principal',
+      body: '',
+      visibility: 'public',
+      at: '2026-06-05T13:00:00Z',
+      attachments: files,
+    };
+    expect(mapComment(wire).attachments).toEqual(files);
+  });
+
+  it('maps the time of the last edit', () => {
+    const wire: CommentOutWire = {
+      id: 'c4',
+      authorKind: 'principal',
+      body: 'geändert',
+      visibility: 'internal',
+      at: '2026-06-05T13:00:00Z',
+      editedAt: '2026-06-05T13:20:00Z',
+    };
+    expect(mapComment(wire).editedAt).toBe('2026-06-05T13:20:00Z');
   });
 
   it('maps isOwn from the wire (default false when absent)', () => {
@@ -976,5 +1004,15 @@ describe('mapMeetingPage', () => {
     const page = mapMeetingPage({} as MeetingPageWire);
     expect(page.items).toEqual([]);
     expect(page.nextCursor).toBeNull();
+  });
+});
+
+describe('messageFiles', () => {
+  it('sends nothing without files, else the ids and the token', () => {
+    expect(messageFiles(undefined)).toEqual({});
+    expect(messageFiles({})).toEqual({});
+    expect(messageFiles({ attachmentIds: [], draftToken: 'tok' })).toEqual({});
+    expect(messageFiles({ attachmentIds: ['a'] })).toEqual({ attachmentIds: ['a'], draftToken: null });
+    expect(messageFiles({ attachmentIds: ['a'], draftToken: 'tok' })).toEqual({ attachmentIds: ['a'], draftToken: 'tok' });
   });
 });

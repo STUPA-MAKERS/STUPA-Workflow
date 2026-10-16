@@ -15,7 +15,14 @@ import { NgTemplateOutlet } from '@angular/common';
 import { IconComponent, MEDIA, type IconName } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { mediaQuerySignal } from '../../../layout/media-query';
+import { AvatarComponent } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
+
+/** A person in front of the text of the chip. */
+export interface FilterSelectPerson {
+  name: string;
+  principalId?: string | null;
+}
 
 /** One choice of a filter chip. */
 export interface FilterSelectOption {
@@ -52,7 +59,7 @@ const TYPEAHEAD_RESET = 600;
   selector: 'app-filter-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, NgTemplateOutlet, TranslatePipe, SideSheetComponent],
+  imports: [AvatarComponent, IconComponent, NgTemplateOutlet, TranslatePipe, SideSheetComponent],
   templateUrl: './filter-select.component.html',
   styleUrl: './filter-select.component.scss',
 })
@@ -74,8 +81,12 @@ export class FilterSelectComponent {
   readonly active = input(false);
   /** An icon in front of the text. */
   readonly icon = input<IconName | null>(null);
+  /** A person's avatar in front of the text (an assignee select), in place of `icon`. */
+  readonly person = input<FilterSelectPerson | null>(null);
   /** The chevron after the text. */
   readonly chevron = input(true);
+  /** Only the icon shows, in a square chip; `label` names the button. */
+  readonly iconOnly = input(false);
   /** `sm`: the filter chip (32px). `md`: a pill as high as the search pill `md` (44px). */
   readonly size = input<'sm' | 'md'>('sm');
   /** Several choices: the text of the button that clears all values. No text, no button. */
@@ -108,6 +119,7 @@ export class FilterSelectComponent {
    * does not start with it ("Typ: Förderantrag", but "Archiv: Alle" as it is).
    */
   protected readonly chipName = computed(() => {
+    if (this.iconOnly()) return this.label();
     const text = this.chipText();
     return text.startsWith(this.label()) ? text : `${this.label()}: ${text}`;
   });

@@ -34,6 +34,7 @@ import type { StatusKind } from '@shared/status-kind.util';
 import { resolveI18n } from '../meetings-display.util';
 import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
+import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { applyRawFormat } from './raw-format';
 
@@ -97,6 +98,7 @@ const TOOLS: readonly FormatTool[] = [
     ProtocolBarComponent,
     SegmentedComponent,
     StatusTextComponent,
+    TodoLinkedListComponent,
   ],
   templateUrl: './top-sheet.component.html',
   styleUrl: './top-sheet.component.scss',

@@ -80,9 +80,6 @@
     (renameTop)="renameTop($event)"
     (setNonPublic)="setNonPublic($event.item, $event.nonPublic)"
     (moveTop)="moveTop($event.from, $event.to)"
-    (dragStart)="onTopDragStart($event)"
-    (dragOver)="onTopDragOver($event)"
-    (dropAt)="onTopDrop($event)"
   />
 
   <!-- Meeting votes without a TOP binding (legacy or active): the control card. -->
@@ -158,7 +155,7 @@
   <app-agenda-item-dialog
     [open]="dialogs.agendaOpen()"
     [meeting]="m"
-    [nextNumber]="agenda().length + 1"
+    [agenda]="agenda()"
     (closed)="dialogs.agendaOpen.set(false)"
     (added)="agendaAdded($event)"
   />

@@ -1,0 +1,37 @@
+<app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'todos.archive.title' | t" [(open)]="open">
+  <div class="as">
+    <app-search-pill
+      size="md"
+      [clearable]="true"
+      [placeholder]="'todos.archive.search' | t"
+      [value]="search.text()"
+      (valueChange)="search.set($event)"
+      (commit)="search.flush()"
+    />
+    @if (failed()) {
+      <p class="as__note as__note--error" role="alert">{{ 'todos.archive.error' | t }}</p>
+    } @else if (loading() && !items().length) {
+      <app-skeleton variant="rows" [count]="4" [label]="'todos.archive.loading' | t" />
+    } @else if (!items().length) {
+      <p class="as__note">{{ 'todos.archive.empty' | t }}</p>
+    }
+    <ul class="as__list">
+      @for (card of items(); track card.id) {
+        <li class="as__row">
+          <button type="button" class="as__open" (click)="pick(card)">
+            <span class="as__title">{{ card.title }}</span>
+            @if (doneOn(card)) {
+              <span class="as__sub">{{ doneOn(card) }}</span>
+            }
+          </button>
+          <app-button variant="tonal" size="sm" [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }" (click)="restore(card)">
+            {{ 'todos.archive.restore' | t }}
+          </app-button>
+        </li>
+      }
+    </ul>
+    @if (items().length < total()) {
+      <app-button variant="text" [loading]="loading()" (click)="more()">{{ 'todos.archive.more' | t }}</app-button>
+    }
+  </div>
+</app-side-sheet>

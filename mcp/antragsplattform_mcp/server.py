@@ -67,6 +67,28 @@ TYPICAL FLOWS:
   `delete_invoice`. To attach an original PDF: `parse_invoice(file_path)` (ZUGFeRD/Factur-X →
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
+- Application attachments: `list_attachments(application_id)` →
+  `upload_attachment(application_id, file_path, field_key?, is_comparison_offer?)` (a
+  local file: PDF, image or Office/OpenDocument, at most 10 MB; needs
+  `application.manage` and scope `applications:write`) → `scanned` is false until the
+  virus scan is clean. `download_attachment(attachment_id, target_path)` writes the file
+  to disk (409 while the scan runs); `delete_attachment` removes it.
+- To-dos: `todo_boards` → `todo_board(board_id)` (columns, cards; the `isDone` column is
+  done) → `todo_card_get` → `todo_card_update(card_id, {version, ...})` with the card's
+  current `version` (409 `card_version_conflict`: read again), `todo_card_move` into a
+  column, `todo_comment`. The scope `todos:write` must let the gremium right `todo.write`
+  through.
+- Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →
+  `tickets_get` → `tickets_note` (internal) or `tickets_update` (status, assignee, kind).
+  `tickets_block_sender(ticket_id)` / `tickets_unblock_sender(ticket_id)` block the reporter
+  ("Absender sperren": later reports get a number and are dropped);
+  `tickets_blocked_senders` lists the blocks, `tickets_delete_blocked_sender(block_id)`
+  lifts one whose ticket is gone or anonymized.
+- Chat files: `tickets_note`, `todo_comment` and `comment_application` take
+  `file_paths` (local files, at most 5, same types and 10 MB cap as `upload_attachment`;
+  the body may then be empty). The tool uploads each file as a draft and binds it to the
+  message. The message lists `attachments` with `scanState`; `download_attachment` fetches
+  a `clean` one. A comment file is not in `list_attachments`.
 - Members and roles: the OIDC groups of the IdP are the only source. No tool adds a member
   or assigns a role. There are three separate group mappings: a group to the membership in
   a Gremium (`create_gremium_membership_mapping`, default role `member`), a group to a

@@ -420,15 +420,92 @@ async def test_update_gremium_not_found() -> None:
 _ADMIN = Principal(sub="admin", roles=["admin"])
 
 
+def todo_locks(*comment_ids: Any) -> list[FakeResult]:
+    """The board lock, the card lock and the comment ids of a Gremium delete."""
+    return [res(), res(), res(*comment_ids)]
+
+
 async def test_delete_gremium_ok() -> None:
     row = gremium_row()
-    # The locked Gremium, then no meeting (the locking select), no vote, the audit.
-    s, sess = svc([res(), res(), *audit_results()], scalars=[row])
+    # The locked Gremium, the to-do locks, then no meeting (the locking select), no
+    # vote, the audit.
+    s, sess = svc([*todo_locks(), res(), res(), *audit_results()], scalars=[row])
     await s.delete_gremium(row.id, _ADMIN)
     assert row in sess.deleted
     assert sess.committed == 1
     lock = str(sess.statements[0])
     assert "FROM gremium" in lock and "FOR UPDATE" in lock
+    # The board, then its cards, before the meetings: the order of every to-do write.
+    board, cards, comments = (str(sess.statements[i]) for i in (3, 4, 5))
+    assert "FROM todo_board" in board and "FOR UPDATE" in board
+    assert "FROM todo_card" in cards and "FOR UPDATE" in cards
+    assert "ORDER BY todo_card.id" in cards
+    assert "FROM todo_comment" in comments and "FOR UPDATE" not in comments
+
+
+async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The comment file rows go before the cascade, their objects after the commit."""
+    from app.modules.files.service import FilesService
+
+    row = gremium_row()
+    c1, c2 = uuid.uuid4(), uuid.uuid4()
+    storage = object()
+    seen: list[tuple[Any, ...]] = []
+
+    async def _drop(
+        self: FilesService, owner: str, ids: list[Any], *, actor: str
+    ) -> list[str]:
+        seen.append(("drop", self.storage, owner, list(ids), actor, list(session.deleted)))
+        return ["k1", "k2"]
+
+    async def _remove(self: FilesService, keys: list[str]) -> None:
+        seen.append(("remove", self.storage, list(keys), session.committed))
+
+    monkeypatch.setattr(FilesService, "drop_for_messages", _drop)
+    monkeypatch.setattr(FilesService, "remove_objects", _remove)
+    session = FakeSession(
+        [*todo_locks(c1, c2), res(), res(), *audit_results()], scalars=[row]
+    )
+    s = ConfigService(session, storage=storage)  # type: ignore[arg-type]
+    await s.delete_gremium(row.id, _ADMIN)
+    # The Gremium row is still there when the rows go; the objects go after the commit.
+    assert seen == [
+        ("drop", storage, "todo_comment", [c1, c2], "admin", []),
+        ("remove", storage, ["k1", "k2"], 1),
+    ]
+    assert row in session.deleted
+
+
+async def test_delete_gremium_keeps_the_objects_when_the_commit_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed commit brings the rows back, so their objects must still be there."""
+    from app.modules.files.service import FilesService
+
+    removed: list[list[str]] = []
+
+    async def _drop(_self: FilesService, _owner: str, _ids: list[Any], *, actor: str) -> list[str]:
+        assert actor == "admin"
+        return ["k1"]
+
+    async def _remove(_self: FilesService, keys: list[str]) -> None:
+        removed.append(list(keys))
+
+    class _FailingCommit(FakeSession):
+        async def commit(self) -> None:
+            raise RuntimeError("fk violation")
+
+    monkeypatch.setattr(FilesService, "drop_for_messages", _drop)
+    monkeypatch.setattr(FilesService, "remove_objects", _remove)
+    row = gremium_row()
+    session = _FailingCommit(
+        [*todo_locks(uuid.uuid4()), res(), res(), *audit_results()], scalars=[row]
+    )
+    with pytest.raises(RuntimeError):
+        await ConfigService(session, storage=object()).delete_gremium(row.id, _ADMIN)  # type: ignore[arg-type]
+    assert removed == []
 
 
 class _DeleteSpy:
@@ -495,7 +572,7 @@ async def test_delete_gremium_locks_and_checks_everything_before_the_first_write
     m1, m2 = _meeting_row(final=True), _meeting_row()
     v1, v2, loose = _vote_row(m1.id), _vote_row(m2.id), _vote_row(None)
     spy = _DeleteSpy(monkeypatch, [v1, loose, v2])
-    s, sess = svc([res(m1, m2), *audit_results()], scalars=[row])
+    s, sess = svc([*todo_locks(), res(m1, m2), *audit_results()], scalars=[row])
     await s.delete_gremium(row.id, _ADMIN)
     assert spy.calls == [
         ("check", m1.id),
@@ -516,7 +593,7 @@ async def test_delete_gremium_locks_and_checks_everything_before_the_first_write
     ]
     assert all(loose.id not in call[1] for call in spy.calls if call[0] == "votes")
     # The Gremium row first, then the meetings of the Gremium in id order.
-    lock = str(sess.statements[3])
+    lock = str(sess.statements[6])
     assert "FOR UPDATE" in lock and "meeting.gremium_id" in lock
     assert "ORDER BY meeting.id" in lock
     assert row in sess.deleted
@@ -536,7 +613,7 @@ async def test_delete_gremium_refusal_writes_nothing(
         refuse_meeting=m2 if refusal == "meeting" else None,
         refuse_lock=refusal == "lock",
     )
-    s, sess = svc([res(m1, m2)], scalars=[row])
+    s, sess = svc([*todo_locks(), res(m1, m2)], scalars=[row])
     with pytest.raises(ForbiddenError if refusal == "meeting" else ConflictError):
         await s.delete_gremium(row.id, _ADMIN)
     assert all(call[0] in {"check", "lock"} for call in spy.calls)

@@ -14,17 +14,22 @@
   }
 </div>
 
-<ol class="ap__list">
+<ol
+  class="ap__list"
+  cdkDropList
+  [cdkDropListDisabled]="!canChangeAgenda()"
+  (cdkDropListDropped)="dropped($event)"
+>
   @for (item of agenda(); track item.id; let i = $index) {
     @let done = isDone(i);
     <li
       class="ap__row"
+      cdkDrag
+      cdkDragPreviewClass="ap__preview"
+      [cdkDragStartDelay]="dragDelay"
+      [cdkDragDisabled]="!canDrag(item)"
       [class.ap__row--done]="done"
       [class.ap__row--drag]="canChangeAgenda()"
-      [attr.draggable]="canChangeAgenda() && renamingTopId() !== item.id"
-      (dragstart)="dragStart.emit(i)"
-      (dragover)="dragOver.emit($event)"
-      (drop)="dropAt.emit(i)"
     >
       @if (renamingTopId() === item.id) {
         <div class="ap__rename">
@@ -86,8 +91,13 @@
           </span>
         </app-list-item>
       }
+      <div *cdkDragPlaceholder class="ap__placeholder"></div>
     </li>
   } @empty {
     <li class="ap__empty">{{ 'meetings.agenda.empty' | t }}</li>
   }
 </ol>
+
+@if (todoOpen()) {
+  <app-todo-new-dialog [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
+}

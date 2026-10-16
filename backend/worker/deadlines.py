@@ -20,6 +20,9 @@ idempotent steps:
 5. Discard. An application whose email stays unconfirmed longer than
    `guest_application_settings.confirm_ttl_hours` is deleted, with its MinIO
    objects and a `guest_application_discard` audit entry without PII.
+6. To-do reminders. `process_todo_due` (`worker/todos.py`) sends `todo_due` for the
+   open cards due tomorrow. A failure of this step is logged and does not stop the
+   cycle.
 
 An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the flow. The
 reminder, deadline-action and auto-transition scans skip it. The magic-link verify
@@ -66,6 +69,7 @@ from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError, NotFoundError
+from worker.todos import process_todo_due
 
 logger = logging.getLogger("app.deadlines")
 
@@ -147,10 +151,20 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     closed = await _process_votes(ctx, now)
     advanced = await _process_auto_transitions(ctx)
     discarded = await _discard_unconfirmed(ctx, now, settings)
+    todos = await _process_todo_due(ctx, now)
     return (
         f"reminders={reminded} actions={fired} votes={closed} "
-        f"auto={advanced} discarded={discarded}"
+        f"auto={advanced} discarded={discarded} todos={todos}"
     )
+
+
+async def _process_todo_due(ctx: dict[str, Any], now: datetime) -> int:
+    """Run the to-do due reminder; a failure costs only this step."""
+    try:
+        return await process_todo_due(ctx, now)
+    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+        logger.exception("todo_due reminders failed")
+        return 0
 
 
 async def _discard_unconfirmed(

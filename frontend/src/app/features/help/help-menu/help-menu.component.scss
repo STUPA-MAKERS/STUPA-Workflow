@@ -1,0 +1,184 @@
+:host {
+  display: block;
+}
+
+/* ------------------------------------------------------------------ rail trigger */
+/* The same entry as the areas of the rail (nav-rail.component.scss): a pill behind the
+   icon, the label below. The open menu fills the pill like an active entry. */
+.hm__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 60px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: var(--fw-medium);
+  line-height: 14px;
+  cursor: pointer;
+}
+.hm__ind {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 32px;
+  border-radius: 16px;
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+.hm__label {
+  max-width: 88px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hm__rail:hover {
+  color: var(--color-text);
+}
+.hm__rail:hover .hm__ind {
+  background: var(--color-surface-2);
+}
+.hm__rail.is-open {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}
+.hm__rail.is-open .hm__ind {
+  background: var(--color-selected);
+  color: var(--color-accent-text);
+}
+.hm__rail:focus-visible {
+  outline: none;
+}
+.hm__rail:focus-visible .hm__ind {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+@media (max-height: 760px) {
+  .hm__rail {
+    min-height: 52px;
+  }
+}
+
+/* ------------------------------------------------------------------ header trigger */
+/* A quiet text button with the icon, beside the language chip of the public header. */
+.hm__head {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.hm__head:hover,
+.hm__head.is-open {
+  background: var(--color-surface-2);
+}
+.hm__head:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ panel */
+.hm {
+  display: flex;
+  flex-direction: column;
+  color: var(--color-text);
+}
+/* Fixed, so the scrolling rail does not clip it. */
+.hm--popover {
+  position: fixed;
+  z-index: var(--z-dropdown);
+  width: 320px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 6px 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  box-shadow: var(--shadow-elevated);
+}
+.hm__title {
+  margin: 0;
+  padding: 10px var(--space-4) 6px;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-semibold);
+}
+.hm__cap {
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--color-text-muted);
+}
+
+.hm__sep {
+  height: var(--border-width);
+  margin: 6px 0;
+  background: var(--color-border);
+}
+
+.hm__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  width: 100%;
+  min-height: 44px;
+  padding: 11px var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-body);
+  font-weight: var(--fw-medium);
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.hm__item > app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.hm__item:hover {
+  background: var(--color-surface-4);
+}
+.hm__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.hm__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+/* A URL is never cut: it wraps anywhere. */
+.hm__url {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+  overflow-wrap: anywhere;
+}
+
+/* In the "Mehr" sheet: the sheet is the surface, the rows sit on it. */
+.hm--sheet {
+  padding-bottom: var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+.hm--sheet .hm__item {
+  padding-inline: var(--space-2);
+  border-radius: var(--radius-md);
+}
+.hm--sheet .hm__item:hover {
+  background: var(--color-surface-3);
+}

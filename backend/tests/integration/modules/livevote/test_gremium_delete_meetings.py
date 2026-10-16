@@ -139,3 +139,65 @@ async def test_gremium_delete_with_a_final_protocol_needs_the_permission(
     async with maker() as session:
         assert await session.get(Gremium, draft.gremium_id) is None
         assert await session.get(Vote, draft.vote_ids["closed"]) is None
+
+
+async def test_gremium_delete_removes_the_files_of_its_to_do_comments(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    """The board cascade drops the rows; the delete removes the objects with them."""
+    from app.modules.auth.models import Principal as PrincipalRow
+    from app.modules.files.models import Attachment
+    from app.modules.todos.boards import ensure_gremium_board
+    from app.modules.todos.models import TodoBoard, TodoCard, TodoColumn, TodoComment
+    from tests._support.memory_storage import MemoryStorage
+
+    s = await seed(maker, status="closed")
+    storage = MemoryStorage()
+    key = f"attachments/{uuid.uuid4()}/beleg.pdf"
+    await storage.put(key, b"data", "application/pdf")
+    async with maker() as session:
+        await ensure_gremium_board(session, s.gremium_id, "G")
+        author = PrincipalRow(sub=f"a-{uuid.uuid4().hex[:8]}", display_name="A")
+        session.add(author)
+        await session.flush()
+        board = await session.scalar(
+            select(TodoBoard.id).where(TodoBoard.gremium_id == s.gremium_id)
+        )
+        column = await session.scalar(select(TodoColumn.id).where(TodoColumn.board_id == board))
+        assert board is not None and column is not None
+        card = TodoCard(
+            id=uuid.uuid4(),
+            board_id=board,
+            column_id=column,
+            rank="m",
+            title="Karte",
+            created_by=author.id,
+        )
+        session.add(card)
+        await session.flush()
+        comment = TodoComment(id=uuid.uuid4(), card_id=card.id, author_id=author.id, body="b")
+        session.add(comment)
+        await session.flush()
+        attachment = Attachment(
+            id=uuid.uuid4(),
+            todo_comment_id=comment.id,
+            filename="beleg.pdf",
+            mime="application/pdf",
+            size=4,
+            storage_key=key,
+            scanned=True,
+            scan_result="clean",
+        )
+        session.add(attachment)
+        await session.commit()
+
+    admin = Principal(sub="gremien-admin", permissions={"admin.gremien"})
+    async with maker() as session:
+        await ConfigService(session, storage=storage).delete_gremium(s.gremium_id, admin)
+
+    assert key not in storage.blobs
+    async with maker() as session:
+        assert await session.get(Attachment, attachment.id) is None
+    [entry] = await audit_actions(maker, target_id=attachment.id)
+    assert entry.action == "attachment_delete"
+    assert entry.actor == "gremien-admin"

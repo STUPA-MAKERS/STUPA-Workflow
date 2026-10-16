@@ -220,6 +220,7 @@ class AgendaService:
                 AgendaItemOut(
                     id=r.id,
                     applicationId=r.application_id,
+                    todoId=r.todo_id,
                     title=title,
                     body=r.body,
                     position=r.position,
@@ -503,6 +504,58 @@ class AgendaService:
             AuditAction.AGENDA_ITEM_ADD, actor=actor, item=item, nonPublic=non_public
         )
         return True
+
+    async def add_todo_in_tx(
+        self,
+        meeting_id: UUID,
+        *,
+        todo_id: UUID,
+        title: str,
+        non_public: bool = False,
+        actor: str | None = None,
+    ) -> MeetingAgendaItem:
+        """Add an agenda item for a to-do card in the transaction of the caller.
+
+        The item has no application; its ``title`` is the card title and its
+        ``todo_id`` the card. The caller checks the card and links it to the item. A
+        new item writes ``agenda_item_add``.
+
+        Raises:
+            NotFoundError: The meeting does not exist.
+            ConflictError: The meeting is closed (``meeting_closed``), or the card is
+                already on the agenda (``todo_already_on_agenda``).
+        """
+        meeting = await self._meeting(meeting_id, for_update=True)
+        self._assert_agenda_open(meeting)
+        existing = await self.session.scalar(
+            select(MeetingAgendaItem.id).where(
+                MeetingAgendaItem.meeting_id == meeting_id,
+                MeetingAgendaItem.todo_id == todo_id,
+            )
+        )
+        if existing is not None:
+            raise ConflictError(
+                "the to-do is already on the agenda of this meeting",
+                code="todo_already_on_agenda",
+            )
+        item = MeetingAgendaItem(
+            meeting_id=meeting_id,
+            application_id=None,
+            todo_id=todo_id,
+            title=title.strip() or title,
+            position=await self._next_position(meeting_id),
+            non_public=non_public,
+        )
+        self.session.add(item)
+        await self.session.flush()
+        await self._audit(
+            AuditAction.AGENDA_ITEM_ADD,
+            actor=actor,
+            item=item,
+            nonPublic=non_public,
+            todoId=str(todo_id),
+        )
+        return item
 
     async def remove(
         self,

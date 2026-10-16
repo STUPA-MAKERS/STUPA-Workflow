@@ -2,7 +2,8 @@
 
 The group manages a vote but never casts one. It also covers the agenda and the
 attendance of a meeting, the protocol (minutes), the delegations, and the application
-attachments.
+attachments (list, upload from a local file, download to a local file, delete). The
+download also serves the files of chat messages.
 
 An agent can create, open, close and cancel a vote. There is deliberately no tool to
 cast a ballot. Voting is human-only.
@@ -10,11 +11,16 @@ cast a ballot. Voting is human-only.
 
 from __future__ import annotations
 
+import os
+import re
+import tempfile
+from pathlib import Path
 from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 
 from .. import schemas as S
+from ..client import ApiError
 from ..schemas import dump_create, dump_patch
 from ._common import ToolGroup, api, params
 
@@ -600,19 +606,189 @@ async def delete_substitute(substitute_id: str) -> dict:
     return await api().delete(f"/delegations/substitutes/{substitute_id}")
 
 
+# The upload allowlist of the platform (`backend/app/modules/files/mime.py`,
+# `_EXT_TO_MIME`): file extension to the content type that the tool sends. The server
+# sniffs the bytes with libmagic and ignores the claimed type, but it rejects a file
+# whose sniffed type does not match the extension (415). The tool checks the extension
+# first, so an agent gets the list of allowed types instead of a bare 415.
+# `test_attachment_tools.py` compares this map with the backend when the backend imports.
+ATTACHMENT_TYPES: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".odt": "application/vnd.oasis.opendocument.text",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
+}
+
+# The hard cap of the platform (`MAX_ATTACHMENT_BYTES`). An instance can set a lower
+# `attachment_max_bytes`; the server then answers 413.
+ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+
+_DOWNLOAD_CHUNK = 64 * 1024
+_DISPOSITION_NAME = re.compile(r'filename="([^"]*)"')
+
+
+def _attachment_part(
+    file_path: str, filename: str | None
+) -> tuple[str, bytes, str]:
+    """Read a local file for the upload and pick its name and content type.
+
+    Raises:
+        ApiError: The file is missing, unreadable, empty, too large, or its extension
+            is not on the allowlist (status 400; nothing is sent).
+    """
+    p = Path(file_path).expanduser()
+    if not p.is_file():
+        raise ApiError(400, f"file not found: {file_path!r}")
+    if not os.access(p, os.R_OK):
+        raise ApiError(400, f"file not readable: {file_path!r}")
+    name = Path(filename).name if filename else p.name
+    ext = Path(name).suffix.lower()
+    mime = ATTACHMENT_TYPES.get(ext)
+    if mime is None:
+        allowed = ", ".join(ATTACHMENT_TYPES)
+        raise ApiError(
+            400, f"file type {ext or '(none)'!r} is not allowed; allowed: {allowed}"
+        )
+    size = p.stat().st_size
+    if size == 0:
+        raise ApiError(400, f"file is empty: {file_path!r}")
+    if size > ATTACHMENT_MAX_BYTES:
+        raise ApiError(
+            400, f"file has {size} bytes; the platform takes at most {ATTACHMENT_MAX_BYTES}"
+        )
+    try:
+        data = p.read_bytes()
+    except OSError as exc:
+        raise ApiError(400, f"file not readable: {file_path!r} ({exc})") from exc
+    return name, data, mime
+
+
 @group.tool
 async def list_attachments(application_id: str) -> dict:
     """List the file attachments of an application.
 
-    The call returns the metadata only. Upload and download stay with the UI and the
-    REST API.
+    Each entry holds `id`, `filename`, `mime` (the type that the server sniffed),
+    `size`, `scanned` and `is_comparison_offer`. `scanned` stays false until the
+    ClamAV scan reports clean; only then does `download_attachment` work. Upload with
+    `upload_attachment`. A caller without the PII right does not see the files of the
+    `isPII` form fields.
     """
     return await api().get(f"/applications/{application_id}/attachments")
 
 
 @group.tool
+async def upload_attachment(
+    application_id: str,
+    file_path: str,
+    filename: str | None = None,
+    field_key: str | None = None,
+    is_comparison_offer: bool = False,
+) -> dict:
+    """Upload a local file as an attachment of an application.
+
+    `POST /applications/{id}/attachments` (multipart field `file`). `file_path` is a
+    path on the machine of the MCP server. `filename` overrides the name that the
+    platform stores (the extension must still fit the content). `field_key` binds the
+    file to a form field of type file; `is_comparison_offer` marks a comparison offer
+    (Vergleichsangebot).
+
+    Allowed: PDF, PNG, JPEG, GIF, WebP and the Office/OpenDocument types (doc, docx,
+    xls, xlsx, ppt, pptx, odt, ods, odp), at most 10 MB. The server sniffs the content:
+    a mismatch between content and extension gives 415, an oversize body 413, missing
+    object storage 503. An upload is allowed in every state of the application, also a
+    locked one.
+
+    Requires `application.manage` (scope `applications:write`), or the caller is the
+    logged-in creator of the application. Audited.
+
+    Returns:
+        The attachment: `id`, `filename`, `mime`, `size`, `scanned` (false: the virus
+        scan still runs, the file cannot be downloaded yet) and `is_comparison_offer`.
+    """
+    name, data, mime = _attachment_part(file_path, filename)
+    form: dict[str, str] = {"is_comparison_offer": "true" if is_comparison_offer else "false"}
+    if field_key is not None:
+        form["field_key"] = field_key
+    return await api().post(
+        f"/applications/{application_id}/attachments",
+        files={"file": (name, data, mime)},
+        data=form,
+    )
+
+
+@group.tool
+async def download_attachment(
+    attachment_id: str, target_path: str, overwrite: bool = False
+) -> dict:
+    """Download an attachment to a local file. The file content never enters the chat.
+
+    `GET /attachments/{id}/download`, streamed to disk. `target_path` is a file path or
+    an existing directory on the machine of the MCP server; for a directory the tool
+    uses the stored file name. An existing file is kept unless `overwrite` is true.
+
+    The same route serves the files of chat messages (the `attachments` of a ticket
+    note, a to-do comment or an application comment); their read rule is the rule of
+    reading the message, and `scanState` must be `clean`.
+
+    409 while the virus scan runs (`scanned: false`, `scanState: scanning`), 410 after
+    a finding removed the file, 404 for an unknown id or without read access to the
+    application or the message.
+
+    Returns:
+        `path` (absolute), `filename`, `mime` and `size` in bytes.
+    """
+    target = Path(target_path).expanduser()
+    if not target.is_dir():
+        if not target.parent.is_dir():
+            raise ApiError(400, f"directory not found: {str(target.parent)!r}")
+        if target.exists() and not overwrite:
+            raise ApiError(400, f"file exists (pass overwrite=true): {target_path!r}")
+    async with api().stream("GET", f"/attachments/{attachment_id}/download") as resp:
+        match = _DISPOSITION_NAME.search(resp.headers.get("content-disposition", ""))
+        stored = Path(match.group(1)).name if match else ""
+        if stored in {"", ".", ".."}:
+            stored = f"attachment-{attachment_id}"
+        final = target / stored if target.is_dir() else target
+        if final.exists() and not overwrite:
+            raise ApiError(400, f"file exists (pass overwrite=true): {str(final)!r}")
+        fd, tmp = tempfile.mkstemp(dir=final.parent, prefix=".download-")
+        size = 0
+        try:
+            with os.fdopen(fd, "wb") as out:
+                async for chunk in resp.aiter_bytes(_DOWNLOAD_CHUNK):
+                    out.write(chunk)
+                    size += len(chunk)
+            os.replace(tmp, final)
+        except BaseException:
+            Path(tmp).unlink(missing_ok=True)
+            raise
+        mime = resp.headers.get("content-type", "application/octet-stream")
+    return {
+        "path": str(final.resolve()),
+        "filename": stored,
+        "mime": mime.split(";")[0].strip(),
+        "size": size,
+    }
+
+
+@group.tool
 async def delete_attachment(attachment_id: str) -> dict:
-    """Delete a file attachment."""
+    """Delete a file attachment.
+
+    Requires `application.manage` (scope `applications:write`); the logged-in creator
+    may delete only while the state of the application allows edits (409 otherwise).
+    """
     return await api().delete(f"/attachments/{attachment_id}")
 
 

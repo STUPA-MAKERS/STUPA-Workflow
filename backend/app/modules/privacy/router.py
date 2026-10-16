@@ -1,8 +1,9 @@
 """Admin privacy router (`/admin/privacy`, gated by `privacy.manage`).
 
 The router serves the erasure-request queue (list, execute, reject), the direct
-principal erasure, the GDPR access export (XLSX, Art. 15), and the global retention
-default. It sends the erasure notifications best-effort as background tasks.
+principal erasure, the direct erasure of an address without an account, the GDPR
+access export (XLSX, Art. 15), and the global retention default. It sends the erasure
+notifications best-effort as background tasks.
 """
 
 from __future__ import annotations
@@ -23,6 +24,8 @@ from app.modules.notifications.privacy import (
 )
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.privacy.schemas import (
+    EmailErasureBody,
+    EmailErasureOut,
     ErasureRejectBody,
     ErasureRequestOut,
     PrivacySettingsOut,
@@ -34,6 +37,7 @@ from app.modules.privacy.service import (
     PrincipalService,
     PrivacySettingsService,
     build_auskunft_workbook,
+    erase_email,
 )
 from app.shared.errors import ProblemDetail, ValidationProblem
 from app.shared.xlsx import XLSX_MEDIA_TYPE
@@ -174,9 +178,41 @@ async def erase_principal(
     principal_id: UUID,
     principal: ConfigPrincipal,
     session: DbSession,
+    request: Request,
 ) -> Response:
-    await PrincipalService(session).erase(principal_id, actor=principal.sub)
+    await PrincipalService(session).erase(
+        principal_id,
+        actor=principal.sub,
+        files=_files_with_storage(session, request),
+    )
     return Response(status_code=204)
+
+
+@router.post(
+    "/erase-email",
+    response_model=EmailErasureOut,
+    dependencies=[_CONFIG],
+    responses=_errors(401, 403, 422),
+)
+async def erase_by_email(
+    body: EmailErasureBody,
+    principal: ConfigPrincipal,
+    session: DbSession,
+    request: Request,
+) -> EmailErasureOut:
+    """Anonymize the applications and the ticket reports of one address (Art. 17).
+
+    This covers a person without an account, for example the reporter of a ticket
+    without a session, who has no application to file an erasure request from. An
+    account under the address stays and comes back as ``principalId``.
+    """
+    result = await erase_email(
+        session,
+        _canonical_email(body.email),
+        actor=principal.sub,
+        files=_files_with_storage(session, request),
+    )
+    return EmailErasureOut.model_validate(result)
 
 
 @router.get(
@@ -231,6 +267,9 @@ async def auskunft(
             "comments": len(data["comments"]),
             "attachments": len(data["attachments"]),
             "attendance": len(data["attendance"]),
+            "tickets": len(data["tickets"]),
+            "todos": len(data["todos"]),
+            "todoComments": len(data["todo_comments"]),
             "hasPrincipal": data["principal"] is not None,
         },
     )

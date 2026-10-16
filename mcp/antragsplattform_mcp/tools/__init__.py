@@ -8,9 +8,19 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from . import admin, applications, budget, finance, flow_forms, meetings, session
+from . import (
+    admin,
+    applications,
+    budget,
+    finance,
+    flow_forms,
+    meetings,
+    session,
+    tickets,
+    todos,
+)
 
-_GROUPS = (session, applications, flow_forms, meetings, budget, finance, admin)
+_GROUPS = (session, applications, flow_forms, meetings, todos, tickets, budget, finance, admin)
 
 
 def register_all(mcp: FastMCP) -> None:
