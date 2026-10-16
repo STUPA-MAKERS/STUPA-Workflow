@@ -71,12 +71,34 @@
   flex: none;
   overflow-wrap: anywhere;
 }
+/* Items with a dot between two of them, also after a wrap. Every part draws its dot in
+   the --ht-sep strip before it. The list starts --ht-sep before the clip edge, so the dot
+   of a part that starts a line (also the first part) is clipped: no line starts or ends
+   with a dot. */
 .ht__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0 6px;
+  --ht-sep: 16px;
+  min-width: 0;
+  overflow-x: clip;
   color: var(--color-text-muted);
   font-size: var(--fs-small);
+}
+.ht__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--ht-sep));
+  min-width: 0;
+}
+.ht__part {
+  min-width: 0;
+}
+.ht__part::before {
+  display: inline-block;
+  width: var(--ht-sep);
+  color: var(--color-text-subtle);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
 }
 .ht__link {
   color: var(--color-accent-text);

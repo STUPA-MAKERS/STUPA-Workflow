@@ -81,15 +81,15 @@
                 <span class="ht__block">
                   <span class="ht__label">{{ senderName(b) }}</span>
                   <span class="ht__meta">
-                    <span>{{ 'admin.helpTickets.blockedOn' | t: { date: (b.blockedAt | ldate: 'mediumDate') } }}</span>
-                    @if (b.sourceTicket; as src) {
-                      <span aria-hidden="true">·</span>
-                      <a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{ src.number }}</a>
-                    }
-                    @if (b.hitCount > 0) {
-                      <span aria-hidden="true">·</span>
-                      <span>{{ hits(b) }}</span>
-                    }
+                    <span class="ht__parts">
+                      <span class="ht__part">{{ 'admin.helpTickets.blockedOn' | t: { date: (b.blockedAt | ldate: 'mediumDate') } }}</span>
+                      @if (b.sourceTicket; as src) {
+                        <span class="ht__part"><a class="mono ht__link" [routerLink]="['/tickets', src.id]">{{ src.number }}</a></span>
+                      }
+                      @if (b.hitCount > 0) {
+                        <span class="ht__part">{{ hits(b) }}</span>
+                      }
+                    </span>
                   </span>
                 </span>
                 <app-button

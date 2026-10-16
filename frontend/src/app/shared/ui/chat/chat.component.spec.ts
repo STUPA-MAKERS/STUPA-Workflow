@@ -1017,6 +1017,52 @@ describe('ChatComponent', () => {
       expect(plain.defaultPrevented).toBe(false);
     });
 
+    describe('a file dragged onto the composer', () => {
+      const drag = (target: Element, type: 'dragover' | 'drop', files: File[], types = ['Files']) => {
+        const event = new Event(type, { bubbles: true, cancelable: true }) as DragEvent;
+        Object.defineProperty(event, 'dataTransfer', { value: { files, types, dropEffect: 'none' } });
+        target.dispatchEvent(event);
+        return event;
+      };
+
+      it('uploads the dropped files and keeps the tab', async () => {
+        const { input, api, settle } = await setup({ canAttach: true });
+        const over = drag(input(), 'dragover', []);
+        expect(over.defaultPrevented).toBe(true);
+        expect(over.dataTransfer?.dropEffect).toBe('copy');
+        const drop = drag(input(), 'drop', [new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+        expect(drop.defaultPrevented).toBe(true);
+        await settle();
+        expect(api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name)).toEqual(['a.pdf']);
+      });
+
+      it('applies the limit of five files', async () => {
+        const { input, api, toast, settle } = await setup({ canAttach: true });
+        const files = Array.from({ length: 6 }, (_, i) => new File(['x'], `f${i}.pdf`, { type: 'application/pdf' }));
+        drag(input(), 'drop', files);
+        await settle();
+        expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(5);
+        expect(toast.error).toHaveBeenCalledWith('Höchstens 5 Dateien pro Nachricht.');
+      });
+
+      it('takes the drop without files too, so the browser does not open the file', async () => {
+        const { input, api, settle } = await setup();
+        const over = drag(input(), 'dragover', []);
+        expect(over.defaultPrevented).toBe(true);
+        expect(over.dataTransfer?.dropEffect).toBe('none');
+        const drop = drag(input(), 'drop', [new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+        expect(drop.defaultPrevented).toBe(true);
+        await settle();
+        expect(api.uploadDraftAttachment).not.toHaveBeenCalled();
+      });
+
+      it('leaves a text drag to the textarea', async () => {
+        const { input } = await setup({ canAttach: true });
+        expect(drag(input(), 'dragover', [], ['text/plain']).defaultPrevented).toBe(false);
+        expect(drag(input(), 'drop', [], ['text/plain']).defaultPrevented).toBe(false);
+      });
+    });
+
     it('keeps the text of a paste that also holds a picture of it (Word, a web page)', async () => {
       const { input, api, settle } = await setup({ canAttach: true });
       const paste = (data: Record<string, string>) => {

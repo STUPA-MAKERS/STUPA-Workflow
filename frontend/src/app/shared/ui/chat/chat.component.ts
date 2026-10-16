@@ -93,6 +93,11 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
+/** A drag that carries files from the desktop, not a text selection. */
+function isFileDrag(event: DragEvent): boolean {
+  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+}
+
 /** The body of a message as safe HTML: escaped Markdown, bare URLs as links. */
 @Pipe({ name: 'chatBody', standalone: true })
 export class ChatBodyPipe implements PipeTransform {
@@ -140,7 +145,7 @@ function writeStore(key: string, value: string | null): void {
  *   composer) and "Verwerfen".
  * - Own messages: edit and delete on hover or focus (desktop), a long press opens a
  *   bottom sheet (phone).
- * - Files (`canAttach`): the paperclip and a pasted image upload drafts through
+ * - Files (`canAttach`): the paperclip, a pasted image and a dropped file upload drafts through
  *   `POST /apply/attachments` (its own `DraftAttachmentsService`, never kept in
  *   `sessionStorage`). Up to 5 per message, each under the limit of the site config.
  *   The chips show the upload and the scan state and can leave before the send; the
@@ -563,6 +568,26 @@ export class ChatComponent {
     if (!files.length) return;
     event.preventDefault();
     void this.addFiles(files.map((f) => this.named(f)));
+  }
+
+  /**
+   * A file dragged onto the composer: without a handler the browser opens the file in
+   * the tab, the app unloads and the outbox is lost. A file drag is therefore always
+   * taken, and its files upload only when the chat takes files (`addFiles` applies the
+   * count and the size). A text drag stays with the textarea.
+   */
+  protected onDragOver(event: DragEvent): void {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = this.canAttach() && !this.full() ? 'copy' : 'none';
+  }
+
+  protected onDrop(event: DragEvent): void {
+    if (!isFileDrag(event)) return;
+    event.preventDefault();
+    if (!this.canAttach()) return;
+    const files = Array.from(event.dataTransfer?.files ?? []);
+    if (files.length) void this.addFiles(files);
   }
 
   /**

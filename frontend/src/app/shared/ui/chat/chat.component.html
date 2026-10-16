@@ -154,7 +154,7 @@
 </div>
 
 @if (canPost()) {
-  <form class="chat__composer" (submit)="submit($event)">
+  <form class="chat__composer" (submit)="submit($event)" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
     @if (segmentOptions().length > 1) {
       <app-segmented
         class="chat__vis"

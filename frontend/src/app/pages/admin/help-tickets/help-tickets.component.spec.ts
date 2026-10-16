@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { HttpErrorResponse } from '@angular/common/http';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -265,11 +267,28 @@ describe('HelpTicketsComponent', () => {
       await setup({ perms: ['admin.site', 'ticket.manage'] });
       expect(screen.getByRole('heading', { name: 'Gesperrte Absender' })).toBeInTheDocument();
       expect(rows()).toEqual([
-        'spam@example.orggesperrt am 14.10.2026·T-0042·3 abgefangene Meldungen Entsperren',
-        'Finn Schulzegesperrt am 10.10.2026·1 abgefangene Meldung Entsperren',
+        'spam@example.orggesperrt am 14.10.2026T-00423 abgefangene Meldungen Entsperren',
+        'Finn Schulzegesperrt am 10.10.20261 abgefangene Meldung Entsperren',
         'weg@example.orggesperrt am 09.10.2026 Entsperren',
       ]);
       expect(screen.getByRole('link', { name: 'T-0042' })).toHaveAttribute('href', '/tickets/t42');
+    });
+
+    it('draws the dots in CSS, so a wrapped line never starts or ends with one', async () => {
+      await setup({ perms: ['admin.site', 'ticket.manage'] });
+      const meta = document.querySelector('.ht__blocks li .ht__meta');
+      // No separator is its own flex item: every child of the wrapping row is a part.
+      const parts = [...(meta?.querySelector('.ht__parts')?.children ?? [])];
+      expect(parts.map((p) => p.className)).toEqual(['ht__part', 'ht__part', 'ht__part']);
+      expect(parts.map((p) => p.textContent?.trim())).toEqual(['gesperrt am 14.10.2026', 'T-0042', '3 abgefangene Meldungen']);
+      expect(meta?.textContent).not.toContain('·');
+      const css = readFileSync(join(__dirname, 'help-tickets.component.scss'), 'utf8');
+      const rule = (sel: string) => css.match(new RegExp(`\\n${sel.replace(/[.:]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';
+      expect(rule('.ht__meta')).toMatch(/overflow-x: clip;/);
+      expect(rule('.ht__parts')).toMatch(/flex-wrap: wrap;/);
+      expect(rule('.ht__parts')).toMatch(/margin-inline-start: calc\(-1 \* var\(--ht-sep\)\);/);
+      expect(rule('.ht__part::before')).toMatch(/width: var\(--ht-sep\);/);
+      expect(rule('.ht__part::before')).toMatch(/content: '·' \/ '';/);
     });
 
     it('lists only the blocks without the site right, with no alert', async () => {
