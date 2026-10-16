@@ -59,11 +59,28 @@
             />
           </div>
         }
+        @if (timeline.reloadingList()) {
+          <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
+        }
       </app-sticky-bar>
 
-      <div class="mtl__scroll" appScrollFade="y">
+      <div class="mtl__scroll" appScrollFade="y" [attr.aria-busy]="timeline.reloadingList() || null">
         @if (timeline.loadingList()) {
-          <app-skeleton variant="rows" [count]="6" [label]="'meetings.list.loading' | t" />
+          <!-- The shape of the loaded list (a month heading, rows with the date block in the
+               geometry of `app-list-item`), shown after 300ms. -->
+          <div class="mtl__skel skel-in">
+            <h2 class="sec mtl__month" aria-hidden="true">
+              <span class="skel-text skel-text--accent mtl__skelMonth"></span>
+            </h2>
+            <app-skeleton
+              class="mtl__skelRows"
+              variant="items"
+              [count]="10"
+              [lead]="true"
+              [grouped]="!split()"
+              [label]="'meetings.list.loading' | t"
+            />
+          </div>
         } @else if (timeline.searchActive()) {
           <!-- Search: one list of hits by relevance, no groups. -->
           @if (timeline.searchItems().length) {
@@ -97,6 +114,7 @@
             <ng-container *ngTemplateOutlet="loadPast" />
           }
         } @else {
+          <div class="mtl__groups" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
           @if (!hasUpcoming()) {
             <p class="mtl__status">{{ 'meetings.list.noUpcoming' | t }}</p>
           }
@@ -121,6 +139,7 @@
           @if (timeline.hasMorePast()) {
             <ng-container *ngTemplateOutlet="loadPast" />
           }
+          </div>
         }
       </div>
 

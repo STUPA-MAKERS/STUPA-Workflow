@@ -58,13 +58,28 @@
             </app-button>
           }
         </div>
+        @if (reloading()) {
+          <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
+        }
       </app-sticky-bar>
 
-      <div class="vl__scroll" appScrollFade="y">
+      <div class="vl__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
         @if (error()) {
           <p class="vl__status vl__status--error" role="alert">{{ 'voting.list.error' | t }}</p>
         } @else if (loading()) {
-          <app-skeleton variant="rows" [count]="6" [label]="'voting.list.loading' | t" />
+          <!-- The shape of the loaded list (a month heading, rows in the geometry of
+               `app-list-item`), shown after 300ms. -->
+          <div class="vl__skel skel-in">
+            <h2 class="sec vl__month" aria-hidden="true">
+              <span class="skel-text skel-text--accent vl__skelMonth"></span>
+            </h2>
+            <app-skeleton
+              variant="items"
+              [count]="12"
+              [grouped]="!split()"
+              [label]="'voting.list.loading' | t"
+            />
+          </div>
         } @else if (!rows().length) {
           @if (activeFilterCount() > 0) {
             <p class="vl__status">{{ 'voting.list.noMatch' | t }}</p>
@@ -81,6 +96,7 @@
             />
           }
         } @else {
+          <div class="vl__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key) {
             <section class="vl__group" [attr.aria-labelledby]="'vl-g-' + group.key">
               <h2 class="sec vl__month" [id]="'vl-g-' + group.key">{{ group.label }}</h2>
@@ -124,6 +140,7 @@
               </div>
             </section>
           }
+          </div>
 
           @if (hasMore()) {
             <div class="vl__more">

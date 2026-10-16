@@ -49,7 +49,7 @@ export const appConfig: ApplicationConfig = {
       withInterceptors(
         isDevMode()
           // The cache sits INSIDE the loading interceptor: a served-from-cache answer
-          // still counts as a completed request for the overlay, and the auth layer
+          // still counts as a completed request for the loading bar, and the auth layer
           // must run for the revalidation that follows.
           ? [loadingInterceptor, cacheInterceptor, authInterceptor, lazyMockApiInterceptor]
           : [loadingInterceptor, cacheInterceptor, authInterceptor],

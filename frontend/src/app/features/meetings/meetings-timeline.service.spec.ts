@@ -94,6 +94,30 @@ describe('MeetingsTimelineService', () => {
     expect(svc.upcomingHasMore()).toBe(true);
   });
 
+  it('keeps the shown meetings while a filter reloads, and drops a late older answer', () => {
+    const { svc, answer } = setup();
+    svc.loadList();
+    expect(svc.loadingList()).toBe(true);
+    expect(svc.reloadingList()).toBe(false);
+    answer(0, { items: [m('u1')], nextCursor: null });
+    answer(1, { items: [], nextCursor: null });
+
+    svc.selectGremiumFilter('g1');
+    expect(svc.loadingList()).toBe(false);
+    expect(svc.reloadingList()).toBe(true);
+    expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u1']);
+    svc.selectGremiumFilter('g2');
+    // The answer of the g1 load comes late: it changes nothing.
+    answer(2, { items: [m('late')], nextCursor: null });
+    answer(3, { items: [], nextCursor: null });
+    expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u1']);
+    expect(svc.reloadingList()).toBe(true);
+    answer(4, { items: [m('u2')], nextCursor: null });
+    answer(5, { items: [], nextCursor: null });
+    expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u2']);
+    expect(svc.reloadingList()).toBe(false);
+  });
+
   it('stops loading on errors of the first load and of an older page', () => {
     const { svc, answer, fail } = setup();
     svc.loadList();

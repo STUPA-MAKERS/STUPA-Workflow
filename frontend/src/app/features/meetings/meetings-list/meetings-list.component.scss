@@ -76,8 +76,18 @@ app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
 .mtl__month {
   padding: 18px var(--space-4) 6px;
 }
-.mtl__group:first-child .mtl__month {
+.mtl__group:first-child .mtl__month,
+.mtl__skel .mtl__month {
   padding-top: var(--space-2);
+}
+/* The loading shape: a bar about as wide as "Oktober 2026", and the lead tile in the size
+   of `app-date-block`, so the rows have their loaded height. */
+.mtl__skelMonth {
+  width: 7rem;
+}
+.mtl__skelRows {
+  --sk-lead-w: 3rem;
+  --sk-lead-h: 3.25rem;
 }
 .mtl__rows {
   display: flex;

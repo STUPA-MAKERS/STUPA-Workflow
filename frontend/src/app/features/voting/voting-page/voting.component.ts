@@ -160,6 +160,11 @@ export class VotingComponent implements OnDestroy {
 
   readonly loading = signal(true);
   readonly loadingMore = signal(false);
+  /**
+   * Page 0 loads again (a filter or the search changed) while the old rows show. They stay,
+   * dimmed and inert, until the new ones arrive. `loading` means "nothing to show yet".
+   */
+  readonly reloading = signal(false);
   readonly error = signal(false);
   readonly items = signal<VoteListItem[]>([]);
   readonly total = signal(0);
@@ -364,6 +369,7 @@ export class VotingComponent implements OnDestroy {
   /** Load page 0 after a filter change. The rows stay until the new ones arrive. */
   private reload(): void {
     this.loading.set(this.items().length === 0);
+    this.reloading.set(this.items().length > 0);
     this.error.set(false);
     this.fetch('initial', 0, VOTE_PAGE);
   }
@@ -407,6 +413,7 @@ export class VotingComponent implements OnDestroy {
           this.collectGremien(page.items);
           this.followOpen(page.items);
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
         },
         error: () => {
@@ -417,6 +424,7 @@ export class VotingComponent implements OnDestroy {
             this.error.set(true);
           }
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
         },
       });

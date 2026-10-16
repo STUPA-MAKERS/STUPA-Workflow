@@ -84,10 +84,11 @@
   line-height: 1.375rem;
 }
 
-/* The lead tile (a 40px kind icon) and the trailing person circle of a row. */
+/* The lead tile (a 40px kind icon, or the size the page sets: the date block of a meeting)
+   and the trailing person circle of a row. */
 .sk__itemLead {
-  width: 40px;
-  height: 40px;
+  width: var(--sk-lead-w, 40px);
+  height: var(--sk-lead-h, 40px);
   border-radius: var(--radius-md);
 }
 .sk__itemAvatar {

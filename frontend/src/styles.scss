@@ -257,6 +257,7 @@ td:first-child > .skel--bar {
    - `.skel-stale`: on content that is reloading. It stays as it is for 300ms, then
      dims; it never moves. Pair it with `inert` and `aria-busy`.
    - `.skel-progress`: a thin bar at the top of a reloading area, also after 300ms.
+     `.skel-progress--foot` puts it on the lower edge (under a sticky filter bar).
    No pulse: one slow, faint sweep, which stops under reduced motion.
    --------------------------------------------------------------------------- */
 .skel-text,
@@ -340,6 +341,11 @@ td:first-child > .skel--bar {
   to {
     left: 100%;
   }
+}
+/* The bar on the lower edge of its area: under the search and the chips of a list pane. */
+.skel-progress--foot {
+  top: auto;
+  bottom: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .skel-text,
