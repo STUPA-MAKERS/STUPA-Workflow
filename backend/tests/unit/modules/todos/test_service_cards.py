@@ -133,6 +133,7 @@ async def test_a_readable_board_without_the_write_right_answers_403() -> None:
         files=FakeFiles(),  # type: ignore[arg-type]
     )
     _stub(service)
+    session.scalar_q.append(c)
     with pytest.raises(ForbiddenError) as card_write:
         await service.archive_card(c.id, USER)
     assert card_write.value.code == "todo_write_required"
@@ -607,7 +608,12 @@ async def test_a_write_after_a_parallel_transfer_answers_card_moved() -> None:
     with pytest.raises(ConflictError) as locked:
         await service.patch(c.id, CardPatch(version=1, title="Neu"), USER)
     assert locked.value.code == "card_moved"
-    assert session.committed == 0
+    # Every other card write goes through the same lock.
+    session.scalar_q.append(gone)
+    with pytest.raises(ConflictError) as archived:
+        await service.archive_card(c.id, USER)
+    assert archived.value.code == "card_moved"
+    assert session.committed == 0 and c.archived_at is None
 
 
 async def test_a_respread_pings_the_whole_board() -> None:
@@ -688,6 +694,7 @@ def test_append_keeps_short_ranks_and_rebalances_long_ones() -> None:
 
 async def test_archive_and_restore_are_idempotent() -> None:
     session, _b, _col, c, service = _setup()
+    session.scalar_q[:] = [c] * 4
     await service.archive_card(c.id, USER)
     await service.archive_card(c.id, USER)
     assert c.archived_at is not None and session.committed == 1
@@ -707,6 +714,7 @@ async def test_restore_in_the_done_column_restarts_the_archive_clock() -> None:
     session.put(b, done, c)
     service = _svc(session)
     _stub(service)
+    session.scalar_q.append(c)
     await service.restore_card(c.id, USER)
     assert c.archived_at is None
     assert c.completed_at is not None and c.completed_at > old
@@ -730,7 +738,9 @@ async def test_assignees() -> None:
         await service.add_assignee(c.id, uuid.uuid4(), USER)
     from tests.unit.modules.todos.fakes import Rows
 
-    session.execute_q[:] = [Rows(rowcount=1), Rows(rowcount=0)]
+    # Each remove locks the board (one execute) before its delete.
+    session.execute_q[:] = [Rows(), Rows(rowcount=1), Rows(), Rows(rowcount=0)]
+    session.scalar_q[:] = [c, c]
     await service.remove_assignee(c.id, OTHER, USER)
     await service.remove_assignee(c.id, OTHER, USER)
     assert [e.payload["added"] for e in _events(session)] == [True, False]
@@ -749,6 +759,7 @@ async def test_card_labels() -> None:
     await service.add_card_label(c.id, lab.id, USER)
     await service.add_card_label(c.id, lab.id, USER)
     assert len([o for o in session.added if isinstance(o, TodoCardLabel)]) == 1
+    session.scalar_q.append(c)
     await service.remove_card_label(c.id, lab.id, USER)
     assert session.committed == 2
 
@@ -758,7 +769,7 @@ async def test_card_labels() -> None:
 
 async def test_checklist() -> None:
     session, _b, _col, c, service = _setup()
-    session.scalar_q[:] = [None, 0]
+    session.scalar_q[:] = [c, None, c, 0, *([c] * 6)]
     await service.add_check_item(c.id, " Eins ", USER)
     await service.add_check_item(c.id, "Zwei", USER)
     first, second = [o for o in session.added if isinstance(o, TodoCheckItem)]
@@ -802,6 +813,7 @@ async def test_links() -> None:
     (new,) = [o for o in session.added if isinstance(o, TodoLink)]
     foreign = link(uuid.uuid4(), ticket_id=TICKET)
     session.put(foreign)
+    session.scalar_q[:] = [c, c]
     with pytest.raises(NotFoundError):
         await service.remove_link(c.id, foreign.id, USER)
     await service.remove_link(c.id, new.id, USER)
@@ -835,6 +847,7 @@ async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
     (row,) = [o for o in session.added if isinstance(o, TodoComment)]
     third = uuid.uuid4()
     service.access.member_set.add(third)  # type: ignore[attr-defined]
+    session.scalar_q[:] = [c] * 6
     await service.edit_comment(c.id, row.id, "kurz", [OTHER, third], USER)
     assert service.outbox[-1].recipients == (third,) and service.outbox[-1].excerpt == "kurz"
     assert row.edited_at is not None
@@ -872,7 +885,7 @@ async def test_comment_files_bind_list_and_go_with_the_comment(
     files = FakeFiles()
     service.files = files  # type: ignore[assignment]
     draft = uuid.uuid4()
-    session.scalar_q[:] = [c, c]
+    session.scalar_q[:] = [c] * 4
     out = await service.add_comment(
         c.id, "", [], USER, attachment_ids=[draft], draft_token="tok", pepper="p"
     )

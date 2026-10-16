@@ -458,6 +458,45 @@ describe('TodosComponent', () => {
       expect(cmp.board()?.cards.find((c) => c.id === 'k-1')).toMatchObject({ columnId: 'c-3', title: 'Neu' });
     });
 
+    it('reads each card of a burst once: a live tile does not make the other answers stale', async () => {
+      const { cmp, api, settle } = await start('/todos/b-1');
+      const reads = new Map<string, Subject<TodoCardTile>>();
+      const cardTile = jest.fn((id: string): Observable<TodoCardTile> => {
+        const s = new Subject<TodoCardTile>();
+        reads.set(id, s);
+        return s;
+      });
+      (api as unknown as { cardTile: jest.Mock }).cardTile = cardTile;
+      const burst = ['k-1', 'k-2', 'k-3'];
+      for (const cardId of burst) live().emit({ type: 'card', boardId: 'b-1', cardId });
+      await wait(settle);
+      for (const id of burst) reads.get(id)?.next(tile({ id, columnId: 'c-3', title: `${id} neu` }));
+      await wait(settle);
+      expect(cardTile).toHaveBeenCalledTimes(3);
+      for (const id of burst) {
+        expect(cmp.board()?.cards.find((c) => c.id === id)).toMatchObject({ columnId: 'c-3', title: `${id} neu` });
+      }
+    });
+
+    it('drops a tile answer that a live removal overtook', async () => {
+      const { cmp, api, settle } = await start('/todos/b-1');
+      const reads: Subject<TodoCardTile>[] = [];
+      const cardTile = jest.fn((): Observable<TodoCardTile> => {
+        const s = new Subject<TodoCardTile>();
+        reads.push(s);
+        return s;
+      });
+      (api as unknown as { cardTile: jest.Mock }).cardTile = cardTile;
+      live().emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      live().emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      reads[0].next(tile({ id: 'k-1', columnId: 'c-3', title: 'Alt' }));
+      expect(cmp.board()?.cards.some((c) => c.id === 'k-1')).toBe(false);
+      await wait(settle);
+      expect(cardTile).toHaveBeenCalledTimes(2);
+    });
+
     it('polls every 120 s while the socket is up, every 30 s without it', async () => {
       const { api } = await start('/todos/b-1');
       live().connected.set(true);

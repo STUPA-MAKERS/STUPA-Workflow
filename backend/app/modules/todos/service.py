@@ -234,8 +234,11 @@ class TodoService:
         another board while ``lock`` waited is 409 ``card_moved``, because the lock
         held is the lock of the old board.
 
-        Every write locks the board before a card, because a move locks the board
-        and then updates the card, and the other order deadlocks with it.
+        Every card write passes ``lock`` (the moves and the transfer lock the board
+        themselves), so a write that a transfer overtakes is ``card_moved`` and its
+        ping goes to the board that the card is on. Every write locks the board
+        before a card, because a move locks the board and then updates the card, and
+        the other order deadlocks with it.
 
         The card lock is ``FOR NO KEY UPDATE``, because no write changes the key of a
         card, and ``FOR UPDATE`` conflicts with the ``FOR KEY SHARE`` lock of a foreign
@@ -1321,7 +1324,7 @@ class TodoService:
     async def archive_card(self, card_id: uuid.UUID, principal: Principal) -> None:
         """Archive a card (``DELETE``); a second call changes nothing."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is None:
             card.archived_at = card.updated_at = _now()
             self._event(card, "archived", actor)
@@ -1335,7 +1338,7 @@ class TodoService:
         archives it again at its next run.
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         if card.archived_at is not None:
             # Read the column before the card changes. A read after them autoflushes
             # the card, so ``completed_at`` goes in a second UPDATE without an explicit
@@ -1380,7 +1383,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Remove an assignee; an unknown one changes nothing."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         result = await self.session.execute(
             delete(TodoAssignee).where(
                 TodoAssignee.card_id == card.id, TodoAssignee.principal_id == principal_id
@@ -1415,7 +1418,7 @@ class TodoService:
         self, card_id: uuid.UUID, label_id: uuid.UUID, principal: Principal
     ) -> TodoCardDetail:
         """Take a label off the card."""
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         await self.session.execute(
             delete(TodoCardLabel).where(
                 TodoCardLabel.card_id == card.id, TodoCardLabel.label_id == label_id
@@ -1432,7 +1435,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Append a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         last = await self.session.scalar(
             select(func.max(TodoCheckItem.position)).where(TodoCheckItem.card_id == card.id)
         )
@@ -1466,7 +1469,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Rename, tick or untick, or move a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         item = await self._check_item(card, item_id)
         if payload.text is not None:
             value = payload.text.strip() or payload.text
@@ -1500,7 +1503,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Delete a checklist item."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         item = await self._check_item(card, item_id)
         await self.session.delete(item)
         self._event(card, "checklist", actor, {"action": "removed", "text": item.text})
@@ -1542,7 +1545,7 @@ class TodoService:
     ) -> TodoCardDetail:
         """Remove a link of the card."""
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         link = await self.session.get(TodoLink, link_id)
         if link is None or link.card_id != card.id:
             raise NotFoundError(f"link {link_id} not found")
@@ -1635,7 +1638,7 @@ class TodoService:
         principal: Principal,
     ) -> TodoCommentOut:
         """Change an own comment; mentions that are new get the mail."""
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         comment, me = await self._own_comment(card, comment_id, principal)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
@@ -1652,7 +1655,7 @@ class TodoService:
         self, card_id: uuid.UUID, comment_id: uuid.UUID, principal: Principal
     ) -> None:
         """Soft-delete an own comment and remove its files."""
-        card, board = await self._card(card_id, principal, write=True)
+        card, board = await self._card(card_id, principal, lock=True, write=True)
         comment, _me = await self._own_comment(card, comment_id, principal)
         comment.deleted_at = _now()
         await self.files.delete_for_messages("todo_comment", [comment.id], actor=principal.sub)

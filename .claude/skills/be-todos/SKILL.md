@@ -157,7 +157,10 @@ answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 40
   no mail), because the card would else leave "Meine To-Dos" at once.
 - A write that waited for the board lock while a transfer moved the card away is 409
   `card_moved`: `move` and `_card(lock=True)` compare `card.board_id` after the lock
-  (the lock held is the old board's), and `complete` returns False. A move or a
+  (the lock held is the old board's), and `complete` returns False. Every card write
+  (patch, archive, restore, assignees, labels, checklist, links, comments) loads the card
+  with `_card(lock=True, write=True)`, so the check covers it and its ping goes to the
+  board the card is on. A move or a
   transfer whose `_place` respreads the column pings the whole board (`board`),
   because every card of the column got a new rank.
 - `patch_column` and `delete_column` take the board lock before they read the column
@@ -222,8 +225,13 @@ read rule stays in force (a tile is per viewer, `primaryLink` is redacted).
   the session cookie of the handshake (`get_todo_ws_resolver` → `resolve_ws_principal`),
   so a lost role or membership counts at once; a session that is gone closes with 4401.
   The server keeps the ids that `BoardAccess.can_read` allows, drops the rest silently
-  and answers `{"type":"subscribed","boardIds":[…]}`. It rolls back after each subscribe, so the socket
-  holds no transaction. One `PSUBSCRIBE todo-board:*` per socket
+  and answers `{"type":"subscribed","boardIds":[…]}`. A socket that only listens is
+  checked too: before the pump forwards a ping, a last check older than
+  `RECHECK_SECONDS` (300) resolves the principal and filters the set with `can_read`
+  again (4401 when the session is gone, a lost board drops out silently). An
+  `asyncio.Lock` serializes the checks of the subscribe and the pump, because both use
+  the one session of the socket. The clock is injectable (`clock=`) for the tests. It
+  rolls back after each check, so the socket holds no transaction. One `PSUBSCRIBE todo-board:*` per socket
   (`PatternBroker.subscribe_pattern`), filtered by the subscribed ids. Limits: 5 sockets per
   principal (error `too_many_connections`, close 4403; per process, like the meeting
   socket), a token bucket of 5 frames/s (burst 10, `rate_limited`). Bad frames (binary,

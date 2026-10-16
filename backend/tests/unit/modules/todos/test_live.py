@@ -27,6 +27,7 @@ from app.modules.todos.live import BoardPings, board_channel, publish_pings
 from app.modules.todos.models import TodoBoard
 from app.modules.todos.socket import (
     MAX_BOARDS,
+    RECHECK_SECONDS,
     TodoLiveConnection,
     get_todo_ws_broker,
     get_todo_ws_principal,
@@ -320,6 +321,117 @@ async def test_a_gone_session_closes_the_socket_and_ends_the_run(access: type[_A
     )
     await asyncio.wait_for(conn.run(), 2)
     assert ws.closed == [4401] and ws.sent == []
+
+
+class _Clock:
+    """A monotonic clock that a test moves by hand."""
+
+    def __init__(self) -> None:
+        self.now = 1000.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+async def _pings(*messages: dict[str, Any]) -> AsyncIterator[dict[str, Any]]:
+    for message in messages:
+        yield message
+
+
+def _ping(board_id: uuid.UUID) -> dict[str, Any]:
+    return {"type": "card", "boardId": str(board_id), "cardId": str(C1)}
+
+
+async def test_the_pump_checks_again_after_the_recheck_age(
+    access: type[_Access], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    access.allowed = {B1, B2}
+    clock = _Clock()
+    calls: list[float] = []
+
+    async def _resolve() -> Principal | None:
+        calls.append(clock.now)
+        return USER
+
+    session = _session(B1, B2)
+    ws = _Ws([])
+    conn = TodoLiveConnection(
+        ws,  # type: ignore[arg-type]
+        principal=USER,
+        session=session,  # type: ignore[arg-type]
+        broker=InMemoryBroker(),
+        resolve=_resolve,
+        clock=clock,
+    )
+    await conn._subscribe({"type": "subscribe", "boardIds": [str(B1), str(B2)]})
+    clock.now += RECHECK_SECONDS - 1
+    await conn._pump(_pings(_ping(B2)))  # type: ignore[arg-type]
+    assert calls == [1000.0] and ws.sent[-1] == _ping(B2)
+    # The right to B2 is gone; after the recheck age the next ping checks again.
+    access.allowed = {B1}
+    clock.now += 2
+    await conn._pump(_pings(_ping(B2), _ping(B1)))  # type: ignore[arg-type]
+    assert calls == [1000.0, clock.now]
+    assert conn.board_ids == {str(B1)}
+    assert ws.sent[-2:] == [_ping(B2), _ping(B1)]
+    assert session.rolled_back == 2  # type: ignore[attr-defined]
+    # A ping of a board that is not subscribed never triggers a check.
+    clock.now += RECHECK_SECONDS * 2
+    await conn._pump(_pings(_ping(B2)))  # type: ignore[arg-type]
+    assert len(calls) == 2 and ws.closed == []
+
+
+async def test_the_pump_closes_4401_when_the_session_is_gone(access: type[_Access]) -> None:
+    clock = _Clock()
+    current: list[Principal | None] = [USER]
+
+    async def _resolve() -> Principal | None:
+        return current[0]
+
+    ws = _Ws([])
+    conn = TodoLiveConnection(
+        ws,  # type: ignore[arg-type]
+        principal=USER,
+        session=_session(B1),  # type: ignore[arg-type]
+        broker=InMemoryBroker(),
+        resolve=_resolve,
+        clock=clock,
+    )
+    await conn._subscribe({"type": "subscribe", "boardIds": [str(B1)]})
+    current[0] = None
+    clock.now += RECHECK_SECONDS
+    await conn._pump(_pings(_ping(B1), _ping(B1)))  # type: ignore[arg-type]
+    assert ws.closed == [4401] and conn.board_ids == frozenset()
+    assert ws.sent == [{"type": "subscribed", "boardIds": [str(B1)]}]
+
+
+async def test_a_recheck_after_a_parallel_subscribe_reads_nothing(
+    access: type[_Access],
+) -> None:
+    clock = _Clock()
+    calls: list[float] = []
+
+    async def _resolve() -> Principal | None:
+        calls.append(clock.now)
+        return USER
+
+    ws = _Ws([])
+    conn = TodoLiveConnection(
+        ws,  # type: ignore[arg-type]
+        principal=USER,
+        session=_session(B1),  # type: ignore[arg-type]
+        broker=InMemoryBroker(),
+        resolve=_resolve,
+        clock=clock,
+    )
+    clock.now += RECHECK_SECONDS
+    # The subscribe holds the lock; the recheck waits and then finds a fresh check.
+    async with conn._check_lock:
+        recheck = asyncio.create_task(conn._recheck())
+        await asyncio.sleep(0)
+        await conn._readable([B1])
+    assert await recheck is True
+    assert calls == [clock.now]
 
 
 async def test_the_resolver_reads_the_handshake_cookie_again(

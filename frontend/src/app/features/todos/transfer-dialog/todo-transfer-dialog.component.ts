@@ -60,7 +60,7 @@ export class TodoTransferDialogComponent {
   readonly selectedBoard = signal<Uuid>('');
   readonly board = signal<TodoBoard | null>(null);
   readonly column = signal<Uuid>('');
-  /** The chosen board did not load. */
+  /** The board list or the chosen board did not load. */
   readonly failed = signal(false);
   /** Counts the opens: a board list of an earlier open is dropped. */
   private openSeq = 0;
@@ -74,7 +74,9 @@ export class TodoTransferDialogComponent {
   readonly columnOptions = computed<SelectOption[]>(() =>
     sortedColumns(this.board()?.columns ?? []).map((c) => ({ value: c.id, label: c.name })),
   );
-  readonly none = computed(() => this.loaded() && this.targets().length === 0);
+  readonly none = computed(() => this.loaded() && !this.failed() && this.targets().length === 0);
+  /** The board list did not load: the dialog shows the error alone. */
+  readonly unloadable = computed(() => this.loaded() && this.failed() && this.targets().length === 0);
   readonly canConfirm = computed(
     () => !!this.selectedBoard() && this.board()?.id === this.selectedBoard() && !!this.column() && !this.busy(),
   );
@@ -104,7 +106,9 @@ export class TodoTransferDialogComponent {
         if (first) this.setBoard(first.id);
       },
       error: () => {
-        if (open === this.openSeq) this.loaded.set(true);
+        if (open !== this.openSeq) return;
+        this.failed.set(true);
+        this.loaded.set(true);
       },
     });
   }

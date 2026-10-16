@@ -494,7 +494,7 @@ async def transfer_card(
     "/cards/{card_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def archive_card(card_id: UUID, service: ServiceDep, principal: Member) -> Response:
     """Archive a card."""
@@ -503,7 +503,7 @@ async def archive_card(card_id: UUID, service: ServiceDep, principal: Member) ->
 
 
 @router.post(
-    "/cards/{card_id}/restore", response_model=TodoCardDetail, responses=_errors(401, 403, 404)
+    "/cards/{card_id}/restore", response_model=TodoCardDetail, responses=_errors(401, 403, 404, 409)
 )
 async def restore_card(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardDetail:
     """Bring an archived card back."""
@@ -534,7 +534,7 @@ async def add_assignee(
 @router.delete(
     "/cards/{card_id}/assignees/{principal_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_assignee(
     card_id: UUID, principal_id: UUID, service: ServiceDep, principal: Member
@@ -558,7 +558,7 @@ async def add_card_label(
 @router.delete(
     "/cards/{card_id}/labels/{label_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_card_label(
     card_id: UUID, label_id: UUID, service: ServiceDep, principal: Member
@@ -570,7 +570,7 @@ async def remove_card_label(
 @router.post(
     "/cards/{card_id}/checklist",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def add_check_item(
     card_id: UUID, payload: CheckItemCreate, service: ServiceDep, principal: Member
@@ -582,7 +582,7 @@ async def add_check_item(
 @router.patch(
     "/cards/{card_id}/checklist/{item_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def patch_check_item(
     card_id: UUID,
@@ -598,7 +598,7 @@ async def patch_check_item(
 @router.delete(
     "/cards/{card_id}/checklist/{item_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_check_item(
     card_id: UUID, item_id: UUID, service: ServiceDep, principal: Member
@@ -623,7 +623,7 @@ async def add_link(
 @router.delete(
     "/cards/{card_id}/links/{link_id}",
     response_model=TodoCardDetail,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def remove_link(
     card_id: UUID, link_id: UUID, service: ServiceDep, principal: Member
@@ -669,7 +669,7 @@ async def add_comment(
 @router.patch(
     "/cards/{card_id}/comments/{comment_id}",
     response_model=TodoCommentOut,
-    responses=_errors(401, 403, 404, 422),
+    responses=_errors(401, 403, 404, 409, 422),
 )
 async def edit_comment(
     card_id: UUID,
@@ -692,7 +692,7 @@ async def edit_comment(
     "/cards/{card_id}/comments/{comment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     response_class=Response,
-    responses=_errors(401, 403, 404),
+    responses=_errors(401, 403, 404, 409),
 )
 async def delete_comment(
     card_id: UUID, comment_id: UUID, service: ServiceDep, principal: Member

@@ -336,7 +336,7 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
         assert len((await service.add_link(a1, "todo", b1, lead)).links) == 1
 
 
-@pytest.mark.parametrize("write", ["move", "patch"])
+@pytest.mark.parametrize("write", ["move", "patch", "archive", "checklist"])
 async def test_a_write_that_waits_for_a_transfer_answers_card_moved(
     maker: async_sessionmaker[AsyncSession], write: str
 ) -> None:
@@ -353,6 +353,10 @@ async def test_a_write_that_waits_for_a_transfer_answers_card_moved(
             service = TodoService(session)
             if write == "move":
                 return await service.move(card_id, CardMove(columnId=columns[1].id), me)
+            if write == "archive":
+                return await service.archive_card(card_id, me)
+            if write == "checklist":
+                return await service.add_check_item(card_id, "Druck", me)
             return await service.patch(card_id, CardPatch(version=1, title="Neu"), me)
 
     async with maker() as holder:
@@ -370,7 +374,12 @@ async def test_a_write_that_waits_for_a_transfer_answers_card_moved(
     async with maker() as session:
         row = (
             await session.execute(
-                text("SELECT board_id, title FROM todo_card WHERE id = :c"), {"c": card_id}
+                text("SELECT board_id, title, archived_at FROM todo_card WHERE id = :c"),
+                {"c": card_id},
             )
         ).one()
-        assert row == (target, "Plakat")
+        assert row == (target, "Plakat", None)
+        items = await session.scalar(
+            text("SELECT count(*) FROM todo_check_item WHERE card_id = :c"), {"c": card_id}
+        )
+        assert items == 0

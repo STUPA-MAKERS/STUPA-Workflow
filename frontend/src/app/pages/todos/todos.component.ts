@@ -198,8 +198,13 @@ export class TodosComponent implements OnDestroy {
   readonly meId = signal<Uuid | null>(null);
   private etag: string | null = null;
   private loadSeq = 0;
-  /** Counts the local changes of the board: a poll that left before one is dropped. */
+  /** Counts every change of the board, live tiles too: a poll that left before one is dropped. */
   private mutations = 0;
+  /**
+   * Counts my own writes and the tiles taken off: a tile read that left before one is
+   * dropped. A live tile does not count, else a burst of k pings reads ~k² tiles.
+   */
+  private localWrites = 0;
   private mineLoaded = false;
   private mineSeq = 0;
   /** The poll ticks; while the socket is up only every `LIVE_POLL_EVERY`-th reads. */
@@ -617,18 +622,19 @@ export class TodosComponent implements OnDestroy {
 
   /**
    * Read the tile of a `card` ping and put it in place; a 404 or another board takes it out.
-   * A change of the board while the read was out (a write, another tile) makes the answer
-   * stale, like a poll: it is dropped and the card is read again.
+   * A write of mine or a tile taken off while the read was out makes the answer stale: it
+   * is dropped and the card is read again. Another live tile does not, because it changes
+   * only its own card.
    */
   private readTile(ping: TodoPing & { type: 'card' }): void {
     const seq = this.loadSeq;
-    const muts = this.mutations;
+    const writes = this.localWrites;
     this.api.cardTile(ping.cardId).subscribe({
       next: (tile) => {
         if (seq !== this.loadSeq) return;
         // The same load: the board answered before its first ping, and only a new load clears it.
         const board = this.board() as TodoBoard;
-        if (this.busy() || muts !== this.mutations) {
+        if (this.busy() || writes !== this.localWrites) {
           this.liveRetry.next(ping);
           return;
         }
@@ -650,8 +656,15 @@ export class TodosComponent implements OnDestroy {
   private dropTile(cardId: Uuid): void {
     const board = this.board();
     if (!board?.cards.some((c) => c.id === cardId)) return;
-    this.mutations++;
+    // A tile read that left before the drop would put the card back: it counts as a write.
+    this.wrote();
     this.board.set(removeTile(board, cardId));
+  }
+
+  /** Count a change of mine: it makes a poll and a tile read that are out stale. */
+  private wrote(): void {
+    this.mutations++;
+    this.localWrites++;
   }
 
   /** Count a write of the page in flight until `req` ends. */
@@ -666,7 +679,7 @@ export class TodosComponent implements OnDestroy {
    */
   private resync(id: Uuid): void {
     const seq = this.loadSeq;
-    this.mutations++;
+    this.wrote();
     this.api.pollBoard(id, null).subscribe({
       next: ({ board, etag }) => {
         if (seq !== this.loadSeq || !board) return;
@@ -815,11 +828,11 @@ export class TodosComponent implements OnDestroy {
     const board = this.board();
     if (!board) return;
     const optimistic = applyMove(board, event.cardId, event.move);
-    this.mutations++;
+    this.wrote();
     this.board.set(optimistic);
     this.track(this.api.moveCard(event.cardId, event.move)).subscribe({
       next: (tile) => {
-        this.mutations++;
+        this.wrote();
         const now = this.board();
         if (now) this.board.set(replaceTile(now, tile));
       },
@@ -845,7 +858,7 @@ export class TodosComponent implements OnDestroy {
   quickAdd(event: { columnId: Uuid; title: string }): void {
     const board = this.board();
     if (!board) return;
-    this.mutations++;
+    this.wrote();
     this.api.createCard({ boardId: board.id, columnId: event.columnId, title: event.title }).subscribe({
       next: (card) => this.onCreated(card),
       error: () => this.toast.error(this.i18n.translate('todos.error.create')),
@@ -859,7 +872,7 @@ export class TodosComponent implements OnDestroy {
     }
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
-    this.mutations++;
+    this.wrote();
     this.board.set(replaceTile(board, card));
     this.refreshMine();
   }
@@ -875,12 +888,12 @@ export class TodosComponent implements OnDestroy {
     const { card } = event;
     const held = board.cards.some((c) => c.id === card.id);
     if (event.fromBoardId === board.id && held) {
-      this.mutations++;
+      this.wrote();
       this.board.set(removeTile(board, card.id));
       this.refreshMine();
       this.refreshBoards();
     } else if (card.boardId === board.id && !held) {
-      this.mutations++;
+      this.wrote();
       this.board.set(placeTile(board, card));
       this.refreshBoards();
     }
@@ -892,7 +905,7 @@ export class TodosComponent implements OnDestroy {
     // A card of another board (a row, or one that left with a transfer) is not on this board.
     if (!board || card.boardId !== board.id) return;
     const held = board.cards.some((c) => c.id === card.id);
-    this.mutations++;
+    this.wrote();
     if (card.archivedAt) {
       this.board.set(removeTile(board, card.id));
     } else if (held) {
@@ -909,7 +922,7 @@ export class TodosComponent implements OnDestroy {
     this.rowsView()?.commentsChanged(event);
     const board = this.board();
     if (!board?.cards.some((c) => c.id === event.id)) return;
-    this.mutations++;
+    this.wrote();
     this.board.set({
       ...board,
       cards: board.cards.map((c) => (c.id === event.id ? { ...c, commentCount: event.commentCount } : c)),
@@ -919,7 +932,7 @@ export class TodosComponent implements OnDestroy {
   onArchived(id: Uuid): void {
     this.rowsView()?.cardRemoved(id);
     const board = this.board();
-    this.mutations++;
+    this.wrote();
     // A card of a row lives on another board: the archive count of this one stays.
     if (board?.cards.some((c) => c.id === id)) {
       this.board.set({ ...removeTile(board, id), archivedCount: board.archivedCount + 1 });
@@ -930,7 +943,7 @@ export class TodosComponent implements OnDestroy {
   onRestored(card: TodoCardDetail): void {
     const board = this.board();
     if (!board || card.boardId !== board.id) return;
-    this.mutations++;
+    this.wrote();
     this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
   }
 
@@ -950,7 +963,7 @@ export class TodosComponent implements OnDestroy {
     const tile = board?.cards.find((c) => c.id === event.cardId);
     if (!board || !rows || !tile) return;
     const optimistic = removeTile(board, tile.id);
-    this.mutations++;
+    this.wrote();
     this.board.set(optimistic);
     rows.receive(tile, event.boardId, event.move);
     this.track(this.api.transferCard(tile.id, { boardId: event.boardId, ...event.move })).subscribe({
@@ -971,13 +984,13 @@ export class TodosComponent implements OnDestroy {
     const tile = board?.canWrite ? this.rowsView()?.take(event.cardId) : null;
     if (!board || !tile) return;
     const optimistic = insertTile(board, tile, event.move);
-    this.mutations++;
+    this.wrote();
     this.board.set(optimistic);
     this.track(this.api.transferCard(tile.id, { boardId: board.id, ...event.move })).subscribe({
       next: (card) => {
         const now = this.board();
         if (now?.id === board.id) {
-          this.mutations++;
+          this.wrote();
           this.board.set(replaceTile(now, card));
         }
         this.refreshBoards();
@@ -996,7 +1009,7 @@ export class TodosComponent implements OnDestroy {
   }
 
   onSettingsChanged(board: TodoBoard): void {
-    this.mutations++;
+    this.wrote();
     this.board.set(board);
     this.boards.update((list) => list.map((b) => (b.id === board.id ? { ...b, name: board.name } : b)));
   }

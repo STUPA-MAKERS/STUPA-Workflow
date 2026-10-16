@@ -6,6 +6,8 @@
 >
   @if (none()) {
     <p class="tt__empty">{{ 'todos.transfer.none' | t }}</p>
+  } @else if (unloadable()) {
+    <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
   } @else {
     <form class="tt" (submit)="$event.preventDefault(); confirm()">
       <app-select
@@ -28,7 +30,7 @@
     </form>
   }
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
-  @if (!none()) {
+  @if (!none() && !unloadable()) {
     <app-button dialog-footer variant="fill" [loading]="busy()" [disabled]="!canConfirm()" (click)="confirm()">
       {{ 'todos.transfer.confirm' | t }}
     </app-button>

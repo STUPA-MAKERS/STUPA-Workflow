@@ -15,12 +15,20 @@ the boards that the principal reads now (``BoardAccess.can_read``) and drops an
 unreadable or unknown id without a word; it answers ``{"type": "subscribed",
 "boardIds": [...]}`` with the kept ids. Then it forwards the pings of these boards
 (see ``live``). A ping carries ids only, so a board that the viewer lost since the
-last subscribe says "changed", and the REST read then answers 404.
+last check says "changed", and the REST read then answers 404.
+
+A socket that only listens never subscribes again, so the pump checks again too:
+before it forwards a ping, a last check older than ``RECHECK_SECONDS`` resolves the
+principal and filters the subscribed boards with ``can_read`` again. A session that
+is gone closes the socket with ``4401``; a board that the principal no longer reads
+leaves the set without a word, as on a subscribe. A lock serializes the checks of the
+subscribe and of the pump, because both use the one session of the socket, and an
+``AsyncSession`` does not take two statements at once.
 
 Errors keep the socket open: ``invalid_message`` (a binary frame, not JSON, or a
 bad frame), ``too_many_boards``, ``unknown_type`` and ``rate_limited`` (a token
 bucket per socket, as on the meeting socket; every frame counts, a bad one too).
-Every subscribe ends its transaction, because the socket keeps its request session
+Every check ends its transaction, because the socket keeps its request session
 for its whole life, and an open transaction would hold a pool connection.
 """
 
@@ -52,11 +60,15 @@ logger = logging.getLogger("app.todos.live")
 
 #: Resolves the principal of the socket again (``None``: the session is gone).
 PrincipalResolver = Callable[[], Awaitable[Principal | None]]
+#: A monotonic clock in seconds (``time.monotonic``; a test passes a fake).
+Clock = Callable[[], float]
 
 ws_router = APIRouter(tags=["todos"])
 
 #: The most boards that one subscribe names.
 MAX_BOARDS = 100
+#: The age in seconds after which the pump checks the principal and the boards again.
+RECHECK_SECONDS = 300.0
 #: The open sockets of one account per process (a denial-of-service guard).
 MAX_CONNECTIONS_PER_PRINCIPAL = 5
 _connection_counts: dict[str, int] = {}
@@ -102,6 +114,7 @@ class TodoLiveConnection:
         session: AsyncSession,
         broker: PatternBroker,
         resolve: PrincipalResolver | None = None,
+        clock: Clock = time.monotonic,
     ) -> None:
         self.ws = websocket
         self.principal = principal
@@ -109,6 +122,9 @@ class TodoLiveConnection:
         self.broker = broker
         self._resolve = resolve
         self.board_ids: frozenset[str] = frozenset()
+        self._clock = clock
+        self._checked_at = clock()
+        self._check_lock = asyncio.Lock()
         self._tokens = _THROTTLE_BURST
         self._last_refill = time.monotonic()
 
@@ -138,6 +154,7 @@ class TodoLiveConnection:
                 if principal is None:
                     return None
                 self.principal = principal
+            self._checked_at = self._clock()
             wanted = list(dict.fromkeys(ids))
             if not wanted:
                 return []
@@ -167,13 +184,32 @@ class TodoLiveConnection:
         if len(msg.board_ids) > MAX_BOARDS:
             await self._error("too_many_boards")
             return True
-        kept = await self._readable(msg.board_ids)
+        async with self._check_lock:
+            kept = await self._readable(msg.board_ids)
+            self.board_ids = frozenset(str(b) for b in kept or [])
         if kept is None:
-            self.board_ids = frozenset()
             await self.ws.close(code=WS_UNAUTHENTICATED)
             return False
-        self.board_ids = frozenset(str(b) for b in kept)
         await self.ws.send_json({"type": "subscribed", "boardIds": [str(b) for b in kept]})
+        return True
+
+    async def _recheck(self) -> bool:
+        """Check the principal and the boards again when the last check is too old.
+
+        Returns:
+            False when the session is gone; the socket is then closed.
+        """
+        if self._clock() - self._checked_at < RECHECK_SECONDS:
+            return True
+        async with self._check_lock:
+            # A subscribe that held the lock checked a moment ago.
+            if self._clock() - self._checked_at < RECHECK_SECONDS:
+                return True
+            kept = await self._readable(sorted(uuid.UUID(b) for b in self.board_ids))
+            self.board_ids = frozenset(str(b) for b in kept or [])
+        if kept is None:
+            await self.ws.close(code=WS_UNAUTHENTICATED)
+            return False
         return True
 
     async def _frame(self) -> object | None:
@@ -207,7 +243,12 @@ class TodoLiveConnection:
 
     async def _pump(self, subscription: Subscription) -> None:
         async for message in subscription:
-            if str(message.get("boardId")) in self.board_ids:
+            board_id = str(message.get("boardId"))
+            if board_id not in self.board_ids:
+                continue
+            if not await self._recheck():
+                return
+            if board_id in self.board_ids:
                 await self.ws.send_json(message)
 
     async def run(self) -> None:

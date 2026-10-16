@@ -744,5 +744,45 @@ describe('TodoBoardRowsComponent', () => {
       answers[1].next(tile({ id: 'k-1', columnId: 'c-4', title: 'Neu', assignees: [ME] }));
       expect(cards(cmp)).toContain('b-1/k-1/c-4');
     });
+
+    it('reads each card of a burst once: a live tile does not make the other answers stale', async () => {
+      const answers = new Map<string, Subject<TodoCardTile>>();
+      const { cmp, api, live, settle } = await setup({
+        cardTile: (id: string) => {
+          const s = new Subject<TodoCardTile>();
+          answers.set(id, s);
+          return s;
+        },
+        inputs: { me: 'me' },
+      });
+      for (const cardId of ['k-1', 'k-2', 'k-3']) live.emit({ type: 'card', boardId: 'b-1', cardId });
+      await wait(settle);
+      for (const id of ['k-1', 'k-2', 'k-3']) {
+        answers.get(id)?.next(tile({ id, columnId: 'c-2', title: `${id} neu`, assignees: [ME] }));
+      }
+      await wait(settle);
+      expect(api.cardTile).toHaveBeenCalledTimes(3);
+      expect(cards(cmp).filter((c) => c.startsWith('b-1/')).sort()).toEqual(['b-1/k-1/c-2', 'b-1/k-2/c-2', 'b-1/k-3/c-2']);
+    });
+
+    it('drops a tile answer that a live removal overtook', async () => {
+      const answers: Subject<TodoCardTile>[] = [];
+      const { cmp, api, live, settle } = await setup({
+        cardTile: () => {
+          const s = new Subject<TodoCardTile>();
+          answers.push(s);
+          return s;
+        },
+        inputs: { me: 'me' },
+      });
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      live.emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      answers[0].next(tile({ id: 'k-1', columnId: 'c-2', title: 'Alt', assignees: [ME] }));
+      expect(cards(cmp).some((c) => c.includes('/k-1/'))).toBe(false);
+      await wait(settle);
+      expect(api.cardTile).toHaveBeenCalledTimes(2);
+    });
   });
 });

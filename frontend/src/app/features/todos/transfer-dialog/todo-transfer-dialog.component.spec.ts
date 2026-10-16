@@ -107,11 +107,14 @@ describe('TodoTransferDialogComponent', () => {
     expect(cmp.open()).toBe(false);
   });
 
-  it('shows the empty line when the boards do not load', async () => {
+  it('shows the transfer error, not the empty line, when the boards do not load', async () => {
     const { open, cmp } = await setup({ boardsFail: true });
     open();
-    expect(cmp.none()).toBe(true);
-    expect(screen.getByText('Es gibt kein anderes Board, in das du verschieben kannst.')).toBeInTheDocument();
+    expect(cmp.none()).toBe(false);
+    expect(cmp.unloadable()).toBe(true);
+    expect(screen.getByRole('alert')).toHaveTextContent('Die Karte konnte nicht verschoben werden.');
+    expect(screen.queryByText('Es gibt kein anderes Board, in das du verschieben kannst.')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verschieben' })).toBeNull();
   });
 
   it('waits for the board and its column, drops a stale answer and a failed read', async () => {

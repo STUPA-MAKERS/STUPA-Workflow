@@ -264,8 +264,13 @@ export class TodoBoardRowsComponent implements OnInit {
   readonly icon = BOARD_ICON;
 
   private etag: string | null = null;
-  /** Counts the local changes: a poll that left before one is dropped. */
+  /** Counts every change of the rows, live tiles too: a poll that left before one is dropped. */
   private mutations = 0;
+  /**
+   * Counts my own writes and the cards taken off: a tile read that left before one is
+   * dropped. A live tile does not count, else a burst of k pings reads ~k² tiles.
+   */
+  private localWrites = 0;
   private seq = 0;
   /** The first read answered or failed. */
   private readonly ready = signal(false);
@@ -359,6 +364,7 @@ export class TodoBoardRowsComponent implements OnInit {
   /** Read the rows again without an ETag (after a change elsewhere or a refused move). */
   refresh(): void {
     this.mutations++;
+    this.localWrites++;
     this.load(null);
   }
 
@@ -367,6 +373,7 @@ export class TodoBoardRowsComponent implements OnInit {
    * another board), put it in its row, then read the rows again.
    */
   cardChanged(card: TodoCardDetail): void {
+    this.localWrites++;
     const list = this.boards();
     const left = list.some((b) => b.id !== card.boardId && b.cards.some((c) => c.id === card.id));
     if (left) {
@@ -380,6 +387,7 @@ export class TodoBoardRowsComponent implements OnInit {
 
   /** The card drawer archived a card. */
   cardRemoved(id: Uuid): void {
+    this.localWrites++;
     const board = this.boards().find((b) => b.cards.some((c) => c.id === id));
     if (!board) return;
     this.update(board.id, (b) => removeTile(b, id));
@@ -388,6 +396,7 @@ export class TodoBoardRowsComponent implements OnInit {
 
   /** Merge only the comment count: the drawer's copy of the rest can be stale. */
   commentsChanged(event: { id: Uuid; commentCount: number }): void {
+    this.localWrites++;
     const board = this.boards().find((b) => b.cards.some((c) => c.id === event.id));
     if (!board) return;
     this.update(board.id, (b) => ({
@@ -398,6 +407,7 @@ export class TodoBoardRowsComponent implements OnInit {
 
   /** A card of another board lands in a row at once, before the server answers (`dropIn`). */
   receive(tile: TodoCardTile, boardId: Uuid, move: TodoCardMove): void {
+    this.localWrites++;
     this.update(boardId, (b) => insertTile(b, tile, move));
   }
 
@@ -410,6 +420,7 @@ export class TodoBoardRowsComponent implements OnInit {
    *   True when the rows still show the card.
    */
   accept(card: TodoCardDetail): boolean {
+    this.localWrites++;
     if (!this.keeps(card)) {
       this.removeCard(card.id);
       this.toast.success(this.i18n.translate('todos.card.transferred', { board: card.boardName }));
@@ -421,6 +432,7 @@ export class TodoBoardRowsComponent implements OnInit {
 
   /** Take a card out of its row (it went onto the personal board); null when no row holds it. */
   take(cardId: Uuid): TodoCardTile | null {
+    this.localWrites++;
     for (const b of this.boards()) {
       const card = b.cards.find((c) => c.id === cardId);
       if (card) {
@@ -446,7 +458,7 @@ export class TodoBoardRowsComponent implements OnInit {
     let poll = false;
     for (const p of pings) {
       if (p.type === 'board') poll = true;
-      else if (p.type === 'card_removed') this.removeCard(p.cardId, null, p.boardId);
+      else if (p.type === 'card_removed') this.dropCard(p.cardId, p.boardId);
       else this.readTile(p);
     }
     if (poll) this.poll();
@@ -454,20 +466,30 @@ export class TodoBoardRowsComponent implements OnInit {
 
   /**
    * Read the tile of a `card` ping and put it in place; a 404 takes it out of every row. A
-   * change of the rows while the read was out (a write, another tile) makes the answer
-   * stale, like a poll: it is dropped and the card is read again.
+   * write of mine or a card taken off while the read was out makes the answer stale: it is
+   * dropped and the card is read again. Another live tile does not, because it changes
+   * only its own card.
    */
   private readTile(ping: TodoPing & { type: 'card' }): void {
-    const muts = this.mutations;
+    const writes = this.localWrites;
     this.api.cardTile(ping.cardId).subscribe({
       next: (tile) => {
-        if (this.busy() || muts !== this.mutations) this.liveRetry.next(ping);
+        if (this.busy() || writes !== this.localWrites) this.liveRetry.next(ping);
         else this.placeLive(tile);
       },
       error: (err: unknown) => {
-        if (err instanceof HttpErrorResponse && err.status === 404) this.removeCard(ping.cardId);
+        if (err instanceof HttpErrorResponse && err.status === 404) this.dropCard(ping.cardId);
       },
     });
+  }
+
+  /**
+   * A live removal: a tile read that left before it would put the card back, so it counts
+   * as a write.
+   */
+  private dropCard(cardId: Uuid, only: Uuid | null = null): void {
+    this.localWrites++;
+    this.removeCard(cardId, null, only);
   }
 
   private placeLive(tile: TodoCardTile): void {
@@ -604,10 +626,14 @@ export class TodoBoardRowsComponent implements OnInit {
     const before = this.boards().find((b) => b.id === boardId);
     if (!before?.canWrite) return;
     const optimistic = applyMove(before, cardId, move);
+    this.localWrites++;
     this.update(boardId, () => optimistic);
     this.pending++;
     this.api.moveCard(cardId, move).pipe(finalize(() => this.pending--)).subscribe({
-      next: (tile) => this.update(boardId, (b) => replaceTile(b, tile)),
+      next: (tile) => {
+        this.localWrites++;
+        this.update(boardId, (b) => replaceTile(b, tile));
+      },
       error: (err: unknown) => {
         this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.move')));
         // Roll back when nothing else changed the row meanwhile, then read the rows again.
@@ -629,6 +655,7 @@ export class TodoBoardRowsComponent implements OnInit {
       b.id === fromId ? removeTile(b, tile.id) : b.id === toId ? insertTile(b, tile, move) : b,
     );
     this.mutations++;
+    this.localWrites++;
     this.boards.set(optimistic);
     this.pending++;
     this.api.transferCard(tile.id, { boardId: toId, ...move }).pipe(finalize(() => this.pending--)).subscribe({
@@ -640,6 +667,7 @@ export class TodoBoardRowsComponent implements OnInit {
         this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
         if (this.boards() === optimistic) {
           this.mutations++;
+          this.localWrites++;
           this.boards.set(before);
         }
         this.refresh();
