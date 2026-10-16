@@ -34,9 +34,11 @@
   flex: 0 1 18.75rem;
   min-width: 12rem;
 }
+/* The board picker and the search start the bar; the filter chips end it. */
 .td__chips {
   display: flex;
   flex: 0 1 auto;
+  margin-inline-start: auto;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;

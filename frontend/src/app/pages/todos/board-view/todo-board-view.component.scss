@@ -34,10 +34,12 @@
 :host-context([data-theme='dark']) .bv__col {
   background: var(--color-surface-1);
 }
-/* The cards, the done footer and the quick field scroll together under the column head. */
+/* The cards scroll between the column head and the column foot. The scroll area takes
+   the free height of the column, so the foot ("+ To-Do", the quick field, the done
+   links) sits at the bottom edge of the column. */
 .bv__scroll {
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 0;
   flex-direction: column;
   gap: var(--space-2);
   min-height: 0;
@@ -83,9 +85,11 @@
   margin-inline-start: auto;
 }
 
+/* The drop list fills the scroll area, so an empty column is a drop target down to its
+   foot. */
 .bv__cards {
   display: flex;
-  flex: none;
+  flex: 1 0 auto;
   flex-direction: column;
   gap: var(--space-2);
   min-height: 3rem;
@@ -141,6 +145,7 @@
 
 .bv__doneFoot {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);

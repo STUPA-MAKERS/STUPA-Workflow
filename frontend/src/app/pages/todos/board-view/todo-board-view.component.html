@@ -99,7 +99,9 @@
             </div>
           }
         </div>
+        </div>
 
+        <!-- The foot of the column stays at its bottom edge, under the scrolling cards. -->
         @if (col.isDone && (more(col) > 0 || board().archivedCount)) {
           <p class="bv__doneFoot">
             @if (more(col) > 0) {
@@ -145,7 +147,6 @@
             </button>
           }
         }
-        </div>
       </section>
     }
   </div>
