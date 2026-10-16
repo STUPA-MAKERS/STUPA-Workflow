@@ -15,6 +15,20 @@ describe('TodoBoardSkeletonComponent', () => {
     expect((fixture.nativeElement as HTMLElement).getAttribute('aria-hidden')).toBe('true');
   });
 
+  it('draws the column count it is given and the natural height of a board with rows below', async () => {
+    const three = await render(TodoBoardSkeletonComponent, { inputs: { columnCount: 3, natural: true } });
+    expect(three.container.querySelectorAll('.bv__col')).toHaveLength(3);
+    expect(three.fixture.nativeElement as HTMLElement).toHaveClass('bv-host--natural');
+    three.fixture.componentRef.setInput('columnCount', 6);
+    three.fixture.componentRef.setInput('phone', true);
+    three.fixture.componentRef.setInput('natural', false);
+    three.fixture.detectChanges();
+    const six = three;
+    expect(six.container.querySelectorAll('.bsk__tab')).toHaveLength(6);
+    expect(six.container.querySelectorAll('.bv__dot')).toHaveLength(6);
+    expect(six.fixture.nativeElement as HTMLElement).not.toHaveClass('bv-host--natural');
+  });
+
   it('leaves out the place of "+ To-Do" for a person who may not add cards', async () => {
     const { container } = await render(TodoBoardSkeletonComponent);
     expect(container.querySelector('.bsk__add')).toBeNull();

@@ -58,7 +58,7 @@
 } @else if (phone()) {
   <div class="bv bv--phone">
     <div class="bsk__tabs">
-      @for (col of columns; track $index) {
+      @for (col of columns(); track $index) {
         <span class="bsk__tab skel-in"><span class="skel-text" [style.width]="col.name"></span></span>
       }
     </div>
@@ -72,14 +72,14 @@
       </div>
     </div>
     <div class="bv__dots">
-      @for (col of columns; track $index) {
+      @for (col of columns(); track $index) {
         <span class="bv__dot"></span>
       }
     </div>
   </div>
 } @else {
   <div class="bv">
-    @for (col of columns; track $index; let last = $last) {
+    @for (col of columns(); track $index; let last = $last) {
       <section class="bv__col">
         <header class="bv__head">
           <p class="bv__name skel-in"><span class="skel-text" [style.width]="col.name"></span></p>

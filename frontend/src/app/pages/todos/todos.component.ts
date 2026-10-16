@@ -193,9 +193,34 @@ export class TodosComponent implements OnDestroy {
   private readonly drawer = viewChild<ElementRef<HTMLElement>>('drawer');
   /** The rows of the other boards under "Meine To-Dos" (board view only). */
   private readonly rowsView = viewChild(TodoBoardRowsComponent);
-  /** The cards the rows show after the filters. */
-  readonly rowMatches = signal(0);
+  /** The cards the rows show after the filters; null until the rows of this board answered. */
+  readonly rowMatches = signal<number | null>(null);
   readonly withRows = computed(() => this.board()?.kind === 'personal' && this.view() === 'board');
+  /**
+   * The rows held cards at their last answer. Until the rows answer, the board and its
+   * skeleton keep that shape, so the board does not resize when the rows land.
+   */
+  private readonly rowsExpected = signal(true);
+  /** Rows of other boards follow under the board: the board takes its natural height. */
+  readonly rowsBelow = computed(() => {
+    if (!this.withRows()) return false;
+    const n = this.rowMatches();
+    return n === null ? this.rowsExpected() : n > 0;
+  });
+  /** The shape of each board the page has shown: the skeleton draws it on a return. */
+  private readonly shapes = signal<ReadonlyMap<Uuid, { columns: number; labels: boolean }>>(new Map());
+  /** The shape of the loading board: known from an earlier visit, else a new board. */
+  readonly skeleton = computed(() => {
+    const id = this.boardId();
+    const known = id ? this.shapes().get(id) : undefined;
+    const personal = this.summary()?.kind === 'personal';
+    return {
+      columns: known?.columns ?? 4,
+      // A new personal board has no labels, so its chip row has no label chip.
+      labels: known?.labels ?? !personal,
+      natural: personal && this.view() === 'board' && this.rowsExpected(),
+    };
+  });
   private focusedFor: Uuid | null = null;
 
   readonly viewOptions = computed<SegmentedOption[]>(() => [
@@ -240,7 +265,7 @@ export class TodosComponent implements OnDestroy {
   readonly filtered = computed(() => filterActive(this.filter()));
   readonly noMatch = computed(() => {
     if (!this.filtered()) return false;
-    if (this.withRows() && this.rowMatches() > 0) return false;
+    if (this.withRows() && (this.rowMatches() ?? 0) > 0) return false;
     for (const list of this.visible().values()) if (list.length) return false;
     return true;
   });
@@ -313,6 +338,18 @@ export class TodosComponent implements OnDestroy {
       untracked(() => this.loadBoard(id));
     });
 
+    // Remember the shape of each shown board for its skeleton on a return.
+    effect(() => {
+      const b = this.board();
+      if (!b) return;
+      const shape = { columns: b.columns.length, labels: b.labels.length > 0 };
+      untracked(() => {
+        const known = this.shapes().get(b.id);
+        if (known?.columns === shape.columns && known.labels === shape.labels) return;
+        this.shapes.update((m) => new Map(m).set(b.id, shape));
+      });
+    });
+
     // The drawer takes the focus once when it opens for a card.
     effect(() => {
       const id = this.cardId();
@@ -346,6 +383,12 @@ export class TodosComponent implements OnDestroy {
     this.frame.fill.set(false);
   }
 
+  /** The rows answered with the number of cards they show. */
+  onRowMatches(n: number): void {
+    this.rowMatches.set(n);
+    this.rowsExpected.set(n > 0);
+  }
+
   private openDefault(boards: readonly TodoBoardSummary[]): void {
     const pick = defaultBoard(
       boards,
@@ -369,6 +412,7 @@ export class TodosComponent implements OnDestroy {
     this.error.set(false);
     this.board.set(null);
     this.etag = null;
+    this.rowMatches.set(null);
     this.filter.set(NO_FILTER);
     this.search.sync('');
     this.api.pollBoard(id, null).subscribe({

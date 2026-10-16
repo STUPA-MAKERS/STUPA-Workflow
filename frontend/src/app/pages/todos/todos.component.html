@@ -84,7 +84,9 @@
     @if (!board() && loading() && !phone()) {
       <div class="td__chips skel-in" aria-hidden="true">
         <span class="skel-box td__skelChip td__skelChip--wide"></span>
-        <span class="skel-box td__skelChip"></span>
+        @if (skeleton().labels) {
+          <span class="skel-box td__skelChip"></span>
+        }
         <span class="skel-box td__skelChip"></span>
       </div>
     }
@@ -134,9 +136,15 @@
     </div>
   </app-sticky-bar>
 
-  <div class="td__body" cdkScrollable [class.td__body--rows]="withRows() && rowMatches() > 0">
+  <div class="td__body" cdkScrollable [class.td__body--rows]="loading() ? skeleton().natural : rowsBelow()">
     @if (loading()) {
-      <app-todo-board-skeleton [view]="view()" [phone]="phone()" [canWrite]="summary()?.canWrite ?? false" />
+      <app-todo-board-skeleton
+        [view]="view()"
+        [phone]="phone()"
+        [canWrite]="summary()?.canWrite ?? false"
+        [columnCount]="skeleton().columns"
+        [natural]="skeleton().natural"
+      />
       <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
     } @else if (notFound()) {
       <app-empty-state icon="circleok" [heading]="'todos.notFound' | t" />
@@ -167,7 +175,7 @@
           [labels]="labelsById()"
           [today]="today()"
           [phone]="phone()"
-          [fill]="!(withRows() && rowMatches() > 0)"
+          [fill]="!rowsBelow()"
           (openCard)="openCard($event)"
           (moveCard)="moveCard($event)"
           (quickAdd)="quickAdd($event)"
@@ -182,7 +190,7 @@
           [today]="today()"
           [phone]="phone()"
           (openCard)="openCard($event)"
-          (matches)="rowMatches.set($event)"
+          (matches)="onRowMatches($event)"
         />
       }
     }

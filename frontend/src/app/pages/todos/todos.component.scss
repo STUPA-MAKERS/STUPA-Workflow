@@ -119,6 +119,7 @@
   overscroll-behavior-y: contain;
 }
 .td__body--rows > app-todo-board-view,
+.td__body--rows > app-todo-board-skeleton,
 .td__body--rows > app-todo-board-rows {
   flex: none;
 }

@@ -1,5 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** One placeholder tile: a label line or not, one or two title lines, a fact bar. */
@@ -9,7 +9,7 @@ interface SkelTile {
   fact: string;
 }
 
-/** Placeholder columns. Four, as a new board has; the widths are fixed per place. */
+/** Placeholder columns. Four, as a new board has; the widths are fixed per place. More columns repeat them. */
 const COLUMNS: readonly { name: string; tiles: readonly SkelTile[] }[] = [
   {
     name: '3.5rem',
@@ -96,7 +96,7 @@ const LIST_GROUPS: readonly { name: string; rows: readonly { title: string; link
     '../list-view/todo-list-view.component.scss',
     './todo-board-skeleton.component.scss',
   ],
-  host: { 'aria-hidden': 'true' },
+  host: { 'aria-hidden': 'true', '[class.bv-host--natural]': 'natural()' },
 })
 export class TodoBoardSkeletonComponent {
   readonly view = input<'board' | 'list'>('board');
@@ -104,7 +104,18 @@ export class TodoBoardSkeletonComponent {
   /** The person may add cards: each open column ends with the place of "+ To-Do". */
   readonly canWrite = input(false);
 
-  protected readonly columns = COLUMNS;
+  /** The number of columns: the count of the board when the page knows it, else four. */
+  readonly columnCount = input(COLUMNS.length);
+  /**
+   * The board is as tall as its cards (`fill` false on the board view), because the rows
+   * of the other boards follow below it on "Meine To-Dos".
+   */
+  readonly natural = input(false);
+
+  protected readonly columns = computed(() => {
+    const n = Math.max(1, Math.floor(this.columnCount()));
+    return Array.from({ length: n }, (_, i) => COLUMNS[i % COLUMNS.length]);
+  });
   protected readonly phoneTiles = PHONE_TILES;
   protected readonly groups = LIST_GROUPS;
 }

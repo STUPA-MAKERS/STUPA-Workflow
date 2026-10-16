@@ -34,7 +34,8 @@
     </header>
 
     @if (isOpen(row)) {
-      <div class="br__cols" cdkDropListGroup [id]="'br-c-' + row.board.id">
+      <!-- cdkScrollable: a drag in the row scrolls it sideways and measures its drop lists anew. -->
+      <div class="br__cols" cdkScrollable cdkDropListGroup [id]="'br-c-' + row.board.id">
         @for (col of row.columns; track col.id; let ci = $index) {
           <div class="br__col">
             <p class="br__colHead">

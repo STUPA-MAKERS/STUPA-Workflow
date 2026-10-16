@@ -1,3 +1,4 @@
+import { CdkScrollable } from '@angular/cdk/scrolling';
 import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
@@ -127,7 +128,7 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
   selector: 'app-todo-board-rows',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CdkDrag, CdkDropList, CdkDropListGroup, RouterLink, TranslatePipe, IconComponent, TodoCardTileComponent],
+  imports: [CdkDrag, CdkDropList, CdkDropListGroup, CdkScrollable, RouterLink, TranslatePipe, IconComponent, TodoCardTileComponent],
   host: {
     class: 'br-host',
     '(document:focusin)': 'leaveDrag($event)',
@@ -148,7 +149,10 @@ export class TodoBoardRowsComponent {
   readonly phone = input(false);
 
   readonly openCard = output<Uuid>();
-  /** The number of cards the rows show after the filters. */
+  /**
+   * The number of cards the rows show after the filters. It reports first when the first
+   * read answered (or failed), so the page knows whether rows follow under the board.
+   */
   readonly matches = output<number>();
 
   readonly boards = signal<TodoAssignedBoard[]>([]);
@@ -165,12 +169,17 @@ export class TodoBoardRowsComponent {
   /** Counts the local changes: a poll that left before one is dropped. */
   private mutations = 0;
   private seq = 0;
+  /** The first read answered or failed. */
+  private readonly ready = signal(false);
 
   readonly rows = computed(() => boardRows(this.boards(), this.filter(), this.today()));
 
   constructor() {
     this.load(null);
-    effect(() => this.matches.emit(this.rows().reduce((n, r) => n + r.count, 0)));
+    effect(() => {
+      const rows = this.rows();
+      if (this.ready()) this.matches.emit(rows.reduce((n, r) => n + r.count, 0));
+    });
   }
 
   // ------------------------------------------------------------------ data
@@ -183,9 +192,10 @@ export class TodoBoardRowsComponent {
         if (seq !== this.seq || muts !== this.mutations || !res.boards) return;
         this.boards.set(res.boards);
         this.etag = res.etag;
+        this.ready.set(true);
       },
       // The rows are an extra: a failed read keeps what is on screen.
-      error: () => undefined,
+      error: () => this.ready.set(true),
     });
   }
 

@@ -28,6 +28,8 @@ interface Opts {
   /** The board read never answers: the page stays in its loading state. */
   pending?: boolean;
   rows?: TodoAssignedBoard[];
+  /** The rows read: a subject keeps it in flight. */
+  rowsRead?: Subject<TodoAssignedPoll>;
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -41,7 +43,7 @@ async function start(url: string, opts: Opts = {}) {
     pollBoard: jest.fn((): Observable<TodoBoardPoll> =>
       opts.pending ? new Subject<TodoBoardPoll>() : of({ board: b, etag: 'W/"1"' }),
     ),
-    pollMineBoards: jest.fn((): Observable<TodoAssignedPoll> => of({ boards: opts.rows ?? [], etag: 'W/"r"' })),
+    pollMineBoards: jest.fn((): Observable<TodoAssignedPoll> => opts.rowsRead ?? of({ boards: opts.rows ?? [], etag: 'W/"r"' })),
     members: jest.fn(() => of(MEMBERS)),
     mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
@@ -656,6 +658,59 @@ describe('TodosComponent', () => {
       expect(cmp.noMatch()).toBe(true);
       cmp.poll();
       expect(api.pollMineBoards).toHaveBeenLastCalledWith('W/"r"');
+    });
+
+    it('loads the personal board in the shape it will have: natural height, no label chip', async () => {
+      const { harness } = await start('/todos/b-0', { pending: true });
+      const root = harness.routeNativeElement!;
+      expect(root.querySelector('app-todo-board-skeleton')).toHaveClass('bv-host--natural');
+      expect(root.querySelector('.td__body--rows')).not.toBeNull();
+      expect(root.querySelectorAll('.td__skelChip')).toHaveLength(2);
+      TestBed.resetTestingModule();
+      const gremium = await start('/todos/b-1', { pending: true });
+      const other = gremium.harness.routeNativeElement!;
+      expect(other.querySelector('app-todo-board-skeleton')).not.toHaveClass('bv-host--natural');
+      expect(other.querySelectorAll('.td__skelChip')).toHaveLength(3);
+    });
+
+    it('keeps the board at natural height while the rows load, and fills once they answer empty', async () => {
+      const rowsRead = new Subject<TodoAssignedPoll>();
+      const { cmp, harness, settle } = await start('/todos/b-0', { board: personal(), rowsRead });
+      expect(cmp.rowMatches()).toBeNull();
+      expect(cmp.rowsBelow()).toBe(true);
+      expect(harness.routeNativeElement?.querySelector('app-todo-board-view')).toHaveClass('bv-host--natural');
+      rowsRead.next({ boards: [], etag: 'W/"r"' });
+      await settle();
+      expect(cmp.rowMatches()).toBe(0);
+      expect(harness.routeNativeElement?.querySelector('app-todo-board-view')).not.toHaveClass('bv-host--natural');
+      // The next load of the board expects no rows and resets the count of the rows.
+      expect(cmp.skeleton().natural).toBe(false);
+    });
+
+    it('draws the skeleton of a board again with the columns it had, and resets the row count', async () => {
+      const three = board({
+        id: 'b-0',
+        name: 'Meine To-Dos',
+        kind: 'personal',
+        gremiumId: null,
+        cards: [],
+        columns: [
+          { id: 'c-1', name: 'Offen', position: 0, isDone: false, cardCount: 0 },
+          { id: 'c-2', name: 'In Arbeit', position: 1, isDone: false, cardCount: 0 },
+          { id: 'c-4', name: 'Erledigt', position: 2, isDone: true, cardCount: 0 },
+        ],
+      });
+      const { cmp, api, harness, router, settle } = await start('/todos/b-0', { board: three, rows: [other()] });
+      expect(cmp.rowMatches()).toBe(1);
+      api.pollBoard.mockReturnValue(new Subject<TodoBoardPoll>());
+      await router.navigateByUrl('/todos/b-1');
+      await settle();
+      expect(cmp.rowMatches()).toBeNull();
+      await router.navigateByUrl('/todos/b-0');
+      await settle();
+      const skel = harness.routeNativeElement!.querySelector('app-todo-board-skeleton')!;
+      expect(skel.querySelectorAll('.bv__col')).toHaveLength(3);
+      expect(skel).toHaveClass('bv-host--natural');
     });
 
     it('opens a row card in the drawer and passes the changes of the drawer to the rows', async () => {

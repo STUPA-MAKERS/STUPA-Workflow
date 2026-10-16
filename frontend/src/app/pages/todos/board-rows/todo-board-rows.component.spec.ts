@@ -1,3 +1,4 @@
+import { ScrollDispatcher } from '@angular/cdk/scrolling';
 import type { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
@@ -125,6 +126,16 @@ describe('TodoBoardRowsComponent', () => {
     expect(on.matches).toHaveBeenLastCalledWith(4);
     fireEvent.click(screen.getByRole('button', { name: 'Ticket prüfen' }));
     expect(on.openCard).toHaveBeenCalledWith('k-9');
+  });
+
+  it('registers the sideways scroller of each row with the CDK, so a drag scrolls it', async () => {
+    const { container } = await setup();
+    const scrollers = [...TestBed.inject(ScrollDispatcher).scrollContainers.keys()].map(
+      (s) => s.getElementRef().nativeElement,
+    );
+    const rows = [...container.querySelectorAll('.br__cols')];
+    expect(rows.length).toBeGreaterThan(0);
+    for (const el of rows) expect(scrollers).toContain(el);
   });
 
   it('shows nothing when no other board holds my cards, and keeps the rows on a failed read', async () => {
