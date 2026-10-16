@@ -170,6 +170,11 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly counts = signal<InvoiceSegmentCounts | null>(null);
   private nextOffset = 0;
   readonly loading = signal(true);
+  /**
+   * Page 0 loads again (a filter, the search or a save) while the old rows show. They stay,
+   * dimmed and inert, until the new ones arrive. `loading` means "nothing to show yet".
+   */
+  readonly reloading = signal(false);
   readonly loadingMore = signal(false);
   readonly hasMore = computed(() => this.items().length < this.total());
   readonly q = signal('');
@@ -520,12 +525,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.fetchEpoch++;
     this.nextOffset = 0;
     this.loading.set(this.items().length === 0);
+    this.reloading.set(this.items().length > 0);
     this.loadingMore.set(false);
     this.fetch(true);
   }
 
   loadMore(): void {
-    if (this.loadingMore() || this.loading() || !this.hasMore()) return;
+    if (this.loadingMore() || this.loading() || this.reloading() || !this.hasMore()) return;
     this.loadingMore.set(true);
     this.fetch(false);
   }
@@ -546,6 +552,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
         },
         error: () => {
@@ -555,6 +562,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
             this.total.set(0);
           }
           this.loading.set(false);
+          this.reloading.set(false);
           this.loadingMore.set(false);
         },
       });

@@ -50,7 +50,7 @@ describe('loadingInterceptor', () => {
   });
 
   it.each(['POST', 'PUT', 'PATCH', 'DELETE'])(
-    'never triggers the overlay for %s mutations',
+    'never triggers the loading bar for %s mutations',
     (method) => {
       const url = '/api/mutate';
       const req$ =

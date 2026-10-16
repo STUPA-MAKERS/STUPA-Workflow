@@ -1,5 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { I18nService, toFormatLocale } from './i18n.service';
+import * as translations from './translations';
 import { CATALOG } from './translations';
 
 describe('I18nService', () => {
@@ -77,5 +78,29 @@ describe('I18nService', () => {
   it('gives the same mapping as a pure function to code that has no injector', () => {
     expect(toFormatLocale('de')).toBe('de-DE');
     expect(toFormatLocale('en')).toBe('en-GB');
+  });
+  it('ready() loads the catalog of the active locale and refreshes the dictionary', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    const load = jest.spyOn(translations, 'loadCatalog');
+    const i18n = service();
+    await i18n.ready();
+    expect(load).toHaveBeenCalledWith('en');
+    expect(i18n.dictionary()).toBe(CATALOG.en);
+    load.mockRestore();
+  });
+
+  it('ready() resolves when the catalog does not load, so the app starts in German', async () => {
+    localStorage.setItem('ap.locale', 'en');
+    const load = jest.spyOn(translations, 'loadCatalog').mockRejectedValue(new Error('offline'));
+    const i18n = service();
+    await expect(i18n.ready()).resolves.toBeUndefined();
+    load.mockRestore();
+  });
+
+  it('setLocale() starts the load of the new catalog', () => {
+    const load = jest.spyOn(translations, 'loadCatalog');
+    service().setLocale('en');
+    expect(load).toHaveBeenCalledWith('en');
+    load.mockRestore();
   });
 });

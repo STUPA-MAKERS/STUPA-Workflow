@@ -200,6 +200,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly activeFilterCount = this.list.activeFilterCount;
   readonly exporting = this.list.exporting;
   readonly refreshing = this.list.refreshing;
+  readonly reloading = this.list.reloading;
 
   /** The display label of every cost centre: name, path and swatch colour (O19). */
   readonly costCentres = computed(() => costCentreIndex(this.budgetTree()));
@@ -423,6 +424,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly transferItems = this.transfers.items;
   readonly transferTotal = this.transfers.total;
   readonly transferLoading = this.transfers.loading;
+  readonly transferReloading = this.transfers.reloading;
   readonly transferLoadingMore = this.transfers.loadingMore;
   readonly transferHasMore = this.transfers.hasMore;
   readonly transferSaving = this.transfers.saving;

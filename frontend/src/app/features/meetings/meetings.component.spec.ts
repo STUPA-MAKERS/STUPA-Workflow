@@ -1,4 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
+import { renderDeferred } from '../../../testing/defer';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -736,9 +737,10 @@ describe('MeetingsComponent', () => {
     it('shows the protocol pane read-only to a manager who is not the minute-taker', async () => {
       // Two people must not type into one protocol. That is what the exclusivity
       // was written for, so the editor is disabled — not the whole page hidden.
-      const { container } = await loadOtherProtokollant({ status: 'live' });
+      const { container, fixture } = await loadOtherProtokollant({ status: 'live' });
 
       expect(await screen.findByText('Entwurf')).toBeInTheDocument();
+      await renderDeferred(fixture);
       expect(container.querySelector('.mde__host--disabled')).toBeTruthy();
       // Say who holds the pen, so the greyed editor is not a mystery.
       expect(screen.getByText(/Other P führt das Protokoll/)).toBeInTheDocument();

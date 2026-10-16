@@ -6,11 +6,12 @@ import { AuthService } from '@core/auth/auth.service';
 import { PrefetchService } from '@core/cache/prefetch.service';
 import { SwUpdatePromptComponent } from '@core/pwa/sw-update-prompt.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { LoadingOverlayComponent, MEDIA, ToastComponent } from '@stupa-makers/ui-kit';
+import { MEDIA, ToastComponent } from '@stupa-makers/ui-kit';
 import { HelpService } from '../features/help/help.service';
 import { ReportDialogComponent } from '../features/help/report-dialog/report-dialog.component';
 import { CommandPaletteComponent } from '../features/search/command-palette.component';
 import { BottomBarComponent } from './bottom-bar/bottom-bar.component';
+import { LoadBarComponent } from './load-bar/load-bar.component';
 import { mediaQuerySignal } from './media-query';
 import { NavRailComponent } from './nav-rail/nav-rail.component';
 import { PageFrameService } from './page-frame.service';
@@ -32,7 +33,7 @@ export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
 
 /**
  * App frame: the chrome around the router outlet, the toasts, the update prompt, the
- * loading overlay and the search palette.
+ * loading bar and the search palette.
  *
  * There is ONE router outlet for every frame. The frame only adds or removes the chrome
  * around it, so a change of frame (sign-in, the beamer) never destroys and recreates the
@@ -47,7 +48,7 @@ export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
     TranslatePipe,
     ToastComponent,
     SwUpdatePromptComponent,
-    LoadingOverlayComponent,
+    LoadBarComponent,
     CommandPaletteComponent,
     ReportDialogComponent,
     NavRailComponent,

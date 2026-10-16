@@ -391,6 +391,18 @@ describe('ExpensesComponent (unit)', () => {
     expect(cmp.budgetId()).toBe('b-9');
   });
 
+  it('keeps the shown rows while a filter reloads, and blocks a second page meanwhile', () => {
+    const { cmp, http } = build({ expenses: page([EXPENSE], 2) });
+    cmp.setKind('income');
+    expect(cmp.reloading()).toBe(true);
+    expect(cmp.loading()).toBe(false);
+    expect(cmp.items()).toHaveLength(1);
+    cmp.loadMore();
+    flushList(http, page([]));
+    expect(cmp.reloading()).toBe(false);
+    expect(cmp.items()).toHaveLength(0);
+  });
+
   it('fetch passes all active filter params to the API', () => {
     const { cmp, http } = build();
     cmp.kind.set('expense');

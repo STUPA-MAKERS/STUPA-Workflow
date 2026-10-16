@@ -228,8 +228,8 @@ describe('MeetingsListComponent', () => {
   it('puts "Weitere Sitzungen laden" at the end when no past meeting follows', async () => {
     const view = await setup();
     load(view, { upcoming: { items: [PLANNED], nextCursor: 'u-1' }, past: { items: [], nextCursor: null } });
-    const scroll = view.container.querySelector('.mtl__scroll') as HTMLElement;
-    expect(scroll.lastElementChild).toHaveClass('mtl__more');
+    const groups = view.container.querySelector('.mtl__scroll > .mtl__groups') as HTMLElement;
+    expect(groups.lastElementChild).toHaveClass('mtl__more');
   });
 
   it('says when nothing is coming, and shows the empty state without any meeting', async () => {

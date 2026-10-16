@@ -15,6 +15,7 @@ const TOKENS = readFileSync(
   'utf8',
 );
 const scss = (file: string) => readFileSync(join(__dirname, file), 'utf8');
+const globalStyles = () => readFileSync(join(__dirname, '../../../styles.scss'), 'utf8');
 
 function channel(c: number): number {
   const s = c / 255;
@@ -83,18 +84,14 @@ describe('text on surface 3', () => {
     expect(menu).not.toContain('--color-text-subtle');
   });
 
-  it('the row menu draws its loading blocks on surface 4, not on its own surface 3', () => {
-    const menu = scss('row-menu/row-menu.component.scss');
-    expect(menu).toMatch(
-      /\.rm__loading ::ng-deep \.skel \{\s*background: var\(--color-surface-4\);/,
+  it('the skeleton blocks take a fill from the text colour, so they show on every surface', () => {
+    // A block in a surface colour vanished on that surface (the row menu is surface 3);
+    // a share of the text colour shows on all of them, and no menu needs an override.
+    expect(globalStyles()).toMatch(
+      /\n\.skel \{[^}]*--skel-fill: color-mix\(in srgb, var\(--color-text\) 9%, transparent\);/,
     );
-    // The skeleton itself defaults to surface 3, which is why the menu needs the override.
-    expect(scss('skeleton/skeleton.component.scss')).toMatch(
-      /\n\.skel \{\s*background: var\(--color-surface-3\);/,
-    );
-    for (const theme of ['light', 'dark'] as const) {
-      expect(semantic(theme, '--color-surface-4')).not.toBe(semantic(theme, '--color-surface-3'));
-    }
+    expect(scss('skeleton/skeleton.component.scss')).not.toMatch(/\n\.skel \{\s*background/);
+    expect(scss('row-menu/row-menu.component.scss')).not.toContain('.skel');
   });
 });
 
