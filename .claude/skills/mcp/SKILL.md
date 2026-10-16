@@ -1,6 +1,6 @@
 ---
 name: mcp
-description: The antragsplattform_mcp MCP server, a standalone FastMCP package. It exposes the platform HTTP API to agents as the logged-in user via an OAuth2 Authorization-Code + PKCE browser grant. It holds ~160 typed tools (applications/flow/forms/votes/meetings/protocols/budget/RBAC/audit) and atomic flow_*/form_* graph ops. Use when working on MCP tools, server.py, the tools/ modules, OAuth token caching, browser-grant auth, graphops, wire schemas, or the antragsplattform-mcp console entry in /mcp.
+description: The antragsplattform_mcp MCP server, a standalone FastMCP package. It exposes the platform HTTP API to agents as the logged-in user via an OAuth2 Authorization-Code + PKCE browser grant. It holds ~180 typed tools (applications/flow/forms/votes/meetings/protocols/tickets/todos/budget/RBAC/audit) and atomic flow_*/form_* graph ops. Use when working on MCP tools, server.py, the tools/ modules, OAuth token caching, browser-grant auth, graphops, wire schemas, or the antragsplattform-mcp console entry in /mcp.
 ---
 
 # antragsplattform MCP Server — `mcp/`
@@ -9,7 +9,7 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
 
 **Key files:**
 - `antragsplattform_mcp/server.py` — the FastMCP app. It holds the server `_INSTRUCTIONS` text and the `main()` stdio entry point, and calls `tools.register_all`.
-- `antragsplattform_mcp/tools/` — the ~164 `@group.tool` functions, one module per domain group (`session`, `applications`, `flow_forms`, `meetings`, `todos`, `tickets`, `budget`, `finance`, `admin`). Each tool is a thin wrapper around `ApiClient`. `tools/_common.py` holds the lazy `Config` and `ApiClient` singletons. The order in `tools/__init__.py:_GROUPS` keeps the served tool list stable.
+- `antragsplattform_mcp/tools/` — the ~180 `@group.tool` functions, one module per domain group (`session`, `applications`, `flow_forms`, `meetings`, `todos`, `tickets`, `budget`, `finance`, `admin`). Each tool is a thin wrapper around `ApiClient`. `tools/_common.py` holds the lazy `Config` and `ApiClient` singletons. The order in `tools/__init__.py:_GROUPS` keeps the served tool list stable.
 - `antragsplattform_mcp/auth.py` — OAuth2 + PKCE browser grant (RFC 7636/8252): discovery, loopback `/callback` capture, code exchange, refresh, disk token cache. Synchronous. Rejects cleartext non-loopback URLs.
 - `antragsplattform_mcp/client.py` — async `ApiClient` (httpx). It attaches the bearer token, retries once on 401 after a forced re-login and raises `ApiError`. The token fetch runs in a worker thread, so the event loop never blocks.
 - `antragsplattform_mcp/config.py` — `Config.from_env()`: base URL (`ANTRAGSPLATTFORM_URL` or baked `_baked.py:BASE_URL`), `scope`, per-URL token cache path. `CLIENT_ID = "antragsplattform-mcp"`.
