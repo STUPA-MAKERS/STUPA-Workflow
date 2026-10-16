@@ -3,7 +3,9 @@
 A comment can carry files (at most five, the draft uploads of the composer). The send
 binds them with ``comment_id``; they are fixed after that. The delete of a comment
 removes its files with their objects. A file of a comment has no ``application_id``,
-so it never shows in the attachment list of the application.
+so it never shows in the attachment list of the application. An anonymized
+application takes no comment files, because the retention ran once and would not
+see them again.
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.applications.models import Application, Comment
+from app.modules.applications.models import Applicant, Application, Comment
 from app.modules.applications.schemas import ActorOut, CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.audit.actions import AuditAction
@@ -21,7 +23,10 @@ from app.modules.audit.service import record as audit_record
 from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
-from app.shared.errors import ForbiddenError, NotFoundError
+from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
+
+#: The problem code of a comment with files on an anonymized application.
+APPLICATION_ANONYMIZED = "application_anonymized"
 
 
 def is_comment_author(
@@ -63,10 +68,17 @@ class CommentOps(ApplicationsServiceBase):
 
         Raises:
             NotFoundError: The application does not exist or is hidden (404).
-            ValidationProblem: Files without a draft token, or a draft that is
-                missing, expired, foreign or infected (422).
+            ValidationProblem: Files on an anonymized application
+                (``application_anonymized``), files without a draft token, or a draft
+                that is missing, expired, foreign or infected (422).
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        if attachment_ids and await self._is_anonymized(application_id):
+            raise ValidationProblem(
+                "The application is anonymized and takes no files.",
+                code=APPLICATION_ANONYMIZED,
+                errors=[{"field": "attachmentIds", "msg": "application is anonymized"}],
+            )
         token = await check_message_drafts(
             self.session, attachment_ids=attachment_ids, token=draft_token, pepper=pepper
         )
@@ -101,6 +113,13 @@ class CommentOps(ApplicationsServiceBase):
             isOwn=True,  # the creator is always the viewer of the 201 response
             attachments=files.get(comment.id, []),
         )
+
+    async def _is_anonymized(self, application_id: UUID) -> bool:
+        """Tell whether the applicant of the application is anonymized."""
+        at = await self.session.scalar(
+            select(Applicant.anonymized_at).where(Applicant.application_id == application_id)
+        )
+        return at is not None
 
     async def _comment_files(
         self, ids: Sequence[UUID]

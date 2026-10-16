@@ -1799,6 +1799,52 @@ async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.Monkey
     assert out.attachments == []
 
 
+async def test_add_comment_with_files_on_an_anonymized_application_is_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.applications.service import comments as comments_mod
+
+    async def _check(_s: object, **_kw: Any) -> str:
+        raise AssertionError("no draft check on an anonymized application")
+
+    monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
+    app = _app()
+    session = _Session(get_results=[app], scalar_results=[datetime.now(UTC)])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(ValidationProblem) as exc:
+        await svc.add_comment(
+            app.id,
+            author="sub-1",
+            author_kind="principal",
+            body="",
+            visibility="internal",
+            attachment_ids=[uuid4()],
+            draft_token="tok",
+            pepper="p",
+        )
+    assert exc.value.code == "application_anonymized"
+    assert session.added == []
+
+
+async def test_add_comment_without_files_on_an_anonymized_application_skips_the_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.applications.service import comments as comments_mod
+
+    async def _check(_s: object, **_kw: Any) -> None:
+        return None
+
+    monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
+    app = _app()
+    # The anonymized marker would refuse files; a comment without files never asks.
+    session = _Session(get_results=[app], scalar_results=[datetime.now(UTC)], execute_results=[[]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.add_comment(
+        app.id, author=None, author_kind="applicant", body="hallo", visibility="public"
+    )
+    assert out.body == "hallo"
+
+
 async def test_delete_comment_removes_its_files_first() -> None:
     app = _app()
     c = _comment(application_id=app.id)
