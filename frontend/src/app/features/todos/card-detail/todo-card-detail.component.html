@@ -37,7 +37,7 @@
     } @else {
       <div class="cd__cols" aria-hidden="true">
         <section class="cd__col cd__col--chat">
-          <app-skeleton class="cd__chat skel-in" variant="chat" [count]="5" [composer]="board()?.canWrite ?? false" />
+          <app-skeleton class="cd__chat skel-in" variant="chat" [count]="5" [composer]="pageBoard()?.canWrite ?? false" />
         </section>
         <div class="cd__col cd__col--details">
           <ng-container *ngTemplateOutlet="detailsSkel" />

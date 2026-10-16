@@ -193,6 +193,22 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.loadingKicker()).toBe('');
   });
 
+  it('names no board while it loads a card of another board, and counts no foreign columns', async () => {
+    const { cmp, api, detect, fixture } = await setup({ board: board({ id: 'b-0', name: 'Meine To-Dos' }) });
+    const late = new Subject<TodoCardDetail>();
+    api.card.mockReturnValueOnce(late);
+    // A tile of a row of another board: the board of the page does not hold it.
+    fixture.componentRef.setInput('cardId', 'k-9');
+    detect();
+    expect(cmp.loading()).toBe(true);
+    expect(cmp.loadingKicker()).toBe('');
+    expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
+    late.next(detail({ id: 'k-9', boardId: 'b-7', boardName: 'AStA' }));
+    detect();
+    expect(cmp.kicker()).toBe('AStA · To-Do');
+    expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
+  });
+
   it('reads only the comments again when the chat asks, for the scan state of their files', async () => {
     const { cmp, api, fixture, detect, commentsChanged } = await setup();
     const clean = { ...COMMENT, attachments: [{ ...COMMENT.attachments[0], scanState: 'clean' as const }] };

@@ -216,9 +216,22 @@ export class TodoCardDetailComponent {
 
   // ------------------------------------------------------------------ derived
 
-  /** The kicker while the card loads: the board is known from the page. */
+  /**
+   * The board of the page when it holds this card, else null. The page also opens the
+   * cards of the rows of other boards, and its board must not name or count those.
+   */
+  readonly pageBoard = computed(() => {
+    const b = this.board();
+    if (!b) return null;
+    const c = this.card();
+    if (c && c.id === this.cardId()) return c.boardId === b.id ? b : null;
+    const id = this.cardId();
+    return b.cards.some((x) => x.id === id) ? b : null;
+  });
+
+  /** The kicker while the card loads: the board is known from the page when it holds the card. */
   readonly loadingKicker = computed(() => {
-    const name = this.board()?.name;
+    const name = this.pageBoard()?.name;
     return name ? this.t('todos.card.kicker', { board: name }) : '';
   });
 
@@ -338,7 +351,7 @@ export class TodoCardDetailComponent {
   readonly moveColumns = computed<MoveColumn[]>(() => {
     const c = this.card();
     if (!c) return [];
-    const counts = new Map((this.board()?.columns ?? []).map((col) => [col.id, col.cardCount]));
+    const counts = new Map((this.pageBoard()?.columns ?? []).map((col) => [col.id, col.cardCount]));
     return c.columns.map((col) => ({ id: col.id, name: col.name, count: counts.get(col.id) ?? null }));
   });
 
