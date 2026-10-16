@@ -1,23 +1,28 @@
 <app-dialog [open]="open()" [title]="'todos.settings.title' | t" [closeLabel]="'action.close' | t" (closed)="open.set(false)">
   <div class="bs">
-    <app-input
-      name="boardName"
-      [label]="'todos.settings.name' | t"
-      [ngModel]="name()"
-      (ngModelChange)="name.set($event)"
-      (focusout)="saveName()"
-      (keydown.enter)="saveName()"
-    />
+    <section class="bs__sec" aria-labelledby="bs-general">
+      <div class="bs__secHead">
+        <h3 id="bs-general" class="sec bs__title">{{ 'todos.settings.general' | t }}</h3>
+      </div>
+      <app-input
+        name="boardName"
+        [label]="'todos.settings.name' | t"
+        [ngModel]="name()"
+        (ngModelChange)="name.set($event)"
+        (focusout)="saveName()"
+        (keydown.enter)="saveName()"
+      />
+    </section>
 
     <section class="bs__sec" aria-labelledby="bs-cols">
       <div class="bs__secHead">
-        <h3 id="bs-cols" class="bs__title">{{ 'todos.settings.columns' | t }}</h3>
+        <h3 id="bs-cols" class="sec bs__title">{{ 'todos.settings.columns' | t }}</h3>
         <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
           <app-icon name="plus" [size]="15" />
           {{ 'todos.settings.addColumnShort' | t }}
         </app-button>
       </div>
-      <ul class="bs__cols" cdkDropList [cdkDropListDisabled]="busy()" (cdkDropListDropped)="drop($event)">
+      <ul class="bs__cols rowgroup" cdkDropList [cdkDropListDisabled]="busy()" (cdkDropListDropped)="drop($event)">
         @for (col of columns(); track col.id; let i = $index) {
           <li class="bs__col" cdkDrag cdkDragLockAxis="y">
             <span class="bs__grip" cdkDragHandle [attr.aria-hidden]="true"><app-icon name="grip" [size]="16" /></span>
@@ -88,13 +93,14 @@
 
     <section class="bs__sec" aria-labelledby="bs-labels">
       <div class="bs__secHead">
-        <h3 id="bs-labels" class="bs__title">{{ 'todos.settings.labels' | t }}</h3>
+        <h3 id="bs-labels" class="sec bs__title">{{ 'todos.settings.labels' | t }}</h3>
         <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addLabel' | t" (click)="editLabel(null)">
           <app-icon name="plus" [size]="15" />
           {{ 'todos.settings.addLabelShort' | t }}
         </app-button>
       </div>
-      <div class="bs__labels">
+      <div class="bs__labels rowgroup">
+        <div class="bs__labelRow">
         @for (label of board().labels; track label.id) {
           <button
             type="button"
@@ -107,7 +113,10 @@
             <span class="bs__dot" aria-hidden="true"></span>
             {{ label.name }}
           </button>
+        } @empty {
+          <span class="bs__none">{{ 'todos.settings.noLabels' | t }}</span>
         }
+        </div>
       </div>
       @if (labelEdit() !== null) {
         <form class="bs__labelForm" (submit)="$event.preventDefault(); saveLabel()">
@@ -147,23 +156,38 @@
       }
     </section>
 
-    <div class="bs__archive">
-      <app-switch [checked]="archiveOn()" (checkedChange)="setArchive($event)">
-        {{ 'todos.settings.archive' | t: { n: board().archiveAfterDays ?? days() } }}
-      </app-switch>
-      @if (archiveOn()) {
-        <app-input
-          class="bs__days"
-          type="number"
-          name="days"
-          [label]="'todos.settings.days' | t"
-          [ngModel]="days()"
-          (ngModelChange)="days.set($event)"
-          (focusout)="saveDays()"
-          (keydown.enter)="saveDays()"
-        />
-      }
-    </div>
+    <section class="bs__sec" aria-labelledby="bs-archive">
+      <div class="bs__secHead">
+        <h3 id="bs-archive" class="sec bs__title">{{ 'todos.settings.archiveTitle' | t }}</h3>
+      </div>
+      <div class="bs__archive rowgroup">
+        <app-switch class="bs__row" [checked]="archiveOn()" (checkedChange)="setArchive($event)">
+          {{ 'todos.settings.archive' | t }}
+        </app-switch>
+        @if (archiveOn()) {
+          <div class="bs__row bs__days">
+            <label id="bs-days-label" class="bs__daysLabel" for="bs-days">{{ 'todos.settings.archiveAfter' | t }}</label>
+            <span class="bs__daysField">
+              <input
+                id="bs-days"
+                class="bs__input bs__daysInput num"
+                type="number"
+                name="days"
+                min="1"
+                max="365"
+                inputmode="numeric"
+                aria-labelledby="bs-days-label bs-days-unit"
+                [ngModel]="days()"
+                (ngModelChange)="days.set($event)"
+                (focusout)="saveDays()"
+                (keydown.enter)="saveDays()"
+              />
+              <span id="bs-days-unit">{{ 'todos.settings.daysUnit' | t }}</span>
+            </span>
+          </div>
+        }
+      </div>
+    </section>
   </div>
   <app-button dialog-footer variant="fill" (click)="open.set(false)">{{ 'todos.settings.done' | t }}</app-button>
 </app-dialog>
