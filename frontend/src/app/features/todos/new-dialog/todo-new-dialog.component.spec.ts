@@ -4,6 +4,7 @@ import { TodosApiService, type TodoBoardSummary } from '@core/api/todos.service'
 import { ToastService } from '@stupa-makers/ui-kit';
 import { BOARDS, MEMBERS, board, detail } from '../../../../testing/todo-fixtures';
 import { TodoNewDialogComponent, type NewTodoLink } from './todo-new-dialog.component';
+import { LINK_ICON } from '../todos.util';
 
 interface Opts {
   boards?: TodoBoardSummary[];
@@ -140,7 +141,7 @@ describe('TodoNewDialogComponent', () => {
     fixture.detectChanges();
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit To-Do · Andere entfernen' }));
     expect(cmp.links()).toEqual([]);
-    expect(cmp.icon('ticket')).toBe('ticket');
+    expect(cmp.icon('ticket')).toBe(LINK_ICON.ticket);
     // The button opens and closes the picker.
     fireEvent.click(screen.getByRole('button', { name: /Verknüpfen/ }));
     expect(cmp.pickerOpen()).toBe(true);
