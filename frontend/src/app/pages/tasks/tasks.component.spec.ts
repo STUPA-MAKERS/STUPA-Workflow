@@ -369,6 +369,20 @@ describe('TasksComponent', () => {
       expect(screen.getByText('ohne Datum')).toBeInTheDocument();
     });
 
+    it('puts the applications of all months in one list without month headings', async () => {
+      const { harness } = await start('/tasks', [THREE], { todos: TODOS });
+      const container = harness.fixture.nativeElement as HTMLElement;
+      // THREE spans September and August; beside the To-Dos they form one row group.
+      const lists = container.querySelectorAll('.tasks__group:not([aria-labelledby]) .tasks__rows');
+      expect(lists).toHaveLength(1);
+      expect(within(lists[0] as HTMLElement).getAllByRole('link').map((l) => l.textContent)).toEqual([
+        expect.stringContaining('Erster'),
+        expect.stringContaining('Zweiter'),
+        expect.stringContaining('Dritter'),
+      ]);
+      expect(container.querySelector('.tasks__month')).toBeNull();
+    });
+
     it('shows one group with "Anzeigen" and filters the To-Dos by due date', async () => {
       const { cmp, harness } = await start('/tasks', [THREE], { todos: TODOS });
       expect(cmp.showText()).toBe('Anzeigen: Alles');

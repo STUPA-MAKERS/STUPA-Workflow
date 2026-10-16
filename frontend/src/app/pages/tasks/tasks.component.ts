@@ -207,9 +207,16 @@ export class TasksComponent implements OnDestroy {
     })),
   );
 
-  /** The rows by month of submission, like the applications list. */
+  /**
+   * The rows by month of submission, like the applications list. Beside the to-dos the
+   * group "Anträge" has no month headings, so its rows are one list: as one row group per
+   * month, the groups met without the gap of the rows and with round corners between
+   * them.
+   */
   readonly groups = computed<MonthGroup<TaskRow>[]>(() =>
-    groupByMonth(this.rows(), this.i18n.locale()),
+    this.hasTodos()
+      ? [{ key: 'all', label: '', items: this.rows() }]
+      : groupByMonth(this.rows(), this.i18n.locale()),
   );
 
   constructor() {
