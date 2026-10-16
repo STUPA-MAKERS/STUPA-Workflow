@@ -185,6 +185,26 @@ describe('TodoBoardSettingsComponent', () => {
     expect(api.deleteColumn).not.toHaveBeenCalled();
   });
 
+  it('asks where the cards go when a column that looks empty still holds archived cards', async () => {
+    const { cmp, api, toast, detect } = await setup();
+    const col = cmp.columns()[1];
+    api.deleteColumn.mockReturnValueOnce(refuse('column_not_empty'));
+    cmp.deleteColumn(col);
+    detect();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(cmp.busy()).toBe(false);
+    expect(cmp.deleting()).toBe(col);
+    expect(cmp.moveTo()).toBe('c-1');
+    cmp.confirmDelete();
+    expect(api.deleteColumn).toHaveBeenLastCalledWith('b-1', 'c-2', 'c-1');
+    expect(cmp.deleting()).toBeNull();
+
+    cmp.deleteColumn(cmp.columns()[0]);
+    api.deleteColumn.mockReturnValueOnce(refuse('column_not_empty'));
+    cmp.confirmDelete();
+    expect(toast.error).toHaveBeenLastCalledWith('Die Spalte hat noch Karten.');
+  });
+
   it('adds, edits and deletes a label', async () => {
     const { cmp, api, changed, detect } = await setup();
     fireEvent.click(screen.getByRole('button', { name: /Label hinzufügen/ }));
@@ -237,7 +257,6 @@ describe('TodoBoardSettingsComponent', () => {
     const { cmp, api, toast } = await setup();
     for (const [code, text] of [
       ['todo_configure_required', 'Du darfst dieses Board nicht einrichten.'],
-      ['column_not_empty', 'Die Spalte hat noch Karten.'],
       ['done_column_required', 'Die Erledigt-Spalte kann nicht gelöscht werden.'],
       ['odd', 'Die Einstellung konnte nicht gespeichert werden.'],
       [undefined, 'Die Einstellung konnte nicht gespeichert werden.'],

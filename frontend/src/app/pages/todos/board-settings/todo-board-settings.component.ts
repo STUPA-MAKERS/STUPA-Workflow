@@ -239,11 +239,29 @@ export class TodoBoardSettingsComponent {
 
   deleteColumn(col: TodoColumn): void {
     if (col.cardCount > 0) {
-      this.deleting.set(col);
-      this.moveTo.set(this.columns().find((c) => c.id !== col.id)?.id ?? '');
+      this.askMoveTo(col);
       return;
     }
-    this.run(this.api.deleteColumn(this.board().id, col.id));
+    this.busy.set(true);
+    this.api.deleteColumn(this.board().id, col.id).subscribe({
+      next: (board) => {
+        this.busy.set(false);
+        this.changed.emit(board);
+      },
+      error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse && (err.error as { code?: string } | null)?.code === 'column_not_empty') {
+          this.busy.set(false);
+          this.askMoveTo(col);
+          return;
+        }
+        this.fail(err);
+      },
+    });
+  }
+
+  private askMoveTo(col: TodoColumn): void {
+    this.deleting.set(col);
+    this.moveTo.set(this.columns().find((c) => c.id !== col.id)?.id ?? '');
   }
 
   confirmDelete(): void {
