@@ -239,7 +239,7 @@
   <div class="td__closeBox">
     <app-checkbox [ngModel]="completeTodos()" (ngModelChange)="completeTodos.set($event)">
       <span class="td__closeLabel">
-        {{ (openTodos().length === 1 ? 'tickets.close.todosOne' : 'tickets.close.todosMany') | t: { n: openTodos().length || ticket()?.openTodoCount || 0 } }}
+        {{ (openTodoN() === 1 ? 'tickets.close.todosOne' : 'tickets.close.todosMany') | t: { n: openTodoN() } }}
       </span>
     </app-checkbox>
     @if (openTodos().length) {

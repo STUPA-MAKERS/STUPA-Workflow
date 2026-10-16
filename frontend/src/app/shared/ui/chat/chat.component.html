@@ -47,7 +47,7 @@
               <span class="chat__name">{{ item.name }}</span>
             }
             <div class="chat__line">
-              @if (canAct(m) && !phone() && editingId() !== m.id) {
+              @if (canAct(m) && !touchMenu() && editingId() !== m.id) {
                 <span class="chat__acts">
                   <app-button
                     variant="text"
@@ -89,7 +89,7 @@
                   [class.chat__bubble--internal]="item.mark === 'internal'"
                   [class.chat__bubble--failed]="m.state === 'failed'"
                   appPressSelect
-                  [appPressSelectEnabled]="canAct(m) && phone()"
+                  [appPressSelectEnabled]="canAct(m) && touchMenu()"
                   (appPressSelectToggle)="openMenu(m)"
                 >
                   @if (item.head && item.mark === 'internal') {

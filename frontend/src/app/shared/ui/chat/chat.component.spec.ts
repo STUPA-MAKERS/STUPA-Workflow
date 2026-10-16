@@ -29,10 +29,10 @@ function msg(id: string, at: string, extra: Partial<ChatMessage> = {}): ChatMess
   };
 }
 
-/** Let `matchMedia` report a phone with a touch pointer (or a desktop). */
-function mockPhone(phone: boolean): void {
+/** Let `matchMedia` report a phone with a touch pointer (or a desktop, or a narrow window with a mouse). */
+function mockPhone(phone: boolean, coarse = phone): void {
   window.matchMedia = ((query: string) => ({
-    matches: phone && (query.includes('max-width') || query.includes('coarse')),
+    matches: query.includes('coarse') ? coarse : phone && query.includes('max-width'),
     media: query,
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
@@ -46,10 +46,12 @@ interface SetupOpts {
   visibilityOptions?: ChatVisibility[];
   draftKey?: string;
   phone?: boolean;
+  /** A phone width with a mouse or a keyboard (a narrow or zoomed desktop window). */
+  fine?: boolean;
 }
 
 async function setup(opts: SetupOpts = {}) {
-  mockPhone(!!opts.phone);
+  mockPhone(!!opts.phone || !!opts.fine, !!opts.phone);
   const send = jest.fn();
   const edit = jest.fn();
   const del = jest.fn();
@@ -346,6 +348,35 @@ describe('ChatComponent', () => {
       // A confirm without a message does nothing.
       (view.fixture.componentInstance as unknown as { confirmDelete(): void }).confirmDelete();
       expect(del).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('actions in a narrow window with a mouse', () => {
+    it('keeps the hover and focus actions when the width is a phone but the pointer is fine', async () => {
+      const { edit, view } = await setup({ fine: true, messages: [msg('m', today(8, 21), { own: true, body: 'Prüfe ich' })] });
+      expect(view.fixture.nativeElement).toHaveClass('chat--phone');
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
+      fireEvent.input(box, { target: { value: 'Neu' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu' });
+      expect(screen.getByRole('button', { name: 'Nachricht löschen' })).toBeInTheDocument();
+    });
+  });
+
+  describe('messages the viewer may moderate', () => {
+    it('offers edit and delete on a message of another person with canEdit, and not without', async () => {
+      const { del } = await setup({
+        messages: [
+          msg('a', today(8, 20), { own: false, canEdit: true, body: 'Fremd' }),
+          msg('b', today(9, 20), { own: false, body: 'Auch fremd' }),
+          msg('c', today(10, 20), { own: true, canEdit: false, body: 'Gesperrt' }),
+        ],
+      });
+      expect(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(1);
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen' })).getByRole('button', { name: 'Löschen' }));
+      expect(del).toHaveBeenCalledWith({ id: 'a' });
     });
   });
 

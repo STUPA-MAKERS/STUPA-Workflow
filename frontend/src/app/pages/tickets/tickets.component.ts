@@ -41,7 +41,7 @@ import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
-import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterName, ticketAge } from './tickets.util';
+import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
@@ -409,7 +409,7 @@ export class TicketsComponent implements OnDestroy {
       item,
       icon: KIND_ICON[item.kind],
       kindLabel: t(KIND_LABEL[item.kind]),
-      sub: [item.number, reporterName(item.reporter, t), age].filter(Boolean).join(' · '),
+      sub: [item.number, reporterRowName(item.reporter, t), age].filter(Boolean).join(' · '),
       assignee: item.assignee,
     };
   }

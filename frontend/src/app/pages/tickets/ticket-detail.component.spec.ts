@@ -275,6 +275,14 @@ describe('TicketDetailComponent', () => {
     expect(api.patch).toHaveBeenCalledWith('t40', { status: 'rejected', completeTodos: false });
   });
 
+  it('says "1 offenes To-Do" when only the server counts one', async () => {
+    const { cmp, harness } = await start('/tickets/t40', { get: () => of(detail({ openTodoCount: 1 })) });
+    cmp.close('done');
+    harness.detectChanges();
+    expect(cmp.openTodoN()).toBe(1);
+    expect(screen.getByText('Offenes To-Do mit erledigen')).toBeInTheDocument();
+  });
+
   it('lists the linked to-dos and links each to its board', async () => {
     const { cmp } = await start('/tickets/t40', {
       todos: of([card(), card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] })]),

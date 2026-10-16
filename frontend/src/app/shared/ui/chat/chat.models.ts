@@ -28,6 +28,11 @@ export interface ChatMessage {
   at: IsoDateTime;
   editedAt?: IsoDateTime | null;
   own: boolean;
+  /**
+   * May the viewer edit and delete the message. Unset: only an own message. A
+   * moderator (`application.manage` on application comments) also changes others.
+   */
+  canEdit?: boolean;
   visibility?: ChatVisibility | null;
   attachments?: ChatAttachment[];
   state?: ChatMessageState;

@@ -55,6 +55,17 @@ export function reporterName(reporter: TicketReporter, t: Translate): string {
   return reporter.displayName || reporter.email || t('chat.deletedPerson');
 }
 
+/**
+ * The reporter in the sub line of a list row, which is cut with an ellipsis. An
+ * e-mail is never cut, so a reporter known only by the e-mail gives null there; the
+ * detail shows the full address.
+ */
+export function reporterRowName(reporter: TicketReporter, t: Translate): string | null {
+  if (reporter.anonymized) return t('tickets.reporter.anonymized');
+  if (reporter.displayName) return reporter.displayName;
+  return reporter.email ? null : t('chat.deletedPerson');
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 

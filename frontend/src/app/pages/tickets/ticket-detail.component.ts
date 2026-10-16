@@ -152,6 +152,8 @@ export class TicketDetailComponent {
     return !!t && isOpen(t.status);
   });
   readonly openTodos = computed(() => this.todos().filter((c) => !c.isDone));
+  /** The open to-dos of the close question: the loaded ones, else the count of the ticket. */
+  readonly openTodoN = computed(() => this.openTodos().length || this.ticket()?.openTodoCount || 0);
 
   private readonly t = (key: TranslationKey, params?: Record<string, string | number>): string =>
     this.i18n.translate(key, params);

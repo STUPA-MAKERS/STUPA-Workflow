@@ -52,6 +52,8 @@ const OPEN = [
     title: 'Protokoll-PDF zeigt im Kopf das falsche Datum',
     status: 'in_progress',
     assignee: MARA,
+    // An anonymous report: only the e-mail, which the cut sub line never shows.
+    reporter: { principalId: null, displayName: null, email: 'kassenwart.fachschaft-technik@student.example.org', anonymized: false },
     createdAt: new Date(2026, 9, 14, 21, 14).toISOString(),
   }),
 ];
@@ -146,7 +148,8 @@ describe('TicketsComponent', () => {
     expect(row).toHaveTextContent('Fehler');
     expect(row.querySelector('.tk__nobody')).not.toBeNull();
     const other = screen.getByRole('link', { name: /Protokoll-PDF/ }).closest('app-list-item')!;
-    expect(other).toHaveTextContent('T-0040 · Lea Hoffmann · gestern');
+    expect(other.querySelector('.li__sub')).toHaveTextContent(/^T-0040 · gestern$/);
+    expect(other).not.toHaveTextContent('kassenwart');
     expect(other.querySelector('app-avatar')).not.toBeNull();
     expect(rail.refresh).not.toHaveBeenCalled();
   });

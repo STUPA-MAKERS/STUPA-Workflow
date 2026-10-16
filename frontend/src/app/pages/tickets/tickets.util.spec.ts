@@ -5,6 +5,7 @@ import {
   isOpen,
   personName,
   reporterName,
+  reporterRowName,
   ticketAge,
   type Translate,
 } from './tickets.util';
@@ -40,6 +41,14 @@ describe('tickets.util', () => {
     expect(reporterName({ ...base, email: 'kasse@example.org' }, t)).toBe('kasse@example.org');
     expect(reporterName(base, t)).toBe('Gelöschte Person');
     expect(reporterName({ ...base, displayName: 'Lea', anonymized: true }, t)).toBe('Anonymisiert');
+  });
+
+  it('names the reporter of a list row, but never by the e-mail', () => {
+    const base = { principalId: null, displayName: null, email: null, anonymized: false };
+    expect(reporterRowName({ ...base, displayName: 'Lea', email: 'lea@example.org' }, t)).toBe('Lea');
+    expect(reporterRowName({ ...base, email: 'kasse@example.org' }, t)).toBeNull();
+    expect(reporterRowName(base, t)).toBe('Gelöschte Person');
+    expect(reporterRowName({ ...base, displayName: 'Lea', anonymized: true }, t)).toBe('Anonymisiert');
   });
 
   describe('ticketAge', () => {

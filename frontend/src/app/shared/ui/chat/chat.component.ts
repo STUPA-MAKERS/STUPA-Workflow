@@ -132,6 +132,12 @@ export class ChatComponent {
   readonly retry = output<ChatRef>();
 
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  private readonly coarse = mediaQuerySignal('(pointer: coarse)');
+  /**
+   * The long press opens the actions only on a phone with a touch screen. A narrow
+   * window or a zoomed page with a mouse or a keyboard keeps the hover and focus actions.
+   */
+  protected readonly touchMenu = computed(() => this.phone() && this.coarse());
   private readonly log = viewChild.required<ElementRef<HTMLElement>>('log');
 
   protected readonly draft = signal('');
@@ -252,9 +258,9 @@ export class ChatComponent {
     return new Date();
   }
 
-  /** Own sent messages can change. A pending one cannot. */
+  /** Own sent messages can change (or any the viewer may moderate). A pending one cannot. */
   protected canAct(msg: ChatMessage): boolean {
-    return msg.own && !isPending(msg);
+    return (msg.canEdit ?? msg.own) && !isPending(msg);
   }
 
   // --- scrolling -------------------------------------------------------------------
