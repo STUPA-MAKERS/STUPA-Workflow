@@ -1,0 +1,107 @@
+:host {
+  display: inline-flex;
+  flex: none;
+  min-width: 0;
+  max-width: 100%;
+}
+.bp {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+/* The board chip: as high as the search pill, in the selection colour. */
+.bp__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.bp__chip app-icon {
+  flex: none;
+}
+.bp__chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.bp__pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--z-dropdown);
+  display: flex;
+  flex-direction: column;
+  width: min(21rem, calc(100vw - 2rem));
+  max-height: min(30rem, 70vh);
+  padding: var(--space-2);
+  overflow-y: auto;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-3);
+  box-shadow: var(--shadow-elevated);
+}
+.bp__sheet {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-3);
+}
+.bp__cap {
+  margin: var(--space-3) var(--space-3) var(--space-1);
+  color: var(--color-text-muted);
+}
+.bp__cap:first-child {
+  margin-top: var(--space-2);
+}
+.bp__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 6px var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.bp__row:hover,
+.bp__row[aria-current='true'] {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.bp__row:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.bp__icon,
+.bp__check {
+  flex: none;
+}
+.bp__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.bp__name {
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.bp__sub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}

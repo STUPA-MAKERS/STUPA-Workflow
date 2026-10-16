@@ -1,0 +1,181 @@
+<div class="td" [class.td--phone]="phone()">
+  <app-page-header [flush]="true" [title]="'nav.todos' | t" [meta]="board() ? ('todos.openCount' | t: { n: openCount() }) : null">
+    <ng-container ngProjectAs="[actions]">
+      @if (phone()) {
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          data-testid="td-search-toggle"
+          [ariaLabel]="'todos.search.label' | t"
+          (click)="searchOpen.set(!searchOpen())"
+        ><app-icon name="search" [size]="21" /></app-button>
+        @if (board()) {
+          <app-row-menu [label]="'todos.menu' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
+        }
+      } @else {
+        <app-segmented
+          size="control"
+          [ariaLabel]="'todos.view.label' | t"
+          [options]="viewOptions()"
+          [value]="view()"
+          (valueChange)="setView($event)"
+        />
+        @if (board()?.canConfigure) {
+          <app-button
+            variant="text"
+            [iconOnly]="true"
+            data-testid="td-settings"
+            [ariaLabel]="'todos.settings.title' | t"
+            [title]="'todos.settings.title' | t"
+            (click)="settingsOpen.set(true)"
+          ><app-icon name="tune" [size]="21" /></app-button>
+        }
+        @if (board()) {
+          <app-button size="sm" data-testid="td-new" (click)="newCard()">
+            <span class="td__btn"><app-icon name="add" [size]="16" />{{ 'todos.new.short' | t }}</span>
+          </app-button>
+        }
+      }
+    </ng-container>
+  </app-page-header>
+
+  <app-sticky-bar class="td__bar">
+    <div class="td__barRow">
+      <app-todo-board-picker [boards]="boards()" [current]="boardId()" [compact]="phone()" (picked)="pickBoard($event)" />
+      @if (!phone() || searchOpen()) {
+        <app-search-pill
+          class="td__search"
+          size="md"
+          [clearable]="true"
+          [placeholder]="'todos.search.placeholder' | t: { n: openCount() }"
+          [label]="'todos.search.label' | t"
+          [value]="search.text()"
+          (valueChange)="search.set($event)"
+          (commit)="search.flush()"
+        />
+      }
+    </div>
+    @if (board()) {
+      <div class="td__chips" role="group" appScrollFade="x" [attr.aria-label]="'todos.filter.group' | t">
+        <app-filter-select
+          [label]="'todos.filter.assignee' | t"
+          [options]="assigneeOptions()"
+          [value]="filter().assignee"
+          (valueChange)="setAssignee($event)"
+          [text]="assigneeText()"
+          [active]="filter().assignee !== ''"
+          [icon]="filter().assignee ? 'check' : null"
+          [chevron]="!filter().assignee"
+        />
+        @if (labelOptions().length) {
+          <app-filter-select
+            [label]="'todos.filter.label' | t"
+            [multiple]="true"
+            [options]="labelOptions()"
+            [values]="filter().labels"
+            (valuesChange)="setLabels($event)"
+            [text]="labelText()"
+            [active]="filter().labels.length > 0"
+            [icon]="filter().labels.length ? 'check' : null"
+            [chevron]="!filter().labels.length"
+            [resetLabel]="'todos.filter.all' | t"
+          />
+        }
+        <app-filter-select
+          [label]="'todos.filter.due' | t"
+          [options]="dueOptions()"
+          [value]="filter().due"
+          (valueChange)="setDue($event)"
+          [text]="dueText()"
+          [active]="filter().due !== ''"
+          [icon]="filter().due ? 'check' : null"
+          [chevron]="!filter().due"
+        />
+        @if (filtered()) {
+          <button type="button" class="td__reset" data-testid="td-reset" (click)="resetFilters()">
+            {{ 'todos.filter.reset' | t }}
+          </button>
+        }
+      </div>
+    }
+  </app-sticky-bar>
+
+  <div class="td__body">
+    @if (loading()) {
+      <app-skeleton variant="panel" [count]="3" [label]="'todos.loading' | t" />
+    } @else if (notFound()) {
+      <app-empty-state icon="circleok" [heading]="'todos.notFound' | t" />
+    } @else if (error()) {
+      <div class="td__state" role="alert">
+        <p class="td__error">{{ 'todos.error.load' | t }}</p>
+        <app-button variant="tonal" size="sm" data-testid="td-retry" (click)="reload()">{{ 'todos.card.retry' | t }}</app-button>
+      </div>
+    } @else if (board(); as b) {
+      @if (noMatch()) {
+        <div class="td__state">
+          <app-empty-state icon="filter" [heading]="'todos.noMatch' | t" />
+          <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+        </div>
+      } @else if (view() === 'list') {
+        <app-todo-list-view
+          [board]="b"
+          [cards]="visible()"
+          [labels]="labelsById()"
+          [today]="today()"
+          (openCard)="openCard($event)"
+          (toggleDone)="toggleDone($event)"
+        />
+      } @else {
+        <app-todo-board-view
+          [board]="b"
+          [cards]="visible()"
+          [labels]="labelsById()"
+          [today]="today()"
+          [phone]="phone()"
+          (openCard)="openCard($event)"
+          (moveCard)="moveCard($event)"
+          (quickAdd)="quickAdd($event)"
+          (addIn)="newCard($event)"
+          (settings)="settingsOpen.set(true)"
+          (archive)="archiveOpen.set(true)"
+        />
+      }
+    }
+  </div>
+
+  @if (phone() && board()) {
+    <button type="button" class="td__fab" data-testid="td-fab" (click)="newCard()">
+      <app-icon name="add" [size]="22" />
+      {{ 'todos.new.short' | t }}
+    </button>
+  }
+</div>
+
+@if (cardId(); as id) {
+  <div class="td__scrim" aria-hidden="true" (click)="closeCard()"></div>
+  <aside
+    #drawer
+    class="td__drawer"
+    role="dialog"
+    aria-modal="true"
+    tabindex="-1"
+    aria-labelledby="cd-title"
+    (keydown)="onDrawerKey($event)"
+  >
+    <app-todo-card-detail
+      [cardId]="id"
+      [board]="board()"
+      (closed)="closeCard()"
+      (changed)="onCardChanged($event)"
+      (archived)="onArchived($event)"
+    />
+  </aside>
+}
+
+@if (board(); as b) {
+  <app-todo-new-dialog [(open)]="newOpen" [boardId]="b.id" [columnId]="newColumn()" (created)="onCreated($event)" />
+  @if (b.canConfigure) {
+    <app-todo-board-settings [(open)]="settingsOpen" [board]="b" (changed)="onSettingsChanged($event)" />
+  }
+  <app-todo-archive-sheet [(open)]="archiveOpen" [boardId]="b.id" (openCard)="openCard($event)" (restored)="onRestored($event)" />
+}

@@ -1,0 +1,231 @@
+@use 'breakpoints' as bp;
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The columns side by side; the board scrolls sideways, each column down. */
+.bv {
+  display: grid;
+  flex: 1 1 auto;
+  grid-auto-columns: minmax(17rem, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-4);
+  min-height: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.bv__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.bv__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 0 0 var(--space-2);
+}
+.bv__name {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.bv__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+}
+.bv__doneTag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+.bv__menu {
+  margin-inline-start: auto;
+}
+
+.bv__cards {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 3rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.bv__item {
+  display: block;
+}
+.bv__item:focus-visible {
+  outline: none;
+}
+/* The tile in the hand: lifted, tilted a little, with the accent edge. */
+.bv__preview {
+  box-sizing: border-box;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-elevated);
+  outline: 1.5px solid var(--color-accent);
+  transform: rotate(2deg);
+  opacity: 0.97;
+}
+/* Where it lands: a dashed box of the height of the tile. */
+.bv__placeholder {
+  min-height: 5.5rem;
+  border: 1.5px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+.bv__cards.cdk-drop-list-dragging .bv__item:not(.cdk-drag-placeholder) {
+  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+}
+.cdk-drag-animating {
+  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bv__cards.cdk-drop-list-dragging .bv__item,
+  .cdk-drag-animating {
+    transition: none;
+  }
+  .bv__preview {
+    transform: none;
+  }
+}
+
+.bv__doneFoot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text-muted);
+}
+.bv__link,
+.bv__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.bv__link:hover,
+.bv__more:hover {
+  text-decoration: underline;
+}
+.bv__link:focus-visible,
+.bv__more:focus-visible,
+.bv__add:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.bv__add {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.bv__add:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.bv__quick {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1.5px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.bv__quickInput {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  resize: none;
+}
+.bv__quickFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* ------------------------------------------------------------------ phone */
+.bv--phone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow: visible;
+}
+.bv__phoneCards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.bv__empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-2);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+.bv__dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--space-2) 0;
+}
+.bv__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-surface-3);
+}
+.bv__dot--on {
+  width: 16px;
+  background: var(--color-accent);
+}

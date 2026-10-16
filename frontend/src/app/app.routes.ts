@@ -159,6 +159,13 @@ export const routes: Routes = [
               import('./pages/tasks/tasks-none.component').then((m) => m.TasksNoneComponent),
           },
           {
+            // A card of the group "To-Dos": the card detail in the right pane.
+            path: 'todo/:cardId',
+            data: { title: 'todos.card.kicker', parent: ['tasks'] },
+            loadComponent: () =>
+              import('./pages/tasks/task-todo.component').then((m) => m.TaskTodoComponent),
+          },
+          {
             path: ':id',
             // The detail of the applications page. The server authorizes the read.
             data: { title: 'applications.detail.crumb', parent: ['tasks'] },
@@ -354,6 +361,21 @@ export const routes: Routes = [
               import('./pages/tickets/ticket-detail.component').then((m) => m.TicketDetailComponent),
           },
         ],
+      },
+      {
+        // The To-Do boards: `/todos` opens the default board, `/todos/:boardId` one board.
+        // `?card=` opens a card in the drawer, `?view=list` the table. The server
+        // authorizes every board; any signed-in person has the personal one.
+        path: 'todos',
+        data: { title: 'nav.todos', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
+      },
+      {
+        path: 'todos/:boardId',
+        data: { title: 'nav.todos', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
       },
       {
         // The admin frame (board Verwaltung): the admin navigation beside every admin
