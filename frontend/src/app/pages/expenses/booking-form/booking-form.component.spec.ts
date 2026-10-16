@@ -149,7 +149,6 @@ describe('BookingFormComponent', () => {
   it('builds a new booking: kind, cost centre from the tree, fiscal year and payment method', async () => {
     const { dialogs, http, user } = await setup('create');
     expect(screen.getByRole('heading', { name: 'Buchung hinzufügen' })).toBeInTheDocument();
-    expect(screen.getByText('Pflichtfelder sind mit * markiert.')).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Einnahme' }));
     expect(dialogs.newKind()).toBe('income');
     // Income has no application search.

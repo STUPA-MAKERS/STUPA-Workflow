@@ -33,6 +33,7 @@ import {
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /**
  * "Vertretung einrichten" (board Teilnahme-Vertretung): the member picks who represents
@@ -53,6 +54,7 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     NgTemplateOutlet,
     TranslatePipe,

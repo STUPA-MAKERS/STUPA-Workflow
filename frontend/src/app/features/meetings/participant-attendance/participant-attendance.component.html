@@ -29,7 +29,6 @@
       <app-input
         class="pa__note"
         [label]="'meetings.attendance.notePlaceholder' | t"
-        [hint]="'participant.attendance.noteHint' | t"
         [ngModel]="draft()"
         (ngModelChange)="draft.set($event)"
         (focusout)="saveNote()"

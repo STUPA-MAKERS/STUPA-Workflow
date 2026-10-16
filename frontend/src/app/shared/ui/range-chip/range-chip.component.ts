@@ -23,6 +23,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** What a range chip filters: an amount in euro or a date (ISO `YYYY-MM-DD`). */
 export type RangeKind = 'amount' | 'date';
@@ -56,6 +57,7 @@ export interface RangeValue {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     ButtonComponent,
     CurrencyInputComponent,
     DatepickerComponent,

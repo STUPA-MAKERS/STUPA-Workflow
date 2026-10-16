@@ -46,7 +46,8 @@ describe('BudgetPieComponent', () => {
     expect(items).toHaveLength(2);
     expect(items[0].textContent).toContain('Alpha');
     expect(items[0].textContent).toContain('60');
-    expect(items[0].getAttribute('title')).toBe('Alpha');
+    // A name that shows in full gets no tooltip.
+    expect(items[0].querySelector('.pie__name')?.getAttribute('title')).toBeNull();
     expect((items[0].querySelector('.pie__swatch') as HTMLElement).style.background).toBeTruthy();
   });
 

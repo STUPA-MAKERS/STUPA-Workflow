@@ -13,7 +13,7 @@
           <div class="g__who">
             <app-avatar [name]="row.name" size="sm" [decorative]="true" />
             <div class="g__names">
-              <span class="g__name ell" [title]="row.name">{{ row.name }}</span>
+              <span class="g__name ell" [appTruncated]="row.name" #cut="appTruncated" [attr.title]="cut.truncated() ? row.name : null">{{ row.name }}</span>
               <span class="g__sub">{{ row.sub }}</span>
             </div>
           </div>

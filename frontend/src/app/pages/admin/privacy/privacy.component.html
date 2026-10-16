@@ -1,5 +1,5 @@
 <section class="pv">
-  <app-page-header [flush]="true" [title]="'admin.privacy.title' | t" [subtitle]="'admin.privacy.subtitle' | t" />
+  <app-page-header [flush]="true" [title]="'admin.privacy.title' | t" />
 
   <!-- Erasure requests (GDPR Art. 17) -->
   <section class="pv__queue" aria-labelledby="pv-queue">
@@ -31,24 +31,32 @@
       </ng-template>
       <ng-template appCell="actions" let-r>
         @if ($any(r).status === 'open') {
-          <span class="pv__rowActions">
-            <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
-            @let who = $any(r).email || subjectLabel($any(r).subjectType);
-            <app-button
-              variant="tonal"
-              size="sm"
-              [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
-              (click)="openReject($any(r))"
-              >{{ 'admin.privacy.reject' | t }}</app-button
-            >
-            <app-button
-              variant="danger"
-              size="sm"
-              [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
-              (click)="askExecute($any(r))"
-              >{{ 'admin.privacy.execute' | t }}</app-button
-            >
-          </span>
+          @if (phone()) {
+            <app-row-menu
+              [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
+              [sections]="rowMenu()"
+              (selected)="onRowMenu($any(r), $event)"
+            />
+          } @else {
+            <span class="pv__rowActions">
+              <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
+              @let who = $any(r).email || subjectLabel($any(r).subjectType);
+              <app-button
+                variant="tonal"
+                size="sm"
+                [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
+                (click)="openReject($any(r))"
+                >{{ 'admin.privacy.reject' | t }}</app-button
+              >
+              <app-button
+                variant="danger"
+                size="sm"
+                [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
+                (click)="askExecute($any(r))"
+                >{{ 'admin.privacy.execute' | t }}</app-button
+              >
+            </span>
+          }
         }
       </ng-template>
     </app-data-table>
@@ -58,7 +66,6 @@
     <!-- Access export (GDPR Art. 15) -->
     <section class="pv__card" aria-labelledby="pv-auskunft">
       <h2 class="pv__cardTitle" id="pv-auskunft">{{ 'admin.privacy.auskunftTitle' | t }}</h2>
-      <p class="pv__hint">{{ 'admin.privacy.auskunftHint' | t }}</p>
       <form class="pv__form" (submit)="$event.preventDefault(); exportAuskunft()">
         <app-input
           type="email"
@@ -78,7 +85,6 @@
     <!-- Account erasure (GDPR Art. 17) -->
     <section class="pv__card" aria-labelledby="pv-principal">
       <h2 class="pv__cardTitle" id="pv-principal">{{ 'admin.privacy.principalTitle' | t }}</h2>
-      <p class="pv__hint">{{ 'admin.privacy.principalHint' | t }}</p>
       <!-- D1: a person picker (name or e-mail), never a raw id. -->
       <form class="pv__form" (submit)="$event.preventDefault(); askPrincipalErase()">
         @if (person(); as p) {
@@ -136,7 +142,6 @@
   <section class="pv__card pv__retention" aria-labelledby="pv-retention">
     <div class="pv__retentionText">
       <h2 class="pv__cardTitle" id="pv-retention">{{ 'admin.privacy.retentionTitle' | t }}</h2>
-      <p class="pv__hint">{{ 'admin.privacy.retentionHint' | t }}</p>
     </div>
     <form class="pv__retentionForm" (submit)="$event.preventDefault(); saveRetention()">
       <app-input

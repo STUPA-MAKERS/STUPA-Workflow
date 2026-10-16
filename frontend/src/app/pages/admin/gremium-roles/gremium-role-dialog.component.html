@@ -16,7 +16,6 @@
         name="key"
         [required]="isNew()"
         [disabled]="!isNew()"
-        [hint]="isNew() ? ('admin.common.roleKeyHint' | t) : ''"
         [error]="keyError()"
       />
       <app-input

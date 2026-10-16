@@ -1,5 +1,5 @@
 <section class="al">
-  <app-page-header [flush]="true" [title]="'admin.audit.title' | t" [subtitle]="'admin.audit.desc' | t" />
+  <app-page-header [flush]="true" [title]="'admin.audit.title' | t" />
 
   <!-- The chain check: the newest stored result and "Jetzt prüfen". -->
   <div class="al__verify" [class]="'al__verify al__verify--' + (verifyView()?.kind ?? 'muted')" role="status">
@@ -84,7 +84,7 @@
                 @if (e.targetType || e.targetId) {
                   <dt>{{ 'admin.audit.detail.target' | t }}</dt>
                   <dd class="al__wrap">
-                    @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span> · {{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono"> · {{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
+                    @if (e.targetType) {<span>{{ targetTypeLabel(e.targetType) }}</span>}@if (e.targetLabel) {<span>{{ e.targetType ? ' · ' : '' }}{{ e.targetLabel }}</span>}@if (e.targetId) {<span class="mono">{{ e.targetType || e.targetLabel ? ' · ' : '' }}{{ e.targetId }}</span>}@if (revisionId(e); as rev) {<span> · </span><span class="mono">rev {{ rev }}</span>}
                   </dd>
                 }
                 <dt>{{ 'admin.audit.detail.actor' | t }}</dt>

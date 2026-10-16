@@ -7,6 +7,7 @@ import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clockTime } from '../meetings-display.util';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** A request younger than this reads "gerade eben" (ms). */
 const JUST_NOW_MS = 60_000;
@@ -20,7 +21,7 @@ const JUST_NOW_MS = 60_000;
   selector: 'app-guest-requests',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, AvatarComponent, ButtonComponent, IconComponent],
+  imports: [TruncatedDirective, TranslatePipe, AvatarComponent, ButtonComponent, IconComponent],
   templateUrl: './guest-requests.component.html',
   styleUrl: './guests.scss',
 })

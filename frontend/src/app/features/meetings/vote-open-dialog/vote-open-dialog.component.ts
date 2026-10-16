@@ -35,6 +35,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS, errorDetail } from '../meetings-display.util';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
 const KINDS: readonly VoteKind[] = ['motion', 'election'];
@@ -78,6 +79,7 @@ export interface CandidateDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     TranslatePipe,
     DialogComponent,

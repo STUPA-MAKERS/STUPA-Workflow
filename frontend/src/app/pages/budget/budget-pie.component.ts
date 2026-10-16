@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** A pie slice: label, value in currency units and colour (any CSS colour).
  *  An `id`, which is a cost centre id, makes the slice clickable for a drilldown. */
@@ -48,6 +49,7 @@ const GROW = 5; // radial growth on hover
   selector: 'app-budget-pie',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [TruncatedDirective],
   templateUrl: './budget-pie.component.html',
   styleUrl: './budget-pie.component.scss',
 })

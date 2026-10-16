@@ -76,6 +76,7 @@ import {
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
 
 /**
  * One filter of the list.
@@ -242,7 +243,7 @@ export class ApplicationsListComponent implements OnDestroy {
    * load of the next page in that time still sends the applied search only.
    */
   readonly searchText = signal('');
-  /** Debounce timer of the search (about 400 ms, like /expenses). */
+  /** Debounce timer of the search (about 250 ms, like /expenses). */
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
   readonly typeId = signal('');
   /** The chosen flow states. `state` repeats in the URL and in the request (A4). */
@@ -584,7 +585,7 @@ export class ApplicationsListComponent implements OnDestroy {
   // --- filters ------------------------------------------------------------
 
   /**
-   * The search. After about 400 ms of debounce it writes the `q` query param and
+   * The search. After about 250 ms of debounce it writes the `q` query param and
    * reloads. The value stays in the URL, so the filtered list is shareable as a link.
    */
   onSearch(value: string): void {
@@ -592,7 +593,7 @@ export class ApplicationsListComponent implements OnDestroy {
     if (this.searchTimer) clearTimeout(this.searchTimer);
     this.searchTimer = setTimeout(
       () => this.navigate({ q: this.searchText().trim() || null }),
-      400,
+      LIVE_SEARCH_DEBOUNCE_MS,
     );
   }
 

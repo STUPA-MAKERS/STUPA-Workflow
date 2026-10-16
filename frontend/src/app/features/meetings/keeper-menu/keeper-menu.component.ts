@@ -14,6 +14,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** One member of the picker. */
 interface Candidate {
@@ -40,7 +41,7 @@ interface Candidate {
   selector: 'app-keeper-menu',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, IconComponent, AvatarComponent],
+  imports: [TruncatedDirective, FormsModule, TranslatePipe, ButtonComponent, IconComponent, AvatarComponent],
   templateUrl: './keeper-menu.component.html',
   styleUrl: './keeper-menu.component.scss',
   host: { '[class.km--sheet]': 'inSheet()' },

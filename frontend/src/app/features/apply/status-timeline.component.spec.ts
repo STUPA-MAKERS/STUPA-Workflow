@@ -284,8 +284,6 @@ describe('StatusTimelineComponent', () => {
     const update = jest.fn(() => of({ ...app(true, { title: 'Neu' }), version: 3 }));
     const { comp, toast, fixture } = await setup(fakeApi({ update }));
     await userEvent.click(await screen.findByRole('button', { name: /Angaben bearbeiten/ }));
-    // The separator keeps its space before the hint.
-    expect(screen.getByText(/Speichern legt Version 3 an/).textContent).toMatch(/^ · Speichern/);
     // The focus moves to the title of the edit bar.
     await waitFor(() => expect(document.activeElement?.id).toBe('sp-edit-title'));
     // File fields stay out of the edit form.

@@ -129,10 +129,6 @@ export class AccountNotificationsComponent {
     return this.lookup(`account.notifications.kind.${kind}`, kind);
   }
 
-  protected kindHint(kind: string): string {
-    return this.lookup(`account.notifications.hint.${kind}`, '');
-  }
-
   /** Translate a key. A new kind with no translation shows the fallback, not the key. */
   private lookup(key: string, fallback: string): string {
     const label = this.i18n.translate(key as TranslationKey);

@@ -4,9 +4,9 @@
       @for (c of crumbs(); track c.url; let last = $last) {
         <li class="bc__entry">
           @if (last) {
-            <span class="bc__crumb bc__crumb--current ell" aria-current="page" [title]="c.label">{{ c.label }}</span>
+            <span class="bc__crumb bc__crumb--current ell" aria-current="page" [appTruncated]="c.label" #cut="appTruncated" [attr.title]="cut.truncated() ? c.label : null">{{ c.label }}</span>
           } @else {
-            <a class="bc__crumb bc__crumb--link ell" [routerLink]="c.url" [title]="c.label">{{ c.label }}</a>
+            <a class="bc__crumb bc__crumb--link ell" [routerLink]="c.url" [appTruncated]="c.label" #linkCut="appTruncated" [attr.title]="linkCut.truncated() ? c.label : null">{{ c.label }}</a>
             <app-icon class="bc__sep" name="right" [size]="14" aria-hidden="true" />
           }
         </li>

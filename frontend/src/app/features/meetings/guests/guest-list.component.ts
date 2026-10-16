@@ -11,6 +11,7 @@ import type { StatusKind } from '@shared/status-kind.util';
 import { ButtonComponent, DialogComponent, InputComponent } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clockTime } from '../meetings-display.util';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 interface GuestRow {
   g: MeetingGuest;
@@ -32,6 +33,7 @@ interface GuestRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     TranslatePipe,
     AvatarComponent,

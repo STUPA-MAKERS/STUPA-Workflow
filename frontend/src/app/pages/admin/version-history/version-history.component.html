@@ -18,7 +18,7 @@
             <span class="vh__meta">
               <time class="mono" [attr.datetime]="rev.at">{{ rev.at | ldate: 'short' }}</time>
               <span aria-hidden="true">·</span>
-              <span class="vh__actor ell" [title]="actor(rev)">{{ actor(rev) }}</span>
+              <span class="vh__actor ell" [appTruncated]="actor(rev)" #cut="appTruncated" [attr.title]="cut.truncated() ? actor(rev) : null">{{ actor(rev) }}</span>
             </span>
             <span class="vh__actions">
               <button

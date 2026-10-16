@@ -175,15 +175,6 @@
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
-.gd__qr {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-}
-.gd__qr app-icon {
-  flex: none;
-  margin-top: 2px;
-}
 .gd--confirm {
   gap: var(--space-4);
 }

@@ -78,7 +78,7 @@
           }
           <span trail class="ap__trail">
             @if (item.nonPublic) {
-              <app-badge variant="neutral" [title]="'meetings.agenda.nonPublicHint' | t">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
+              <app-badge variant="neutral">{{ 'meetings.agenda.nonPublic' | t }}</app-badge>
             }
             @if (menus()[i].length) {
               <app-row-menu

@@ -65,6 +65,7 @@ import {
   InvoiceFormComponent,
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -265,7 +266,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
   readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
-  /** Debounced search, about 400 ms. It drives the `q` param of the server query. */
+  /** Debounced search, about 250 ms. It drives the `q` param of the server query. */
   onSearch(value: string): void {
     this.q.set(value);
     this.debouncedReload();
@@ -303,7 +304,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), 400);
+    this.searchTimer = setTimeout(() => this.reload(), LIVE_SEARCH_DEBOUNCE_MS);
   }
 
   ngOnDestroy(): void {

@@ -54,14 +54,14 @@
             >
               <app-icon class="pal__rowIcon" [name]="row.icon" [size]="19" />
               <span class="pal__rowText">
-                <span class="pal__rowTitle ell" [title]="row.title">
+                <span class="pal__rowTitle ell" [appTruncated]="row.title" #cut="appTruncated" [attr.title]="cut.truncated() ? row.title : null">
                   @for (part of parts(row.title); track $index) {<span [class.pal__hit]="part.hit">{{ part.text }}</span>}
                 </span>
                 @if (row.subtitle) {
                   @if (row.status) {
                     <app-status-text class="pal__rowSub" kind="neutral">{{ row.subtitle }}</app-status-text>
                   } @else {
-                    <span class="pal__rowSub ell" [title]="row.subtitle">
+                    <span class="pal__rowSub ell" [appTruncated]="row.subtitle" #cut2="appTruncated" [attr.title]="cut2.truncated() ? row.subtitle : null">
                       @for (part of parts(row.subtitle); track $index) {<span [class.pal__hit]="part.hit">{{ part.text }}</span>}
                     </span>
                   }
@@ -82,9 +82,6 @@
 
       @if (showEmpty()) {
         <p class="pal__note">{{ 'search.empty' | t }}</p>
-      }
-      @if (!query().trim()) {
-        <p class="pal__note">{{ 'search.hint' | t }}</p>
       }
       <!-- Say so rather than implying that this is everything. -->
       @if (showTruncated()) {

@@ -2,7 +2,6 @@
   <aside class="wz__aside">
     <div class="wz__intro">
       <h1 class="wz__title">{{ 'apply.title' | t }}</h1>
-      <p class="wz__lead">{{ (loggedIn() ? 'apply.leadSignedIn' : 'apply.lead') | t }}</p>
     </div>
     <app-stepper
       class="wz__stepper"
@@ -82,7 +81,6 @@
                 </app-field-group>
               </section>
             } @else {
-              <p class="wz__hint">{{ 'apply.contact.lead' | t }}</p>
               <form class="wz__contact" [formGroup]="contactForm" (submit)="$event.preventDefault()">
                 <app-input
                   [label]="'apply.contact.email' | t"
@@ -98,7 +96,6 @@
                 <app-input
                   [label]="'apply.contact.nameOptional' | t"
                   [formControl]="contactForm.controls.name"
-                  [hint]="'apply.contact.nameHint' | t"
                 />
               </form>
             }

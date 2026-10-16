@@ -21,7 +21,6 @@
         @if (c.myDelegation; as d) {
           <ng-container [ngTemplateOutlet]="outgoing" [ngTemplateOutletContext]="{ $implicit: d }" />
         } @else if (canCreate()) {
-          <p class="dc__lead">{{ 'delegation.card.lead' | t }}</p>
           <p class="dc__small">
             @if (c.deadline && !c.deadlinePassed) {
               {{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'weekdayShort') } }}
@@ -52,7 +51,6 @@
           } @else if (canCreate()) {
             <li class="dc__row">
               <span class="dc__text">
-                <span>{{ 'delegation.card.lead' | t }}</span>
                 @if (c.deadline && !c.deadlinePassed) {
                   <span class="dc__sub">{{ 'delegation.card.deadline' | t: { date: (c.deadline | ldate: 'weekdayShort') } }}</span>
                 }

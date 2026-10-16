@@ -20,23 +20,3 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
-.pj__explain {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin: 0;
-  padding: 0 var(--space-1);
-  font-size: 0.8125rem;
-  line-height: 1.1875rem;
-  color: var(--color-text-muted);
-}
-.pj__explain dt {
-  display: inline;
-  margin-inline-end: 0.25em;
-  font-weight: var(--fw-semibold);
-  color: var(--color-text);
-}
-.pj__explain dd {
-  display: inline;
-  margin: 0;
-}

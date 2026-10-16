@@ -16,8 +16,15 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 
@@ -60,6 +67,7 @@ function emptyForm(): NewForm {
     NoteComponent,
     PageHeaderComponent,
     StatusTextComponent,
+    RowMenuComponent,
   ],
   templateUrl: './forms-list.component.html',
   styleUrl: './forms-list.component.scss',
@@ -82,6 +90,20 @@ export class FormsListComponent {
   /** Delete needs its own permission. This gate is UX only. The server is authoritative. */
   protected readonly canDelete = computed(() => this.auth.can('admin.types_delete'));
   protected readonly confirmDelete = signal<ApplicationTypeFull | null>(null);
+  /** A phone shows cards: the actions of a type go into the ⋮ menu of its card. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly rowMenu = computed<RowMenuSection[]>(() => {
+    const items: RowMenuItem[] = [{ id: 'edit', label: this.i18n.translate('admin.forms.edit'), icon: 'edit' }];
+    if (this.canDelete()) {
+      items.push({ id: 'delete', label: this.i18n.translate('admin.forms.delete'), icon: 'trash', danger: true });
+    }
+    return [{ items }];
+  });
+
+  protected onRowMenu(type: ApplicationTypeFull, item: RowMenuItem): void {
+    if (item.id === 'edit') void this.router.navigate(['/admin/forms', type.id]);
+    else if (item.id === 'delete') this.askDelete(type);
+  }
   protected readonly deleting = signal(false);
 
   protected readonly types = signal<ApplicationTypeFull[]>([]);

@@ -7,6 +7,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
 import { PageFrameService } from './page-frame.service';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 interface Crumb {
   label: string;
@@ -27,7 +28,7 @@ interface Crumb {
   selector: 'app-breadcrumbs',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent],
+  imports: [TruncatedDirective, RouterLink, TranslatePipe, IconComponent],
   templateUrl: './breadcrumbs.component.html',
   styleUrl: './breadcrumbs.component.scss',
 })

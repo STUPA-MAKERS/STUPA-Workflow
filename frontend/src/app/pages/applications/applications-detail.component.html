@@ -70,9 +70,6 @@
         }
         <p class="ad__editText ell">
           <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
-          <span class="ad__editHint">
-            · {{ 'applications.edit.versionHint' | t: { version: application.version + 1 } }}
-          </span>
         </p>
         @if (!phone()) {
           <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
@@ -463,7 +460,6 @@
   [closeLabel]="'applications.detail.cancel' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
-  <p class="ad__dlgLead">{{ 'applications.budget.lead' | t }}</p>
   <div class="ad__ccTree" appScrollFade="y">
     <app-cost-centre-tree
       [nodes]="budgetTree()"

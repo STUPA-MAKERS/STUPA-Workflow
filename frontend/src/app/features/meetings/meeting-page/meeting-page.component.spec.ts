@@ -345,7 +345,6 @@ describe('MeetingPageComponent', () => {
 
     it('opens a picked item of the preparation pane to prepare it, and goes back', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
-      expect(screen.getByText('Wähle einen TOP, um seinen Text und seine Abstimmungen vorzubereiten.')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();

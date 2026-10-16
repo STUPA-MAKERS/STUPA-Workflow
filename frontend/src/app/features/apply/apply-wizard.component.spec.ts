@@ -203,10 +203,9 @@ describe('ApplyWizardComponent', () => {
     jest.restoreAllMocks();
   });
 
-  it('shows the title, the guest lead and four steps before a type is chosen', async () => {
+  it('shows the title and four steps before a type is chosen', async () => {
     const s = await setup();
     expect(screen.getByRole('heading', { level: 1, name: 'Antrag stellen' })).toBeInTheDocument();
-    expect(screen.getByText(/Ohne Konto/)).toBeInTheDocument();
     const steps = screen.getByRole('list', { name: 'Antrags-Fortschritt' });
     expect(steps.querySelectorAll('li')).toHaveLength(4);
     expect(screen.getByText('Schritt 1 von 4')).toBeInTheDocument();
@@ -408,7 +407,6 @@ describe('ApplyWizardComponent', () => {
   it('skips the contact step for a signed-in user without PII fields', async () => {
     const s = await setup({ form: PLAIN, loggedIn: true });
     await waitFor(() => expect(s.comp.stepKeys()).toEqual(['type', 'details', 'review']));
-    expect(screen.getByText(/mit deinem Konto/)).toBeInTheDocument();
     await pickType(s);
     s.comp.next();
     s.fixture.detectChanges();

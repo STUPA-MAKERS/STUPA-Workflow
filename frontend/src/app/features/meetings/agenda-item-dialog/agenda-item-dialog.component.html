@@ -38,7 +38,7 @@
                   [checked]="pick() === a.applicationId"
                   (change)="pick.set(a.applicationId)"
                 />
-                <span class="aid__title ell" [title]="a.title ?? ''">{{ a.title }}</span>
+                <span class="aid__title ell" [appTruncated]="a.title ?? ''" #cut="appTruncated" [attr.title]="cut.truncated() ? a.title ?? '' : null">{{ a.title }}</span>
                 @if (stateOf(a); as state) {
                   <app-status-text kind="neutral">{{ state }}</app-status-text>
                 }
@@ -79,7 +79,7 @@
                 />
                 <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
                 <span class="aid__text">
-                  <span class="aid__title ell" [title]="c.title">{{ c.title }}</span>
+                  <span class="aid__title ell" [appTruncated]="c.title" #cut2="appTruncated" [attr.title]="cut2.truncated() ? c.title : null">{{ c.title }}</span>
                   <span class="aid__sub ell">{{ c.sub }}</span>
                 </span>
               </label>

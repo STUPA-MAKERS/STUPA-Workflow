@@ -1,5 +1,5 @@
 <section class="fe" [class.fe--wide]="wide()">
-  <app-page-header [flush]="true" [title]="'admin.flow.title' | t" [subtitle]="subtitle()">
+  <app-page-header [flush]="true" [title]="'admin.flow.title' | t" [meta]="versionMeta()">
     @if (loaded()) {
       <app-status-text heading class="fe__validity" [kind]="validation().valid ? 'accent' : 'error'">
         <app-icon [name]="validation().valid ? 'check' : 'alert'" [size]="16" />
@@ -214,7 +214,6 @@
         <p class="fe__legend">
           <span class="fe__legendItem"><span class="fe__legendDot" aria-hidden="true"></span>{{ 'admin.flow.initial' | t }}</span>
           <span class="fe__legendItem"><span class="fe__legendDash" aria-hidden="true"></span>{{ 'admin.flow.legendAutomatic' | t }}</span>
-          <span class="fe__legendHint">{{ 'admin.flow.group.multiHint' | t }}</span>
         </p>
       </div>
     </section>

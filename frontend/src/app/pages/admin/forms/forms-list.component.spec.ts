@@ -164,8 +164,6 @@ describe('FormsListComponent — display helpers', () => {
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('v7')).toBeInTheDocument();
     expect(c.versionLabel(rows[1])).toBe('–');
-    // The draft note explains why a draft type is missing in the public form.
-    expect(screen.getByText(/Ohne aktive Formularversion/)).toBeInTheDocument();
     // Each row action names its type.
     expect(screen.getByRole('link', { name: 'Bearbeiten: Förderantrag' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Antragsart löschen: Raumantrag' })).toBeInTheDocument();

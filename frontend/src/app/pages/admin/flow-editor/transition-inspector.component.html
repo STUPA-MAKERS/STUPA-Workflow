@@ -30,7 +30,6 @@
   <app-switch
     [ngModel]="!!transition().automatic"
     (ngModelChange)="automaticChange.emit($event)"
-    [hint]="'admin.flow.automaticHint' | t"
   >{{ 'admin.flow.automatic' | t }}</app-switch>
   <!-- "Requires action" applies only to manual transitions. The worker fires an
        automatic transition and never creates a task for it. -->
@@ -38,7 +37,6 @@
     <app-switch
       [ngModel]="transition().requiresAction !== false"
       (ngModelChange)="requiresActionChange.emit($event)"
-      [hint]="'admin.flow.requiresActionHint' | t"
     >{{ 'admin.flow.requiresAction' | t }}</app-switch>
   }
 </div>

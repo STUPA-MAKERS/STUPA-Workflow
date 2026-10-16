@@ -1,5 +1,4 @@
 <ng-template #body>
-  <p class="cs__intro">{{ 'account.calendar.intro' | t }}</p>
   @if (error()) {
     <p class="cs__error" role="alert">{{ 'account.calendar.error' | t }}</p>
   }
@@ -14,7 +13,6 @@
     <code class="cs__url" [attr.aria-labelledby]="headingId + '-url'">{{ feedUrl }}</code>
     @if (confirming()) {
       <div class="cs__confirm" role="group" [attr.aria-label]="'account.calendar.rotate' | t">
-        <p class="cs__confirmText">{{ 'account.calendar.rotateHint' | t }}</p>
         <div class="cs__actions">
           <app-button variant="text" size="sm" (click)="cancelRotate()">{{ 'action.cancel' | t }}</app-button>
           <app-button variant="danger" size="sm" [loading]="busy()" (click)="rotate()">

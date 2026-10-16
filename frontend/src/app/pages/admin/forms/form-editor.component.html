@@ -287,7 +287,6 @@
                 @if (isPositions(field.type)) {
                   <fieldset class="fe__sub fe__panel">
                     <legend class="cap fe__cap">{{ 'admin.form.positions' | t }}</legend>
-                    <p class="fe__hint">{{ 'admin.form.positionsHint' | t }}</p>
                     <div class="fe__pair">
                       <app-input
                         type="number"
@@ -307,7 +306,6 @@
                     <app-checkbox
                       [ngModel]="field.validation?.allowNoOffers !== false"
                       (ngModelChange)="setAllowNoOffers(pos, $event)"
-                      [hint]="'admin.form.allowNoOffersHint' | t"
                     >{{ 'admin.form.allowNoOffers' | t }}</app-checkbox>
                   </fieldset>
                 }
@@ -335,8 +333,6 @@
                       <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
                       @if (isNumeric(field.type)) {
                         <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(pos, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
-                      } @else if (isPositions(field.type)) {
-                        <span class="fe__hint">{{ 'admin.form.autoPromoted' | t }}</span>
                       }
                     </div>
                     @if (isNumeric(field.type) && field.isPromoted) {
@@ -403,12 +399,10 @@
           <app-checkbox
             [ngModel]="hasBudget()"
             (ngModelChange)="hasBudget.set($event)"
-            [hint]="'admin.forms.hasBudgetHint' | t"
           >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
           <app-checkbox
             [ngModel]="cmpRequired()"
             (ngModelChange)="cmpRequired.set($event)"
-            [hint]="'admin.forms.cmpRequiredHint' | t"
           >{{ 'admin.forms.cmpRequired' | t }}</app-checkbox>
           @if (cmpRequired()) {
             <app-input

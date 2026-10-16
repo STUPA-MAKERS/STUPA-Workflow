@@ -178,7 +178,7 @@ export class BookingFormComponent {
 
   /** "Lastenrad Anzahlung · erfasst von Konrad Pfeiffer, 25.09.2026". */
   protected readonly subtitle = computed(() => {
-    if (this.mode() === 'create') return this.i18n.translate('expenses.form.required');
+    if (this.mode() === 'create') return '';
     const e = this.editingRow();
     if (!e) return '';
     const date = new Date(e.createdAt).toLocaleDateString(this.i18n.formatLocale(), {

@@ -1,4 +1,3 @@
-.sld__lead,
 .sld__hint,
 .sld__none {
   margin: 0;
@@ -40,6 +39,9 @@
    the sr-only label into the copied text. */
 .sld__url code {
   user-select: all;
+}
+.sld__link {
+  color: var(--color-accent-text);
 }
 
 .sld__form {

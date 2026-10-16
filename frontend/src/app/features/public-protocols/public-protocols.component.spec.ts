@@ -101,7 +101,6 @@ describe('PublicProtocolsComponent', () => {
     expect(api.semesters).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'Haus' }));
     expect(await screen.findByText('Haus', { selector: 'mark' })).toBeInTheDocument();
     expect(screen.getByText('1 Treffer')).toBeInTheDocument();
-    expect(screen.getByText(/Gesucht wird in Sitzungstiteln/)).toBeInTheDocument();
     const calls = api.list.mock.calls.length;
     // Enter with the same text searches nothing new.
     await userEvent.type(box, '{enter}');
