@@ -10,11 +10,11 @@
   >
     @for (item of items(); track item.key) {
       @if (item.kind === 'day') {
-        <div class="chat__sep" role="separator">
+        <div class="chat__sep">
           <span class="chat__sepText">{{ item.label }}</span>
         </div>
       } @else if (item.kind === 'new') {
-        <div class="chat__sep chat__sep--new" role="separator">
+        <div class="chat__sep chat__sep--new">
           <span class="chat__sepText">{{ 'chat.newCount' | t: { count: item.count } }}</span>
         </div>
       } @else if (item.kind === 'event') {
@@ -25,6 +25,7 @@
         @let m = item.msg;
         <div
           class="chat__row"
+          [attr.data-msg-id]="m.id"
           [class.chat__row--own]="m.own"
           [class.chat__row--head]="item.head"
           [class.chat__row--tail]="item.tail"

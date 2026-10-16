@@ -3,6 +3,7 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
   Pipe,
   type PipeTransform,
   afterNextRender,
@@ -118,6 +119,7 @@ function writeStore(key: string, value: string | null): void {
 export class ChatComponent {
   private readonly i18n = inject(I18nService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly injector = inject(Injector);
 
   readonly messages = input<readonly ChatMessage[]>([]);
   readonly events = input<readonly ChatEvent[]>([]);
@@ -340,14 +342,46 @@ export class ChatComponent {
 
   // --- edit, delete, phone menu ----------------------------------------------------
 
+  /**
+   * The Edit button that had the focus leaves the DOM with the edit, so the focus goes
+   * to the edit field, with the cursor at the end.
+   */
   protected startEdit(msg: ChatMessage): void {
     this.menuFor.set(null);
     this.editDraft.set(msg.body);
     this.editingId.set(msg.id);
+    afterNextRender(
+      () => {
+        const box = this.log().nativeElement.querySelector<HTMLTextAreaElement>('.chat__editInput');
+        if (!box) return;
+        box.focus();
+        box.setSelectionRange(box.value.length, box.value.length);
+      },
+      { injector: this.injector },
+    );
   }
 
   protected cancelEdit(): void {
+    this.endEdit();
+  }
+
+  /**
+   * Close the edit. When the focus was in it, it goes back to the Edit button of the
+   * message, or to the log where the message has no buttons (a phone).
+   */
+  private endEdit(): void {
+    const id = this.editingId();
+    const log = this.log().nativeElement;
+    const inside = log.contains(document.activeElement);
     this.editingId.set(null);
+    if (id === null || !inside) return;
+    afterNextRender(
+      () => {
+        const row = Array.from(log.querySelectorAll<HTMLElement>('.chat__row')).find((r) => r.dataset['msgId'] === id);
+        (row?.querySelector<HTMLElement>('.chat__acts button') ?? log).focus();
+      },
+      { injector: this.injector },
+    );
   }
 
   protected onEditKey(event: KeyboardEvent): void {
@@ -367,7 +401,7 @@ export class ChatComponent {
     const body = this.editDraft().trim();
     if (id === null || !body) return;
     const msg = this.messages().find((m) => m.id === id);
-    this.editingId.set(null);
+    this.endEdit();
     if (msg && msg.body !== body) this.edit.emit({ id, body });
   }
 

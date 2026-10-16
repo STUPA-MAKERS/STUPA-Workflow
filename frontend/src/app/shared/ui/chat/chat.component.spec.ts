@@ -320,6 +320,41 @@ describe('ChatComponent', () => {
       expect(edit).toHaveBeenCalledWith({ id: 'm', body: 'Neu' });
     });
 
+    it('moves the focus into the edit field and back to the Edit button', async () => {
+      const { view } = await setup({ messages: own() });
+      const settle = async () => {
+        view.fixture.detectChanges();
+        await view.fixture.whenStable();
+      };
+      const editOf = (i: number) => screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[i];
+      const box = () => screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      editOf(1).focus();
+      fireEvent.click(editOf(1));
+      await settle();
+      expect(box()).toHaveFocus();
+      expect(box().selectionStart).toBe(box().value.length);
+      expect(box().value.length).toBeGreaterThan(0);
+      fireEvent.keyDown(box(), { key: 'Escape' });
+      await settle();
+      expect(editOf(1)).toHaveFocus();
+
+      fireEvent.click(editOf(0));
+      await settle();
+      fireEvent.input(box(), { target: { value: 'Neu' } });
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      await settle();
+      expect(editOf(0)).toHaveFocus();
+
+      // An edit closed while the focus is elsewhere leaves the focus there.
+      fireEvent.click(editOf(0));
+      await settle();
+      const outside = screen.getByRole('textbox', { name: 'Nachricht schreiben …' });
+      outside.focus();
+      fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+      await settle();
+      expect(outside).toHaveFocus();
+    });
+
     it('saves with the button, cancels with Abbrechen and needs a text', async () => {
       const { edit, cmp } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[1]);
@@ -433,8 +468,11 @@ describe('ChatComponent', () => {
       // Enter is a new line on a phone.
       fireEvent.keyDown(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }), { key: 'Enter' });
       expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toBeInTheDocument();
+      expect(screen.getByRole('textbox', { name: 'Nachricht bearbeiten' })).toHaveFocus();
       cmp.cancelEdit();
       view.fixture.detectChanges();
+      // A phone has no Edit button: the focus goes to the log.
+      expect(screen.getByRole('log')).toHaveFocus();
 
       cmp.openMenu(cmp.messages()[0]);
       view.fixture.detectChanges();
@@ -472,6 +510,10 @@ describe('ChatComponent', () => {
       const { view } = await setup({ messages: [msg('a', today(9)), msg('b', today(10)), msg('c', today(10, 1))] });
       const sep = view.container.querySelector('.chat__sep--new');
       expect(sep).toHaveTextContent('2 neue');
+      // A separator role would make the text presentational: the day and the marker reach AT as text.
+      expect(screen.queryAllByRole('separator')).toHaveLength(0);
+      expect(sep).not.toHaveAttribute('role');
+      expect(screen.getByText('Heute').closest('[role]')).toBe(screen.getByRole('log'));
     });
 
     it('offers a button for new messages below and follows at the end', async () => {
