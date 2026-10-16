@@ -97,7 +97,7 @@
         (activeChange)="selectTab($event)"
       />
       <section
-        class="td__panel"
+        class="td__panel td__panel--log"
         role="tabpanel"
         [id]="tabBar.panelId('log')"
         [attr.aria-labelledby]="tabBar.tabId('log')"
@@ -106,7 +106,7 @@
         <ng-container *ngTemplateOutlet="log" />
       </section>
       <section
-        class="td__panel"
+        class="td__panel td__panel--details"
         role="tabpanel"
         [id]="tabBar.panelId('details')"
         [attr.aria-labelledby]="tabBar.tabId('details')"
@@ -142,44 +142,69 @@
 <ng-template #details let-ticket>
   <section class="td__sec" aria-labelledby="td-details">
     <h3 id="td-details" class="sec td__secTitle" [class.sr-only]="!split()">{{ 'tickets.detail.details' | t }}</h3>
+    <!-- Side by side the fields pair up; in one column the e-mail follows the reporter. -->
     <app-field-group>
-      <div class="td__pair">
-        <app-field-row [label]="'tickets.detail.reporter' | t">{{ reporter() }}</app-field-row>
-        <app-field-row [label]="'tickets.detail.reported' | t">
-          <time [attr.datetime]="ticket.createdAt">{{ reportedAt(ticket) }}</time>
-        </app-field-row>
-      </div>
+      @if (split()) {
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="reporterRow" />
+          <ng-container *ngTemplateOutlet="reportedRow" />
+        </div>
+        <ng-container *ngTemplateOutlet="emailRow" />
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="assigneeRow" />
+          <ng-container *ngTemplateOutlet="kindRow" />
+        </div>
+      } @else {
+        <ng-container *ngTemplateOutlet="reporterRow" />
+        <ng-container *ngTemplateOutlet="emailRow" />
+        <ng-container *ngTemplateOutlet="reportedRow" />
+        <ng-container *ngTemplateOutlet="assigneeRow" />
+        <ng-container *ngTemplateOutlet="kindRow" />
+      }
+    </app-field-group>
+    <ng-template #reporterRow>
+      <app-field-row [label]="'tickets.detail.reporter' | t">{{ reporter() }}</app-field-row>
+    </ng-template>
+    <ng-template #reportedRow>
+      <app-field-row [label]="'tickets.detail.reported' | t">
+        <time [attr.datetime]="ticket.createdAt">{{ reportedAt(ticket) }}</time>
+      </app-field-row>
+    </ng-template>
+    <ng-template #emailRow>
       @if (ticket.reporter.email) {
         <app-field-row [label]="'tickets.detail.email' | t">
           <a class="td__mail" [attr.href]="'mailto:' + ticket.reporter.email">{{ ticket.reporter.email }}</a>
         </app-field-row>
       }
-      <div class="td__pair">
-        <app-field-row [label]="'tickets.detail.assignee' | t">
-          <app-filter-select
-            class="td__select"
-            size="md"
-            [label]="'tickets.detail.assignee' | t"
-            [options]="assigneeOptions()"
-            [value]="ticket.assignee?.principalId ?? ''"
-            (valueChange)="setAssignee($event)"
-            [text]="assigneeName()"
-          />
-        </app-field-row>
-        <app-field-row [label]="'tickets.detail.kind' | t">
-          <app-filter-select
-            class="td__select"
-            size="md"
-            [label]="'tickets.detail.kind' | t"
-            [options]="kindOptions()"
-            [value]="ticket.kind"
-            (valueChange)="setKind($event)"
-            [icon]="kindIcon()"
-            [text]="kindLabel()"
-          />
-        </app-field-row>
-      </div>
-    </app-field-group>
+    </ng-template>
+    <ng-template #assigneeRow>
+      <app-field-row [label]="'tickets.detail.assignee' | t">
+        <app-filter-select
+          class="td__select"
+          size="md"
+          [label]="'tickets.detail.assignee' | t"
+          [options]="assigneeOptions()"
+          [value]="ticket.assignee?.principalId ?? ''"
+          (valueChange)="setAssignee($event)"
+          [person]="assigneePerson()"
+          [text]="assigneeName()"
+        />
+      </app-field-row>
+    </ng-template>
+    <ng-template #kindRow>
+      <app-field-row [label]="'tickets.detail.kind' | t">
+        <app-filter-select
+          class="td__select"
+          size="md"
+          [label]="'tickets.detail.kind' | t"
+          [options]="kindOptions()"
+          [value]="ticket.kind"
+          (valueChange)="setKind($event)"
+          [icon]="kindIcon()"
+          [text]="kindLabel()"
+        />
+      </app-field-row>
+    </ng-template>
   </section>
 
   <section class="td__sec" aria-labelledby="td-todos">
@@ -200,7 +225,7 @@
               <span class="td__todoSub">{{ todoSub(card) }}</span>
             </span>
             @if (card.assignees.length) {
-              <app-avatar-stack [names]="todoNames(card)" [principalIds]="todoIds(card)" [max]="3" />
+              <app-avatar-stack size="xs" [names]="todoNames(card)" [principalIds]="todoIds(card)" [max]="3" />
             }
           </li>
         }

@@ -13,7 +13,9 @@
   (click)="toggle()"
   (keydown)="onTriggerKey($event)"
 >
-  @if (icon(); as lead) {
+  @if (person(); as who) {
+    <app-avatar class="fs__av" size="xs" [decorative]="true" [name]="who.name" [principalId]="who.principalId" />
+  } @else if (icon(); as lead) {
     <app-icon [name]="lead" [size]="15" />
   }
   @if (!iconOnly()) {

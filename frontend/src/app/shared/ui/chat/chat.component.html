@@ -92,11 +92,11 @@
                   [appPressSelectEnabled]="canAct(m) && touchMenu()"
                   (appPressSelectToggle)="openMenu(m)"
                 >
-                  @if (item.head && item.mark === 'internal') {
+                  @if (item.markLabel && item.mark === 'internal') {
                     <span class="chat__mark chat__mark--internal">
                       <app-icon name="lock" [size]="13" />{{ 'chat.internal' | t }}
                     </span>
-                  } @else if (item.head && item.mark === 'public') {
+                  } @else if (item.markLabel && item.mark === 'public') {
                     <span class="chat__mark chat__mark--public">
                       <app-icon name="globe" [size]="13" />{{ 'chat.public' | t }}
                     </span>

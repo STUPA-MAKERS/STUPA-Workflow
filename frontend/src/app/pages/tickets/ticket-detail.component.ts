@@ -187,6 +187,11 @@ export class TicketDetailComponent {
     const a = this.ticket()?.assignee;
     return a ? personName(a, this.t) : this.t('tickets.detail.unassigned');
   });
+  /** The avatar before the assignee in the select; none while nobody is assigned. */
+  readonly assigneePerson = computed(() => {
+    const a = this.ticket()?.assignee;
+    return a ? { name: personName(a, this.t), principalId: a.principalId } : null;
+  });
 
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const t = this.ticket();

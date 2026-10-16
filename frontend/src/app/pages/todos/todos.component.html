@@ -32,7 +32,7 @@
           ><app-icon name="tune" [size]="21" /></app-button>
         }
         @if (board()) {
-          <app-button size="sm" data-testid="td-new" (click)="newCard()">
+          <app-button data-testid="td-new" (click)="newCard()">
             <span class="td__btn"><app-icon name="add" [size]="16" />{{ 'todos.new.short' | t }}</span>
           </app-button>
         }

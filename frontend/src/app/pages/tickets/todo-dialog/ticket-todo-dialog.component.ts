@@ -17,6 +17,8 @@ import {
   TodosApiService,
   type TodoBoard,
   type TodoBoardSummary,
+  type TodoLinkKind,
+  type TodoLinkTarget,
   type TodoMember,
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -30,8 +32,19 @@ import {
   InputComponent,
   SelectComponent,
   ToastService,
+  type IconName,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { TodoLinkPickerComponent, linkKey } from '../../../features/todos/link-picker/todo-link-picker.component';
+import { LINK_ICON, LINK_KIND_LABEL } from '../../../features/todos/todos.util';
+
+/** A further link of the new card, picked in the dialog. */
+interface ExtraLink {
+  kind: TodoLinkKind;
+  targetId: Uuid;
+  kindLabel: string;
+  title: string;
+}
 
 /** The most characters of a card title (server rule). */
 const MAX_TITLE = 300;
@@ -42,7 +55,8 @@ const MAX_TITLE = 300;
  * The title starts as the title of the ticket. The board starts as the team board (the
  * board "Plattform" of `ticket.manage`), else the personal board; the column as the
  * first column. The person and the due date are optional. The link to the ticket goes
- * along; the reporter never sees it (one-way).
+ * along; the reporter never sees it (one-way). "Verknüpfen" adds further links with the
+ * picker of the card drawer.
  */
 @Component({
   selector: 'app-ticket-todo-dialog',
@@ -57,6 +71,7 @@ const MAX_TITLE = 300;
     IconComponent,
     InputComponent,
     SelectComponent,
+    TodoLinkPickerComponent,
   ],
   templateUrl: './ticket-todo-dialog.component.html',
   styleUrl: './ticket-todo-dialog.component.scss',
@@ -81,6 +96,14 @@ export class TicketTodoDialogComponent {
   readonly dueDate = signal('');
   /** The link to the ticket; the reporter can take it off. */
   readonly linked = signal(true);
+  /** The links picked in the dialog, after the ticket. */
+  readonly links = signal<ExtraLink[]>([]);
+  readonly pickerOpen = signal(false);
+  readonly linkedKeys = computed(() => {
+    const keys = new Set(this.links().map((l) => linkKey(l.kind, l.targetId)));
+    if (this.linked()) keys.add(linkKey('ticket', this.ticket().id));
+    return keys;
+  });
   readonly saving = signal(false);
   /** The boards did not load, or no board can take a card. */
   readonly noBoard = signal(false);
@@ -123,6 +146,8 @@ export class TicketTodoDialogComponent {
     this.assigneeId.set('');
     this.dueDate.set('');
     this.linked.set(true);
+    this.links.set([]);
+    this.pickerOpen.set(false);
     this.saving.set(false);
     this.noBoard.set(false);
     this.api.boards().subscribe({
@@ -169,6 +194,29 @@ export class TicketTodoDialogComponent {
     });
   }
 
+  icon(kind: TodoLinkKind): IconName {
+    return LINK_ICON[kind];
+  }
+
+  /** A pick in the picker adds the target; a linked one goes off again. */
+  pickLink(hit: TodoLinkTarget): void {
+    const key = linkKey(hit.kind, hit.targetId);
+    if (hit.kind === 'ticket' && hit.targetId === this.ticket().id) {
+      this.linked.update((on) => !on);
+      return;
+    }
+    if (this.linkedKeys().has(key)) {
+      this.links.update((list) => list.filter((l) => linkKey(l.kind, l.targetId) !== key));
+      return;
+    }
+    const kindLabel = this.i18n.translate(LINK_KIND_LABEL[hit.kind]);
+    this.links.update((list) => [...list, { kind: hit.kind, targetId: hit.targetId, kindLabel, title: hit.title }]);
+  }
+
+  unlink(link: ExtraLink): void {
+    this.links.update((list) => list.filter((l) => l !== link));
+  }
+
   cancel(): void {
     this.open.set(false);
   }
@@ -184,7 +232,10 @@ export class TicketTodoDialogComponent {
         title: this.title().trim(),
         dueDate: this.dueDate() || null,
         assigneeIds: this.assigneeId() ? [this.assigneeId()] : [],
-        links: this.linked() ? [{ kind: 'ticket', targetId: t.id }] : [],
+        links: [
+          ...(this.linked() ? [{ kind: 'ticket' as const, targetId: t.id }] : []),
+          ...this.links().map((l) => ({ kind: l.kind, targetId: l.targetId })),
+        ],
       })
       .subscribe({
         next: () => {

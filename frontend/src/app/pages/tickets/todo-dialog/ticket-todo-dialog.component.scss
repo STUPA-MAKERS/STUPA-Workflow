@@ -56,7 +56,19 @@
 }
 .ttd__chipText {
   min-width: 0;
+  color: var(--color-text-muted);
   overflow-wrap: anywhere;
+}
+/* The name of the target reads first: the kind before it stays muted. */
+.ttd__chipName {
+  color: var(--color-text);
+  font-weight: var(--fw-medium);
+}
+.ttd__picker {
+  flex: 1 0 100%;
+}
+.ttd__picker:empty {
+  display: none;
 }
 .ttd__chipX {
   display: grid;

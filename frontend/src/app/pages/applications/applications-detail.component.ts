@@ -1145,6 +1145,7 @@ export class ApplicationsDetailComponent {
       },
       body: comment.body,
       at: comment.at,
+      editedAt: comment.editedAt,
       own: comment.isOwn,
       // The server lets the author and a holder of `application.manage` change a comment.
       canEdit: comment.isOwn || this.canManage(),

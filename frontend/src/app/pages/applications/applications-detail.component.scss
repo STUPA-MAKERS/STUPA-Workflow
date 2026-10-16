@@ -422,11 +422,23 @@
 .ad__chat {
   --chat-log-max: min(60vh, 36rem);
 }
+/* The tab fills the page down to the bottom navigation: the panel, its section and the
+   chat grow, and the chat reaches over the bottom padding of the page, so the composer bar
+   sits on the navigation and runs from edge to edge. */
+.ad__panel--chat:not([hidden]):has(.chat--phone) {
+  flex: 1 1 0;
+  min-height: 0;
+}
+.ad__panel--chat .ad__sec:has(.chat--phone) {
+  flex: 1 1 0;
+  min-height: 0;
+}
 .ad__chat.chat--phone {
-  --chat-log-min: max(14rem, calc(100dvh - var(--app-bottom-inset, 0px) - 32rem));
-  --chat-log-max: var(--chat-log-min);
-  /* The chat ends the page: the composer bar runs down to the bottom navigation. */
-  --chat-composer-foot: 4rem;
+  flex: 1 1 0;
+  margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
+  --chat-log-min: 12rem;
+  --chat-log-max: none;
+  --chat-composer-bleed: var(--space-4);
 }
 
 /* ------------------------------------------------------------------ dialogs */

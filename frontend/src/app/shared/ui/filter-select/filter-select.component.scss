@@ -37,6 +37,11 @@
 .fs__text {
   flex: 1 1 auto;
   max-width: 18rem;
+  /* A chip that is wider than its text keeps the text beside the icon or the avatar. */
+  text-align: start;
+}
+.fs__av {
+  flex: none;
 }
 .fs__chev {
   flex: none;

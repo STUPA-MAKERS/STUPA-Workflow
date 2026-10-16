@@ -424,6 +424,7 @@ export class StatusTimelineComponent {
       author: { principalId: null, displayName: this.authorName(comment) },
       body: comment.body,
       at: comment.at,
+      editedAt: comment.editedAt,
       own: comment.isOwn,
     };
   }

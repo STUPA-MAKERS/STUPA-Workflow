@@ -154,6 +154,7 @@ export function mapComment(wire: CommentOutWire): ApplicationComment {
     isPublic: wire.visibility === 'public',
     isOwn: wire.isOwn ?? false,
     at: wire.at,
+    editedAt: wire.editedAt ?? null,
   };
 }
 

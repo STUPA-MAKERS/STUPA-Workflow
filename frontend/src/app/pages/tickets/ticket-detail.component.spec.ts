@@ -189,6 +189,32 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByRole('link', { name: '33. Sitzung STUPA' })).toHaveAttribute('href', '/meetings/m1');
   });
 
+  const fieldLabels = () =>
+    [...document.querySelectorAll('[aria-labelledby="td-details"] app-field-row .fld__label')].map((l) =>
+      l.textContent?.trim(),
+    );
+
+  it('pairs the fields side by side', async () => {
+    await start('/tickets/t40', { split: true });
+    expect(document.querySelectorAll('.td__pair')).toHaveLength(2);
+    expect(fieldLabels()).toEqual(['Gemeldet von', 'Gemeldet', 'E-Mail', 'Zugewiesen', 'Art']);
+  });
+
+  it('puts the mail after the reporter in one column', async () => {
+    await start('/tickets/t40', { split: false });
+    expect(document.querySelectorAll('.td__pair')).toHaveLength(0);
+    expect(fieldLabels()).toEqual(['Gemeldet von', 'E-Mail', 'Gemeldet', 'Zugewiesen', 'Art']);
+  });
+
+  it('shows the avatar of the assignee in the select, and none without one', async () => {
+    const { cmp } = await start('/tickets/t40', {
+      get: () => of(detail({ assignee: { principalId: 'p9', displayName: 'Selin' } })),
+    });
+    expect(cmp.assigneePerson()).toEqual({ name: 'Selin', principalId: 'p9' });
+    cmp.ticket.set(detail({ assignee: null }));
+    expect(cmp.assigneePerson()).toBeNull();
+  });
+
   it('links an application, and leaves out what the context lacks', async () => {
     const { cmp } = await start('/tickets/t40', {
       get: () =>

@@ -166,7 +166,8 @@
 /* ------------------------------------------------------------------ fields */
 .cd__fields {
   display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
+  /* The values start on one line, a label column of at least 5.25rem. */
+  grid-template-columns: minmax(5.25rem, max-content) minmax(0, 1fr);
   gap: var(--space-3) var(--space-6);
   margin: 0;
 }
@@ -393,6 +394,7 @@ a.cd__linkTitle:hover {
   border-radius: var(--radius-md);
 }
 .cd__item:hover {
+  border-radius: var(--radius-pill);
   background: var(--color-surface-2);
 }
 .cd__item .cd__itemForm {
@@ -464,8 +466,9 @@ a.cd__linkTitle:hover {
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+/* A text link: the hover underlines, no box. */
 .cd__toggle:hover {
-  background: var(--color-surface-2);
+  text-decoration: underline;
 }
 .cd__toggle:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -500,10 +503,24 @@ a.cd__linkTitle:hover {
   border-bottom: 0;
   padding-bottom: 0;
 }
+/* Under the back link the kicker line needs only the height of its 40px buttons. */
+:host(.cd--phone) .cd__head app-sheet-bar {
+  min-height: 40px;
+}
+/* The tab "Aktivität" fills the drawer down to the bottom navigation: the log takes the
+   height between the tabs and the composer and scrolls inside, so it opens at the newest
+   message, and the composer bar sits on the navigation. */
+:host(.cd--phone) .cd__panel--chat:not([hidden]) {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 0;
+}
 :host(.cd--phone) .cd__chat {
-  --chat-log-min: max(14rem, calc(100dvh - 22rem));
-  --chat-log-max: var(--chat-log-min);
+  flex: 1 1 auto;
+  --chat-log-min: 12rem;
+  --chat-log-max: none;
   --chat-composer-bottom: 0px;
+  --chat-composer-bleed: var(--space-4);
 }
 .cd__bar {
   position: sticky;

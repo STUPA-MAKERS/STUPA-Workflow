@@ -2,7 +2,7 @@ import { Component, signal } from '@angular/core';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
-import { FilterSelectComponent, type FilterSelectOption } from './filter-select.component';
+import { FilterSelectComponent, type FilterSelectOption, type FilterSelectPerson } from './filter-select.component';
 
 const OPTIONS: FilterSelectOption[] = [
   { value: '', label: 'Alle Typen' },
@@ -26,6 +26,8 @@ const OPTIONS: FilterSelectOption[] = [
       [active]="value() !== '' || values().length > 0"
       [text]="text()"
       [iconOnly]="iconOnly()"
+      [icon]="icon()"
+      [person]="person()"
       resetLabel="Zurücksetzen"
     />
     <button type="button">danach</button>
@@ -38,6 +40,8 @@ class HostComponent {
   readonly values = signal<readonly string[]>([]);
   readonly text = signal<string | null>(null);
   readonly iconOnly = signal(false);
+  readonly icon = signal<'bug' | null>(null);
+  readonly person = signal<FilterSelectPerson | null>(null);
 }
 
 /** Let `matchMedia` report a phone (or not). jsdom has none of its own. */
@@ -99,6 +103,20 @@ describe('FilterSelectComponent', () => {
     expect(chip()).toHaveAccessibleName('Typ');
     expect(chip()).toHaveAttribute('title', 'Typ');
     expect(view.container.querySelector('.fs__text')).toBeNull();
+  });
+
+  it('puts the avatar of a person in front of the text, in place of the icon', async () => {
+    const { chip, host, view } = await setup();
+    host.icon.set('bug');
+    view.fixture.detectChanges();
+    expect(chip().querySelector('app-icon:not(.fs__chev)')).not.toBeNull();
+    expect(chip().querySelector('app-avatar')).toBeNull();
+    host.person.set({ name: 'Mara Keller', principalId: 'p1' });
+    view.fixture.detectChanges();
+    const avatar = chip().querySelector('app-avatar.fs__av');
+    expect(avatar).toHaveTextContent('MK');
+    expect(chip().querySelector('app-icon:not(.fs__chev)')).toBeNull();
+    expect(chip()).toHaveAccessibleName('Typ: Alle Typen');
   });
 
   it('opens the list under the chip on a click, with a check on the current value', async () => {

@@ -466,6 +466,8 @@ export interface CommentOutWire {
   at: IsoDateTime;
   /** True if the viewer wrote this comment. The server decides. It aligns the chat. */
   isOwn?: boolean;
+  /** When the text was last changed; null or absent for a comment never edited. */
+  editedAt?: IsoDateTime | null;
 }
 
 /** `ApplicationTypeListItem`. */
@@ -766,6 +768,8 @@ export interface ApplicationComment {
   /** True if the viewer wrote this comment. Own messages go right, others left and gray. */
   isOwn: boolean;
   at: IsoDateTime;
+  /** When the text was last changed: the chat says "bearbeitet". */
+  editedAt?: IsoDateTime | null;
 }
 
 /** Application type, frontend view, for the wizard selection. */

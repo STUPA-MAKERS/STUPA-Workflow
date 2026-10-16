@@ -8,6 +8,7 @@ import {
   type TodoBoard,
   type TodoBoardSummary,
   type TodoCardCreate,
+  type TodoLinkTarget,
   type TodoMember,
 } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -110,7 +111,8 @@ describe('TicketTodoDialogComponent', () => {
     expect(c.boardOptions().map((o) => o.value)).toEqual(['gb', 'pb', 'tb']);
     expect(c.columnOptions().map((o) => o.label)).toEqual(['In Arbeit', 'Offen']);
     expect(c.memberOptions().map((o) => o.label)).toEqual(['Niemand', 'Mara Keller', 'Gelöschte Person']);
-    expect(screen.getByText('Ticket · T-0040 Protokoll-PDF zeigt im Kopf das falsche Datum')).toBeInTheDocument();
+    const chip = document.querySelector('.ttd__chipText');
+    expect(chip?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Ticket · T-0040 Protokoll-PDF zeigt im Kopf das falsche Datum');
   });
 
   it('creates the card with the link and closes', async () => {
@@ -140,12 +142,34 @@ describe('TicketTodoDialogComponent', () => {
     expect(c.linked()).toBe(false);
     c.save();
     expect(api.createCard).toHaveBeenLastCalledWith(expect.objectContaining({ links: [], assigneeIds: [], dueDate: null }));
-    c.open.set(true);
-    fixture.detectChanges();
-    c.linked.set(false);
-    fixture.detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: /Ticket verknüpfen/ }));
+    // The picker puts the ticket back.
+    c.pickLink({ kind: 'ticket', targetId: 't40', title: TICKET.title } as TodoLinkTarget);
     expect(c.linked()).toBe(true);
+  });
+
+  it('adds further links with the picker and takes them off again', async () => {
+    const { c, api, fixture } = await setup();
+    expect(screen.getByRole('button', { name: 'Verknüpfen' })).toBeTruthy();
+    const top = { kind: 'agenda_item', targetId: 'a2', title: 'Haushaltsplan 2027' } as TodoLinkTarget;
+    c.pickLink(top);
+    c.pickLink({ kind: 'meeting', targetId: 'm1', title: '33. Sitzung' } as TodoLinkTarget);
+    fixture.detectChanges();
+    expect(c.linkedKeys()).toEqual(new Set(['agenda_item:a2', 'meeting:m1', 'ticket:t40']));
+    expect(screen.getByText('Haushaltsplan 2027')).toBeTruthy();
+    // A second pick of a linked target takes it off; the chip's × does the same.
+    c.pickLink(top);
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit 33. Sitzung entfernen' }));
+    c.pickLink({ kind: 'todo', targetId: 'c9', title: 'Kassenprüfung' } as TodoLinkTarget);
+    c.save();
+    expect(api.createCard).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        links: [
+          { kind: 'ticket', targetId: 't40' },
+          { kind: 'todo', targetId: 'c9' },
+        ],
+      }),
+    );
   });
 
   it('switches the board and its columns and members', async () => {

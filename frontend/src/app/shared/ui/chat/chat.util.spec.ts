@@ -67,17 +67,19 @@ describe('chat util', () => {
     expect(own && own.kind === 'msg' && own.name).toBeNull();
   });
 
-  it('breaks a group at a change of visibility and marks only when asked', () => {
+  it('keeps a group over a change of visibility, labels each change, marks only when asked', () => {
     const list = [
       msg('a', '2026-10-12T10:00:00', { visibility: 'public' }),
       msg('b', '2026-10-12T10:01:00', { visibility: 'internal' }),
+      msg('b2', '2026-10-12T10:01:30', { visibility: 'internal' }),
       msg('c', '2026-10-12T10:02:00'),
     ];
     const marked = buildItems(list, [], opts({ marked: true }));
-    expect(kinds(marked)).toEqual(['day', 'aHT', 'bHT', 'cHT']);
-    expect(marked.map((i) => (i.kind === 'msg' ? i.mark : '-'))).toEqual(['-', 'public', 'internal', null]);
+    expect(kinds(marked)).toEqual(['day', 'aH', 'b', 'b2', 'cT']);
+    expect(marked.map((i) => (i.kind === 'msg' ? i.mark : '-'))).toEqual(['-', 'public', 'internal', 'internal', null]);
+    expect(marked.map((i) => (i.kind === 'msg' ? i.markLabel : '-'))).toEqual(['-', true, true, false, true]);
     const plain = buildItems(list, [], opts());
-    expect(plain.map((i) => (i.kind === 'msg' ? i.mark : '-'))).toEqual(['-', null, null, null]);
+    expect(plain.map((i) => (i.kind === 'msg' ? i.mark : '-'))).toEqual(['-', null, null, null, null]);
   });
 
   it('puts day separators and events in time order, pending messages last', () => {

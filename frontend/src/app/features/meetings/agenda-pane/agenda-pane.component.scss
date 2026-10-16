@@ -195,18 +195,27 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
   box-shadow: var(--shadow-elevated);
+  /* An accent edge marks the row in the hand; an outline paints over the content. */
+  outline: 1.5px solid var(--color-accent);
+  outline-offset: -1.5px;
   /* `rotate`, not `transform`: the CDK sets the inline transform of the preview. */
-  rotate: 2deg;
+  rotate: 1deg;
 }
 .ap__preview .ap__grip {
   opacity: 1;
 }
-/* Where it lands: a dashed box of the height of a row. */
+/* The row in the hand keeps its menu button, as the row at rest under the pointer. */
+.ap__preview .ap__menu {
+  width: auto;
+  margin-inline-start: 0;
+}
+/* Where it lands: a dashed box of the height of a row, strong enough to read beside the
+   row in the hand. */
 .ap__placeholder {
   min-height: 3.375rem;
-  border: 1.5px dashed var(--color-accent);
+  border: 2px dashed var(--color-accent);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
 }
 .ap__list.cdk-drop-list-dragging .ap__row:not(.cdk-drag-placeholder),
 .ap__row.cdk-drag-animating {

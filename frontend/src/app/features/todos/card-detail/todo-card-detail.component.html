@@ -30,7 +30,7 @@
             <app-icon name="arrow" [size]="16" />
           </a>
         }
-        @if (!phone()) {
+        @if (!phone() && mode() === 'drawer') {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.copyLink' | t" (click)="copyLink()">
             <app-icon name="link" [size]="19" />
           </app-button>
@@ -170,7 +170,7 @@
       <dd class="cd__chips">
         @for (person of card.assignees; track person.principalId ?? $index) {
           <span class="cd__person">
-            <app-avatar size="sm" [name]="name(person)" [principalId]="person.principalId" [decorative]="true" />
+            <app-avatar size="xs" [name]="name(person)" [principalId]="person.principalId" [decorative]="true" />
             <span>{{ name(person) }}</span>
             @if (canWrite() && person.principalId) {
               <button

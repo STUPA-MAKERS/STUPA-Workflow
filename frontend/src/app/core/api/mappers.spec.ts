@@ -291,7 +291,20 @@ describe('mapComment', () => {
       isPublic: true,
       isOwn: false,
       at: '2026-06-05T13:00:00Z',
+      editedAt: null,
     });
+  });
+
+  it('maps the time of the last edit', () => {
+    const wire: CommentOutWire = {
+      id: 'c4',
+      authorKind: 'principal',
+      body: 'geändert',
+      visibility: 'internal',
+      at: '2026-06-05T13:00:00Z',
+      editedAt: '2026-06-05T13:20:00Z',
+    };
+    expect(mapComment(wire).editedAt).toBe('2026-06-05T13:20:00Z');
   });
 
   it('maps isOwn from the wire (default false when absent)', () => {

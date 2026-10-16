@@ -92,7 +92,7 @@ describe('TodoCardDetailComponent', () => {
     // The checklist shows the open items; the done ones behind the toggle.
     expect(screen.getByRole('checkbox', { name: 'Raum anfragen' })).toHaveAttribute('aria-checked', 'false');
     expect(screen.queryByRole('checkbox', { name: 'Termin klären' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte einblenden/ }));
+    fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte zeigen/ }));
     expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('1/2')).toBeInTheDocument();
     expect(container.querySelector('.cd__bar-fill')).toHaveStyle({ width: '50%' });
@@ -102,10 +102,11 @@ describe('TodoCardDetailComponent', () => {
     expect(closed).toHaveBeenCalled();
   });
 
-  it('shows the board link in the pane and no close button', async () => {
+  it('shows the board link in the pane and no close or copy button', async () => {
     const { container } = await setup({ mode: 'pane' });
     expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toHaveAttribute('href', '/todos/b-1?card=k-1');
     expect(screen.queryByRole('button', { name: 'Schließen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
     expect(container.querySelector('app-sheet-bar')).not.toBeNull();
   });
 

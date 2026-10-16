@@ -20,6 +20,8 @@ export type ChatItem =
       tail: boolean;
       /** The visibility mark, only where a thread holds both kinds. */
       mark: ChatVisibility | null;
+      /** The mark shows its label: first of a group, or the visibility changes in it. */
+      markLabel: boolean;
     };
 
 export interface BuildOptions {
@@ -114,12 +116,13 @@ export function buildItems(
       newShown = true;
       prev = null;
     }
+    // A group is one person within the window; a change of visibility does not break it.
     const joins =
       prev !== null &&
       authorKey(prev.msg) === authorKey(msg) &&
-      (prev.msg.visibility ?? null) === (msg.visibility ?? null) &&
       time.getTime() - Date.parse(prev.msg.at) <= GROUP_WINDOW_MS;
     if (prev !== null && joins) prev.tail = false;
+    const visChanged = prev !== null && (prev.msg.visibility ?? null) !== (msg.visibility ?? null);
     const item: MsgItem = {
       kind: 'msg',
       key: `msg-${msg.id}`,
@@ -128,6 +131,7 @@ export function buildItems(
       head: !joins,
       tail: true,
       mark: opts.marked ? (msg.visibility ?? null) : null,
+      markLabel: !joins || visChanged,
     };
     items.push(item);
     prev = item;

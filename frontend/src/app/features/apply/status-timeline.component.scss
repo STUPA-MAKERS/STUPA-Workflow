@@ -200,6 +200,9 @@
   --chat-composer-bottom: 0px;
   /* The sheet is surface 2: the messages of the Gremium take the next step. */
   --chat-bubble: var(--color-surface-3);
+  /* The composer bar lies on the sheet, from edge to edge of it, under a hairline. */
+  --chat-composer-surface: transparent;
+  --chat-composer-bleed: var(--space-4);
 }
 .sp__dialogText {
   margin: 0;
