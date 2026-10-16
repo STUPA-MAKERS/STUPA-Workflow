@@ -13,6 +13,12 @@
   margin: 0;
 }
 .bars__result {
+  /* app-status-text never wraps; a result such as "Gewählt: Anna, Ben" can be longer
+     than the card, so it wraps here. */
+  flex: 0 1 auto;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
   font-size: var(--fs-h2);
   line-height: 1.5rem;
   font-weight: var(--fw-semibold);

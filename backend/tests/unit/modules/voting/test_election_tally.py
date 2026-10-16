@@ -155,10 +155,10 @@ def test_single_seat_tie_goes_to_the_lot() -> None:
     assert out.open_seats == 1
 
 
-def test_multi_seat_boundary_tie_goes_to_a_runoff() -> None:
+def test_multi_seat_boundary_tie_goes_to_the_lot() -> None:
     ballots = _ballots(["c1", "c2"], ["c1", "c3"], ["c1", "c4"])
     out = tally_election(ballots, _config(seats=2, n=4), 10)
-    assert out.result == "runoff"
+    assert out.result == "tie"
     assert out.elected == ("c1",)
     assert out.tied == ("c2", "c3", "c4")
     assert out.open_seats == 1

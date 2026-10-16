@@ -96,6 +96,77 @@ def _is_tally_line(line: str) -> bool:
     return sum(1 for rx in _TALLY_RE.values() if rx.search(line)) >= 2
 
 
+_ELECTION_META_RE: Final = re.compile(r"^(?:Wahl|Stichwahl)\b.*·\s*\d+\s+Posten")
+_ELECTION_VOTES_RE: Final = re.compile(r"^.+:\s*\d+(?:\s+·\s+.+:\s*\d+)*$")
+_ELECTION_PART_RE: Final = re.compile(r"^(.*):\s*(\d+)$")
+_ELECTION_OTHERS_RE: Final = re.compile(r"^(\d+) weitere Kandidierende$")
+
+
+def _election(lines: list[str]) -> Node | None:
+    """Read a personnel election from the lines after the question.
+
+    The backend writes `Wahl · 2 Posten`, the votes per candidate
+    (`Anna: 5 · Ben: 3 · Enthaltungen: 1`), `Gewählt: …` and the notes of the lot;
+    the public form writes the elected people and `n weitere Kandidierende`. The
+    editor reads the same lines (`parseElection` of the ui-kit). A callout without
+    the seat line, or with a single candidate (its Ja/Nein line), is no ranking.
+    """
+    meta = next((line for line in lines if _ELECTION_META_RE.match(line)), None)
+    if meta is None or any(line.startswith("Kandidatur:") for line in lines):
+        return None
+    rows: list[dict[str, object]] = []
+    abstentions: int | None = None
+    elected_raw: str | None = None
+    others = 0
+    lot: str | None = None
+    notes: list[str] = []
+    for line in lines:
+        if line is meta:
+            continue
+        others_match = _ELECTION_OTHERS_RE.match(line)
+        if line.startswith("Gewählt:"):
+            elected_raw = line.removeprefix("Gewählt:").strip()
+        elif others_match:
+            others = int(others_match.group(1))
+        elif line == "Durch Los entschieden.":
+            lot = "drawn"
+        elif line.rstrip(".") == "Gleichstand: das Los steht aus":
+            lot = "pending"
+        elif not rows and _ELECTION_VOTES_RE.match(line):
+            for part in re.split(r"\s+·\s+", line):
+                match = _ELECTION_PART_RE.match(part)
+                if match is None:
+                    continue
+                if match.group(1) == "Enthaltungen":
+                    abstentions = int(match.group(2))
+                else:
+                    rows.append({"name": match.group(1), "votes": int(match.group(2))})
+        else:
+            notes.append(line)
+    elected: list[str] = []
+    if elected_raw is not None and elected_raw != "niemand":
+        rest = elected_raw
+        # Match the known names first, so a name with ", " stays whole.
+        for row in sorted(rows, key=lambda r: -len(str(r["name"]))):
+            if str(row["name"]) in rest:
+                elected.append(str(row["name"]))
+                rest = rest.replace(str(row["name"]), "", 1)
+        if not rows:
+            elected = [name.strip() for name in elected_raw.split(",") if name.strip()]
+    for row in rows:
+        row["elected"] = row["name"] in elected
+    rows.sort(key=lambda r: (-cast("int", r["votes"]), not r["elected"]))
+    return {
+        "meta": meta,
+        "rows": rows,
+        "abstentions": abstentions,
+        "elected": [] if rows else elected,
+        "others": others,
+        "lot": lot,
+        "notes": notes,
+    }
+
+
 # -- inline text: shortcodes, math, arrows ----------------------------------
 
 SHORTCODE_RE: Final[re.Pattern[str]] = re.compile(r"\{\{\s*(.*?)\s*\}\}")
@@ -554,7 +625,8 @@ class _Converter:
 
         A callout without a tally line, such as the election of several candidates,
         has no Ja/Nein/Enthaltung counts. `counts` is then false, and the template
-        draws the body without the three boxes.
+        draws the body without the three boxes. An election also gets `election`
+        (see `_election`), and the template draws its ranking.
         """
         lines = self._callout_lines(kids)
         texts = ["".join(_plain(n) for n in line) for line in lines]
@@ -571,7 +643,7 @@ class _Converter:
             else:
                 nodes = self._inline_nodes(line)
             body.append(_trim(nodes))
-        return {
+        node: Node = {
             "t": "tally",
             "yes": _tally(tally, "yes"),
             "no": _tally(tally, "no"),
@@ -579,6 +651,12 @@ class _Converter:
             "counts": bool(tally),
             "lines": body,
         }
+        election = None if tally else _election([t.strip() for t in texts[1:] if t.strip()])
+        if election is not None:
+            # The template draws the ranking; only the question stays a body line.
+            node["election"] = election
+            node["lines"] = body[:1]
+        return node
 
     def _signature_callout(self, kids: list[object]) -> Node:
         """Build a signature block from its `Rolle: Name` lines."""

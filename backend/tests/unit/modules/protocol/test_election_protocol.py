@@ -18,6 +18,8 @@ from app.modules.protocol.markdown import (
     ElectionSnippet,
     build_election_snippet,
     replace_vote_block,
+    replace_vote_blocks,
+    votes_in_body,
 )
 from app.modules.protocol.public import PublicDecision, PublicTop
 from app.modules.protocol.service import _election_snippet, _snippet
@@ -140,6 +142,31 @@ def test_replace_vote_block() -> None:
     new = "> [!abstimmung] **Q**\n> Gewählt: A"
     assert replace_vote_block(body, new) == "Text\n> [!abstimmung] **Q**\n> Gewählt: A\nMehr"
     assert replace_vote_block("Nichts", new) == "Nichts"
+
+
+ONE = "> [!abstimmung] **Q**\n> Wahl · 1 Posten\n> Gewählt: A"
+TWO = "> [!abstimmung] **Q**\n> Wahl · 2 Posten\n> Gewählt: A, B"
+
+
+def test_two_votes_with_one_question_share_no_head_line() -> None:
+    body = f"Text\n\n{TWO}\n"
+    assert votes_in_body(body, [ONE, TWO]) == [False, True]
+    assert votes_in_body(f"{ONE}\n\n{TWO}", [ONE, TWO]) == [True, True]
+    edited = "> [!abstimmung] **Q**\n> geändert"
+    assert votes_in_body(edited, [ONE, TWO]) == [True, False]
+    assert votes_in_body("", [ONE]) == [False]
+
+
+def test_replace_vote_blocks_swaps_each_block_once() -> None:
+    body = f"{TWO}\n\n{ONE}\nMehr"
+    out = replace_vote_blocks(
+        body, [(ONE, "> [!abstimmung] **Q**\n> eins"), (TWO, "> [!abstimmung] **Q**\n> zwei")]
+    )
+    assert out == "> [!abstimmung] **Q**\n> zwei\n\n> [!abstimmung] **Q**\n> eins\nMehr"
+    adjacent = f"{TWO}\n{ONE}"
+    out = replace_vote_blocks(adjacent, [(ONE, "> [!abstimmung] **Q**\n> eins")])
+    assert out == f"{TWO}\n> [!abstimmung] **Q**\n> eins"
+    assert replace_vote_blocks("> Zitat\nText", [(ONE, "x")]) == "> Zitat\nText"
 
 
 def test_public_decision_of_an_election() -> None:

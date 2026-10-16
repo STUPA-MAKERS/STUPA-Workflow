@@ -311,3 +311,48 @@ async def test_roster_marks_the_vote_and_the_keeper_right() -> None:
         "b": (True, True),
         "f": (False, False),
     }
+
+
+# A ballot marks the voter present.
+
+
+async def test_cast_marks_a_member_without_record_present(
+    audit_calls: list[dict[str, Any]],
+) -> None:
+    meeting = _meeting("live")
+    me = _member("me")
+    db = fake_session(result(meeting), result(me), result(None), result())
+    await AttendanceService(db).mark_present_on_cast(meeting.id, "me")
+    (row,) = db.added
+    assert (row.status, row.source, row.principal_id) == ("present", "self", me.id)
+    assert audit_calls[0]["data"]["status"] == {"from": None, "to": "present"}
+    assert audit_calls[0]["data"]["reason"] == "vote_cast"
+    assert db.committed == 0
+
+
+async def test_cast_overrides_an_absence_of_the_lead(audit_calls: list[dict[str, Any]]) -> None:
+    meeting = _meeting("live")
+    me = _member("me")
+    row = _row(me.id, status="excused", source="lead", note="krank")
+    db = fake_session(result(meeting), result(me), result(row), result())
+    await AttendanceService(db).mark_present_on_cast(meeting.id, "me")
+    assert (row.status, row.source, row.note) == ("present", "lead", None)
+    assert audit_calls[0]["data"]["status"] == {"from": "excused", "to": "present"}
+
+
+@pytest.mark.parametrize("case", ["closed", "stranger", "present", "delegated"])
+async def test_cast_leaves_the_attendance(case: str, audit_calls: list[dict[str, Any]]) -> None:
+    meeting = _meeting("closed" if case == "closed" else "live")
+    me = _member("me")
+    other = _member("other")
+    row = _row(me.id, status="present", source="self")
+    results = {
+        "closed": [result(meeting)],
+        "stranger": [result(meeting), result(other)],
+        "present": [result(meeting), result(me), result(row)],
+        "delegated": [result(meeting), result(me), result(None), result((uuid4(),))],
+    }[case]
+    db = fake_session(*results)
+    await AttendanceService(db).mark_present_on_cast(meeting.id, "me")
+    assert db.added == []
+    assert audit_calls == []
