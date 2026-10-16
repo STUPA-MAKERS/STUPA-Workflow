@@ -63,10 +63,12 @@ export const appConfig: ApplicationConfig = {
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
     provideAppInitializer(() => {
       inject(ThemeService).init();
-      inject(I18nService); // the constructor default sets document.lang
+      const i18n = inject(I18nService); // the constructor default sets document.lang
       inject(BrandingService).init(); // site-config app name: tab title, header, home
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
+      // EN lives in a lazy chunk. Wait for it, so the first paint is not German.
+      return i18n.ready();
     }),
     // ngsw-config.json caches the app shell and the assets. It does not cache /api.
     provideServiceWorker('ngsw-worker.js', {

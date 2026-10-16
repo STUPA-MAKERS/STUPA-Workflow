@@ -1,4 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
+import { renderDeferred } from '../../../../testing/defer';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -473,6 +474,8 @@ describe('MeetingPageComponent', () => {
 
     it('passes the edits of the sheet on and makes the editor read-only for a reader', async () => {
       const { container, fixture } = await setup();
+      await renderDeferred(fixture);
+      expect(container.querySelector('.mde__host')).toBeTruthy();
       expect(container.querySelector('.mde__host--disabled')).toBeNull();
       fixture.componentRef.setInput('canEdit', false);
       fixture.detectChanges();

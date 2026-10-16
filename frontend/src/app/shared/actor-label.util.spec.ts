@@ -1,4 +1,5 @@
-import { de, en, type TranslationKey } from '@core/i18n/translations';
+import { de, type TranslationKey } from '@core/i18n/translations';
+import { en } from '@core/i18n/translations.en';
 import { actorInfoFromLegacy, actorLabel, systemActorLabel, type Translate } from './actor-label.util';
 
 const tDe: Translate = (key: TranslationKey) => de[key];
