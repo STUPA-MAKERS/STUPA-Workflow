@@ -718,6 +718,7 @@ describe('ExpensesComponent (unit)', () => {
   it('onAppSearch queries applications and maps candidates (a nameless one reads "Ohne Titel", never its id)', () => {
     const { cmp, http } = build();
     dlg(cmp).onAppSearch('  flyer ');
+    dlg(cmp).appSearch.flush();
     // appQuery holds the raw value. Only the request param is trimmed.
     expect(dlg(cmp).appQuery()).toBe('  flyer ');
     const req = http.expectOne((r) => r.url.endsWith('/applications'));
@@ -750,6 +751,7 @@ describe('ExpensesComponent (unit)', () => {
   it('onAppSearch clears candidates on error', () => {
     const { cmp, http } = build();
     dlg(cmp).onAppSearch('z');
+    dlg(cmp).appSearch.flush();
     http.expectOne((r) => r.url.endsWith('/applications')).error(new ProgressEvent('err'));
     expect(dlg(cmp).appCandidates()).toEqual([]);
   });

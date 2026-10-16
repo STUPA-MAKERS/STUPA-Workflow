@@ -53,11 +53,12 @@
 
     @if (c.votingDelegationEnabled) {
       <div class="dd__voting">
-        <span class="dd__votingText">
+        <!-- The text is the label of the switch: the whole row toggles it. -->
+        <label class="dd__votingText" for="dd-voting">
           <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
           <span class="dd__note">{{ (voting() ? 'participant.delegation.votingOn' : 'participant.delegation.votingOff') | t }}</span>
-        </span>
-        <app-switch [checked]="voting()" (checkedChange)="voting.set($event)" [ariaLabel]="'delegation.dialog.voting' | t" />
+        </label>
+        <app-switch [id]="'dd-voting'" [checked]="voting()" (checkedChange)="voting.set($event)" [ariaLabel]="'delegation.dialog.voting' | t" />
       </div>
     } @else {
       <p class="dd__note">{{ 'delegation.dialog.votingDisabled' | t }}</p>
@@ -86,7 +87,7 @@
     />
     <app-avatar [name]="name(r)" [principalId]="r.principalId" size="sm" [decorative]="true" />
     <span class="dd__text">
-      <span class="dd__name ell" [title]="name(r)">{{ name(r) }}</span>
+      <span class="dd__name ell" [appTruncated]="name(r)" #cut="appTruncated" [attr.title]="cut.truncated() ? name(r) : null">{{ name(r) }}</span>
       <span class="dd__sub">{{ roleKey(r) | t }}</span>
     </span>
   </label>

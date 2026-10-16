@@ -12,6 +12,7 @@ import {
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { StateDef } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** Row of the guard priority stack. The parent computes the label. */
 export interface GuardPriorityRow {
@@ -29,6 +30,7 @@ export interface GuardPriorityRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

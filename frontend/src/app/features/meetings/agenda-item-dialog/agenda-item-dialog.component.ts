@@ -34,6 +34,7 @@ import {
 import { errorDetail, resolveI18n } from '../meetings-display.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { cardsOf, isoDay, shortDay, sortedColumns } from '../../todos/todos.util';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** What the new agenda item is: an application of the Gremium, a to-do, or a free text. */
 export type AgendaItemKind = 'application' | 'todo' | 'freetext';
@@ -64,6 +65,7 @@ export interface AgendaTodoOption {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     ScrollFadeDirective,
     FormsModule,
     TranslatePipe,

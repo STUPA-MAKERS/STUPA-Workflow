@@ -138,6 +138,7 @@
 }
 .dd__votingText {
   display: flex;
+  cursor: pointer;
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;

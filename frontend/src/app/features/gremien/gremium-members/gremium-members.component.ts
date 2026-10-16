@@ -24,6 +24,7 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { fileSlug, fullDate, localized, personName, roleRank, toCsv } from '../gremien.util';
+import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 
 export interface MemberGroup {
   readonly key: string;
@@ -51,6 +52,7 @@ export interface MemberRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    StickyBarComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

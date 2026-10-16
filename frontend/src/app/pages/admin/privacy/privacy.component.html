@@ -31,24 +31,32 @@
       </ng-template>
       <ng-template appCell="actions" let-r>
         @if ($any(r).status === 'open') {
-          <span class="pv__rowActions">
-            <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
-            @let who = $any(r).email || subjectLabel($any(r).subjectType);
-            <app-button
-              variant="tonal"
-              size="sm"
-              [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
-              (click)="openReject($any(r))"
-              >{{ 'admin.privacy.reject' | t }}</app-button
-            >
-            <app-button
-              variant="danger"
-              size="sm"
-              [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
-              (click)="askExecute($any(r))"
-              >{{ 'admin.privacy.execute' | t }}</app-button
-            >
-          </span>
+          @if (phone()) {
+            <app-row-menu
+              [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
+              [sections]="rowMenu()"
+              (selected)="onRowMenu($any(r), $event)"
+            />
+          } @else {
+            <span class="pv__rowActions">
+              <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
+              @let who = $any(r).email || subjectLabel($any(r).subjectType);
+              <app-button
+                variant="tonal"
+                size="sm"
+                [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
+                (click)="openReject($any(r))"
+                >{{ 'admin.privacy.reject' | t }}</app-button
+              >
+              <app-button
+                variant="danger"
+                size="sm"
+                [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
+                (click)="askExecute($any(r))"
+                >{{ 'admin.privacy.execute' | t }}</app-button
+              >
+            </span>
+          }
         }
       </ng-template>
     </app-data-table>

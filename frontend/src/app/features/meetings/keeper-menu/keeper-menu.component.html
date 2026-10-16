@@ -7,7 +7,7 @@
     <div class="km__plan" role="status">
       <app-avatar [name]="plan.name ?? '—'" [principalId]="plan.principalId" size="sm" [accent]="true" [decorative]="true" />
       <span class="km__names">
-        <span class="km__name ell" [title]="plan.name ?? ''">{{ plan.name }}</span>
+        <span class="km__name ell" [appTruncated]="plan.name ?? ''" #cut="appTruncated" [attr.title]="cut.truncated() ? plan.name ?? '' : null">{{ plan.name }}</span>
         <span class="km__sub">{{ plannedSub() }}</span>
       </span>
       <app-button variant="text" size="sm" (click)="discard.emit()">{{ 'meetings.handover.discard' | t }}</app-button>
@@ -40,7 +40,7 @@
       >
         <app-avatar [name]="c.name" [principalId]="c.principalId" size="sm" [decorative]="true" />
         <span class="km__names">
-          <span class="km__name ell" [title]="c.name">{{ c.name }}</span>
+          <span class="km__name ell" [appTruncated]="c.name" #cut2="appTruncated" [attr.title]="cut2.truncated() ? c.name : null">{{ c.name }}</span>
           <span class="km__sub">{{ c.sub }}</span>
         </span>
         @if (c.current) {

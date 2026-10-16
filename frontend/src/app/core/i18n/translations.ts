@@ -1646,7 +1646,6 @@ export const de = {
     'Zuteilung je Haushaltsjahr, Farbe je Kostenstelle, Unter-Kostenstellen anlegen.',
   'budget.tree.createTopShort': 'Budget',
   'budget.tree.moreActions': 'Weitere Aktionen',
-  'budget.tree.toolbar': 'Budget-Einstellungen',
   'budget.tree.topLabel': 'Budget',
   'budget.tree.topChip': '{name} {key} · Stichtag {cutoff}',
   'budget.tree.fyLabel': 'Haushaltsjahr',
@@ -2344,7 +2343,7 @@ export const de = {
   'admin.brand.appName.full': 'Voller Name (Browser-Tab)',
   'admin.brand.appName.short': 'Kurzname (PWA)',
   'admin.brand.appName.hint':
-    'Leer lassen, um die Standardnamen (STUPA Antragsplattform / StuPa) zu verwenden.',
+    'Leer lassen, um die Standardnamen (STUPA Antragsplattform / STUPA) zu verwenden.',
   'admin.brand.avatars.group': 'Profilbilder',
   'admin.brand.avatars.gravatar': 'Gravatar-Bilder zeigen',
   'admin.brand.avatars.hint':

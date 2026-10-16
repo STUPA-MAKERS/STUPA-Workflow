@@ -43,7 +43,7 @@
               />
               <app-avatar [name]="name(r)" [principalId]="r.principalId" size="sm" [decorative]="true" />
               <span class="dd__text">
-                <span class="dd__name ell" [title]="name(r)">{{ name(r) }}</span>
+                <span class="dd__name ell" [appTruncated]="name(r)" #cut="appTruncated" [attr.title]="cut.truncated() ? name(r) : null">{{ name(r) }}</span>
                 <span class="dd__sub">{{ (r.isMember ? 'participant.delegation.member' : 'participant.delegation.substitute') | t }}</span>
               </span>
             </label>
@@ -59,11 +59,12 @@
 
     @if (votingEnabled()) {
       <div class="dd__voting">
-        <span class="dd__votingText">
+        <!-- The text is the label of the switch: the whole row toggles it. -->
+        <label class="dd__votingText" for="lsd-voting">
           <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
           <span class="dd__note">{{ (voting() ? 'meetings.leadSubstitute.votingOn' : 'meetings.leadSubstitute.votingOff') | t: { name: memberName() } }}</span>
-        </span>
-        <app-switch [checked]="voting()" (checkedChange)="voting.set($event)" [ariaLabel]="'delegation.dialog.voting' | t" />
+        </label>
+        <app-switch [id]="'lsd-voting'" [checked]="voting()" (checkedChange)="voting.set($event)" [ariaLabel]="'delegation.dialog.voting' | t" />
       </div>
     }
   </div>

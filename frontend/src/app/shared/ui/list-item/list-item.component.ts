@@ -80,16 +80,27 @@ export class ListItemComponent {
   readonly activate = output<void>();
 
   private readonly subLine = viewChild.required<ElementRef<HTMLElement>>('subLine');
+  private readonly titleText = viewChild.required<ElementRef<HTMLElement>>('titleText');
+  /** The title is cut (ellipsis, or the two lines of `wrap`). */
+  private readonly titleCut = signal(false);
   /** The full text of the sub line while it is cut, else null. */
   protected readonly subTip = signal<string | null>(null);
-  /** The `title` of the control: the title, and the sub line when it is cut. */
+  /**
+   * The `title` of the control: the title and the sub line, but only while one of them
+   * is cut. A text that shows in full needs no second copy as a tooltip.
+   */
   protected readonly tooltip = computed(() => {
     const sub = this.subTip();
-    return sub ? `${this.title()}\n${sub}` : this.title();
+    if (sub) return `${this.title()}\n${sub}`;
+    return this.titleCut() ? this.title() : null;
   });
 
-  /** Measures the sub line when the pointer enters the row, before the tooltip shows. */
-  protected measureSub(): void {
+  /** Measures the title and the sub line when the pointer enters the row, before the tooltip shows. */
+  protected measure(): void {
+    const title = this.titleText().nativeElement;
+    this.titleCut.set(
+      title.scrollWidth > title.clientWidth + 1 || title.scrollHeight > title.clientHeight + 1,
+    );
     const el = this.subLine().nativeElement;
     const cut = el.scrollWidth > el.clientWidth;
     this.subTip.set(cut ? (el.textContent ?? '').replace(/\s+/g, ' ').trim() || null : null);

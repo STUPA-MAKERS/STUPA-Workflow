@@ -460,6 +460,21 @@ export class BudgetTreeComponent {
     ];
   });
 
+  /** The phone menu of a fiscal year: the same two actions as the icon buttons. */
+  readonly fyMenu = computed<RowMenuSection[]>(() => [
+    {
+      items: [
+        { id: 'edit', label: this.i18n.translate('budget.tree.fyEdit'), icon: 'edit' },
+        { id: 'delete', label: this.i18n.translate('budget.tree.fyDelete'), icon: 'trash', danger: true },
+      ],
+    },
+  ]);
+
+  onFyMenu(fy: FiscalYear, item: RowMenuItem): void {
+    if (item.id === 'edit') this.openFyEdit(fy);
+    else if (item.id === 'delete') this.askFyDelete(fy);
+  }
+
   onRowMenu(node: BudgetTreeNode, item: RowMenuItem): void {
     if (item.id === 'edit') this.openEditNode(node);
     else if (item.id === 'limit') this.openLimit(node);

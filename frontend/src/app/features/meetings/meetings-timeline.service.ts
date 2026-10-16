@@ -6,6 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { Meeting, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
 
 /** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
 export type MeetingChange =
@@ -128,11 +129,11 @@ export class MeetingsTimelineService implements OnDestroy {
     if (this.searchTimer !== null) clearTimeout(this.searchTimer);
   }
 
-  /** Debounced (~400 ms) header search. An empty query returns to the timeline. */
+  /** Debounced (~250 ms) header search. An empty query returns to the timeline. */
   onSearch(value: string): void {
     this.searchQuery.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.runSearch(), 400);
+    this.searchTimer = setTimeout(() => this.runSearch(), LIVE_SEARCH_DEBOUNCE_MS);
   }
 
   private runSearch(): void {

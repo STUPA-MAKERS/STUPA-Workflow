@@ -27,7 +27,7 @@
             <li class="gm__row">
               <code class="gm__group mono">{{ r.oidcGroup }}</code>
               <app-icon class="gm__arrow" name="arrow" [size]="16" />
-              <span class="gm__target ell" [title]="r.role ? r.target + ' · ' + r.role : r.target">
+              <span class="gm__target ell" [appTruncated]="r.role ? r.target + ' · ' + r.role : r.target" #cut="appTruncated" [attr.title]="cut.truncated() ? (r.role ? r.target + ' · ' + r.role : r.target) : null">
                 {{ r.target }}
                 @if (r.role) {
                   · <strong class="gm__role">{{ r.role }}</strong>

@@ -62,11 +62,20 @@ function setWidths(el: Element, scroll: number, client: number): void {
 }
 
 describe('ListItemComponent', () => {
-  it('shows the title on one line and keeps the full text as the title attribute', async () => {
-    await render(HostComponent);
+  it('shows the title on one line and gives it a tooltip only while it is cut', async () => {
+    const view = await render(HostComponent);
     const title = screen.getByRole('button', { name: LONG });
-    expect(title).toHaveAttribute('title', LONG);
+    const row = view.container.querySelector('.li') as HTMLElement;
     expect(title).toHaveClass('li__title');
+
+    fireEvent.pointerEnter(row);
+    view.fixture.detectChanges();
+    expect(title).not.toHaveAttribute('title');
+
+    setWidths(title.querySelector('.li__titleText') as HTMLElement, 400, 180);
+    fireEvent.pointerEnter(row);
+    view.fixture.detectChanges();
+    expect(title).toHaveAttribute('title', LONG);
   });
 
   it('puts a [status] on the title line, after the title and outside the control', async () => {
@@ -188,7 +197,7 @@ describe('ListItemComponent', () => {
     setWidths(line, 180, 180);
     fireEvent.pointerEnter(row);
     view.fixture.detectChanges();
-    expect(control).toHaveAttribute('title', 'Druckkosten');
+    expect(control).not.toHaveAttribute('title');
 
     setWidths(line, 260, 180);
     fireEvent.pointerEnter(row);
@@ -215,11 +224,11 @@ describe('ListItemComponent', () => {
     setWidths(line, 300, 120);
     fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
     view.fixture.detectChanges();
-    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute('title', 'Lastenrad');
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).not.toHaveAttribute('title');
     Object.defineProperty(line, 'textContent', { configurable: true, get: () => null });
     fireEvent.pointerEnter(view.container.querySelector('.li') as HTMLElement);
     view.fixture.detectChanges();
-    expect(screen.getByRole('button', { name: 'Lastenrad' })).toHaveAttribute('title', 'Lastenrad');
+    expect(screen.getByRole('button', { name: 'Lastenrad' })).not.toHaveAttribute('title');
   });
 
   it('has no a11y violations', async () => {

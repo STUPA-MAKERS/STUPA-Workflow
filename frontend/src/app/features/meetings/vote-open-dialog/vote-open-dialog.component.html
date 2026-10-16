@@ -73,7 +73,7 @@
           @for (c of candidates(); track c.key; let i = $index, first = $first, last = $last) {
             <li class="vod__cand">
               <span class="vod__candNo mono" aria-hidden="true">{{ i + 1 }}</span>
-              <span class="vod__candName ell" [title]="c.name">{{ c.name }}</span>
+              <span class="vod__candName ell" [appTruncated]="c.name" #cut="appTruncated" [attr.title]="cut.truncated() ? c.name : null">{{ c.name }}</span>
               <span class="vod__candKind">{{ (c.principalId ? 'election.dialog.member' : 'election.dialog.free') | t }}</span>
               <app-button variant="text" size="sm" [disabled]="first" [iconOnly]="true" [ariaLabel]="'election.dialog.up' | t: { name: c.name }" (click)="moveCandidate(i, -1)"><app-icon name="up" [size]="16" /></app-button>
               <app-button variant="text" size="sm" [disabled]="last" [iconOnly]="true" [ariaLabel]="'election.dialog.down' | t: { name: c.name }" (click)="moveCandidate(i, 1)"><app-icon name="down" [size]="16" /></app-button>

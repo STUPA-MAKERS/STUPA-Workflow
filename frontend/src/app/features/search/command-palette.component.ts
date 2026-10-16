@@ -25,6 +25,7 @@ import { CommandPaletteService } from './command-palette.service';
 import { highlight, type TextPart } from './highlight';
 import { PageIndexService, type PageEntry } from './page-index.service';
 import { isApplePlatform } from './shortcut';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** One row of the palette. A page comes from the client, a record from the server. */
 interface PaletteRow {
@@ -102,7 +103,7 @@ const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
+  imports: [TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
   templateUrl: './command-palette.component.html',
   styleUrl: './command-palette.component.scss',
 })

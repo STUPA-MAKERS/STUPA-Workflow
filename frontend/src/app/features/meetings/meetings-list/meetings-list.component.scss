@@ -31,11 +31,6 @@
 /* The column, its header and the search bar are the shared list geometry: `.ld-pane`
    (styles.scss) and `app-page-header` with `pane`. */
 
-/* The gap between the icon and the text of a header button; an icon button has none. */
-app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
-  margin-inline-end: 4px;
-}
-
 .mtl__chips {
   display: flex;
   flex-wrap: wrap;

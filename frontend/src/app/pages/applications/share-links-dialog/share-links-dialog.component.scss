@@ -41,6 +41,9 @@
 .sld__url code {
   user-select: all;
 }
+.sld__link {
+  color: var(--color-accent-text);
+}
 
 .sld__form {
   display: flex;

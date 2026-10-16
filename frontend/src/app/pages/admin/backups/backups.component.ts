@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import { NoteComponent, PageHeaderComponent, StatusTextComponent, backupStatus } from '@shared/ui';
 import {
   ButtonComponent,
@@ -12,9 +13,16 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
 import { downloadBlob } from '@shared/download.util';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { formatBytes } from '../admin-health/admin-health.util';
 import type { Backup, BackupKind } from '../admin.models';
@@ -62,6 +70,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
     NoteComponent,
     PageHeaderComponent,
     StatusTextComponent,
+    RowMenuComponent,
   ],
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.scss',
@@ -72,6 +81,8 @@ export class BackupsComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
 
   protected readonly rows = signal<Backup[]>([]);
+  /** A phone shows cards: the actions of an archive go into the ⋮ menu of its card. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
   /** False without an age recipient: this installation cannot create an archive. */
   protected readonly enabled = signal(true);
   /** False without the private key: it cannot read one either, so no restore, no import. */
@@ -115,6 +126,7 @@ export class BackupsComponent implements OnDestroy {
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
       width: '9rem',
+      card: 'actions',
     },
   ]);
 
@@ -225,6 +237,37 @@ export class BackupsComponent implements OnDestroy {
    * the object store sits on the internal Docker network, so such a URL names a host the
    * browser cannot resolve.
    */
+  /** The ⋮ menu of a finished archive on a phone: the same actions as the icon buttons. */
+  protected rowMenu(row: Backup): RowMenuSection[] {
+    const t = (key: TranslationKey): string => this.i18n.translate(key);
+    const items: RowMenuItem[] = [
+      { id: 'download', label: t('admin.backups.download'), icon: 'download' },
+      {
+        id: 'pin',
+        label: t(row.pinned ? 'admin.backups.unpin' : 'admin.backups.pin'),
+        icon: row.pinned ? 'pinslash' : 'pin',
+      },
+    ];
+    if (this.restoreEnabled()) {
+      items.push({ id: 'restore', label: t('admin.backups.restore'), icon: 'history' });
+    }
+    items.push({
+      id: 'delete',
+      label: t('admin.common.delete'),
+      icon: 'trash',
+      danger: true,
+      disabledReason: row.pinned ? t('admin.backups.pinnedHint') : null,
+    });
+    return [{ items }];
+  }
+
+  protected onRowMenu(row: Backup, item: RowMenuItem): void {
+    if (item.id === 'download') this.download(row);
+    else if (item.id === 'pin') this.togglePin(row);
+    else if (item.id === 'restore') this.askRestore(row);
+    else if (item.id === 'delete') this.askDelete(row);
+  }
+
   protected download(row: Backup): void {
     this.api.exportBackup(row.id).subscribe({
       next: (blob) => downloadBlob(blob, archiveFileName(row.createdAt)),

@@ -1611,7 +1611,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'budget.tree.subtitle': 'Allocation per fiscal year, a colour per cost centre, sub cost centres.',
   'budget.tree.createTopShort': 'Budget',
   'budget.tree.moreActions': 'More actions',
-  'budget.tree.toolbar': 'Budget settings',
   'budget.tree.topLabel': 'Budget',
   'budget.tree.topChip': '{name} {key} · cutoff {cutoff}',
   'budget.tree.fyLabel': 'Fiscal year',
@@ -2299,7 +2298,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.appName.full': 'Full name (browser tab)',
   'admin.brand.appName.short': 'Short name (PWA)',
   'admin.brand.appName.hint':
-    'Leave empty to use the default names (STUPA Antragsplattform / StuPa).',
+    'Leave empty to use the default names (STUPA Antragsplattform / STUPA).',
   'admin.brand.avatars.group': 'Profile pictures',
   'admin.brand.avatars.gravatar': 'Show Gravatar pictures',
   'admin.brand.avatars.hint':
