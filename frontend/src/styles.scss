@@ -201,11 +201,19 @@
    Always pair a placeholder with a `role="status"` message for a screen reader: the
    blocks themselves are decorative and hidden from the accessibility tree.
    --------------------------------------------------------------------------- */
+/* The block takes the fill and the slow sweep of `.skel-text` below, not a pulse: many
+   blocks that blink together make the whole page flicker. */
 .skel {
   display: block;
   border-radius: var(--radius-sm, 4px);
-  background: var(--color-surface-sunken);
-  animation: skel-pulse 1.4s var(--ease-standard, ease) infinite;
+  --skel-fill: color-mix(in srgb, var(--color-text) 9%, transparent);
+  --skel-shine: color-mix(in srgb, var(--color-text) 5%, transparent);
+  background-color: var(--skel-fill);
+  background-image: linear-gradient(90deg, transparent 0, var(--skel-shine) 50%, transparent 100%);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  background-position: -100% 0;
+  animation: skel-sweep 1.8s var(--ease-standard, ease) infinite;
 }
 .skel--line {
   height: 0.75rem;
@@ -228,15 +236,6 @@ td:first-child > .skel--bar {
   height: 18rem;
   border: var(--border-width) solid var(--color-border);
   background: var(--color-surface);
-}
-@keyframes skel-pulse {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   .skel {

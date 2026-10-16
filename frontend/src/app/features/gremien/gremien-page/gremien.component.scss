@@ -92,8 +92,13 @@
 .grl__head {
   padding: 18px var(--space-4) 6px;
 }
-.grl__group:first-child .grl__head {
+.grl__group:first-child .grl__head,
+.grl__skel .grl__head {
   padding-top: var(--space-1);
+}
+/* The loading shape: a bar about as wide as "Meine Gremien 3". */
+.grl__skelHead {
+  width: 7.5rem;
 }
 .grl__count {
   margin-inline-start: 2px;
