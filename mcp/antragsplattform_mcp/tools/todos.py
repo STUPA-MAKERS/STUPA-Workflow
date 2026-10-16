@@ -12,6 +12,7 @@ from mcp.server.fastmcp import FastMCP
 
 from .. import schemas as S
 from ..schemas import dump_create, dump_patch
+from ._chat_files import post_message
 from ._common import ToolGroup, api, params
 
 group = ToolGroup()
@@ -44,6 +45,9 @@ async def todo_board(board_id: str) -> dict:
 @group.tool
 async def todo_card_get(card_id: str) -> dict:
     """Get one card with description, checklist, links, comments and events.
+
+    Each comment lists its `attachments` with `scanState`; download a clean one with
+    `download_attachment`.
 
     `version` is the optimistic lock that `todo_card_update` needs. A link whose
     target the caller cannot read has `accessible: false` and no title.
@@ -100,18 +104,31 @@ async def todo_card_move(
 
 @group.tool
 async def todo_comment(
-    card_id: str, body: str, mentions: list[str] | None = None
+    card_id: str,
+    body: str = "",
+    mentions: list[str] | None = None,
+    file_paths: list[str] | None = None,
 ) -> dict:
-    """Add a comment to a card.
+    """Add a comment to a card, optionally with files.
+
+    Each file in `file_paths` (a local path on the machine of the MCP server, at most 5
+    per comment) goes up as a draft through `POST /apply/attachments`; the comment then
+    binds the drafts. Allowed types and the 10 MB cap are those of `upload_attachment`.
+    The comment lists `attachments` (`id`, `filename`, `mime`, `size`, `scanState`);
+    download a clean one with `download_attachment`. A failed upload or post deletes
+    the drafts already uploaded.
 
     Args:
-        body: Markdown, 1 to 10000 characters. Write a mention as "@Display Name".
+        body: Markdown, up to 10000 characters; empty only with at least one file.
+            Write a mention as "@Display Name".
         mentions: Principal ids of the mentioned board members; they get a mail. A
             person who is not a member gives 422 `mention_not_member`.
+        file_paths: Local files to attach.
     """
-    return await api().post(
+    return await post_message(
         f"/todos/cards/{card_id}/comments",
-        json={"body": body, "mentions": mentions or []},
+        {"body": body, "mentions": mentions or []},
+        file_paths,
     )
 
 

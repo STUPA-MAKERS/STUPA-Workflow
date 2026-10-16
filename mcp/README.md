@@ -73,7 +73,7 @@ only. A vote names the gremium UUID as `eligibleGroup`.
 
 Auth: `login`, `whoami`, `logout`.
 Applications: `list_applications`, `get_application`, `get_application_timeline`,
-`create_application`, `comment_application`.
+`create_application`, `comment_application` (with optional `file_paths`).
 Flow: `list_transitions`, `fire_transition`.
 Votes: `get_vote`, `create_application_vote`, `open_vote`, `close_vote`, `cancel_vote`,
 `create_meeting_vote` (also as a prepared draft), `open_meeting_vote`, `delete_meeting_vote`,
@@ -86,7 +86,10 @@ Invoices: `list_invoices`, `get_invoice`, `create_invoice`, `update_invoice`,
 `upload_invoice_file`.
 Attachments: `list_attachments`, `upload_attachment` (a local file, at most 10 MB, needs
 `application.manage`), `download_attachment` (to a local file, after a clean virus scan),
-`delete_attachment`.
+`delete_attachment`. `download_attachment` also fetches the files of chat messages.
+Chat files: `tickets_note`, `todo_comment` and `comment_application` take `file_paths`
+(at most 5 local files per message). The tool uploads each one as a draft
+(`POST /apply/attachments`) and binds the drafts to the new message.
 Meetings: `list_meetings`, `get_meeting`, `create_meeting`, `update_meeting`, `delete_meeting`,
 the agenda tools, attendance (`get_attendance`, `set_attendance`, `reset_attendance`) and the
 minute-taker handover (`protokollant_handover`, `cancel_protokollant_handover`).
@@ -97,7 +100,9 @@ On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (
 `application.create_on_behalf`).
 To-dos: `todo_boards`, `todo_board`, `todo_card_get`, `todo_card_create`, `todo_card_update`
 (needs the card `version`), `todo_card_move`, `todo_comment`.
-Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update` (need `ticket.manage`).
+Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
+`tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
+`tickets_delete_blocked_sender` (need `ticket.manage`).
 Audit: `list_audit`, `verify_audit_chain` (live), `get_latest_audit_verification` (stored).
 
 The list above is not complete. The server has about 160 tools in the modules of

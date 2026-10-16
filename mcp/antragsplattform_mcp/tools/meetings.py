@@ -2,7 +2,8 @@
 
 The group manages a vote but never casts one. It also covers the agenda and the
 attendance of a meeting, the protocol (minutes), the delegations, and the application
-attachments (list, upload from a local file, download to a local file, delete).
+attachments (list, upload from a local file, download to a local file, delete). The
+download also serves the files of chat messages.
 
 An agent can create, open, close and cancel a vote. There is deliberately no tool to
 cast a ballot. Voting is human-only.
@@ -736,8 +737,13 @@ async def download_attachment(
     an existing directory on the machine of the MCP server; for a directory the tool
     uses the stored file name. An existing file is kept unless `overwrite` is true.
 
-    409 while the virus scan runs (`scanned: false`), 410 after a finding removed the
-    file, 404 for an unknown id or without read access to the application.
+    The same route serves the files of chat messages (the `attachments` of a ticket
+    note, a to-do comment or an application comment); their read rule is the rule of
+    reading the message, and `scanState` must be `clean`.
+
+    409 while the virus scan runs (`scanned: false`, `scanState: scanning`), 410 after
+    a finding removed the file, 404 for an unknown id or without read access to the
+    application or the message.
 
     Returns:
         `path` (absolute), `filename`, `mime` and `size` in bytes.

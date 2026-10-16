@@ -80,6 +80,15 @@ TYPICAL FLOWS:
   through.
 - Tickets (help menu reports, `ticket.manage` and scope `tickets:write`): `tickets_list` →
   `tickets_get` → `tickets_note` (internal) or `tickets_update` (status, assignee, kind).
+  `tickets_block_sender(ticket_id)` / `tickets_unblock_sender(ticket_id)` block the reporter
+  ("Absender sperren": later reports get a number and are dropped);
+  `tickets_blocked_senders` lists the blocks, `tickets_delete_blocked_sender(block_id)`
+  lifts one whose ticket is gone or anonymized.
+- Chat files: `tickets_note`, `todo_comment` and `comment_application` take
+  `file_paths` (local files, at most 5, same types and 10 MB cap as `upload_attachment`;
+  the body may then be empty). The tool uploads each file as a draft and binds it to the
+  message. The message lists `attachments` with `scanState`; `download_attachment` fetches
+  a `clean` one. A comment file is not in `list_attachments`.
 - Members and roles: the OIDC groups of the IdP are the only source. No tool adds a member
   or assigns a role. There are three separate group mappings: a group to the membership in
   a Gremium (`create_gremium_membership_mapping`, default role `member`), a group to a
