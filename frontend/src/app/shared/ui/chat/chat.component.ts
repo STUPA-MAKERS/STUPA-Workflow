@@ -595,9 +595,23 @@ export class ChatComponent {
       }
     }
     if (!take.length) return;
-    const { failed } = await this.drafts.upload(take);
+    const done = this.drafts.upload(take);
+    this.leaveFullAttach();
+    const { failed } = await done;
     for (const f of failed) {
       this.toast.error(`${f.filename}: ${this.i18n.translate(chatUploadError(f.reason), { mb })}`);
+    }
+  }
+
+  /**
+   * A full composer disables the paperclip, and a disabled button drops its focus to
+   * the page. The upload queues its files at once, so the focus goes to the text box
+   * before the next render disables the button.
+   */
+  private leaveFullAttach(): void {
+    const attach = this.host.nativeElement.querySelector('.chat__attach');
+    if (this.full() && attach?.contains(document.activeElement)) {
+      this.composerInput()?.nativeElement.focus();
     }
   }
 

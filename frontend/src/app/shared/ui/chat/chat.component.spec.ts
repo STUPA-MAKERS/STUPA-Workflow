@@ -678,6 +678,18 @@ describe('ChatComponent', () => {
       expect(screen.getByRole('dialog', { name: 'Nachricht löschen' })).toBeInTheDocument();
     });
 
+    it('offers no copy for a message of files only', async () => {
+      const { view, cmp } = await setup({
+        phone: true,
+        messages: [msg('m', today(8, 21), { own: true, body: '  ' })],
+      });
+      cmp.openMenu(cmp.messages()[0]);
+      view.fixture.detectChanges();
+      const sheet = screen.getByRole('dialog');
+      expect(within(sheet).queryByRole('button', { name: 'Text kopieren' })).not.toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Bearbeiten' })).toBeInTheDocument();
+    });
+
     it('closes the sheet with its close button', async () => {
       const { view, cmp } = await longPress();
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Schließen' }));
@@ -865,6 +877,39 @@ describe('ChatComponent', () => {
       expect(screen.getByRole('button', { name: 'Datei anhängen' })).toBeDisabled();
       await pick(pdf());
       expect(api.uploadDraftAttachment).toHaveBeenCalledTimes(5);
+    });
+
+    it('moves the focus from the paperclip to the text box when a pick fills the message', async () => {
+      const { pick, input } = await setup({ canAttach: true });
+      const clip = () => screen.getByRole('button', { name: 'Datei anhängen' });
+      clip().focus();
+      await pick(pdf('a.pdf'));
+      expect(clip()).toHaveFocus();
+      await pick(...Array.from({ length: 4 }, (_, i) => pdf(`f${i}.pdf`)));
+      expect(clip()).toBeDisabled();
+      expect(input()).toHaveFocus();
+    });
+
+    it('leaves the focus where it is when the paperclip had none', async () => {
+      const { cmp, view } = await setup({ canAttach: true });
+      const other = document.createElement('button');
+      document.body.appendChild(other);
+      other.focus();
+      await cmp.addFiles(Array.from({ length: 5 }, (_, i) => pdf(`f${i}.pdf`)));
+      view.fixture.detectChanges();
+      expect(other).toHaveFocus();
+      other.remove();
+    });
+
+    it('keeps the uploading chip a list item, with the status inside', async () => {
+      const answer = new Subject<DraftUpload>();
+      const { pick, view } = await setup({ canAttach: true, upload: () => answer });
+      await pick(pdf());
+      const chip = view.container.querySelector('.chat__draft--pending') as HTMLElement;
+      expect(chip.tagName).toBe('LI');
+      expect(chip).not.toHaveAttribute('role');
+      expect(within(chip).getByRole('status')).toHaveTextContent('angebot.pdf');
+      expect(within(view.container.querySelector('.chat__drafts') as HTMLElement).getAllByRole('listitem')).toHaveLength(1);
     });
 
     it('counts a batch still on its way against the 5 files of a message', async () => {

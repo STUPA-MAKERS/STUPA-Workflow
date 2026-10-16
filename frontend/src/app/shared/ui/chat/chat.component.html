@@ -191,9 +191,9 @@
           </li>
         }
         @for (p of uploads(); track p.key) {
-          <li class="chat__draft chat__draft--pending" role="status">
+          <li class="chat__draft chat__draft--pending">
             <span class="chat__spinner" aria-hidden="true"></span>
-            <span class="chat__fileText">
+            <span class="chat__fileText" role="status">
               <span class="mono chat__fileName">{{ p.filename }}</span>
               <span class="chat__fileMeta">{{ 'chat.uploading' | t }}</span>
             </span>
@@ -268,9 +268,11 @@
 >
   @if (menuFor(); as m) {
     <div class="chat__menu" role="group">
-      <button type="button" class="chat__menuItem" (click)="copy(m)">
-        <app-icon name="copy" [size]="20" />{{ 'chat.copy' | t }}
-      </button>
+      @if (m.body.trim()) {
+        <button type="button" class="chat__menuItem" (click)="copy(m)">
+          <app-icon name="copy" [size]="20" />{{ 'chat.copy' | t }}
+        </button>
+      }
       <button type="button" class="chat__menuItem" (click)="startEdit(m)">
         <app-icon name="edit" [size]="20" />{{ 'chat.editShort' | t }}
       </button>
