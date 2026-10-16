@@ -119,6 +119,15 @@
   background: var(--color-selected);
   color: var(--color-on-selected);
 }
+.exp__selAll {
+  display: flex;
+  flex: 1 1 auto;
+  align-self: stretch;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  cursor: pointer;
+}
 .exp__selText {
   flex: 1 1 auto;
   min-width: 0;

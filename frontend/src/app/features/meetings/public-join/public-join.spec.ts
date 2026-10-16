@@ -80,16 +80,13 @@ describe('JoinLinkComponent', () => {
 
 describe('PublicJoinSettingsComponent', () => {
   it('turns the participation on and picks the guest mode', async () => {
-    const { fixture } = await render(PublicJoinSettingsComponent, { inputs: { creating: true } });
+    const { fixture } = await render(PublicJoinSettingsComponent);
     const cmp = fixture.componentInstance;
     expect(screen.queryByText('Gäste in dieser Sitzung')).toBeNull();
     await userEvent.click(screen.getByRole('switch', { name: /Öffentliche Teilnahme/ }));
     expect(cmp.publicJoin()).toBe(true);
-    expect(screen.getByText(/Link und QR-Code gibt es nach dem Anlegen/)).toBeInTheDocument();
-    expect(screen.getByText(/Einzelne Abstimmungen/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('radio', { name: /Gäste schauen nur zu/ }));
     expect(cmp.guestsMode()).toBe('watch');
-    expect(screen.queryByText(/Einzelne Abstimmungen/)).toBeNull();
     cmp.setMode('other');
     expect(cmp.guestsMode()).toBe('watch');
   });

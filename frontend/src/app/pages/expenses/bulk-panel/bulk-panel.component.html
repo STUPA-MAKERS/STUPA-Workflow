@@ -40,12 +40,9 @@
         />
       </div>
     }
-    <p class="bp__hint">
-      {{ 'expenses.bulk.reassignHint' | t }}
-      @if (fixedRows().length) {
-        {{ 'expenses.bulk.reassignFixed' | t: { names: fixedNames() } }}
-      }
-    </p>
+    @if (fixedRows().length) {
+      <p class="bp__hint">{{ 'expenses.bulk.reassignFixed' | t: { names: fixedNames() } }}</p>
+    }
     <div class="bp__end">
       <app-button variant="tonal" size="sm" [disabled]="!canReassign() || busy()" [loading]="busy()" (click)="reassign.emit()">
         <span class="ff__btn"><app-icon name="repeat" [size]="16" />{{ 'expenses.bulk.reassignConfirm' | t }}</span>

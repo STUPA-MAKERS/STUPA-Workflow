@@ -174,16 +174,18 @@
   gap: var(--space-1);
   margin-inline-start: auto;
 }
-/* The control: one pill, the options side by side, the chosen one filled. */
+/* The control: one pill, the options side by side, the chosen one filled. The options
+   have equal widths: each column is as wide as the widest label. */
 .as__seg {
-  display: flex;
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
   height: 32px;
   overflow: hidden;
   border: var(--border-width) solid var(--color-border-strong);
   border-radius: var(--radius-pill);
 }
 .as__opt {
-  flex: 1 1 auto;
   padding: 0 9px;
   border: 0;
   background: transparent;

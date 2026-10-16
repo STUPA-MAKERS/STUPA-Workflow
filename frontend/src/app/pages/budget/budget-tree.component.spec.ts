@@ -919,9 +919,9 @@ describe('BudgetTreeComponent', () => {
       c.openEditNode(ROOT.children[0].children[0]);
       expect(c.editDecisionGremium()).toBe('');
       expect(c.decisionGremiumHint()).toBe('Geerbt von VSM · Studierendenschaft: StuPa');
-      // An own value replaces the inherited hint with the explanation.
+      // An own value replaces the inherited line with nothing.
       c.editDecisionGremium.set('g-1');
-      expect(c.decisionGremiumHint()).toContain('Dieses Gremium entscheidet');
+      expect(c.decisionGremiumHint()).toBe('');
     });
 
     it('says that no gremium decides for a root or a tree without one', async () => {

@@ -13,7 +13,6 @@
     <header class="ff__head">
       <div class="ff__titles">
         <h2 class="ff__title" id="cap-title">{{ 'applications.capture.title' | t }}</h2>
-        <p class="ff__subtitle">{{ subtitle() }}</p>
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
         <app-icon name="x" [size]="20" />
@@ -127,10 +126,6 @@
                 (ngModelChange)="onGuestEmail($event ?? '')"
               />
             </div>
-            <p class="ff__info">
-              <app-icon name="mail" [size]="16" />
-              <span>{{ 'applications.capture.guestHint' | t }}</span>
-            </p>
           }
         </fieldset>
 

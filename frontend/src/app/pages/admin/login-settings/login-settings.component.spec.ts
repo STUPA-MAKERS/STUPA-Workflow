@@ -46,13 +46,12 @@ const saveButton = (): HTMLButtonElement => screen.getByRole('button', { name: '
 describe('LoginSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows the stored lifetimes and the note on the account check', async () => {
+  it('shows the stored lifetimes', async () => {
     const { api } = await setup();
     expect(api.getLoginSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Anmeldung' })).toBeInTheDocument();
     expect(webField().value).toBe('90');
     expect(pwaField().value).toBe('180');
-    expect(screen.getByText(/Etwa alle 12 Stunden prüft die Plattform das Konto/)).toBeInTheDocument();
     // A setting that nobody changed has no change date.
     expect(screen.queryByText(/Zuletzt geändert/)).not.toBeInTheDocument();
     // Nothing changed yet: the save is off.

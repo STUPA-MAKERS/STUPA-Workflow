@@ -126,15 +126,18 @@
           <!-- Board Fin-Buchungen-Auswahl: the selection bar in the column. One pane at a
                time it also holds the bulk actions; side by side they are in the sheet. -->
           <div class="exp__selbar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
-            <input
-              type="checkbox"
-              class="exp__check"
-              [attr.aria-label]="'expenses.bulk.selectAll' | t"
-              [checked]="allSelected()"
-              [indeterminate]="selectedCount() > 0 && !allSelected()"
-              (change)="toggleSelectAll(!allSelected())"
-            />
-            <span class="exp__selText" aria-live="polite">{{ selectionLabel() }}</span>
+            <!-- The box and its count are one label: the whole text toggles the selection. -->
+            <label class="exp__selAll">
+              <input
+                type="checkbox"
+                class="exp__check"
+                [attr.aria-label]="'expenses.bulk.selectAll' | t"
+                [checked]="allSelected()"
+                [indeterminate]="selectedCount() > 0 && !allSelected()"
+                (change)="toggleSelectAll(!allSelected())"
+              />
+              <span class="exp__selText" aria-live="polite">{{ selectionLabel() }}</span>
+            </label>
             @if (split()) {
               <app-button variant="text" size="sm" (click)="toggleSelectAll(true)">{{
                 'expenses.bulk.selectAll' | t

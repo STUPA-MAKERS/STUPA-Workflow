@@ -2,7 +2,6 @@
   <app-page-header
     [flush]="true"
     [title]="'account.grants.title' | t"
-    [subtitle]="'account.grants.intro' | t"
   />
 
   @if (actionError(); as e) {
@@ -15,7 +14,6 @@
         <app-icon class="gr__mcpIcon" name="webhook" [size]="22" />
         <div class="gr__mcpText">
           <h2 class="gr__h2" id="gr-mcp-title">{{ 'account.mcp.title' | t }}</h2>
-          <p class="gr__muted">{{ 'account.mcp.intro' | t }}</p>
         </div>
         <app-button class="gr__download" variant="fill" [loading]="downloading()" (click)="downloadPackage()">
           <app-icon name="download" [size]="16" />

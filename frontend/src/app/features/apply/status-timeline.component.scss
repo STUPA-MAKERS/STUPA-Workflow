@@ -177,10 +177,6 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.sp__editHint {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
 /* Targets of a programmatic focus only (tabindex -1, not in the tab order): no ring.
    The text of the bar clips its overflow, so a ring would show as a stray line. */
 .sp__title:focus,
@@ -293,9 +289,6 @@
     margin-inline: calc(-1 * var(--space-4));
     border-inline: 0;
     border-radius: 0;
-  }
-  .sp__editHint {
-    display: none;
   }
   .sp__endCard {
     padding: var(--space-5);

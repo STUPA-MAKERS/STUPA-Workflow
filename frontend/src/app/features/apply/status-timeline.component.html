@@ -35,8 +35,6 @@
             <p class="sp__editText">
               <!-- The title takes the focus when the edit mode opens. -->
               <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
-              <!-- The separator sits in the hint, so it goes with it on a phone. -->
-              <span class="sp__editHint"> · {{ 'applications.edit.versionHint' | t: { version: app.version + 1 } }}</span>
             </p>
             <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
             <app-button variant="fill" [loading]="saving()" (click)="save()">

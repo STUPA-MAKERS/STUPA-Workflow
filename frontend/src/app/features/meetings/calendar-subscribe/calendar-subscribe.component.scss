@@ -65,9 +65,7 @@
   font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
 }
-.cs__intro,
-.cs__none,
-.cs__confirmText {
+.cs__none {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
@@ -117,9 +115,6 @@
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-danger-subtle);
-}
-.cs__confirmText {
-  color: var(--color-text);
 }
 .cs__live {
   position: absolute;

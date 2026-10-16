@@ -899,9 +899,6 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
     expect(screen.getByText('Validierung')).toBeInTheDocument();
     expect(screen.getByLabelText('Minimum')).toBeInTheDocument();
     expect(screen.getByLabelText('Sichtbar wenn (JsonLogic)')).toHaveAttribute('placeholder', 'leer: immer sichtbar');
-    // The cost positions name their automatic metric instead of the switch.
-    await userEvent.click(toggles[0]);
-    expect(screen.getByText('Fließt automatisch als Summe in den Betrag (Budget).')).toBeInTheDocument();
   });
 
   it('the required box sets the flag of the question', async () => {

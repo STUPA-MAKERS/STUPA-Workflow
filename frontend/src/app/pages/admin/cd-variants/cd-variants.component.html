@@ -1,5 +1,5 @@
 <section class="cdv">
-  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t" [subtitle]="'admin.cdVariants.subtitle' | t">
+  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
     <app-button actions variant="fill" (click)="openCreate()">
       <app-icon name="plus" [size]="18" /> {{ 'admin.cdVariants.add' | t }}
     </app-button>
@@ -115,8 +115,6 @@
         <li class="cdv__empty">{{ 'admin.cdVariants.empty' | t }}</li>
       }
     </ul>
-
-    <app-note>{{ 'admin.cdVariants.note' | t: { mb: maxMb, min: minPx } }}</app-note>
   }
 </section>
 
@@ -137,7 +135,7 @@
     <app-input
       class="cdv__keyField"
       [label]="'admin.common.key' | t"
-      [hint]="(editingId() ? 'admin.cdVariants.keyLocked' : 'admin.cdVariants.keyHint') | t"
+      [hint]="editingId() ? ('admin.cdVariants.keyLocked' | t) : ''"
       name="key"
       [disabled]="editingId() !== null"
       [ngModel]="form().key"
@@ -146,7 +144,6 @@
     <app-select
       [label]="'admin.cdVariants.base' | t"
       [options]="baseOptions()"
-      [hint]="'admin.cdVariants.baseHint' | t"
       name="baseVariant"
       [ngModel]="form().baseVariant"
       (ngModelChange)="patch('baseVariant', $event)"
@@ -205,9 +202,6 @@
           {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
         </app-button>
       </div>
-      <p class="cdv__hint">
-        {{ (draft.slot === 'square' ? 'admin.cdVariants.squareFileHint' : 'admin.cdVariants.fileHint') | t: { mb: maxMb, min: minPx } }}
-      </p>
       @if (draft.slot === 'square') {
         @if (draft.previewUrl && verdict() === 'ok') {
           <div class="cdv__field">
@@ -221,7 +215,6 @@
             </div>
           </div>
         }
-        <p class="cdv__hint">{{ 'admin.cdVariants.squareReplaces' | t }}</p>
       }
       @if (logoError(); as err) {
         <app-note kind="error" icon="alert" role="alert">{{ err | t: { min: minPx } }}</app-note>

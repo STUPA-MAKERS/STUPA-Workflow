@@ -409,10 +409,6 @@
   margin: 0;
   font-size: var(--fs-md);
 }
-.ad__editHint {
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
 /* The fields of the form: the global `.fe-form` grid (styles.scss). */
 .ad__edit {
   min-width: 0;
@@ -455,12 +451,7 @@
 }
 
 /* ------------------------------------------------------------------ dialogs */
-.ad__dlgLead {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-/* The tree scrolls here, below the lead and above the fiscal year. An end fades only
+/* The tree scrolls here, above the fiscal year. An end fades only
    when more rows are past it (`appScrollFade` sets the classes). */
 .ad__ccTree {
   max-height: 50vh;
@@ -515,10 +506,6 @@
   }
   .ad__pair {
     grid-template-columns: minmax(0, 1fr);
-  }
-  /* The bar keeps the title and the two buttons on one line. */
-  .ad__editHint {
-    display: none;
   }
 }
 /* A long intake note wraps inside its part instead of running out of the sheet. */

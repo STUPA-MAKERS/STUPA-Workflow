@@ -96,12 +96,6 @@
 .home__choices--three {
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
 }
-.home__note {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-  text-align: center;
-}
 
 /* "Zuletzt veröffentlicht": the newest public protocols, three in a row. */
 .home__latest {

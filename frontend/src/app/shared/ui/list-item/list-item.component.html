@@ -1,4 +1,4 @@
-<div class="li" [class.li--on]="selected()" [class.li--wrap]="wrap()" (pointerenter)="measureSub()">
+<div class="li" [class.li--on]="selected()" [class.li--wrap]="wrap()" (pointerenter)="measure()">
   <span class="li__lead"><ng-content select="[lead]" /></span>
   <span class="li__body">
     <span class="li__head">
@@ -8,20 +8,20 @@
           [routerLink]="target"
           [queryParams]="linkQueryParams()"
           [queryParamsHandling]="linkQueryParamsHandling()"
-          [title]="tooltip()"
+          [attr.title]="tooltip()"
           [attr.aria-current]="selected() ? 'true' : null"
           (click)="activate.emit()"
-          ><span class="li__titleText">{{ title() }}</span></a
+          ><span #titleText class="li__titleText">{{ title() }}</span></a
         >
       } @else {
         <button
           type="button"
           class="li__title"
-          [title]="tooltip()"
+          [attr.title]="tooltip()"
           [attr.aria-current]="selected() ? 'true' : null"
           (click)="activate.emit()"
         >
-          <span class="li__titleText">{{ title() }}</span>
+          <span #titleText class="li__titleText">{{ title() }}</span>
         </button>
       }
       <ng-content select="[status]" />

@@ -4,6 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService, type SelectOption } from '@stupa-makers/ui-kit';
 import type { Uuid } from '@core/api/models';
 import { downloadBlob } from '@shared/download.util';
+import { liveSearch } from '@shared/live-search';
 import {
   BudgetTreeApi,
   type Expense,
@@ -37,6 +38,24 @@ export class ExpenseDialogsState {
   readonly newApplicationId = signal('');
   readonly appQuery = signal('');
   readonly appCandidates = signal<{ id: string; title: string }[]>([]);
+  /**
+   * The search behind "Antrag verknüpfen": debounced like every search field, and a new
+   * query cancels the request that is still out, so a late answer never wins.
+   */
+  readonly appSearch = liveSearch({
+    minLength: 1,
+    run: (q) => this.apps.listApplications({ q, limit: 8 }),
+    result: (page) =>
+      this.appCandidates.set(
+        page.items.map((a) => ({
+          id: a.id,
+          title: a.title || this.i18n.translate('applications.list.untitled'),
+        })),
+      ),
+    reset: () => this.appCandidates.set([]),
+    error: () => this.appCandidates.set([]),
+  });
+
   readonly fiscalYearOptions = signal<SelectOption[]>([]);
   readonly newInvoiceDate = signal('');
   readonly newPaymentDate = signal('');
@@ -230,32 +249,21 @@ export class ExpenseDialogsState {
 
   onAppSearch(value: string): void {
     this.appQuery.set(value);
-    const q = value.trim();
-    if (!q) {
-      this.appCandidates.set([]);
-      return;
-    }
-    this.apps.listApplications({ q, limit: 8 }).subscribe({
-      next: (page) =>
-        this.appCandidates.set(
-          page.items.map((a) => ({
-            id: a.id,
-            title: a.title || this.i18n.translate('applications.list.untitled'),
-          })),
-        ),
-      error: () => this.appCandidates.set([]),
-    });
+    if (!value.trim()) this.appCandidates.set([]);
+    this.appSearch.set(value);
   }
 
   pickApp(a: { id: string; title: string }): void {
     this.newApplicationId.set(a.id);
     this.appQuery.set(a.title);
+    this.appSearch.sync(a.title);
     this.appCandidates.set([]);
   }
 
   clearApp(): void {
     this.newApplicationId.set('');
     this.appQuery.set('');
+    this.appSearch.sync('');
     this.appCandidates.set([]);
   }
 

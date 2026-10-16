@@ -18,7 +18,13 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
-import { ButtonComponent, InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, InputComponent, MEDIA, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
 
@@ -71,6 +77,7 @@ export function isHttpUrl(text: string): boolean {
     InputComponent,
     NoteComponent,
     SwitchComponent,
+    RowMenuComponent,
   ],
   templateUrl: './help-tickets.component.html',
   styleUrl: './help-tickets.component.scss',
@@ -88,6 +95,11 @@ export class HelpTicketsComponent {
   protected readonly allowed = computed(() => this.auth.can('admin.site'));
 
   protected readonly loading = signal(true);
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  /** The ⋮ menu of the header on a phone: "Verwerfen". */
+  protected readonly headerMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'discard', label: this.i18n.translate('admin.helpTickets.discard'), icon: 'undo' }] },
+  ]);
   /** The labels of the switch rows, which the loading form shows as they are. */
   protected readonly skelSwitches = [
     'admin.helpTickets.public',
@@ -249,6 +261,10 @@ export class HelpTicketsComponent {
     const n = Number(value);
     this.lastMonths = n;
     this.patch({ retentionMonths: n });
+  }
+
+  protected onHeaderMenu(item: RowMenuItem): void {
+    if (item.id === 'discard') this.discard();
   }
 
   protected discard(): void {

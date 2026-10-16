@@ -154,7 +154,6 @@ describe('TransitionDetailComponent', () => {
       },
       { budgetTree: TREE },
     );
-    expect(screen.getByText('Leer = Gremium der Abstimmung.')).toBeInTheDocument();
     // The pickers show the path key and the name, an unknown id shows no id.
     expect(screen.getAllByText('VSM · Studierendenschaft')).toHaveLength(2);
     expect(screen.getByText('Unbekannte Kostenstelle')).toBeInTheDocument();

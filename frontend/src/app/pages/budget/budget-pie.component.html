@@ -46,7 +46,6 @@
             class="pie__item"
             [class.pie__item--on]="hovered() === i"
             [disabled]="!a.id"
-            [title]="a.label"
             (pointerenter)="hovered.set(i)"
             (pointerleave)="hovered.set(null)"
             (focus)="hovered.set(i)"
@@ -54,7 +53,13 @@
             (click)="onSlice(a)"
           >
             <span class="pie__swatch" [style.background]="a.color"></span>
-            <span class="pie__name ell">{{ a.label }}</span>
+            <span
+              class="pie__name ell"
+              [appTruncated]="a.label"
+              #nameCut="appTruncated"
+              [attr.title]="nameCut.truncated() ? a.label : null"
+              >{{ a.label }}</span
+            >
             <span class="pie__val mono">{{ money(a.value) }}</span>
           </button>
         </li>

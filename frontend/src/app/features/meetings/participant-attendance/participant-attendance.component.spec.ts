@@ -64,7 +64,6 @@ describe('ParticipantAttendanceComponent', () => {
     const { change, fixture } = await setup(me({ status: 'excused', source: 'self', note: 'Prüfung' }));
     const field = screen.getByLabelText('Grund (optional)');
     await waitFor(() => expect(field).toHaveValue('Prüfung'));
-    expect(screen.getByText('Sichtbar für dich und die Sitzungsführung.')).toBeInTheDocument();
     // Leaving the field unchanged sends nothing.
     await userEvent.click(field);
     await userEvent.tab();

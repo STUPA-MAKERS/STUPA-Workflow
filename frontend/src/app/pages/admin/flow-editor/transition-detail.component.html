@@ -2,7 +2,6 @@
 
 <section class="td__block" aria-labelledby="td-guard">
   <h3 class="cap ins__cap" id="td-guard">{{ 'admin.flow.guard' | t }}</h3>
-  <p class="ins__hint">{{ 'admin.flow.guardHelp' | t }}</p>
   <app-guard-editor
     [guard]="transition().guard ?? null"
     [roleOptions]="roleOptions()"
@@ -44,8 +43,6 @@
                 [ngModel]="actionParam(act, 'gremiumId')"
                 (ngModelChange)="actionParamChange.emit({ ai, key: 'gremiumId', value: $event })"
               />
-              <p class="ins__hint">{{ 'admin.flow.actSessionGremiumHint' | t }}</p>
-              <p class="ins__hint">{{ 'admin.flow.actSessionHint' | t }}</p>
             }
             @case ('assignBudgetFromApplicantGremium') {
               <app-cost-centre-picker
@@ -58,7 +55,6 @@
                 [value]="actionParam(act, 'parentId')"
                 (picked)="actionParamChange.emit({ ai, key: 'parentId', value: $event })"
               />
-              <p class="ins__hint">{{ 'admin.flow.actApplicantGremiumHint' | t }}</p>
             }
             @case ('assignBudgetFromMap') {
               <app-input
@@ -105,7 +101,6 @@
               <app-button class="td__inlineAdd" variant="text" size="sm" [disabled]="hasBlankMapRow(act)" (click)="addMapRow(ai, act)">
                 <app-icon name="plus" [size]="15" /> {{ 'admin.flow.actMapAdd' | t }}
               </app-button>
-              <p class="ins__hint">{{ 'admin.flow.actMapHint' | t }}</p>
             }
             @case ('assignBudget') {
               <app-input
@@ -124,7 +119,6 @@
                 [ngModel]="actionParam(act, 'field')"
                 (ngModelChange)="actionParamChange.emit({ ai, key: 'field', value: $event })"
               />
-              <p class="ins__hint">{{ 'admin.flow.actBudgetFieldHint' | t }}</p>
             }
             @case ('notify') {
               <span class="td__sub">{{ 'admin.flow.actRecipients' | t }}</span>

@@ -102,7 +102,6 @@ export class BrandingEditorComponent {
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
 
-  protected readonly maxMb = LOGO_MAX_SIZE_MB;
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
   protected readonly freetexts = FREETEXTS;

@@ -165,7 +165,6 @@
             [value]="t.body ?? ''"
             [disabled]="!editable()"
             [placeholder]="'meetings.protocol.placeholder' | t"
-            [hint]="'meetings.protocol.hint' | t"
             (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
           />
         } @placeholder {

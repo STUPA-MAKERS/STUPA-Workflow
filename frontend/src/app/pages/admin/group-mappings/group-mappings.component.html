@@ -2,7 +2,6 @@
   <app-page-header
     [flush]="true"
     [title]="'admin.groupMappings.title' | t"
-    [subtitle]="'admin.groupMappings.subtitle' | t"
   />
 
   <!-- Three separate mappings. They do not depend on each other. -->
@@ -14,10 +13,6 @@
           <app-icon name="plus" [size]="16" /> {{ key(sec.kind, 'add') | t }}
         </app-button>
       </header>
-      <p class="gm__hint">{{ key(sec.kind, 'hint') | t }}</p>
-      @if (sec.kind === 'role') {
-        <p class="gm__hint">{{ 'admin.groupMappings.role.ruleHint' | t }}</p>
-      }
 
       @if (sec.loading) {
         <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
@@ -27,7 +22,7 @@
             <li class="gm__row">
               <code class="gm__group mono">{{ r.oidcGroup }}</code>
               <app-icon class="gm__arrow" name="arrow" [size]="16" />
-              <span class="gm__target ell" [title]="r.role ? r.target + ' · ' + r.role : r.target">
+              <span class="gm__target ell" [appTruncated]="r.role ? r.target + ' · ' + r.role : r.target" #cut="appTruncated" [attr.title]="cut.truncated() ? (r.role ? r.target + ' · ' + r.role : r.target) : null">
                 {{ r.target }}
                 @if (r.role) {
                   · <strong class="gm__role">{{ r.role }}</strong>
@@ -112,7 +107,6 @@
           <app-select
             [label]="'admin.groupMappings.gremium' | t"
             [placeholder]="'admin.groupMappings.gremiumPlaceholder' | t"
-            [hint]="'admin.groupMappings.role.gremiumFilterHint' | t"
             [options]="gremiumOptions()"
             [ngModel]="gremiumId()"
             (ngModelChange)="onDialogGremium($event)"
@@ -135,7 +129,6 @@
               }
             </p>
           }
-          <p class="gm__dialogNote gm__dialogNote--muted">{{ 'admin.groupMappings.role.ruleHint' | t }}</p>
         }
       }
       <button type="submit" hidden></button>

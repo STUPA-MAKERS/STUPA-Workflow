@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, model } fr
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   CurrencyInputComponent,
@@ -40,8 +39,6 @@ export class DecisionEditorComponent {
   /** The requested amount of the application (decimal string), for the hint and the check. */
   readonly requested = input<string | null>(null);
   readonly currency = input<string | null>('EUR');
-  /** The hint under the switch. A vote says the proposal applies only when it passes. */
-  readonly switchHint = input<TranslationKey>('decision.switchHintVote');
   /** A unique prefix for the ids of the controls. */
   readonly idPrefix = input('dec');
 

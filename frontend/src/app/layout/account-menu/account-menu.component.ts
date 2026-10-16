@@ -20,6 +20,7 @@ import { ThemeService } from '@core/theme/theme.service';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { IconComponent, SwitchComponent } from '@stupa-makers/ui-kit';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /**
  * `popover`: the avatar at the foot of the rail, which opens the menu beside the rail.
@@ -48,6 +49,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,

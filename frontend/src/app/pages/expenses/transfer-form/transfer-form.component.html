@@ -14,13 +14,9 @@
         <h2 class="ff__title" [id]="'tf-title-' + mode()">{{
           (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t
         }}</h2>
-        <p class="ff__subtitle">
-          @if (mode() === 'create') {
-            {{ 'expenses.form.required' | t }}
-          } @else {
-            {{ t.editing()?.description }}
-          }
-        </p>
+        @if (mode() !== 'create') {
+          <p class="ff__subtitle">{{ t.editing()?.description }}</p>
+        }
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
         <app-icon name="x" [size]="20" />

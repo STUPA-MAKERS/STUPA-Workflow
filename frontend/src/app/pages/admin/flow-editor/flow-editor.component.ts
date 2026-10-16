@@ -314,11 +314,10 @@ export class FlowEditorComponent {
     return v ? Math.round((this.fitBounds().w / v.w) * 100) : 100;
   });
 
-  /** The lead line: the scope of the flow and, once known, its active version. */
-  protected readonly subtitle = computed(() => {
-    const notice = this.i18n.translate('admin.flow.globalNotice');
+  /** The meta of the header: the active version, once known. */
+  protected readonly versionMeta = computed(() => {
     const v = this.currentVersion();
-    return v === null ? notice : `${notice} · ${this.i18n.translate('admin.flow.versionActive', { n: v })}`;
+    return v === null ? null : this.i18n.translate('admin.flow.versionActive', { n: v });
   });
 
   /** The ⋮ menu of the header on a phone: "Versionen". */

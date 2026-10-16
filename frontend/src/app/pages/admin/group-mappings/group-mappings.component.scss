@@ -24,17 +24,6 @@
   padding-inline: var(--space-1);
 }
 
-.gm__hint {
-  margin: 0;
-  padding-inline: var(--space-1);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.gm__hint + .gm__list,
-.gm__hint + app-skeleton {
-  margin-top: var(--space-2);
-}
-
 .gm__list {
   margin: 0;
   padding: 0;
@@ -92,9 +81,6 @@
 }
 .gm__dialogNote {
   font-size: var(--fs-sm);
-}
-.gm__dialogNote--muted {
-  color: var(--color-text-muted);
 }
 .gm__dialogFoot {
   display: flex;

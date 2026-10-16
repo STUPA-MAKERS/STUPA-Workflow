@@ -1,5 +1,5 @@
 <section class="wh">
-  <app-page-header [flush]="true" [title]="'admin.webhook.title' | t" [subtitle]="'admin.webhook.desc' | t">
+  <app-page-header [flush]="true" [title]="'admin.webhook.title' | t">
     @if (canManage()) {
       <app-button actions variant="fill" (click)="openAdd()">
         <app-icon name="plus" [size]="18" /> {{ 'admin.webhook.add' | t }}
@@ -105,8 +105,6 @@
         <li class="wh__empty">{{ 'admin.webhook.none' | t }}</li>
       }
     </ul>
-
-    <app-note>{{ 'admin.webhook.signedNote' | t }}</app-note>
   }
 </section>
 
@@ -131,7 +129,6 @@
       <app-switch [checked]="d.active" (checkedChange)="patch('active', $event)">{{ 'admin.webhook.active' | t }}</app-switch>
       <fieldset class="wh__eventsField">
         <legend class="wh__legend">{{ 'admin.webhook.events' | t }}</legend>
-        <p class="wh__hint">{{ 'admin.webhook.eventsHint' | t }}</p>
         <div class="wh__eventGrid">
           @for (ev of allEvents; track ev) {
             <app-checkbox [ngModel]="d.events.includes(ev)" (ngModelChange)="toggleEvent(ev)" [name]="'ev-' + ev">

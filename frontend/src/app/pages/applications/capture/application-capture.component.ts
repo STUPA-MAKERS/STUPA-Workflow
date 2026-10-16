@@ -237,14 +237,6 @@ export class ApplicationCaptureComponent {
     );
   });
 
-  /** The second line of the head: the chosen applicant, else the hint. */
-  protected readonly subtitle = computed(() => {
-    const name = this.mode() === 'account' ? this.pickedLabel() : this.guestName().trim();
-    return name
-      ? this.i18n.translate('applications.capture.subtitleFor', { name })
-      : this.i18n.translate('applications.capture.subtitle');
-  });
-
   protected readonly pickedLabel = computed(() => {
     const p = this.picked();
     return p ? candidateLabel(p) : '';

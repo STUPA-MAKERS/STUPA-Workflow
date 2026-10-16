@@ -8,14 +8,13 @@
     }
   </app-page-header>
 
-  <app-note>
-    <span>{{ 'admin.gremien.membersHint' | t }}</span>
-    @if (canManageMappings()) {
+  @if (canManageMappings()) {
+    <app-note>
       <a class="gmm__noteLink" routerLink="/admin/group-mappings">{{
         'admin.users.manageGroupMappings' | t
       }}</a>
-    }
-  </app-note>
+    </app-note>
+  }
 
   <!-- Read-only. The OIDC group sync writes the memberships, not the admin. -->
   <section class="gmm__section" aria-labelledby="gmm-members-title">

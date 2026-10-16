@@ -1,50 +1,53 @@
-<div class="gdc__tools">
-  <app-search-pill
-    class="gdc__search"
-    size="md"
-    [placeholder]="'gremien.decisions.search' | t"
-    [label]="'gremien.decisions.searchLabel' | t"
-    [clearable]="true"
-    [busy]="search.pending()"
-    [value]="search.text()"
-    (valueChange)="search.set($event)"
-    (commit)="search.flush()"
-  />
-  <div class="gdc__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
-    <app-filter-select
-      [label]="'gremien.decisions.result' | t"
-      [options]="resultOptions()"
-      [value]="result()"
-      (valueChange)="setResult($event)"
-      [text]="resultText()"
-      [active]="result() !== ''"
-      [icon]="result() ? 'check' : null"
-      [chevron]="!result()"
+<!-- On a phone the page scrolls: the search and the filters stay at the top. -->
+<app-sticky-bar [sticky]="phone()">
+  <div class="gdc__tools">
+    <app-search-pill
+      class="gdc__search"
+      size="md"
+      [placeholder]="'gremien.decisions.search' | t"
+      [label]="'gremien.decisions.searchLabel' | t"
+      [clearable]="true"
+      [busy]="search.pending()"
+      [value]="search.text()"
+      (valueChange)="search.set($event)"
+      (commit)="search.flush()"
     />
-    <app-filter-select
-      [label]="'gremien.decisions.kind' | t"
-      [options]="kindOptions()"
-      [value]="kind()"
-      (valueChange)="setKind($event)"
-      [text]="kindText()"
-      [active]="kind() !== ''"
-      [icon]="kind() ? 'check' : null"
-      [chevron]="!kind()"
-    />
-    @if (!phone()) {
+    <div class="gdc__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
       <app-filter-select
-        [label]="'gremien.decisions.since' | t"
-        [options]="sinceOptions()"
-        [value]="since()"
-        (valueChange)="setSince($event)"
-        [text]="sinceText()"
-        [active]="since() !== ''"
-        [icon]="since() ? 'check' : null"
-        [chevron]="!since()"
+        [label]="'gremien.decisions.result' | t"
+        [options]="resultOptions()"
+        [value]="result()"
+        (valueChange)="setResult($event)"
+        [text]="resultText()"
+        [active]="result() !== ''"
+        [icon]="result() ? 'check' : null"
+        [chevron]="!result()"
       />
-    }
+      <app-filter-select
+        [label]="'gremien.decisions.kind' | t"
+        [options]="kindOptions()"
+        [value]="kind()"
+        (valueChange)="setKind($event)"
+        [text]="kindText()"
+        [active]="kind() !== ''"
+        [icon]="kind() ? 'check' : null"
+        [chevron]="!kind()"
+      />
+      @if (!phone()) {
+        <app-filter-select
+          [label]="'gremien.decisions.since' | t"
+          [options]="sinceOptions()"
+          [value]="since()"
+          (valueChange)="setSince($event)"
+          [text]="sinceText()"
+          [active]="since() !== ''"
+          [icon]="since() ? 'check' : null"
+          [chevron]="!since()"
+        />
+      }
+    </div>
   </div>
-</div>
+</app-sticky-bar>
 
 @if (loading() && !items().length) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.decisions.loading' | t" />

@@ -1,5 +1,5 @@
 <section class="ns">
-  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t" [subtitle]="'admin.notifications.intro' | t">
+  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t">
     @if (settings()) {
       <app-button actions variant="fill" [disabled]="!dirty() || !valid()" [loading]="saving()" (click)="save()">
         <app-icon name="check" [size]="18" /> {{ 'action.save' | t }}
@@ -20,7 +20,6 @@
         <div class="ns__head">
           <div class="ns__text">
             <h2 class="ns__title" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
-            <p class="ns__desc">{{ 'admin.notifications.taskReminderDesc' | t }}</p>
           </div>
           <app-switch [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
             {{ 'admin.notifications.enabled' | t }}
@@ -30,7 +29,6 @@
           <app-input
             type="number"
             [label]="'admin.notifications.afterDays' | t"
-            [hint]="'admin.notifications.afterDaysHint' | t"
             [error]="afterDaysError()"
             [ngModel]="s.taskReminderAfterDays"
             (ngModelChange)="patch({ taskReminderAfterDays: toNumber($event) })"
@@ -40,7 +38,6 @@
           <app-input
             type="number"
             [label]="'admin.notifications.repeatDays' | t"
-            [hint]="'admin.notifications.repeatDaysHint' | t"
             [error]="repeatDaysError()"
             [ngModel]="s.taskReminderRepeatDays"
             (ngModelChange)="patch({ taskReminderRepeatDays: toNumber($event) })"

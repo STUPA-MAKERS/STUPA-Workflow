@@ -8,6 +8,7 @@ import {
   type ExpenseKind,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
 
 export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
 
@@ -147,7 +148,7 @@ export class ExpensesListState {
 
   private debouncedReload(): void {
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), 400);
+    this.searchTimer = setTimeout(() => this.reload(), LIVE_SEARCH_DEBOUNCE_MS);
   }
 
   /**

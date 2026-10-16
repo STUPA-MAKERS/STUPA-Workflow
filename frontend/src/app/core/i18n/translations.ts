@@ -84,49 +84,31 @@ export const de = {
   'account.nav.notificationsDesc': 'E-Mails je Anlass ein- und ausschalten',
   'account.nav.grantsDesc': 'MCP-Server und Zugriffe von Agenten',
   'account.calendar.title': 'Kalender-Abo',
-  'account.calendar.intro':
-    'Abonniere deine Sitzungstermine im Kalender (Google, Apple, Outlook …). Die URL ist persönlich — teile sie nicht.',
   'account.calendar.urlLabel': 'Abo-URL',
   'account.calendar.copy': 'Kopieren',
   'account.calendar.copied': 'Kopiert!',
   'account.calendar.none': 'Es wurde noch kein Abo-Link erzeugt.',
   'account.calendar.generate': 'Abo-Link erzeugen',
   'account.calendar.rotate': 'Neue URL erzeugen',
-  'account.calendar.rotateHint': 'Erzeugt eine neue URL — die bisherige wird ungültig.',
   'account.calendar.error': 'Der Abo-Link konnte nicht geladen werden.',
   'account.calendar.rotateError': 'Der Abo-Link konnte nicht erzeugt werden.',
   'pwa.updateReady': 'Eine neue Version der App ist verfügbar.',
   'pwa.reload': 'Neu laden',
   'account.notifications.title': 'Benachrichtigungen',
-  'account.notifications.intro':
-    'Wähle, welche E-Mail-Benachrichtigungen du erhalten möchtest. Login-Links werden immer zugestellt.',
   'account.notifications.error': 'Einstellungen konnten nicht geladen werden.',
   'account.notifications.saveError': 'Speichern fehlgeschlagen — bitte erneut versuchen.',
   'account.notifications.empty': 'Für dein Konto gibt es keine Benachrichtigungen zum Ausschalten.',
   'account.notifications.kind.status_update': 'Status-Updates zu Anträgen',
-  'account.notifications.hint.status_update':
-    'Wenn sich der Status eines Antrags ändert, der dich betrifft.',
   'account.notifications.kind.comment': 'Neue Kommentare',
-  'account.notifications.hint.comment': 'Wenn ein Antrag kommentiert wird, der dich betrifft.',
   'account.notifications.kind.task': 'Neue Aufgaben',
-  'account.notifications.hint.task':
-    'Wenn ein Antrag einen Schritt erreicht, in dem du handeln kannst.',
   'account.notifications.kind.task_reminder': 'Aufgaben-Erinnerungen',
-  'account.notifications.hint.task_reminder': 'Erinnerungen an offene Aufgaben.',
   'account.notifications.kind.meeting': 'Sitzungen',
-  'account.notifications.hint.meeting': 'Einladung und Tagesordnung von Sitzungen deiner Gremien.',
   'account.notifications.kind.delegation': 'Delegationen',
-  'account.notifications.hint.delegation':
-    'Wenn du eine Stimm-Delegation erhältst oder sie widerrufen wird.',
   'account.notifications.kind.protocol': 'Protokolle',
-  'account.notifications.hint.protocol': 'Wenn ein Sitzungsprotokoll finalisiert wurde.',
   'account.notifications.kind.deadline': 'Frist-Erinnerungen',
-  'account.notifications.hint.deadline': 'Wenn eine Frist zu einem Antrag näher rückt.',
   'account.notifications.kind.privacy': 'Datenschutz/Löschanträge',
-  'account.notifications.hint.privacy': 'Statusmeldungen zu DSGVO-Löschanträgen.',
   'search.title': 'Suche',
   'search.placeholder': 'Antrag, Sitzung, Kostenstelle, Seite …',
-  'search.hint': 'Tippen, um zu suchen. Enter öffnet den Treffer.',
   'search.archived': 'Archiviert',
   'search.close': 'Suche schließen',
   'search.keys.select': 'Auswählen',
@@ -142,8 +124,6 @@ export const de = {
   'search.group.gremium': 'Gremien',
   'search.group.principal': 'Personen',
   'account.grants.title': 'API-Zugang',
-  'account.grants.intro':
-    'Verwalte hier die OAuth-Zugriffe (Agenten/MCP), die in deinem Namen handeln dürfen.',
   'account.grants.active': 'Aktive Zugriffe',
   'account.grants.activeCount': 'Aktive Zugriffe · {count}',
   'account.grants.empty': 'Keine aktiven Zugriffe.',
@@ -160,8 +140,6 @@ export const de = {
   'account.grants.revoke': 'Widerrufen',
   'account.grants.revokeAll': 'Alle widerrufen',
   'account.mcp.title': 'MCP-Server',
-  'account.mcp.intro':
-    'Lade den MCP-Server, mit dem Agenten die Plattform-API nutzen können. Das Paket ist bereits auf diese Plattform vorkonfiguriert.',
   'account.mcp.download': 'MCP-Paket herunterladen',
   'account.mcp.downloadError': 'Das MCP-Paket konnte nicht geladen werden.',
   'account.mcp.step1': 'Paket entpacken.',
@@ -295,8 +273,6 @@ export const de = {
   'expenses.bulk.exportConfirm': 'Exportieren',
   'expenses.bulk.reassign': 'Umbuchen',
   'expenses.bulk.reassignTitle': 'Auswahl umbuchen',
-  'expenses.bulk.reassignHint':
-    'Leere Felder bleiben unverändert. Die Kostenstelle wirkt nur auf eigenständige Buchungen.',
   'expenses.bulk.reassignConfirm': 'Übernehmen',
   'expenses.bulk.reassignDone': '{count} Buchung(en) aktualisiert.',
   'expenses.bulk.reassignError': 'Sammel-Umbuchung fehlgeschlagen.',
@@ -364,7 +340,6 @@ export const de = {
   'invoices.rowMenu': 'Aktionen für Rechnung {number}',
   'invoices.col.bookings': 'Buchungen',
   'invoices.dueLine': 'fällig {date}',
-  'invoices.dropHint': 'ZUGFeRD/Factur-X wird automatisch gelesen',
   'invoices.dropButton': 'PDF wählen',
   'action.close': 'Schließen',
 
@@ -377,8 +352,6 @@ export const de = {
   'home.choice.apply.desc': 'Kein Konto nötig — in wenigen Minuten eingereicht.',
   'home.choice.login.title': 'Als Gremiumsmitglied anmelden',
   'home.choice.login.desc': 'Anträge bearbeiten, Sitzungen führen, Haushalt verwalten.',
-  'home.statusNote':
-    'Bereits eingereicht? Den Status verfolgst du über den Link in deiner Bestätigungs-E-Mail.',
   'home.choice.go': 'Weiter',
 
   'common.yes': 'Ja',
@@ -398,11 +371,9 @@ export const de = {
   'apply.type.empty': 'Zurzeit sind keine Antragsarten verfügbar.',
   'apply.form.loading': 'Formular wird geladen …',
   'apply.contact.title': 'Kontakt',
-  'apply.contact.lead': 'An diese E-Mail senden wir den Bearbeitungs-Link für deinen Antrag.',
   'apply.contact.email': 'E-Mail',
   'apply.contact.emailInvalid': 'Bitte eine gültige E-Mail-Adresse eingeben.',
   'apply.contact.name': 'Name',
-  'apply.contact.nameHint': 'Wird Gremien angezeigt; nicht öffentlich.',
   'apply.review.title': 'Prüfen & absenden',
   'apply.positions.add': 'Position hinzufügen',
   'apply.positions.label': 'Bezeichnung der Position',
@@ -477,10 +448,6 @@ export const de = {
   'apply.submitted.link': 'Antrag öffnen',
   'apply.confirm.linkUnlimited': 'Der Link in der E-Mail ist unbegrenzt gültig.',
   'apply.confirm.linkDays': 'Der Link in der E-Mail ist {days} Tage gültig.',
-  'apply.lead':
-    'Ohne Konto. Nach dem Absenden bekommst du per Mail einen Link, mit dem du den Status verfolgst.',
-  'apply.leadSignedIn':
-    'Du stellst den Antrag mit deinem Konto. Danach findest du ihn unter „Anträge“.',
   'apply.stepOf': 'Schritt {n} von {total}',
   'apply.steps.details': 'Angaben',
   'apply.steps.reviewHint': 'Zusammenfassung',
@@ -686,8 +653,6 @@ export const de = {
   'applications.archived': 'Antrag archiviert.',
   'applications.unarchived': 'Antrag ist wieder in der Liste.',
   'applications.share.title': 'Öffentlicher Link',
-  'applications.share.lead':
-    'Wer den Link hat, sieht den Antrag ohne Anmeldung — ohne Kommentare und ohne Änderungsverlauf. Persönliche Angaben bleiben außen vor.',
   'applications.share.ttl': 'Gültig für (Tage)',
   'applications.share.label': 'Notiz',
   'applications.share.labelPlaceholder': 'Wofür ist dieser Link?',
@@ -781,8 +746,6 @@ export const de = {
   'applications.history.captured': 'Im Auftrag der antragstellenden Person erfasst',
   'applications.history.intake': 'Eingang: {intake}',
   'applications.capture.title': 'Antrag erfassen',
-  'applications.capture.subtitle': 'Für eine andere Person · geht direkt in den Ablauf',
-  'applications.capture.subtitleFor': 'Für {name} · geht direkt in den Ablauf',
   'applications.capture.applicant': 'Antragsteller:in',
   'applications.capture.mode.account': 'Konto',
   'applications.capture.mode.guest': 'Neue Person',
@@ -794,8 +757,6 @@ export const de = {
   'applications.capture.name': 'Name',
   'applications.capture.email': 'E-Mail',
   'applications.capture.emailInvalid': 'Bitte eine gültige E-Mail-Adresse eingeben.',
-  'applications.capture.guestHint':
-    'Die Person bekommt eine E-Mail mit einem persönlichen Link zu ihrem Antrag.',
   'applications.capture.application': 'Antrag',
   'applications.capture.type': 'Antragsart',
   'applications.capture.typePlaceholder': 'Antragsart wählen',
@@ -818,7 +779,6 @@ export const de = {
   'applications.capture.noteReceived': 'eingegangen am {date}',
   // Edit mode of the detail (board Anträge-Bearbeiten).
   'applications.edit.title': 'Antrag bearbeiten',
-  'applications.edit.versionHint': 'Speichern legt Version {version} an',
   'applications.edit.saved': 'Gespeichert. Version {version} angelegt.',
   'applications.edit.invalid': 'Prüfe die markierten Felder.',
   // Agenda dialog (board Anträge-Tagesordnung, A1).
@@ -829,7 +789,6 @@ export const de = {
     'Keine geplante Sitzung sichtbar. Der Antrag kommt automatisch auf die nächste geplante Sitzung des Gremiums, falls es eine gibt.',
   'applications.agenda.meetingInvalid':
     'Diese Sitzung nimmt keine Anträge mehr an. Wähle eine andere geplante Sitzung.',
-  'applications.agenda.appends': 'Der Antrag kommt als neuer TOP ans Ende.',
   'applications.agenda.note': 'Notiz zum Übergang (optional)',
   'applications.agenda.notePlaceholder': 'Erscheint im Verlauf des Antrags',
   'applications.agenda.added': 'Auf die Tagesordnung von „{meeting}“ gesetzt.',
@@ -853,7 +812,6 @@ export const de = {
   'forms.positions.position': 'Position',
   'forms.positions.provider': 'Anbieter',
   'forms.positions.amount': 'Betrag',
-  'forms.positions.offersLead': 'Angebote · das bevorzugte bestimmt den Betrag',
   'forms.positions.preferOfferNamed': 'Bevorzugt: {name}',
   'forms.positions.offerN': 'Angebot {n}',
   'forms.positions.removePosition': 'Position entfernen',
@@ -929,7 +887,6 @@ export const de = {
   'applications.transitions.fallback': 'Übergang',
   'applications.transitions.forbidden': 'Sie dürfen diesen Übergang nicht ausführen.',
   'applications.budget.title': 'Kostenstelle',
-  'applications.budget.lead': 'Diesem Antrag eine Kostenstelle zuordnen.',
   'applications.budget.field': 'Kostenstelle',
   'applications.budget.none': 'Keine',
   'applications.budget.save': 'Zuordnen',
@@ -1073,7 +1030,6 @@ export const de = {
   'meetings.agenda.noMatch': 'Kein Antrag passt zur Suche.',
   'meetings.agenda.freetextTitle': 'Titel',
   'meetings.agenda.nonPublicLabel': 'Nicht öffentlich (NÖ)',
-  'meetings.agenda.nonPublicHint': 'TOP erscheint nicht im öffentlichen Protokoll',
   'meetings.agenda.empty': 'Noch keine Anträge auf der Tagesordnung.',
   'meetings.agenda.addFreetext': 'TOP hinzufügen',
   'meetings.agenda.untitled': 'Unbenannter TOP',
@@ -1117,9 +1073,6 @@ export const de = {
   // F1: approval with deviations (decision proposal, decision section, decision dialog).
   'decision.section': 'Beschlussvorschlag',
   'decision.switch': 'Mit Abweichungen genehmigen',
-  'decision.switchHintVote':
-    'Abweichender Förderbetrag oder Auflagen. Gilt nur, wenn die Abstimmung angenommen wird.',
-  'decision.switchHintTransition': 'Abweichender Förderbetrag oder Auflagen für diese Genehmigung.',
   'decision.amount': 'Förderbetrag',
   'decision.amountHint': 'Beantragt: {requested}',
   'decision.amountHintDiff': 'Beantragt: {requested} · Abweichung {diff}',
@@ -1132,8 +1085,6 @@ export const de = {
   'decision.conditionDown': 'Auflage {n} nach unten',
   'decision.conditionCount.one': '1 Auflage',
   'decision.conditionCount.other': '{n} Auflagen',
-  'decision.questionHint':
-    'Aus dem Vorschlag erzeugt. Ändert sich mit Betrag und Auflagen, solange du sie nicht von Hand bearbeitest.',
   'decision.error.amountInvalid':
     'Der Förderbetrag muss größer als 0 sein und höchstens zwei Nachkommastellen haben.',
   'decision.error.amountExceeds': 'Der Förderbetrag darf den beantragten Betrag nicht übersteigen.',
@@ -1153,7 +1104,6 @@ export const de = {
   'decision.applicantNoteConditions': 'Bitte beachte die Auflagen des Beschlusses.',
   'meetings.vote.option': 'Option',
   'meetings.vote.secret': 'Geheime Abstimmung',
-  'meetings.vote.secretHint': 'Stimmen werden ohne Namen gezählt',
   'meetings.vote.majorityRule': 'Mehrheitsregel',
   'meetings.vote.rule.simple': 'Einfach',
   'meetings.vote.rule.absolute': 'Absolut',
@@ -1203,7 +1153,6 @@ export const de = {
   'election.dialog.nameTwice':
     'Ein freier Name steht doppelt auf der Liste. Entferne einen der beiden Einträge.',
   'election.dialog.secret': 'Geheime Wahl',
-  'election.dialog.secretHint': 'Stimmen werden ohne Namen gezählt',
   'election.dialog.submit': 'Wahl öffnen',
   'election.rule.single':
     'Jede Person hat eine Stimme. Gewählt ist, wer die meisten Stimmen erhält. Bei Gleichstand entscheidet das Los.',
@@ -1373,7 +1322,6 @@ export const de = {
   'meetings.prep.change': 'Ändern',
   'meetings.prep.presentCount': '{n} von {m} anwesend',
   'meetings.prep.recordAttendance': 'Erfassen',
-  'meetings.prep.topsHint': 'Wähle einen TOP, um seinen Text und seine Abstimmungen vorzubereiten.',
   'meetings.prep.back': 'Zurück zur Vorbereitung',
   'meetings.dock.closedAt': 'Geschlossen um {time}',
   'meetings.page.back': 'Zurück zu Sitzungen',
@@ -1413,7 +1361,6 @@ export const de = {
   'meetings.dock.top': 'TOP',
   'meetings.dock.none': '–',
   'meetings.dock.voteCast': 'abgegeben',
-  'meetings.protocol.hint': 'Hier weiterschreiben … Markdown wird beim Tippen formatiert.',
   'meetings.follow.now': 'Jetzt',
   'meetings.keeper.from': 'ab {start}',
   'meetings.keeper.fromTopAt': 'ab {top}, {time}',
@@ -1425,7 +1372,6 @@ export const de = {
   'meetings.keeper.takesOverAt': 'übernimmt ab {top}',
   'meetings.keeper.takesOverNext': 'übernimmt mit dem nächsten TOP',
   'meetings.keeper.keeps': 'führt das Protokoll',
-  'meetings.keeper.onlyRight': 'Nur Mitglieder mit dem Recht „Protokoll führen“.',
   'meetings.handoverDialog.before': 'Bisher',
   'meetings.handoverDialog.after': 'Neu',
   'meetings.handoverDialog.change': 'Ändern',
@@ -1463,8 +1409,6 @@ export const de = {
   'meetings.leadSubstitute.title': 'Vertretung eintragen',
   'meetings.leadSubstitute.for': 'für {name}',
   'meetings.leadSubstitute.pool': 'Stellvertretung aus dem Pool',
-  'meetings.leadSubstitute.poolNote':
-    'Persönliche Stellvertretungen des Mitglieds und Stellvertretungen für das ganze Gremium.',
   'meetings.leadSubstitute.search': 'Stellvertretung suchen',
   'meetings.leadSubstitute.loading': 'Lädt …',
   'meetings.leadSubstitute.empty': 'Für {name} ist niemand im Stellvertretungs-Pool eingetragen.',
@@ -1609,8 +1553,6 @@ export const de = {
   'budget.tree.incomeTitle': 'Einnahmen {amount}',
   'admin.webhook.edit': 'Webhook bearbeiten',
   'admin.webhook.noEvents': 'Keine festen Ereignisse · Trigger aus dem Flow',
-  'admin.webhook.signedNote':
-    'Jede Zustellung ist mit HMAC-SHA256 signiert. Der Server hält je Webhook den jüngsten Zustellversuch fest; Adressen und Antwortinhalte speichert er nicht.',
   'admin.mailTemplates.template': 'Vorlage',
   'admin.mailTemplates.lang': 'Sprache der Vorlage',
   'admin.mailTemplates.key.erasure_requested': 'Löschantrag eingegangen',
@@ -1624,8 +1566,6 @@ export const de = {
   'admin.cdVariants.unused': 'von keinem Gremium genutzt',
   'admin.cdVariants.pickFile': 'Datei auswählen',
   'admin.cdVariants.noFile': 'Keine Datei gewählt',
-  'admin.cdVariants.note':
-    'Welche Variante ein Gremium nutzt, stellst du beim Gremium ein. Quadratisches Logo: PNG, JPEG oder WebP, quadratisch, mindestens {min} × {min} px, höchstens {mb} MB. Titelseite und Fußzeile: zusätzlich SVG und PDF. Ohne quadratisches Logo zeigt die App die Initialen des Gremiums.',
   'admin.config.history.unknownActor': 'Unbekannte Person',
   'admin.brand.textLang': 'Texte in',
   'admin.brand.replaceLogo': 'Datei ersetzen',
@@ -1638,15 +1578,10 @@ export const de = {
   'admin.brand.removeLink': 'Link entfernen',
   'admin.brand.noColumns': 'Noch keine Spalte.',
   'admin.brand.noLegal': 'Noch keine rechtlichen Links.',
-  'admin.brand.copyrightHint': 'Leer lassen für den Standardtext.',
   'admin.brand.preview': 'Vorschau',
-  'admin.brand.previewHint': 'So sehen Kopf, Texte und Fußzeile mit diesem Entwurf aus.',
   'budget.tree.col.income': 'Einnahmen',
-  'budget.tree.subtitle':
-    'Zuteilung je Haushaltsjahr, Farbe je Kostenstelle, Unter-Kostenstellen anlegen.',
   'budget.tree.createTopShort': 'Budget',
   'budget.tree.moreActions': 'Weitere Aktionen',
-  'budget.tree.toolbar': 'Budget-Einstellungen',
   'budget.tree.topLabel': 'Budget',
   'budget.tree.topChip': '{name} {key} · Stichtag {cutoff}',
   'budget.tree.fyLabel': 'Haushaltsjahr',
@@ -1664,27 +1599,20 @@ export const de = {
   'budget.tree.colorHex': 'Farbe als Hex-Wert',
   'budget.tree.colorInvalid': 'Format #rrggbb',
   'budget.tree.colorClear': 'Farbe entfernen',
-  'budget.tree.colorHint': 'Ohne eigene Farbe gilt die Farbe des Elternknotens.',
   'budget.tree.active': 'Aktiv',
-  'budget.tree.activeHint':
-    'Eine inaktive Kostenstelle steht im Antragsformular nicht zur Auswahl.',
   'budget.tree.deleteTitle': 'Kostenstelle löschen',
   'budget.tree.deleteConfirm': '„{name}“ ({path}) löschen?',
   'budget.tree.deleteBlocked':
     'Eine Kostenstelle mit Unter-Kostenstellen oder Zuteilungen lässt sich nicht löschen.',
   'budget.tree.fyState': 'Status',
   'admin.deadlines.edit': 'Frist bearbeiten',
-  'admin.deadlines.keyHint': 'Den Schlüssel nennt der Flow. Nach dem Anlegen bleibt er fest.',
   'admin.deadlines.keyLocked': 'Der Schlüssel ist unveränderlich.',
   'admin.deadlines.daysValue': '{n} Tage',
   'admin.deadlines.dateCount': '{n} Termine',
   'admin.deadlines.noNextDate': 'Kein Termin mehr',
   'admin.guest.title': 'Anträge ohne Konto',
-  'admin.guest.subtitle': 'Gilt für Anträge, die ohne Anmeldung eingereicht werden.',
   'admin.guest.hours': 'Unbestätigte Anträge verwerfen nach',
   'admin.guest.hoursUnit': 'Stunden',
-  'admin.guest.hoursHint':
-    'Bestätigt niemand die E-Mail-Adresse, löscht die Plattform den Antrag samt Anhängen nach dieser Zeit. 1 bis {max} Stunden.',
   'admin.guest.hoursRange': 'Eine ganze Zahl von 1 bis {max} Stunden.',
   'admin.guest.link': 'Gültigkeit des persönlichen Links',
   'admin.guest.linkUnlimited': 'Unbegrenzt',
@@ -1692,41 +1620,25 @@ export const de = {
   'admin.guest.days': 'Gültig für',
   'admin.guest.daysUnit': 'Tage',
   'admin.guest.daysRange': 'Eine ganze Zahl von 1 bis {max} Tagen.',
-  'admin.guest.linkHint':
-    'Mit dem Link verfolgt und bearbeitet die antragstellende Person ihren Antrag. Löst sie einen neuen Link ein, verfallen die älteren. Eine Änderung gilt für neu angeforderte Links.',
   'admin.guest.loadError': 'Die Einstellungen konnten nicht geladen werden.',
   'admin.meetingWindow.title': 'Sitzung eröffnen',
-  'admin.meetingWindow.subtitle': 'Wann sich eine geplante Sitzung vor ihrem Beginn eröffnen lässt.',
   'admin.meetingWindow.openLead': 'Frühestens eröffnen',
-  'admin.meetingWindow.openLeadHint':
-    'Vorher lässt sich die Sitzung nicht eröffnen. 0 bis {max} Minuten vor dem geplanten Beginn.',
   'admin.meetingWindow.confirmLead': 'Ohne Rückfrage eröffnen ab',
-  'admin.meetingWindow.confirmLeadHint':
-    'Davor fragt ein zusätzlicher Dialog, ob die Sitzung wirklich schon beginnen soll. 0 = vor dem Beginn immer mit Rückfrage; derselbe Wert wie bei „Frühestens eröffnen“ = nie mit Rückfrage.',
   'admin.meetingWindow.unit': 'Min. vorher',
   'admin.meetingWindow.range': 'Eine ganze Zahl von 0 bis {max} Minuten.',
   'admin.meetingWindow.order': 'Höchstens so viele Minuten wie bei „Frühestens eröffnen“.',
   'admin.loginSettings.title': 'Anmeldung',
-  'admin.loginSettings.subtitle': 'Wie lange eine Anmeldung im Browser und in der installierten App gültig bleibt.',
   'admin.loginSettings.web': 'Anmeldung im Browser gültig für',
-  'admin.loginSettings.webHint': 'Gilt für die Anmeldung in einem Browser-Tab.',
   'admin.loginSettings.pwa': 'Anmeldung in der installierten App gültig für',
-  'admin.loginSettings.pwaHint': 'Gilt für die App, die auf dem Startbildschirm oder dem Desktop installiert ist.',
   'admin.loginSettings.daysUnit': 'Tage',
   'admin.loginSettings.range': 'Eine ganze Zahl von 1 bis {max} Tagen.',
-  'admin.loginSettings.note':
-    'Eine Anmeldung bleibt so viele Tage nach der letzten Nutzung gültig. Eine Änderung gilt für jede Anmeldung ab ihrer nächsten Verlängerung. Etwa alle 12 Stunden prüft die Plattform das Konto beim Identitätsanbieter: Ist eine Gruppe entfernt oder das Konto gesperrt, endet der Zugang trotzdem schnell. Browser löschen ein Cookie spätestens nach {max} Tagen, darum ist das der höchste Wert.',
   'admin.loginSettings.updatedAt': 'Zuletzt geändert am {date}',
   'admin.loginSettings.loadError': 'Die Einstellungen konnten nicht geladen werden.',
   'admin.loginSettings.forbidden': 'Für diese Einstellungen fehlt das Recht, Personen zu verwalten.',
   'admin.forms.col.version': 'Version',
   'admin.forms.withBudget': 'Mit Budget',
   'admin.forms.withoutBudget': 'Ohne Budget',
-  'admin.forms.draftNote':
-    'Ohne aktive Formularversion bleibt eine Antragsart ein Entwurf und ist im öffentlichen Antrag nicht wählbar.',
   'admin.gremiumRoles.manage': 'Rollen verwalten',
-  'admin.gremien.note':
-    'Mitgliedschaften kommen aus OIDC-Gruppen und sind hier nur lesbar. Rollen und ihre Berechtigungen pflegst du hier.',
   'admin.gremien.collapse': 'Zuklappen',
   'admin.gremien.expand': 'Aufklappen',
   'admin.gremien.settings': 'Einstellungen',
@@ -1800,8 +1712,6 @@ export const de = {
   'admin.audit.targetType.notification_settings': 'Benachrichtigungen',
   'admin.audit.targetType.gremium_membership': 'Mitgliedschaft',
   'admin.audit.targetType.auskunft': 'Auskunft',
-  'admin.backups.subtitle':
-    'Ganze Plattform sichern: Datenbank und alle Anhänge, age-verschlüsselt.',
   'admin.backups.pinned': 'angeheftet',
   'admin.privacy.noEmail': 'anonymisiert',
   'admin.audit.verify.checkedOn': 'Zuletzt geprüft am {when}',
@@ -1827,9 +1737,6 @@ export const de = {
   'admin.roles.empty': 'Noch keine globalen Rollen.',
   'admin.roles.fixedFoot':
     'Feste Rollen lassen sich nicht löschen. Administrator hat immer alle Rechte; die Rechte von Mitglied sind änderbar.',
-  'admin.roles.addSubtitle': 'Die Rechte setzt du danach in der aufgeklappten Rolle.',
-  'admin.roles.keyHint':
-    'Beginnt mit einem Kleinbuchstaben, danach Kleinbuchstaben, Ziffern und Unterstriche. Später nicht mehr änderbar.',
   'admin.roles.add': 'Hinzufügen',
   'admin.roles.keyTaken': 'Diesen Schlüssel gibt es schon.',
   'admin.frame.navLabel': 'Verwaltungsbereiche',
@@ -1932,13 +1839,9 @@ export const de = {
   'budget.tree.col.actions': 'Aktionen',
   'budget.overview.button': 'Übersicht',
   'budget.overview.title': 'Budget-Übersicht',
-  'budget.overview.hint':
-    'Ringe = Ebenen des Kostenstellen-Baums (außen = tiefer). Klick auf ein Segment öffnet die Kostenstelle.',
   'budget.pie.emptyLabel': '{name}: kein Betrag vorhanden',
   'budget.tree.col.color': 'Farbe',
   'budget.tree.stateConfig': 'Beantragt/Gebunden-States',
-  'budget.tree.stateConfigHint':
-    'Flow-States, die als angenommen (gebunden) bzw. abgelehnt (ausgeschlossen) zählen. Alles andere ist beantragt.',
   'budget.tree.stateCol': 'Status',
   'budget.tree.accepted': 'Angenommen',
   'budget.tree.denied': 'Abgelehnt',
@@ -1948,32 +1851,20 @@ export const de = {
   'budget.tree.delete': 'Löschen',
   'budget.tree.fyTitle': 'Haushaltsjahr anlegen',
   'budget.tree.fyYear': 'Jahr',
-  'budget.tree.fyYearHint':
-    'Start und Ende ergeben sich aus dem Stichtag des Budgets. Anzeige: »YYYY« bei Stichtag 01.01., sonst »YYYY/YY«.',
   'budget.tree.fyInactive': 'inaktiv',
   'budget.tree.stichtagTitle': 'Stichtag setzen',
-  'budget.tree.stichtagHint':
-    'Tag (1 bis 28) und Monat, an dem ein Haushaltsjahr beginnt. Vorgabe: 01.01.',
   'budget.tree.done': 'Fertig',
   'budget.tree.save': 'Speichern',
   'budget.tree.editNode': 'Kostenstelle bearbeiten',
-  'budget.tree.editNodeHint':
-    'Ändert sich der Schlüssel, passt die Plattform den Pfad aller Unter-Kostenstellen an.',
   'budget.tree.hiddenInBudget': 'Im Budget-Tab ausblenden',
-  'budget.tree.hiddenInBudgetHint':
-    'Nur Anzeige: Die Kostenstelle (inkl. Unterbaum) erscheint nicht im Budget-Tab; Summen, Verfügbar-Rechnung und Export bleiben unverändert.',
   'budget.tree.decisionGremium': 'Entscheidendes Gremium',
   'budget.tree.decisionGremiumNone': '— keins (übergeordnet) —',
-  'budget.tree.decisionGremiumHint':
-    'Dieses Gremium entscheidet über Anträge auf diese Kostenstelle und ihre Unterstellen, wenn der Ablauf das Gremium aus der Kostenstelle nimmt.',
   'budget.tree.decisionGremiumInherited': 'Geerbt von {path} · {name}: {gremium}',
   'budget.tree.unknownGremium': 'unbekanntes Gremium',
   'budget.tree.decisionGremiumNoneHint':
     'Kein Gremium hier und darüber: Anträge auf diese Kostenstelle haben kein entscheidendes Gremium.',
   'budget.tree.viewGremium': 'Sichtbar für Gremium',
   'budget.tree.viewGremiumNone': '— kein Gremium —',
-  'budget.tree.viewGremiumHint':
-    'Mitglieder dieses Gremiums sehen die Kostenstelle samt Unterbaum im Budget-Tab als Wurzel — auch ohne globale Budget-Rechte.',
   'budget.tree.toast.saved': 'Gespeichert.',
   'budget.tree.toast.keyFailed':
     'Speichern fehlgeschlagen (Schlüssel ungültig oder bereits vergeben?).',
@@ -1996,8 +1887,6 @@ export const de = {
   'budget.tree.fyExisting': 'Vorhandene Haushaltsjahre',
   'budget.tree.fyActive': 'Aktiv',
   'budget.tree.fyEdit': 'Haushaltsjahr bearbeiten',
-  'budget.tree.fyEditHint':
-    'Der Server leitet Beginn und Ende aus dem Stichtag des Budgets neu ab. Ein inaktives Jahr steht nicht mehr zur Auswahl.',
   'budget.tree.fyDelete': 'Haushaltsjahr löschen',
   'budget.tree.fyDeleteTitle': 'Haushaltsjahr löschen?',
   'budget.tree.fyDeleteConfirm':
@@ -2019,7 +1908,6 @@ export const de = {
   'admin.common.moveUp': 'Nach oben',
   'admin.common.moveDown': 'Nach unten',
   'admin.common.key': 'Schlüssel',
-  'admin.common.roleKeyHint': 'Kleinbuchstaben, Ziffern und _. Am Anfang steht ein Buchstabe.',
   'admin.common.roleKeyInvalid':
     'Der Schlüssel muss mit einem Kleinbuchstaben beginnen. Erlaubt sind nur Kleinbuchstaben, Ziffern und _.',
   'admin.common.label': 'Bezeichnung',
@@ -2071,15 +1959,10 @@ export const de = {
   'admin.form.type.positions': 'Kostenpositionen',
   'admin.form.type.section': 'Abschnitt (neuer Schritt)',
   'admin.form.metric.amount': 'Betrag (Budget)',
-  'admin.form.autoPromoted': 'Fließt automatisch als Summe in den Betrag (Budget).',
   'admin.form.positions': 'Kostenpositionen',
-  'admin.form.positionsHint':
-    'Antragsteller listen Positionen; jede mit mehreren Vergleichsangeboten. Ein Angebot wird bevorzugt — dessen Wert zählt; die Summe der Positionen ergibt den Betrag.',
   'admin.form.minOffers': 'Min. Vergleichsangebote',
   'admin.form.minPositions': 'Min. Positionen',
   'admin.form.allowNoOffers': 'Verzicht auf Vergleichsangebote erlauben',
-  'admin.form.allowNoOffersHint':
-    'Antragstellende können pro Position mit Begründung erklären, dass keine Vergleichsangebote möglich sind — dann genügt ein einzelnes Angebot.',
 
   'admin.flow.title': 'Flow-Editor',
   // Flow-Validierung: was der Editor an einem Graphen bemängelt, bevor gespeichert wird.
@@ -2139,16 +2022,9 @@ export const de = {
   'admin.flow.cfgGremiumPh': 'Gremium wählen…',
   'admin.flow.cfgRole': 'Entscheidende Rolle',
   'admin.flow.cfgRolePh': 'Rolle wählen…',
-  'admin.flow.globalNotice': 'Globales Flow-Chart für alle Anträge',
-  'admin.flow.branchHint':
-    'Dieser State hat zwei Ausgänge — markiere die Übergänge mit Zweig „pass"/„fail" bzw. „accept"/„reject".',
   'admin.flow.cfgDeadline': 'Frist',
   'admin.flow.cfgDeadlinePh': 'Keine Frist',
-  'admin.flow.cfgDeadlineHint':
-    'Beim Betreten dieses States wird die gewählte Frist angelegt. Verbinde einen Ausgang mit dem Guard „Frist abgelaufen", damit er bei Ablauf automatisch feuert.',
   'admin.flow.guardPriority': 'Guard-Priorität',
-  'admin.flow.guardPriorityHint':
-    'Pro unterschiedlichem Guard ein Ausgangs-Punkt. Die Reihenfolge bestimmt die Auswertung — der erste passende Guard gewinnt.',
   'admin.flow.guardDefault': 'Kein Guard (Catch-all)',
   'admin.flow.moveUp': 'Nach oben',
   'admin.flow.moveDown': 'Nach unten',
@@ -2177,13 +2053,9 @@ export const de = {
   'admin.flow.removeState': 'Status löschen',
   'admin.flow.removeTransition': 'Übergang löschen',
   'admin.flow.automatic': 'Automatischer Übergang',
-  'admin.flow.automaticHint': 'Feuert ohne Nutzer-Aktion, sobald der Guard erfüllt ist.',
   'admin.flow.requiresAction': 'Erfordert Aktion',
-  'admin.flow.requiresActionHint':
-    'Zählt als offene Aufgabe im Aufgaben-Tab. Deaktivieren für rein optionale Aktionen.',
   'admin.flow.selectHint': 'Wähle einen Status oder Übergang im Diagramm zum Bearbeiten.',
   'admin.flow.guardNone': '— ohne Bedingung —',
-  'admin.flow.guardHelp': 'Der Übergang feuert automatisch, sobald diese Bedingung erfüllt ist.',
   'admin.flow.guardAddChild': 'Bedingung',
   'admin.flow.guardBoolTrue': 'erfüllt',
   'admin.flow.guardCombinator.and': 'UND (alle)',
@@ -2227,22 +2099,16 @@ export const de = {
   'admin.flow.cfgGremiumSource': 'Wer entscheidet',
   'admin.flow.cfgGremiumSourceFixed': 'Festes Gremium',
   'admin.flow.cfgGremiumSourceBudget': 'Gremium aus der Kostenstelle',
-  'admin.flow.cfgGremiumSourceBudgetHint':
-    'Beim Eintritt nimmt der Antrag das entscheidende Gremium seiner Kostenstelle (oder einer übergeordneten). Ohne ein solches Gremium ist der Übergang gesperrt.',
   'admin.flow.nodeGremiumFromBudget': 'Gremium: aus Kostenstelle',
   'admin.flow.actSessionGremiumPh': 'Gremium der Abstimmung',
-  'admin.flow.actSessionGremiumHint': 'Leer = Gremium der Abstimmung.',
   'admin.flow.actSubtree': 'Suche begrenzen auf',
   'admin.flow.actSubtreeAll': 'Alle Kostenstellen',
-  'admin.flow.actApplicantGremiumHint':
-    'Weist die eine Kostenstelle zu, deren eigenes entscheidendes Gremium ein Gremium der Antragsteller:in ist. Bei keiner oder mehreren Treffern bleibt die Kostenstelle offen.',
   'admin.flow.actMapRows': 'Feldwert → Kostenstelle',
   'admin.flow.actMapValue': 'Feldwert',
   'admin.flow.actMapBudget': 'Kostenstelle',
   'admin.flow.actMapAdd': 'Zeile hinzufügen',
   'admin.flow.actMapRemove': 'Zeile entfernen',
   'admin.flow.actMapEmpty': 'Noch keine Zuordnung.',
-  'admin.flow.actMapHint': 'Ohne passenden Feldwert bleibt die Kostenstelle offen.',
   'admin.flow.ccPick': 'Kostenstelle wählen…',
   'admin.flow.ccUnknown': 'Unbekannte Kostenstelle',
   'admin.flow.ccEmpty': 'Keine Kostenstellen vorhanden.',
@@ -2276,10 +2142,6 @@ export const de = {
   'admin.flow.group.subgroups': 'Untergruppen',
   'admin.flow.group.rootCrumb': 'Flow',
   'admin.flow.group.dissolve': 'Gruppe auflösen',
-  'admin.flow.group.dissolveHint':
-    'Auflösen entfernt nur die visuelle Klammer — der Inhalt wandert eine Ebene nach oben.',
-  'admin.flow.group.multiHint':
-    'Shift-Klick wählt mehrere Schritte; „Gruppieren“ fasst sie zusammen. Ein Klick auf eine Gruppe öffnet sie.',
   'admin.flow.guardHint.budgetIs': 'ID der Kostenstelle (Budget-Baum).',
   'admin.flow.guardHint.hasField': 'Feld-Schlüssel, z. B. „iban".',
   'admin.flow.compareField': 'Feld',
@@ -2292,13 +2154,10 @@ export const de = {
   'admin.flow.recipientKind.email': 'E-Mail-Adresse',
   'admin.flow.actWebhook': 'Webhook',
   'admin.flow.actWebhookPh': 'Webhook wählen …',
-  'admin.flow.actSessionHint': 'Nur gültig auf einem Übergang in einen Abstimmungs-State.',
   'admin.flow.actBudget': 'Kostenstelle',
   'admin.flow.actBudgetPh': 'ID der Kostenstelle',
   'admin.flow.actBudgetField': 'Feld mit Kostenstelle',
   'admin.flow.actBudgetFieldPh': 'Feld-Key (z. B. ziel_kostenstelle)',
-  'admin.flow.actBudgetFieldHint':
-    'Weist die im genannten Formularfeld (gremium_select/budget_select) gewählte Kostenstelle zu.',
   'admin.flow.actRecipients': 'Empfänger',
   'admin.flow.actEmailPh': 'name@beispiel.de',
   'admin.flow.addRecipient': 'Empfänger',
@@ -2336,24 +2195,17 @@ export const de = {
   'admin.flow.addActionPh': 'Aktion wählen …',
 
   'admin.brand.title': 'Branding & Texte',
-  'admin.brand.desc':
-    'Logos, Fußzeile, rechtliche Links und Freitexte. „Entwurf aktivieren“ macht die Änderungen für alle sichtbar.',
   'admin.brand.version': 'Version {n}',
   'admin.brand.draftDirty': 'Nicht aktivierter Entwurf',
   'admin.brand.appName.group': 'App-Name',
   'admin.brand.appName.full': 'Voller Name (Browser-Tab)',
   'admin.brand.appName.short': 'Kurzname (PWA)',
-  'admin.brand.appName.hint':
-    'Leer lassen, um die Standardnamen (STUPA Antragsplattform / StuPa) zu verwenden.',
   'admin.brand.avatars.group': 'Profilbilder',
   'admin.brand.avatars.gravatar': 'Gravatar-Bilder zeigen',
-  'admin.brand.avatars.hint':
-    'Personen mit einem Gravatar-Konto zeigen ihr Bild statt der Initialen. Die Plattform holt das Bild selbst; der Browser verbindet sich nicht mit Gravatar. Aus: überall Initialen.',
   'admin.brand.logos': 'Logos',
   'admin.brand.logo.wordmark': 'Wortmarke',
   'admin.brand.logo.imagemark': 'Bildmarke',
   'admin.brand.logo.favicon': 'Favicon',
-  'admin.brand.logoHint': 'PNG/JPEG/WEBP/ICO, max. {mb} MB.',
   'admin.brand.dropHere': 'Datei hierher ziehen oder auswählen',
   'admin.brand.tooLarge': 'Datei zu groß (max. {mb} MB).',
   'admin.brand.badType': 'Dateityp nicht erlaubt.',
@@ -2370,8 +2222,6 @@ export const de = {
   'admin.brand.text.emailFooter': 'E-Mail-Fußzeile',
   'admin.brand.text.applyInfo': 'Info unter der Antrags-Auswahl (Markdown)',
   'admin.brand.submitted.group': 'Texte nach dem Einreichen',
-  'admin.brand.submitted.hint':
-    'Markdown. Die Seite nach dem Absenden zeigt diesen Text. Ein leeres Feld zeigt den Standardtext.',
   'admin.brand.submitted.internal': 'Intern – angemeldet mit Konto',
   'admin.brand.submitted.external': 'Extern – Gast mit E-Mail-Bestätigung',
   'admin.brand.submitted.preview': 'Vorschau',
@@ -2382,12 +2232,9 @@ export const de = {
   'admin.brand.badUrl': 'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
 
   'admin.webhook.title': 'Webhooks',
-  'admin.webhook.desc':
-    'Sende Ereignisse an externe Systeme (z. B. Chat-Bridges). Pro Hook eine Ziel-URL und die Ereignisse, die ihn auslösen.',
   'admin.webhook.name': 'Name',
   'admin.webhook.url': 'Ziel-URL',
   'admin.webhook.events': 'Ereignisse',
-  'admin.webhook.eventsHint': 'Optional — Trigger kommen meist aus dem Flow-Graph.',
   'admin.webhook.active': 'Aktiv',
   'admin.webhook.add': 'Webhook hinzufügen',
   'admin.webhook.none': 'Keine Webhooks konfiguriert.',
@@ -2424,8 +2271,6 @@ export const de = {
   'admin.webhook.delivery.reason.unknown': 'Die Ursache ist unbekannt.',
 
   'admin.gremiumRoles.title': 'Gremium-Rollen',
-  'admin.gremiumRoles.subtitle':
-    'Die Rollen eines Gremiums und ihre Berechtigungen, getrennt von den globalen Rollen.',
   'admin.gremiumRoles.add': 'Gremium-Rolle hinzufügen',
   'admin.gremiumRoles.empty': 'Noch keine Gremium-Rollen angelegt.',
   'admin.gremiumRoles.forced': 'Pflichtrolle: in jedem Gremium vorhanden, nicht löschbar',
@@ -2439,7 +2284,6 @@ export const de = {
   'admin.gremiumPerm.protocol.finalize': 'Protokoll freigeben',
 
   'admin.audit.title': 'Audit-Log',
-  'admin.audit.desc': 'Fortlaufendes Protokoll aller sicherheitsrelevanten Aktionen.',
   'admin.audit.empty': 'Keine Audit-Einträge.',
   'admin.audit.error': 'Audit-Log konnte nicht geladen werden.',
   'admin.audit.loadMore': 'Mehr laden',
@@ -2587,20 +2431,14 @@ export const de = {
   'admin.backups.offHint':
     'Für diese Installation ist kein age-Empfänger hinterlegt. Ohne ihn kann die Plattform kein Archiv verschlüsseln. Siehe deploy/README.md.',
   'admin.backups.createTitle': 'Sicherung anlegen',
-  'admin.backups.createHint':
-    'Ein Archiv enthält die gesamte Datenbank und alle Anhänge, age-verschlüsselt. Die Erstellung läuft im Hintergrund und dauert je nach Datenmenge einige Minuten.',
   'admin.backups.note': 'Notiz (optional)',
   'admin.backups.notePlaceholder': 'z. B. vor der Haushaltsabstimmung',
   'admin.backups.create': 'Sicherung anlegen',
   'admin.backups.importTitle': 'Archiv einspielen',
-  'admin.backups.importHint':
-    'Nimmt eine hochgeladene .tar.age-Datei in die Liste auf. Sie wird dabei geprüft, aber NICHT zurückgespielt.',
   'admin.backups.import': 'Datei wählen',
   'admin.backups.noIdentity':
     'Kein privater AGE-Schlüssel hinterlegt. Ein Import prüft das Archiv, indem er es entschlüsselt — dafür braucht die Plattform BACKUP_AGE_IDENTITY_FILE. Ohne den Schlüssel bleiben Import und Zurückspielen aus.',
   'admin.backups.listTitle': 'Vorhandene Sicherungen',
-  'admin.backups.retentionHint':
-    'Die {count} neuesten Sicherungen bleiben erhalten. Angeheftete Sicherungen und die automatische Kopie vor einem Zurücksetzen werden nie gelöscht.',
   'admin.backups.empty': 'Noch keine Sicherungen vorhanden.',
   'admin.backups.col.created': 'Erstellt',
   'admin.backups.col.status': 'Status',
@@ -2640,7 +2478,6 @@ export const de = {
   'admin.backups.toast.restoreStarted':
     'Zurücksetzen gestartet. Die Plattform ist gleich kurz nicht erreichbar und Sie werden abgemeldet.',
   'admin.privacy.title': 'Datenschutz',
-  'admin.privacy.subtitle': 'DSGVO-Verwaltung: Löschanträge, Auskunft, Aufbewahrung.',
   'admin.privacy.queueTitle': 'Löschanträge (Art. 17)',
   'admin.privacy.queueEmpty': 'Keine Löschanträge.',
   'admin.privacy.col.status': 'Status',
@@ -2662,13 +2499,10 @@ export const de = {
   'admin.privacy.subject.applicant': 'Antrag',
   'admin.privacy.subject.principal': 'Konto',
   'admin.privacy.auskunftTitle': 'Auskunft (Art. 15)',
-  'admin.privacy.auskunftHint': 'Alle zu einer E-Mail gespeicherten Daten als XLSX exportieren.',
   'admin.privacy.email': 'E-Mail-Adresse',
   'admin.privacy.auskunftExport': 'Exportieren',
   'admin.privacy.auskunftDone': 'Auskunft exportiert.',
   'admin.privacy.principalTitle': 'Konto löschen (Art. 17)',
-  'admin.privacy.principalHint':
-    'Personenbezogene Daten eines Kontos leeren. Die Kennung bleibt als Pseudonym.',
   'admin.privacy.personSearch': 'Person suchen (Name oder E-Mail)',
   'admin.privacy.personHits': 'Gefundene Konten',
   'admin.privacy.personPlaceholder': 'Name oder E-Mail …',
@@ -2678,42 +2512,27 @@ export const de = {
     'Die personenbezogenen Daten dieses Kontos endgültig löschen? Das kann nicht rückgängig gemacht werden.',
   'admin.privacy.principalErased': 'Konto gelöscht.',
   'admin.privacy.retentionTitle': 'Aufbewahrung (Art. 5(1)(e))',
-  'admin.privacy.retentionHint':
-    'Globaler Standard in Monaten, bis abgeschlossene Anträge anonymisiert werden.',
   'admin.privacy.retentionMonths': 'Aufbewahrung (Monate)',
 
   'admin.notifications.title': 'Benachrichtigungen',
-  'admin.notifications.intro': 'Plattformweite Einstellungen für E-Mail-Benachrichtigungen.',
   'admin.notifications.taskReminder': 'Aufgaben-Erinnerungen',
-  'admin.notifications.taskReminderDesc':
-    'Erinnert Handlungsberechtigte per Mail, wenn ein Antrag zu lange ohne Aktion in einem Schritt steht. Einzelne Nutzer:innen können die Art „Aufgaben-Erinnerungen“ in ihren Konto-Einstellungen abwählen.',
   'admin.notifications.enabled': 'Aktiviert',
   'admin.notifications.afterDays': 'Erinnern nach (Tagen)',
-  'admin.notifications.afterDaysHint':
-    'Tage ohne Statuswechsel, bis die erste Erinnerung verschickt wird (mind. 1).',
   'admin.notifications.repeatDays': 'Wiederholen alle (Tage)',
-  'admin.notifications.repeatDaysHint':
-    '0 = nur einmal je Aufenthalt im Schritt; sonst alle N Tage erneut erinnern.',
   'admin.notifications.saved': 'Einstellungen gespeichert.',
   'admin.notifications.error': 'Einstellungen konnten nicht geladen werden.',
   'admin.notifications.saveError': 'Speichern fehlgeschlagen — bitte erneut versuchen.',
 
   'admin.deadlines.title': 'Fristen',
-  'admin.deadlines.subtitle':
-    'Fristen, die der Flow referenziert. Ein State legt beim Betreten seine Frist an; der Guard „Frist abgelaufen“ führt weiter.',
   'admin.deadlines.add': 'Frist hinzufügen',
   'admin.deadlines.empty': 'Noch keine Fristen angelegt.',
   'admin.deadlines.kind': 'Art',
   'admin.deadlines.date': 'Datum',
   'admin.deadlines.offsetDays': 'Frist in Tagen',
   'admin.deadlines.dates': 'Termine',
-  'admin.deadlines.datesHint':
-    'Liste von Terminen; verwendet wird jeweils der nächste noch ausstehende.',
   'admin.deadlines.addDate': 'Termin hinzufügen',
   'admin.deadlines.removeDate': 'Termin entfernen',
   'admin.deadlines.atTime': 'Uhrzeit',
-  'admin.deadlines.atTimeHint':
-    'Optional: feste Uhrzeit (Ortszeit der Zeitzone). Leer = Zeitpunkt der Auslösung.',
   'admin.deadlines.timezone': 'Zeitzone',
   'admin.deadlines.deleteTitle': 'Frist löschen',
   'admin.deadlines.deleteConfirm':
@@ -2728,9 +2547,6 @@ export const de = {
 
   // Agent-Tokens (OAuth-Zugänge) aller Personen — Verwaltungssicht mit Not-Aus.
   'admin.oauthGrants.title': 'Agent-Zugänge',
-  'admin.oauthGrants.subtitle': 'OAuth-Zugänge aller Personen ansehen und widerrufen.',
-  'admin.oauthGrants.intro':
-    'Ein Agent-Zugang ist ein Token, mit dem ein Programm im Namen einer Person auf die Plattform zugreift. Widerrufe einen Zugang, wenn ein Token abhandengekommen ist.',
   'admin.oauthGrants.loading': 'Zugänge werden geladen…',
   'admin.oauthGrants.error': 'Die Zugänge konnten nicht geladen werden.',
   'admin.oauthGrants.empty': 'Keine aktiven Agent-Zugänge.',
@@ -2757,7 +2573,6 @@ export const de = {
 
   // Corporate-design variants: the logo sets of the rendered documents.
   'admin.cdVariants.title': 'Dokument-Varianten',
-  'admin.cdVariants.subtitle': 'Logo-Sätze, mit denen ein Gremium seine Dokumente rendert.',
   'admin.cdVariants.add': 'Variante hinzufügen',
   'admin.cdVariants.create': 'Dokument-Variante anlegen',
   'admin.cdVariants.edit': 'Dokument-Variante bearbeiten',
@@ -2765,12 +2580,9 @@ export const de = {
   'admin.cdVariants.error': 'Die Dokument-Varianten konnten nicht geladen werden.',
   'admin.cdVariants.empty': 'Noch keine Dokument-Varianten angelegt.',
   'admin.cdVariants.name': 'Name',
-  'admin.cdVariants.keyHint':
-    'Wird aus dem Namen erzeugt. Nach dem Anlegen ist er nicht mehr änderbar.',
   'admin.cdVariants.keyLocked': 'Der Schlüssel ist unveränderlich.',
   'admin.cdVariants.keyExists': 'Dieser Schlüssel ist bereits vergeben.',
   'admin.cdVariants.base': 'Basis-Variante',
-  'admin.cdVariants.baseHint': 'Die Dokumentform, auf der die Variante aufbaut.',
   'admin.cdVariants.base.report': 'Bericht',
   'admin.cdVariants.base.protocol': 'Protokoll',
   'admin.cdVariants.toggleLogos': 'Logos anzeigen',
@@ -2781,8 +2593,6 @@ export const de = {
   'admin.cdVariants.noSquare': 'Kein quadratisches Logo',
   'admin.cdVariants.variantOf': 'Variante {name}',
   'admin.cdVariants.otherFile': 'Andere Datei',
-  'admin.cdVariants.squareFileHint':
-    'PNG, JPEG oder WebP, quadratisch, mindestens {min} × {min} px, höchstens {mb} MB.',
   'admin.cdVariants.squareChecking': 'Bild wird geprüft …',
   'admin.cdVariants.square.ok': '{w} × {h} px · quadratisch, groß genug',
   'admin.cdVariants.square.notSquare': '{w} × {h} px · nicht quadratisch (Seitenverhältnis 1:1)',
@@ -2793,8 +2603,6 @@ export const de = {
   'admin.cdVariants.serverTooSmall': 'Das Logo ist kleiner als {min} × {min} px.',
   'admin.cdVariants.serverTooManyPx': 'Das Logo ist größer als {max} × {max} px.',
   'admin.cdVariants.previewLabel': 'So erscheint es in der Gremien-Liste',
-  'admin.cdVariants.squareReplaces':
-    'Eine Variante hat höchstens ein quadratisches Logo. Ein neues ersetzt das alte.',
   'admin.cdVariants.noLogos': 'Noch keine Logos.',
   'admin.cdVariants.addLogo': 'Logo hinzufügen',
   'admin.cdVariants.removeLogo': 'Logo entfernen',
@@ -2803,7 +2611,6 @@ export const de = {
   'admin.cdVariants.sourceVendored': 'Mitgeliefertes Logo',
   'admin.cdVariants.vendoredHint':
     'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in einen normalen Upload um.',
-  'admin.cdVariants.fileHint': 'PNG, JPEG, WebP, SVG oder PDF, höchstens {mb} MB.',
   'admin.cdVariants.logoTooLarge': 'Die Datei ist zu groß.',
   'admin.cdVariants.logoType': 'Dieser Dateityp ist nicht erlaubt.',
   'admin.cdVariants.download': 'Datei herunterladen',
@@ -2813,7 +2620,6 @@ export const de = {
   'admin.cdVariants.inUse':
     'Diese Variante ist noch einem Gremium zugewiesen. Ändern Sie zuerst das Gremium.',
   'admin.deleg.title': 'Vertretung / Delegation',
-  'admin.deleg.subtitle': 'Sitzungsgebundene Vertretungen im Überblick.',
   'admin.deleg.loading': 'Vertretungen werden geladen …',
   'admin.deleg.error': 'Die Vertretungen konnten nicht geladen werden.',
   'admin.deleg.none': 'Keine aktiven Vertretungen.',
@@ -2827,8 +2633,6 @@ export const de = {
 
   // Substitute pool, shown in the Gremium member administration.
   'admin.substitutes.title': 'Stellvertretungen',
-  'admin.substitutes.hint':
-    'An eine Stellvertretung darf ohne Vorlauf bis Sitzungsbeginn übertragen werden, auch wenn sie nicht Mitglied ist.',
   'admin.substitutes.add': 'Stellvertretung hinzufügen',
   'admin.substitutes.addAction': 'Hinzufügen',
   'admin.substitutes.search': 'Person suchen',
@@ -2844,8 +2648,6 @@ export const de = {
 
   // Meeting delegation: card on the meeting page plus dialog.
   'delegation.card.title': 'Vertretung',
-  'delegation.card.lead':
-    'Du kannst dich für diese Sitzung vertreten lassen (optional inkl. Stimmrecht).',
   'delegation.card.deadline': 'Einrichtbar bis {date}.',
   'delegation.card.deadlinePassed':
     'Die Frist ist abgelaufen — nur noch Stellvertreter aus dem Pool sind möglich.',
@@ -2870,10 +2672,7 @@ export const de = {
   'participant.attendance.title': 'Deine Anwesenheit',
   'participant.attendance.delegated':
     'Du lässt dich in dieser Sitzung vertreten. Widerrufe die Vertretung, um dich anwesend zu melden.',
-  'participant.attendance.noteHint': 'Sichtbar für dich und die Sitzungsführung.',
   'participant.delegation.yourSubstitutes': 'Deine Stellvertretung',
-  'participant.delegation.substitutesNote':
-    'Stellvertretungen vertreten dich ohne Vorlauf bis Sitzungsbeginn.',
   'participant.delegation.substitutesOnly':
     'Die Frist ist abgelaufen. Bis Sitzungsbeginn ist nur noch eine Stellvertretung möglich.',
   'participant.delegation.others': 'Andere Mitglieder',
@@ -2954,7 +2753,6 @@ export const de = {
     'Antragsart „{name}" wirklich löschen? Formular und Verlauf werden mit entfernt.',
   'admin.forms.deleteFailed': 'Löschen fehlgeschlagen – ggf. existieren noch Anträge dieser Art.',
   'admin.forms.listTitle': 'Anträge & Formulare',
-  'admin.forms.listSubtitle': 'Antragstypen anlegen und ihre Formulare bearbeiten.',
   'admin.forms.add': 'Formular anlegen',
   'admin.forms.create': 'Neues Formular',
   'admin.forms.nameDe': 'Titel (DE)',
@@ -2965,9 +2763,7 @@ export const de = {
   'admin.forms.helpDe': 'Hilfetext (DE)',
   'admin.forms.helpEn': 'Hilfetext (EN)',
   'admin.forms.hasBudget': 'Mit Budget',
-  'admin.forms.hasBudgetHint': 'Erlaubt die Auswahl eines Budget-Topfes beim Antrag.',
   'admin.forms.cmpRequired': 'Vergleichsangebote erforderlich',
-  'admin.forms.cmpRequiredHint': 'Antragsteller müssen Vergleichsangebote beilegen.',
   'admin.forms.cmpMinCount': 'Mindestanzahl',
   'admin.forms.col.budget': 'Budget',
   'admin.forms.untitled': 'Unbenanntes Formular',
@@ -3050,15 +2846,12 @@ export const de = {
   'budget.dash.appsNone': 'Keine Anträge auf dieser Kostenstelle.',
 
   'admin.gremien.title': 'Gremien',
-  'admin.gremien.subtitle': 'Sitzungen, Protokolle und Abstimmungen gehören zu einem Gremium.',
   'admin.gremien.create': 'Gremium anlegen',
   'admin.gremien.edit': 'Gremium bearbeiten',
   'admin.gremien.name': 'Name',
   'admin.gremien.slug': 'Kürzel (slug)',
   'admin.gremien.cdVariant': 'CD-Variante',
   'admin.gremien.cdVariantNone': 'Standard des PDF-Renderers',
-  'admin.gremien.cdVariantHint':
-    'Logos der gerenderten Protokolle. Varianten pflegst du unter Dokument-Varianten.',
   'admin.gremien.defaultLang': 'Standardsprache',
   'admin.gremien.langDe': 'Deutsch',
   'admin.gremien.langEn': 'Englisch',
@@ -3070,30 +2863,19 @@ export const de = {
   'admin.gremien.deleteConfirm':
     '„{name}" wird mit allen Sitzungen samt ihren Abstimmungen und mit allen Rollenzuweisungen unwiderruflich gelöscht. Abstimmungen ohne Sitzung bleiben erhalten.',
   'admin.gremien.delegation': 'Stimm-Delegation erlauben',
-  'admin.gremien.delegationHint': 'Mitglieder dürfen sich für einzelne Sitzungen vertreten lassen.',
   'admin.gremien.delegationLead': 'Vorlauf für Delegationen (Minuten)',
-  'admin.gremien.delegationLeadHint':
-    '0 = bis Sitzungsbeginn. Stellvertretungen aus dem Pool sind ausgenommen.',
   'admin.gremien.delegationExternal': 'Delegation an Externe erlauben',
-  'admin.gremien.delegationExternalHint': 'Auch Personen außerhalb von Gremium und Pool.',
   'admin.gremien.quorum': 'Quorum (%)',
-  'admin.gremien.quorumHint':
-    'Anteil der Stimmberechtigten, der teilnehmen muss. Leer = kein Quorum.',
   'admin.gremien.mailRecipients': 'Zusätzliche Protokoll-Empfänger',
   'admin.gremien.mailRecipientsPlaceholder': 'listen@example.org\nvorstand@example.org',
-  'admin.gremien.mailRecipientsHint':
-    'Eine Adresse je Zeile. Finalisierte Protokolle gehen an die aktiven Mitglieder und an diese Adressen.',
   'admin.gremien.memberPicked': 'Gewählt',
   'admin.gremien.members': 'Mitglieder',
   'admin.gremien.membersOf': 'Mitglieder',
   'admin.gremien.membersEmpty': 'Noch keine Mitglieder in diesem Gremium.',
   'admin.gremien.memberSearchPlaceholder': 'Name, E-Mail oder OIDC-Subject …',
   'admin.gremien.membersLoadFailed': 'Die Mitglieder konnten nicht geladen werden.',
-  'admin.users.subtitle': 'Benutzer suchen und ihre Rollen und OIDC-Gruppen ansehen.',
   'admin.users.col.groups': 'SSO-Gruppen (letzter Login)',
   'admin.users.noGroups': 'Keine Gruppen.',
-  'admin.users.rolesFromGroups':
-    'Die Rollen kommen aus den OIDC-Gruppen der Person über die Gruppen-Zuordnung. Sie ändern sich bei der nächsten Anmeldung. Die Rolle Mitglied bekommt jede Person bei der Anmeldung.',
   'admin.users.manageGroupMappings': 'Gruppen-Zuordnung',
   'admin.gremien.loading': 'Gremien werden geladen …',
   'admin.gremien.error': 'Gremien konnten nicht geladen werden.',
@@ -3143,8 +2925,6 @@ export const de = {
   'admin.users.revoke.notSelf':
     'Deine eigenen Rechte kannst du nicht entziehen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
   'admin.users.revoke.title': 'Rechte entziehen',
-  'admin.users.revoke.subtitle':
-    'Für Personen, die sich nicht mehr anmelden. Wähle, welche Gremien und Rollen die Person verliert.',
   'admin.users.revoke.loading': 'Rechte werden geladen …',
   'admin.users.revoke.loadFailed': 'Die Rechte der Person konnten nicht geladen werden.',
   'admin.users.revoke.retry': 'Erneut versuchen',
@@ -3194,7 +2974,6 @@ export const de = {
   'admin.users.revoke.returnsAutomatically':
     'Kommt beim nächsten Start oder Login zurück: die Person ist als Bootstrap-Admin eingetragen (BOOTSTRAP_ADMIN_SUBJECTS / BOOTSTRAP_ADMIN_EMAILS).',
   'admin.users.revoke.deactivate': 'Konto zusätzlich deaktivieren',
-  'admin.users.revoke.deactivateHint': 'Die Person kann sich dann nicht mehr anmelden.',
   'admin.users.revoke.count.gremium': '1 Gremium',
   'admin.users.revoke.count.gremien': '{n} Gremien',
   'admin.users.revoke.count.role': '1 Rolle',
@@ -3218,16 +2997,12 @@ export const de = {
   'admin.users.merge.title': 'Mit anderem Konto zusammenführen',
   'admin.users.merge.subtitle': 'Altes Konto: {name}',
   'admin.users.merge.unnamed': 'Konto ohne Namen',
-  'admin.users.merge.pickLead':
-    'Wähle das Konto, das bleibt. Das alte Konto geht darin auf und wird danach gesperrt.',
   'admin.users.merge.pickSearch': 'Konto suchen, das bleibt',
   'admin.users.merge.pickList': 'Konten zur Auswahl',
   'admin.users.merge.loadingPreview': 'Vorschau wird geladen …',
   'admin.users.merge.previewFailed': 'Die Vorschau konnte nicht geladen werden.',
   'admin.users.merge.from': 'Altes Konto',
-  'admin.users.merge.fromNote': 'Wird gesperrt und verweist danach auf das Konto, das bleibt.',
   'admin.users.merge.into': 'Bleibt bestehen',
-  'admin.users.merge.intoNote': 'Übernimmt Anträge, Stimmen, Vertretungen und Verlauf.',
   'admin.users.merge.conflictsTitle': 'Konflikte',
   'admin.users.merge.conflictsLead':
     'So lassen sich die Konten nicht zusammenführen. Löse zuerst diese Konflikte.',
@@ -3320,7 +3095,6 @@ export const de = {
     'Dieses Konto wurde zusammengeführt und ist gesperrt. Melde dich mit deinem aktuellen Konto an.',
   'admin.roles.loading': 'Rollen werden geladen …',
   'admin.roles.title': 'Rollen & Rechte',
-  'admin.roles.subtitle': 'Globale Rollen und ihre Rechte. Aufklappen zeigt die Berechtigungen.',
   'admin.roles.addGlobalRole': 'Globale Rolle hinzufügen',
   'admin.roles.roleKey': 'Schlüssel',
   'admin.roles.deleteRole': 'Rolle löschen',
@@ -3331,8 +3105,6 @@ export const de = {
   'admin.roles.adminLocked':
     'Die Administrator-Rolle hat immer alle Rechte und ist hier nicht bearbeitbar.',
   'admin.mailTemplates.title': 'Mail-Vorlagen',
-  'admin.mailTemplates.subtitle':
-    'Betreff, Text und HTML der Benachrichtigungs-Mails je Sprache bearbeiten (Jinja2-Platzhalter).',
   'admin.mailTemplates.empty': 'Keine Vorlagen vorhanden.',
   'admin.mailTemplates.selectHint': 'Links eine Vorlage zum Bearbeiten wählen.',
   'admin.mailTemplates.key.magic_link': 'Anmelde-Link',
@@ -3372,10 +3144,6 @@ export const de = {
   'admin.groupMappings.deleted': 'Zuordnung gelöscht.',
   'admin.groupMappings.failed': 'Aktion fehlgeschlagen.',
   'admin.groupMappings.loadFailed': 'Die Zuordnungen konnten nicht geladen werden.',
-  'admin.gremien.membersHint':
-    'Die Mitgliedschaft kommt aus den OIDC-Gruppen der Person, über die Zuordnung „Gremien-Mitgliedschaft“. Die Liste ist schreibgeschützt. Sie ändert sich bei der nächsten Anmeldung der Person und wenn sich eine Zuordnung ändert.',
-  'admin.groupMappings.subtitle':
-    'Bei jeder Anmeldung liest die Plattform die OIDC-Gruppen der Person. Globale Rollen, Gremien-Mitgliedschaft und Gremien-Rollen sind drei getrennte Zuordnungen.',
   'admin.groupMappings.unknown': '(unbekannt)',
   'admin.groupMappings.reserved': 'Das Präfix „vote:“ ist reserviert.',
   'admin.groupMappings.gremiumPlaceholder': 'Gremium wählen …',
@@ -3389,16 +3157,12 @@ export const de = {
   'admin.groupMappings.notFound':
     'Das Gremium oder die Rolle gibt es nicht mehr. Lade die Seite neu.',
   'admin.groupMappings.global.title': 'Globale Rollen',
-  'admin.groupMappings.global.hint':
-    'Jede Person in der OIDC-Gruppe bekommt die globale Rolle. Eine globale Rolle gilt auf der ganzen Plattform und hat keinen Bezug zu einem Gremium.',
   'admin.groupMappings.global.add': 'Globale Rolle zuordnen',
   'admin.groupMappings.global.editTitle': 'Globale Rolle bearbeiten',
   'admin.groupMappings.global.empty': 'Noch keine OIDC-Gruppe einer globalen Rolle zugeordnet.',
   'admin.groupMappings.global.deleteBody':
     'Diese Zuordnung löschen? Personen, die die Rolle nur über diese Gruppe haben, verlieren sie bei der nächsten Anmeldung.',
   'admin.groupMappings.membership.title': 'Gremien-Mitgliedschaft',
-  'admin.groupMappings.membership.hint':
-    'Jede Person in der OIDC-Gruppe wird Mitglied des Gremiums, mit der Gremien-Rolle „Mitglied“. Nur diese Zuordnung macht eine Person zum Mitglied.',
   'admin.groupMappings.membership.add': 'Mitgliedschaft zuordnen',
   'admin.groupMappings.membership.editTitle': 'Mitgliedschaft bearbeiten',
   'admin.groupMappings.membership.empty':
@@ -3406,11 +3170,6 @@ export const de = {
   'admin.groupMappings.membership.deleteBody':
     'Diese Zuordnung löschen? Personen, die nur über diese Gruppe Mitglied sind, verlieren die Mitgliedschaft.',
   'admin.groupMappings.role.title': 'Gremien-Rollen',
-  'admin.groupMappings.role.hint':
-    'Jede Person in der OIDC-Gruppe bekommt die Rolle in dem Gremium, aber nur, wenn sie über „Gremien-Mitgliedschaft“ Mitglied dieses Gremiums ist. Diese Zuordnung macht niemanden zum Mitglied.',
-  'admin.groupMappings.role.ruleHint':
-    'Gelten für eine Person mehrere Rollen in einem Gremium, gilt die Rolle mit den meisten Rechten.',
-  'admin.groupMappings.role.gremiumFilterHint': 'Das Gremium filtert nur die Liste der Rollen.',
   'admin.groupMappings.role.add': 'Gremien-Rolle zuordnen',
   'admin.groupMappings.role.editTitle': 'Gremien-Rolle bearbeiten',
   'admin.groupMappings.role.empty': 'Noch keine OIDC-Gruppe einer Gremien-Rolle zugeordnet.',
@@ -3460,7 +3219,6 @@ export const de = {
   'expenses.form.fromInvoice':
     'Aus der Rechnung übernommen: Empfänger/Zahler, Rechnungsdatum, Belegnummer.',
   'expenses.form.receipt': 'Beleg',
-  'expenses.form.required': 'Pflichtfelder sind mit * markiert.',
   'expenses.form.what': 'Was',
   'expenses.form.where': 'Wohin',
   'expenses.none': 'Keine Buchung geöffnet',
@@ -3538,20 +3296,12 @@ export const de = {
   'guests.pseudonym': 'Gast {n}',
   'guests.tag': 'Gast',
   'guests.settings.title': 'Öffentliche Teilnahme (QR)',
-  'guests.settings.hint':
-    'Personen ohne Konto treten mit dem Handy bei. Du lässt jede Person zu. Zugelassene Gäste sehen die öffentlichen TOPs wie Mitglieder.',
   'guests.settings.modeCaption': 'Gäste in dieser Sitzung',
   'guests.settings.needsNoQuorum': 'Nur in Gremien ohne Quorum möglich.',
   'guests.settings.hasQuorum': 'Dieses Gremium hat ein Quorum von {n} %.',
   'guests.toast.needsNoQuorum': 'Öffentliche Teilnahme ist nur in Gremien ohne Quorum möglich.',
-  'guests.settings.linkAfterCreate':
-    'Link und QR-Code gibt es nach dem Anlegen: in „Sitzung bearbeiten“, im Kopf der Sitzungsseite („QR-Code“) und auf dem Beamer.',
-  'guests.settings.perVote':
-    'Einzelne Abstimmungen kannst du beim Öffnen auf Mitglieder beschränken. Abstimmungen in nicht öffentlichen TOPs sind immer nur für Mitglieder.',
   'guests.mode.vote': 'Gäste dürfen abstimmen',
   'guests.mode.watch': 'Gäste schauen nur zu',
-  'guests.mode.voteHint': 'Gäste stimmen wie Mitglieder ab, dann ohne Quorum.',
-  'guests.mode.watchHint': 'Gäste folgen der Sitzung live. Abstimmen dürfen nur Mitglieder.',
   'guests.link.caption': 'Beitrittslink · Code {code}',
   'guests.link.copy': 'Kopieren',
   'guests.link.copied': 'Kopiert',
@@ -3568,16 +3318,10 @@ export const de = {
   'guests.toast.guestVoteOpen':
     'Eine Abstimmung mit Gästen ist offen. Schließe sie, bevor Gäste nur noch zuschauen.',
   'guests.vote.switch': 'Gäste stimmen mit ab',
-  'guests.vote.switchOn':
-    '{n} zugelassene Gäste stimmen mit. Ohne Quorum: es zählt nur die Mehrheit der abgegebenen Stimmen.',
-  'guests.vote.switchOff': 'Aus: nur die Mitglieder stimmen ab. Quorum wie bisher.',
-  'guests.vote.switchNonPublic': 'In einem nicht öffentlichen TOP stimmen nur Mitglieder ab.',
   'guests.vote.votersWith':
     'Stimmberechtigt jetzt: {n} ({members} Mitglieder + {guests} Gäste anwesend)',
   'guests.vote.votersMembers': 'Stimmberechtigt: {n} Mitglieder ({present} anwesend)',
   'guests.vote.composition': '{members} Mitglieder + {guests} Gäste anwesend',
-  'guests.vote.lateHint':
-    'Gäste, die du jetzt zulässt, stimmen noch mit. Die Zahl der Stimmberechtigten steht beim Schließen fest.',
   'guests.vote.resultCaption': 'Ergebnis ohne Quorum',
   'guests.vote.cast': 'Abgegeben',
   'guests.vote.castN': 'Abgegeben {n}',
@@ -3619,8 +3363,6 @@ export const de = {
   'guests.list.renameTitle': 'Namen des Gasts ändern',
   'guests.list.remove': 'Gast entfernen',
   'guests.list.removeTitle': '{name} entfernen?',
-  'guests.list.removeHint':
-    'Die Person kann danach nicht mehr abstimmen. Stimmen in geschlossenen Abstimmungen bleiben gezählt.',
   'guests.status.left': 'Hat verlassen',
   'guests.status.removed': 'Entfernt',
   'guests.status.watching': 'Schaut zu',
@@ -3667,7 +3409,6 @@ export const de = {
     'Nimm an der Sitzung teil und stimme mit ab. Ein Konto brauchst du nicht.',
   'guests.join.introWatch': 'Verfolge die Sitzung live. Ein Konto brauchst du nicht.',
   'guests.join.name': 'Dein Name',
-  'guests.join.nameHint': 'Vor- und Nachname. Die Sitzungsleitung sieht ihn und lässt dich zu.',
   'guests.join.submit': 'Beitreten',
   'guests.join.member': 'Mitglied?',
   'guests.join.login': 'Mit Konto anmelden',
@@ -3713,7 +3454,6 @@ export const de = {
   'publicProtocols.lede':
     'Finalisierte Protokolle der öffentlichen Gremien als öffentliche Fassung: Anwesenheit nur als Zahl, nicht-öffentliche Tagesordnungspunkte ohne Titel und Inhalt.',
   'publicProtocols.search': 'Titel oder Text suchen',
-  'publicProtocols.searchHint': 'Gesucht wird in Sitzungstiteln und im Text öffentlicher TOPs.',
   'publicProtocols.filter.gremium': 'Gremium',
   'publicProtocols.filter.gremienN': '{n} Gremien',
   'publicProtocols.filter.semester': 'Semester',
@@ -3780,8 +3520,6 @@ export const de = {
   'meetings.finalizeDialog.body':
     'Das Protokoll wird final, als PDF erstellt und an den Verteiler versandt. Danach ist es nicht mehr änderbar.',
   'meetings.finalizeDialog.withheld': 'Nicht veröffentlichen',
-  'meetings.finalizeDialog.withheldHint':
-    'Das Protokoll erscheint nicht unter „Öffentliche Protokolle“. Du kannst es später veröffentlichen.',
   'meetings.protocolBar.public': 'Öffentlich unter „Öffentliche Protokolle“.',
   'meetings.protocolBar.withheld': 'Nicht veröffentlicht.',
   'meetings.protocolBar.publish': 'Veröffentlichen',
@@ -3791,8 +3529,6 @@ export const de = {
   'admin.gremien.public': 'Öffentlich (Protokolle auf der öffentlichen Seite zeigen)',
   'admin.gremien.publicShort': 'Öffentlich',
   'admin.gremien.publicTag': 'Öffentlich',
-  'admin.gremien.publicHint':
-    'Finalisierte Protokolle dieses Gremiums erscheinen ohne Anmeldung unter „Öffentliche Protokolle“. Die Startseite verlinkt die Seite.',
   'admin.gremien.publicImplies.title': 'Was das bedeutet',
   'admin.gremien.publicImplies.final':
     'Nur finalisierte Protokolle. Entwürfe und Protokolle im Rendern erscheinen nie.',
@@ -3805,8 +3541,6 @@ export const de = {
   'admin.gremien.publicImplies.meetings':
     'Sitzungen selbst erscheinen nie öffentlich: keine Termine, keine laufenden Sitzungen. Nur Titel und Datum als Teil eines finalen Protokolls.',
   'admin.gremien.publicView': 'Öffentliche Seite ansehen',
-  'admin.gremien.publicQrNote':
-    'Unabhängig davon: die öffentliche Teilnahme (QR) stellt die Sitzungsleitung pro Sitzung ein. Sie macht keine Sitzung öffentlich sichtbar, und dieser Schalter erlaubt keine Gäste.',
   'admin.gremien.publicConfirm.title': 'Protokolle veröffentlichen?',
   'admin.gremien.publicConfirm.loading': 'Protokolle werden gezählt …',
   'admin.gremien.publicConfirm.count':
@@ -3815,8 +3549,6 @@ export const de = {
     'Nach dem Speichern sind alle finalisierten Protokolle von {name} ohne Anmeldung lesbar, als öffentliche Fassung.',
   'admin.gremien.publicConfirm.missing':
     'Für {n} davon gibt es noch keine öffentliche Fassung. Die Plattform erzeugt sie jetzt; bis dahin erscheinen sie nicht.',
-  'admin.gremien.publicConfirm.nonPublicHint':
-    'Wer einen TOP nicht veröffentlichen will, markiert ihn vor dem Finalisieren als „Nicht öffentlich (NÖ)“.',
   'admin.gremien.publicConfirm.confirm': 'Veröffentlichen',
   'admin.audit.action.protocol_publication': 'Protokoll-Veröffentlichung geändert',
   // The tab "Gremien" (/gremien).
@@ -3985,13 +3717,10 @@ export const de = {
   'search.group.ticket': 'Tickets',
   'search.group.todo': 'To-Dos',
   'account.notifications.kind.ticket_created': 'Neue Tickets',
-  'account.notifications.hint.ticket_created': 'Wenn jemand ein Problem meldet.',
   'admin.mailTemplates.key.ticket_created': 'Neues Ticket (Team)',
   'admin.mailTemplates.key.ticket_received': 'Eingangsbestätigung Ticket',
   'account.notifications.kind.ticket_message': 'Nachrichten zu Tickets',
-  'account.notifications.hint.ticket_message': 'Wenn jemand auf sein gemeldetes Ticket antwortet. Ist das Ticket zugewiesen, nur an die zuständige Person.',
   'account.notifications.kind.ticket_answer': 'Antworten auf meine Tickets',
-  'account.notifications.hint.ticket_answer': 'Wenn das Team auf ein Ticket antwortet, das du gemeldet hast.',
   'admin.mailTemplates.key.ticket_message': 'Nachricht zu einem Ticket (Team)',
   'admin.mailTemplates.key.ticket_answer': 'Antwort auf ein Ticket (meldende Person)',
   'account.scope.tickets_write.label': 'Tickets bearbeiten',

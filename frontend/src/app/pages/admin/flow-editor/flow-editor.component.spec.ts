@@ -3118,14 +3118,14 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       expect(c.fitBounds()).toEqual(b);
     });
 
-    it('shows the versions in the inspector and names the active version in the lead line', async () => {
+    it('shows the versions in the inspector and names the active version in the header', async () => {
       const { fixture } = await setup({ getGlobalFlow: jest.fn(() => of(TAGGED)) });
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const c = fixture.componentInstance as any;
-      expect(screen.getByText('Globales Flow-Chart für alle Anträge')).toBeInTheDocument();
+      expect(screen.queryByText(/Version 12 aktiv/)).toBeNull();
       c.currentVersion.set(12);
       fixture.detectChanges();
-      expect(screen.getByText('Globales Flow-Chart für alle Anträge · Version 12 aktiv')).toBeInTheDocument();
+      expect(screen.getByText('Version 12 aktiv')).toBeInTheDocument();
 
       c.selectEdge(0);
       fixture.detectChanges();

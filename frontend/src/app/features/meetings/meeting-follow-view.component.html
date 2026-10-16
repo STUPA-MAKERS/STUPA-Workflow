@@ -214,7 +214,7 @@
       }
     </footer>
 
-    <app-side-sheet side="end" [heading]="'participant.attendance.title' | t" [(open)]="attendanceOpen">
+    <app-side-sheet [side]="phone() ? 'bottom' : 'end'" [heading]="'participant.attendance.title' | t" [(open)]="attendanceOpen">
       @if (attendanceOpen() && me(); as row) {
         <div class="fv__sheetStack">
           <app-participant-attendance
