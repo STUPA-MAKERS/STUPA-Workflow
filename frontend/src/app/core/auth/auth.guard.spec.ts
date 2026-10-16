@@ -37,6 +37,7 @@ describe('authGuard', () => {
   let assign: jest.Mock<void, [string]>;
 
   beforeEach(() => {
+    sessionStorage.clear();
     location = createLocationMock();
     assign = location.assign;
     TestBed.configureTestingModule({
@@ -101,6 +102,22 @@ describe('authGuard', () => {
     http.expectOne('/api/auth/me').flush(null, { status: 401, statusText: 'Unauthorized' });
     expect(result).toBe(false);
     expect(assign).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Fapplications%2Fa1%23comment-c1');
+  });
+
+  it('goes home instead of looping when a login just came back without a session', () => {
+    sessionStorage.setItem('auth.loginStartedAt', String(Date.now() - 5_000));
+    const result = run({}, null);
+    expect(result).toBeInstanceOf(UrlTree);
+    expect(String(result)).toBe('/');
+    expect(assign).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem('auth.loginStartedAt')).toBeNull();
+  });
+
+  it('logs in again when the last login is older than a minute', () => {
+    sessionStorage.setItem('auth.loginStartedAt', String(Date.now() - 120_000));
+    expect(run({}, null)).toBe(false);
+    expect(assign).toHaveBeenCalledWith('/api/auth/login');
+    expect(sessionStorage.getItem('auth.loginStartedAt')).not.toBeNull();
   });
 
   it('allows an authenticated user when no permission is required', () => {

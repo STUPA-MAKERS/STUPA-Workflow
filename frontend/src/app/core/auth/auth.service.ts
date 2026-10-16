@@ -83,7 +83,10 @@ export class AuthService {
   ensureLoaded(): Observable<Principal | null> {
     this.principal$ ??= this.api.me().pipe(
       catchError(() => of(null)),
-      tap((p) => this._principal.set(p)),
+      tap((p) => {
+        this._principal.set(p);
+        if (p) writeLoginMark(null);
+      }),
       shareReplay(1),
     );
     return this.principal$;
@@ -136,7 +139,21 @@ export class AuthService {
    */
   login(returnTo?: string): void {
     const current = `${this.location.pathname}${this.location.search}${this.location.hash}`;
+    writeLoginMark(Date.now());
     this.location.assign(this.loginUrl(loginReturnTo(returnTo ?? current)));
+  }
+
+  /**
+   * `true` once if a login started in this tab less than a minute ago and still gave no
+   * principal. The guard then goes home instead of starting the login again: the login
+   * returns to the guarded page, so a `/auth/me` that keeps failing after a good login
+   * (a server error, a cookie the browser refuses) would otherwise loop through the IdP.
+   * The call clears the mark, so the next attempt can log in again.
+   */
+  loginJustFailed(): boolean {
+    const started = readLoginMark();
+    writeLoginMark(null);
+    return started !== null && Date.now() - started < LOGIN_LOOP_WINDOW_MS;
   }
 
   /** The URL of the login start, with `client=pwa` for the installed app and `returnTo`. */
@@ -205,4 +222,27 @@ export function loginReturnTo(url: string): string | null {
   const hash = /^#[A-Za-z][\w-]*$/.test(parsed.hash) ? parsed.hash : '';
   const out = `${path}${search ? `?${search}` : ''}${hash}`;
   return out === '/' ? null : out;
+}
+
+const LOGIN_MARK = 'auth.loginStartedAt';
+const LOGIN_LOOP_WINDOW_MS = 60_000;
+
+/** The start time of the last login in this tab, or `null`. Storage may be blocked. */
+function readLoginMark(): number | null {
+  try {
+    const raw = sessionStorage.getItem(LOGIN_MARK);
+    const value = raw === null ? NaN : Number(raw);
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLoginMark(value: number | null): void {
+  try {
+    if (value === null) sessionStorage.removeItem(LOGIN_MARK);
+    else sessionStorage.setItem(LOGIN_MARK, String(value));
+  } catch {
+    /* Blocked storage: no loop guard, the login still works. */
+  }
 }

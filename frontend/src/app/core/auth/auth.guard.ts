@@ -28,6 +28,11 @@ export const authGuard: CanActivateFn = (route, state) => {
   return auth.ensureLoaded().pipe(
     map((principal) => {
       if (!principal) {
+        // A login that just came back without a session: go home, do not loop.
+        if (auth.loginJustFailed()) {
+          toast.error(i18n.translate('auth.loginFailed'));
+          return router.createUrlTree(['/']);
+        }
         // Back to the blocked target after the login, not to the page before it.
         auth.login(state?.url);
         return false;

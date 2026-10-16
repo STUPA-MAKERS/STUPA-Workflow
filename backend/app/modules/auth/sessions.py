@@ -163,8 +163,10 @@ def safe_return_to(value: str | None) -> str | None:
 
     Only a same-origin path is accepted: it starts with exactly one `/` (so it has no
     scheme and no host), has no backslash (which a browser reads as `/`), no whitespace
-    or control character, and is not under `/api/`. This keeps the redirect after the
-    callback from becoming an open redirect.
+    or control character, and is not under `/api/`. A dot segment or an encoded dot,
+    slash or backslash is refused too, because the browser resolves it and could reach
+    `/api/` that way. This keeps the redirect after the callback from becoming an open
+    redirect.
     """
     if not value or len(value) > _RETURN_TO_MAX:
         return None
@@ -173,6 +175,11 @@ def safe_return_to(value: str | None) -> str | None:
     if any(c.isspace() or not c.isprintable() for c in value):
         return None
     path = urlsplit(value).path
+    lowered = path.lower()
+    if any(code in lowered for code in ("%2e", "%2f", "%5c")):
+        return None
+    if any(segment in {".", ".."} for segment in path.split("/")):
+        return None
     if path == "/api" or path.startswith("/api/"):
         return None
     return value

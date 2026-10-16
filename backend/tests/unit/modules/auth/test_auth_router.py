@@ -630,6 +630,11 @@ def test_login_return_to_rides_the_tx_cookie(
         "/api",
         "/a b",
         "/a\nb",
+        "/./api/auth/me",
+        "/x/../api/auth/me",
+        "/%2e/api/auth/me",
+        "/%2F%2Fevil.example",
+        "/%5Cevil.example",
         "/" + "a" * 1100,
     ],
 )

@@ -92,6 +92,14 @@ describe('AuthService', () => {
     );
   });
 
+  it('marks a started login and clears the mark once a principal loads', () => {
+    auth.login();
+    expect(sessionStorage.getItem('auth.loginStartedAt')).not.toBeNull();
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(PRINCIPAL);
+    expect(sessionStorage.getItem('auth.loginStartedAt')).toBeNull();
+  });
+
   it('returns to the target it is given', () => {
     auth.login('/todos/b1?view=list');
     expect(assign).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Ftodos%2Fb1%3Fview%3Dlist');
