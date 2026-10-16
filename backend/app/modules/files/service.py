@@ -15,6 +15,9 @@ application comment) have no application. ``owner_of`` names their owner, the ro
 checks the read rule of that owner, and ``message_url`` / ``message_download_stream``
 apply the same quarantine gates. ``message_attachments`` lists the files of a set of
 messages in one query, and ``delete_for_messages`` removes them with their message.
+``drop_for_messages`` removes only the rows and returns the storage keys, and
+``remove_objects`` removes those objects after the commit of the caller, so a rollback
+never leaves a row whose object is gone.
 
 ``signed_url`` returns the app-relative ``/download`` route that the authorization layer
 gates. It does so only after a clean scan. The route carries no signature and does not
@@ -528,18 +531,46 @@ class FilesService:
         await self._remove_rows(rows, actor=actor)
         return len(rows)
 
+    async def drop_for_messages(
+        self, owner: MessageOwner, ids: Sequence[uuid.UUID], *, actor: str
+    ) -> list[str]:
+        """Delete the file rows of a set of messages, without a commit or an object removal.
+
+        For each file the method deletes the row and writes an ``attachment_delete``
+        audit entry. The caller commits and then calls ``remove_objects`` with the
+        returned keys. The objects stay until that commit, because a rollback brings
+        the rows back and a row without its object is a broken download.
+
+        Returns:
+            The storage keys of the removed files.
+        """
+        wanted = list(dict.fromkeys(ids))
+        if not wanted:
+            return []
+        column = _OWNER_COLUMNS[owner]
+        rows = (await self.session.scalars(select(Attachment).where(column.in_(wanted)))).all()
+        return await self._drop_rows(rows, actor=actor)
+
+    async def remove_objects(self, storage_keys: Sequence[str]) -> None:
+        """Remove storage objects as best effort; a failure only logs a warning."""
+        if self.storage is None:
+            return
+        for storage_key in storage_keys:
+            try:
+                await self.storage.remove(storage_key)
+            except StorageError:
+                logger.warning("could not remove object %s of a removed attachment", storage_key)
+
     async def _remove_rows(self, rows: Sequence[Attachment], *, actor: str) -> None:
+        await self.remove_objects(await self._drop_rows(rows, actor=actor))
+
+    async def _drop_rows(self, rows: Sequence[Attachment], *, actor: str) -> list[str]:
+        keys: list[str] = []
         for attachment in rows:
-            storage_key = attachment.storage_key
+            if attachment.storage_key is not None:
+                keys.append(attachment.storage_key)
             owner = _owner_data(attachment)
             await self.session.delete(attachment)
-            if self.storage is not None and storage_key is not None:
-                try:
-                    await self.storage.remove(storage_key)
-                except StorageError:
-                    logger.warning(
-                        "could not remove object for removed attachment %s", attachment.id
-                    )
             await audit_record(
                 self.session,
                 actor=actor,
@@ -548,6 +579,7 @@ class FilesService:
                 target_id=str(attachment.id),
                 data=owner,
             )
+        return keys
 
     async def _open_stream(
         self, attachment: Attachment

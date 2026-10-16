@@ -446,7 +446,7 @@ async def test_delete_gremium_ok() -> None:
 async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The comment files go with their objects before the cascade drops their rows."""
+    """The comment file rows go before the cascade, their objects after the commit."""
     from app.modules.files.service import FilesService
 
     row = gremium_row()
@@ -454,21 +454,58 @@ async def test_delete_gremium_removes_the_files_of_the_to_do_comments(
     storage = object()
     seen: list[tuple[Any, ...]] = []
 
-    async def _delete(
+    async def _drop(
         self: FilesService, owner: str, ids: list[Any], *, actor: str
-    ) -> int:
-        seen.append((self.storage, owner, list(ids), actor, list(session.deleted)))
-        return len(ids)
+    ) -> list[str]:
+        seen.append(("drop", self.storage, owner, list(ids), actor, list(session.deleted)))
+        return ["k1", "k2"]
 
-    monkeypatch.setattr(FilesService, "delete_for_messages", _delete)
+    async def _remove(self: FilesService, keys: list[str]) -> None:
+        seen.append(("remove", self.storage, list(keys), session.committed))
+
+    monkeypatch.setattr(FilesService, "drop_for_messages", _drop)
+    monkeypatch.setattr(FilesService, "remove_objects", _remove)
     session = FakeSession(
         [*todo_locks(c1, c2), res(), res(), *audit_results()], scalars=[row]
     )
     s = ConfigService(session, storage=storage)  # type: ignore[arg-type]
     await s.delete_gremium(row.id, _ADMIN)
-    # The Gremium row is still there when the files go.
-    assert seen == [(storage, "todo_comment", [c1, c2], "admin", [])]
+    # The Gremium row is still there when the rows go; the objects go after the commit.
+    assert seen == [
+        ("drop", storage, "todo_comment", [c1, c2], "admin", []),
+        ("remove", storage, ["k1", "k2"], 1),
+    ]
     assert row in session.deleted
+
+
+async def test_delete_gremium_keeps_the_objects_when_the_commit_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A failed commit brings the rows back, so their objects must still be there."""
+    from app.modules.files.service import FilesService
+
+    removed: list[list[str]] = []
+
+    async def _drop(_self: FilesService, _owner: str, _ids: list[Any], *, actor: str) -> list[str]:
+        assert actor == "admin"
+        return ["k1"]
+
+    async def _remove(_self: FilesService, keys: list[str]) -> None:
+        removed.append(list(keys))
+
+    class _FailingCommit(FakeSession):
+        async def commit(self) -> None:
+            raise RuntimeError("fk violation")
+
+    monkeypatch.setattr(FilesService, "drop_for_messages", _drop)
+    monkeypatch.setattr(FilesService, "remove_objects", _remove)
+    row = gremium_row()
+    session = _FailingCommit(
+        [*todo_locks(uuid.uuid4()), res(), res(), *audit_results()], scalars=[row]
+    )
+    with pytest.raises(RuntimeError):
+        await ConfigService(session, storage=object()).delete_gremium(row.id, _ADMIN)  # type: ignore[arg-type]
+    assert removed == []
 
 
 class _DeleteSpy:

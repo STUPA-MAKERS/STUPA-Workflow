@@ -3,7 +3,9 @@
 ``erase_todos`` removes the assignments of the person and deletes the personal
 board with its cards, because that board holds only the person's own notes. The files
 of the comments on that board go first with their objects, because the board cascade
-would leave the objects behind. Cards, comments, their files and events on the shared
+would leave the objects behind. The board and its cards are locked before the comment
+ids are read, so a comment that binds files at the same moment is part of the ids or
+fails on the deleted card. Cards, comments, their files and events on the shared
 boards stay: their author, actor and creator ids point to the erased principal, which
 shows as "Gelöschte Person".
 
@@ -43,14 +45,30 @@ async def erase_todos(
 
     The files of the comments on the personal board go first: rows, audit entries and
     objects (``delete_for_messages``).
+
+    The board goes first and then its cards, the order of every to-do write. The card
+    lock is ``FOR UPDATE``, which waits for the key-share lock of a comment insert. A
+    comment that binds files therefore commits before the ids are read, or its insert
+    waits and then fails on the deleted card. Otherwise its files would lose their row
+    through the board cascade and keep their object.
     """
+    boards = select(TodoBoard.id).where(
+        TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id
+    )
+    await session.execute(boards.order_by(TodoBoard.id).with_for_update())
+    await session.execute(
+        select(TodoCard.id)
+        .where(TodoCard.board_id.in_(boards))
+        .order_by(TodoCard.id)
+        .with_for_update()
+    )
     comment_ids = list(
         (
             await session.scalars(
                 select(TodoComment.id)
                 .join(TodoCard, TodoCard.id == TodoComment.card_id)
-                .join(TodoBoard, TodoBoard.id == TodoCard.board_id)
-                .where(TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id)
+                .where(TodoCard.board_id.in_(boards))
+                .order_by(TodoComment.id)
             )
         ).all()
     )

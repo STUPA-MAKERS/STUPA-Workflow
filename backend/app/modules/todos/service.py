@@ -1372,6 +1372,11 @@ class TodoService:
     ) -> TodoCommentOut:
         """Add a comment and bind its files; new mentions get the mail ``todo_mentioned``.
 
+        The method locks the board and then the card before the insert, because the
+        insert takes a key-share lock on the card and the commit updates the board. In
+        the other order it deadlocks with the Gremium delete and the erasure, which
+        lock the board and then the cards ``FOR UPDATE``.
+
         Raises:
             NotFoundError: The card is not readable (HTTP 404).
             ValidationProblem: A mention outside the board, files without a draft
@@ -1379,7 +1384,7 @@ class TodoService:
                 (HTTP 422).
         """
         actor = await self._actor(principal)
-        card, board = await self._card(card_id, principal)
+        card, board = await self._card(card_id, principal, lock=True)
         wanted = list(dict.fromkeys(mentions))
         await self._check_mentions(board, wanted)
         token = await check_message_drafts(

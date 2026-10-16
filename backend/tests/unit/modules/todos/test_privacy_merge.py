@@ -27,8 +27,13 @@ async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> Non
     session = ScriptedSession(scalars=[[comment_id]])
     files = FakeFiles()
     await erase_todos(session, ME, files=files, actor="admin")  # type: ignore[arg-type]
-    lookup, first, second = (str(s) for s in session.statements)
-    assert "todo_board.kind" in lookup and "todo_comment.id" in lookup
+    board_lock, card_lock, lookup, first, second = (str(s) for s in session.statements)
+    # The board and its cards are locked, in id order, before the comment ids are read.
+    assert board_lock.startswith("SELECT todo_board.id") and "todo_board.kind" in board_lock
+    assert "ORDER BY todo_board.id" in board_lock and board_lock.endswith("FOR UPDATE")
+    assert card_lock.startswith("SELECT todo_card.id") and "todo_board.owner_id" in card_lock
+    assert "ORDER BY todo_card.id" in card_lock and card_lock.endswith("FOR UPDATE")
+    assert "todo_comment.id" in lookup and "todo_board.owner_id" in lookup
     assert files.removed == [([comment_id], "admin")]
     assert first.startswith("DELETE FROM todo_assignee")
     assert second.startswith("DELETE FROM todo_board") and "kind" in second
@@ -37,7 +42,7 @@ async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> Non
 async def test_erase_todos_builds_its_own_files_service() -> None:
     session = ScriptedSession(scalars=[[]])
     await erase_todos(session, ME)  # type: ignore[arg-type]
-    assert len(session.statements) == 3
+    assert len(session.statements) == 5
 
 
 async def test_todo_export() -> None:

@@ -560,9 +560,16 @@ async def test_links() -> None:
 async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
     people[OTHER] = PersonRef(principal_id=OTHER, display_name="Otto")
     session, _b, _col, c, service = _setup()
+    session.scalar_q[:] = [c, c]
     with pytest.raises(ValidationProblem) as exc:
         await service.add_comment(c.id, "x", [uuid.uuid4()], USER)
     assert exc.value.code == "mention_not_member"
+    # The board is locked before the card, the order of every to-do write.
+    board_lock, card_lock = (str(st) for st in session.statements[:2])
+    assert board_lock.startswith("SELECT todo_board.id") and board_lock.endswith("FOR UPDATE")
+    assert card_lock.startswith("SELECT todo_card") and card_lock.endswith("FOR UPDATE")
+    with pytest.raises(NotFoundError):
+        await service.add_comment(uuid.uuid4(), "x", [], USER)
     body = "Hallo   " + "x" * 300
     out = await service.add_comment(c.id, body, [OTHER, OTHER, ME], USER)
     assert out.is_own and [m.display_name for m in out.mentions] == ["Otto", None]
@@ -609,6 +616,7 @@ async def test_comment_files_bind_list_and_go_with_the_comment(
     files = FakeFiles()
     service.files = files  # type: ignore[assignment]
     draft = uuid.uuid4()
+    session.scalar_q[:] = [c, c]
     out = await service.add_comment(
         c.id, "", [], USER, attachment_ids=[draft], draft_token="tok", pepper="p"
     )

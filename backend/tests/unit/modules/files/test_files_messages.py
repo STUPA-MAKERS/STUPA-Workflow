@@ -221,6 +221,29 @@ async def test_delete_for_messages_removes_rows_objects_and_audits(
     assert await _svc(session).delete_for_messages("ticket_note", [NOTE], actor="a") == 1
 
 
+async def test_drop_for_messages_keeps_the_objects_until_remove_objects(
+    audits: list[dict[str, Any]],
+) -> None:
+    keep, gone = _att(storage_key="k1"), _att(storage_key=None)
+    storage = FakeStorage()
+    session = ScriptedSession(scalars=[[keep, gone]])
+    service = _svc(session, storage)
+    assert await service.drop_for_messages("todo_comment", [NOTE, NOTE], actor="a") == ["k1"]
+    assert session.deleted == [keep, gone]
+    assert len(audits) == 2 and session.committed == 0
+    assert storage.removed == []
+    await service.remove_objects(["k1"])
+    assert storage.removed == ["k1"]
+    empty = ScriptedSession()
+    assert await _svc(empty, storage).drop_for_messages("todo_comment", [], actor="a") == []
+    assert empty.statements == []
+
+
+async def test_remove_objects_is_best_effort() -> None:
+    await _svc(ScriptedSession(), FailingStorage()).remove_objects(["k1", "k2"])
+    await _svc(ScriptedSession()).remove_objects(["k1"])
+
+
 async def test_delete_for_messages_without_ids_asks_nothing() -> None:
     session = ScriptedSession()
     assert await _svc(session).delete_for_messages("todo_comment", [], actor="a") == 0
