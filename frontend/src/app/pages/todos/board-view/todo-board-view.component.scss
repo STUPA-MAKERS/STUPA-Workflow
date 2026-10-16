@@ -118,12 +118,19 @@
   /* `rotate`, not `transform`: the CDK sets the inline transform of the preview. */
   rotate: 2deg;
   opacity: 1;
+  /* The tilted preview is a composited layer. Where the edge of the tile is the edge of
+     the layer, a GPU compositor can draw that edge without antialiasing, so it shows
+     steps. The transparent outline makes the layer 1px larger than the tile, and the
+     hidden back face keeps the preview on one layer, so the edge is painted inside the
+     layer and gets smoothed. */
+  outline: 1px solid transparent;
+  backface-visibility: hidden;
 }
 /* An accent edge marks the tile in the hand, drawn on the tile itself so it follows
-   its corners. */
+   its corners. It is an inset shadow, not an outline: the shadow is painted as a
+   rounded shape with smoothed edges also when it is tilted. */
 .bv__preview app-todo-card-tile {
-  outline: 2px solid var(--color-accent);
-  outline-offset: -1px;
+  box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 /* Where it lands: the item itself, kept at the height of the tile, as a dashed box. */
 .bv__item.cdk-drag-placeholder {
