@@ -215,7 +215,7 @@ describe('TicketDetailComponent', () => {
 
   it('shows the details: reporter, mail, the context and the linked object', async () => {
     await start('/tickets/t40', { split: true });
-    expect(screen.getByRole('heading', { name: 'Verlauf' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Verlauf' })).toHaveClass('sr-only');
     expect(screen.getByRole('link', { name: 'tobias@example.org' })).toHaveAttribute('href', 'mailto:tobias@example.org');
     expect(screen.getByRole('link', { name: 'https://stupa.example.org/meetings/m1/protocol' })).toHaveAttribute(
       'target',

@@ -26,7 +26,6 @@
       <div class="td__cols" aria-hidden="true">
         <div class="td__col td__col--log">
           <section class="td__sec">
-            <h3 class="sec td__secTitle">{{ 'tickets.detail.log' | t }}</h3>
             <app-skeleton class="td__chat skel-in" variant="chat" [count]="6" />
           </section>
         </div>
@@ -164,7 +163,7 @@
 <ng-template #log>
   <section class="td__sec" [attr.aria-labelledby]="split() ? 'td-log' : null">
     @if (split()) {
-      <h3 id="td-log" class="sec td__secTitle">{{ 'tickets.detail.log' | t }}</h3>
+      <h3 id="td-log" class="sr-only">{{ 'tickets.detail.log' | t }}</h3>
     }
     <app-chat
       class="td__chat"
