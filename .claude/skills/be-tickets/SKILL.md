@@ -68,7 +68,8 @@ kind, internal notes, a timeline of events and the technical context of the repo
 - Note files: `POST /notes` takes `NoteCreate` (`body` may be empty with a file,
   `attachmentIds` ≤ 5, `draftToken`) and binds with `ticket_note_id`; files on an
   anonymized ticket give 422 `ticket_anonymized`. With files `add_note` reads the ticket
-  `FOR UPDATE`, and the cron `anonymize_tickets` locks it too, so a note cannot bind files
+  `FOR UPDATE`, and the cron `anonymize_tickets` and the erasure (`anonymize_reported_tickets`)
+  lock it too, so a note cannot bind files
   between the check and the anonymization. `TicketNoteOut.attachments` lists them;
   `delete_note` and `delete_for_ticket` (anonymization, retention) remove them.
 - **Sender block** (`ticket_sender_block`): exactly one of `principal_id` (the reporter

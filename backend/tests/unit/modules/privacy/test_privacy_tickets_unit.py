@@ -243,6 +243,9 @@ async def test_the_reported_tickets_match_the_bare_e_mail() -> None:
     assert "reporter_email" in query
     assert "reporter_principal_id =" not in query
     assert "anonymized_at IS NULL" in query
+    # The erasure locks the tickets like add_note and the retention cron, so a note
+    # cannot bind files while the ticket is anonymized.
+    assert query.endswith("ORDER BY ticket.id FOR UPDATE")
     assert ticket.reporter_email is None
     assert ticket.anonymized_at is not None
     assert files.deleted == [(ticket.id, "admin")]

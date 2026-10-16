@@ -168,6 +168,11 @@ async def anonymize_reported_tickets(
     without a session gave the address (``email``, a citext compare). Already
     anonymized tickets do not change.
 
+    The tickets are read ``FOR UPDATE``, in id order, as ``add_note`` and the
+    retention cron read them. A note that binds files waits for the anonymization or
+    finishes before it, because otherwise its files stay on an anonymized ticket that
+    no later step cleans up.
+
     Returns:
         The number of anonymized tickets.
     """
@@ -180,7 +185,11 @@ async def anonymize_reported_tickets(
         return 0
     reported = (
         await session.scalars(
-            select(Ticket).where(or_(*reporter), Ticket.anonymized_at.is_(None))
+            select(Ticket)
+            .where(or_(*reporter), Ticket.anonymized_at.is_(None))
+            .order_by(Ticket.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
         )
     ).all()
     tickets = TicketService(session, files=files or FilesService(session))
