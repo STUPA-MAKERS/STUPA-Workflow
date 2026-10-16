@@ -6,6 +6,7 @@ module sends none.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any
@@ -624,9 +625,31 @@ class AuskunftService:
                 "title": t.title,
                 "status": t.status,
                 "createdAt": t.created_at,
+                "body": t.body,
+                "context": t.context,
             }
             for t in trows
         ]
+        if trows:
+            # The attachments of the reported tickets: metadata only, as above.
+            number_by_ticket = {t.id: format_number(t.number) for t in trows}
+            tarows = (
+                await self.session.scalars(
+                    select(Attachment)
+                    .where(Attachment.ticket_id.in_(list(number_by_ticket)))
+                    .order_by(Attachment.ticket_id, Attachment.created_at)
+                )
+            ).all()
+            attachments.extend(
+                {
+                    "ticketNumber": number_by_ticket.get(at.ticket_id) if at.ticket_id else None,
+                    "filename": at.filename,
+                    "mime": at.mime,
+                    "size": at.size,
+                    "createdAt": at.created_at,
+                }
+                for at in tarows
+            )
         todos = await todo_export(
             self.session, [principal_row.id] if principal_row is not None else []
         )
@@ -675,9 +698,11 @@ def build_auskunft_workbook(
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    six sheets: the comments that the subject can see, the attachment metadata, the
-    meeting attendance with the reason of an excuse, the reported tickets, the
-    to-dos that the subject created or is assigned to, and the own to-do comments.
+    six sheets: the comments that the subject can see, the attachment metadata of the
+    applications and the reported tickets, the meeting attendance with the reason of an
+    excuse, the reported tickets with their text and technical context, the to-dos that
+    the subject created or is assigned to (with the description of the own cards), and
+    the own to-do comments.
     """
     from io import BytesIO
 
@@ -734,10 +759,10 @@ def build_auskunft_workbook(
     )
     _add_sheet(
         "Anhänge",
-        ["Antrags-ID", "Dateiname", "Typ", "Größe (Bytes)", "Hochgeladen"],
+        ["Antrag / Ticket", "Dateiname", "Typ", "Größe (Bytes)", "Hochgeladen"],
         [
             [
-                str(at.get("applicationId") or ""),
+                str(at.get("applicationId") or at.get("ticketNumber") or ""),
                 at.get("filename") or "",
                 at.get("mime") or "",
                 at.get("size"),
@@ -764,20 +789,24 @@ def build_auskunft_workbook(
 
     _add_sheet(
         "Tickets",
-        ["Nummer", "Titel", "Status", "Gemeldet"],
+        ["Nummer", "Titel", "Status", "Gemeldet", "Text", "Technischer Kontext"],
         [
             [
                 t.get("number") or "",
                 t.get("title") or "",
                 t.get("status") or "",
                 _fmt_dt(t.get("createdAt")),
+                t.get("body") or "",
+                json.dumps(t["context"], ensure_ascii=False, sort_keys=True)
+                if t.get("context")
+                else "",
             ]
             for t in tickets
         ],
     )
     _add_sheet(
         "To-Dos",
-        ["Board", "Titel", "Spalte", "Fällig", "Erstellt"],
+        ["Board", "Titel", "Spalte", "Fällig", "Erstellt", "Beschreibung"],
         [
             [
                 t.get("board") or "",
@@ -785,6 +814,7 @@ def build_auskunft_workbook(
                 t.get("column") or "",
                 t["dueDate"].isoformat() if t.get("dueDate") else "",
                 _fmt_dt(t.get("createdAt")),
+                t.get("description") or "",
             ]
             for t in todos
         ],

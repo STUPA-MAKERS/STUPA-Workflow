@@ -385,6 +385,42 @@ async def test_auskunft_collect_and_workbook(session: AsyncSession) -> None:
     assert len(blob) > 0
 
 
+async def test_auskunft_holds_the_ticket_text_context_and_attachments(
+    session: AsyncSession,
+) -> None:
+    from app.modules.tickets.models import Ticket
+
+    email = f"t-{uuid.uuid4().hex[:8]}@example.org"
+    ticket = Ticket(
+        kind="bug",
+        title="Kaputt",
+        body="Der Knopf geht nicht.",
+        reporter_email=email,
+        context={"url": "/x", "userAgent": "UA"},
+    )
+    session.add(ticket)
+    await session.flush()
+    session.add(
+        Attachment(
+            ticket_id=ticket.id,
+            filename="screen.png",
+            mime="image/png",
+            size=12,
+            storage_key=f"k-{uuid.uuid4()}",
+        )
+    )
+    await session.commit()
+
+    result = await AuskunftService(session).collect(email)
+    (row,) = result["tickets"]
+    assert row["body"] == "Der Knopf geht nicht."
+    assert row["context"] == {"url": "/x", "userAgent": "UA"}
+    (shot,) = result["attachments"]
+    assert shot["ticketNumber"] == row["number"]
+    assert shot["filename"] == "screen.png"
+    assert build_auskunft_workbook(**result)
+
+
 # no match at all: the workbook still comes out valid, only with empty rows
 async def test_auskunft_collect_no_match(session: AsyncSession) -> None:
     result = await AuskunftService(session).collect("niemand@example.org")

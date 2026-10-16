@@ -80,7 +80,7 @@ loses its actor (that actor is the reporter), one commit and one `anonymization`
 per ticket. `PrincipalService.erase` gives the same anonymization to the tickets of the
 account and to the reports without a session under the account's e-mail; an applicant
 erasure does it for the tickets of the request's e-mail
-(`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets". The account merge moves
+(`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge". The account merge moves
 reporter, assignee, note author and event actor (area `tickets`).
 
 **Search:** source `ticket` behind `ticket.manage`, reuses `TicketService.list`; title

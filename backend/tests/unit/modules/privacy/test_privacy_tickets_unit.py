@@ -89,7 +89,39 @@ async def test_the_export_lists_the_tickets_of_the_address() -> None:
     db = fake_session(scalars=[result(), result(mine)], scalar=[None])
     data = await AuskunftService(db).collect("x@example.org")
     assert data["tickets"] == [
-        {"number": "T-0003", "title": "Kaputt", "status": "done", "createdAt": _AT}
+        {
+            "number": "T-0003",
+            "title": "Kaputt",
+            "status": "done",
+            "createdAt": _AT,
+            "body": "b",
+            "context": {"url": "u"},
+        }
+    ]
+
+
+async def test_the_export_lists_the_attachments_of_the_reported_tickets() -> None:
+    from app.modules.files.models import Attachment
+
+    mine = _ticket(reporter_email="x@example.org", number=7)
+    shot = Attachment(
+        id=uuid.uuid4(),
+        ticket_id=mine.id,
+        filename="screen.png",
+        mime="image/png",
+        size=12,
+        created_at=_AT,
+    )
+    db = fake_session(scalars=[result(), result(mine), result(shot)], scalar=[None])
+    data = await AuskunftService(db).collect("x@example.org")
+    assert data["attachments"] == [
+        {
+            "ticketNumber": "T-0007",
+            "filename": "screen.png",
+            "mime": "image/png",
+            "size": 12,
+            "createdAt": _AT,
+        }
     ]
 
 
@@ -108,16 +140,37 @@ def test_the_workbook_has_a_ticket_sheet() -> None:
         versions=[],
         principal=None,
         tickets=[
-            {"number": "T-0001", "title": "=HYPERLINK()", "status": "new", "createdAt": _AT},
+            {
+                "number": "T-0001",
+                "title": "=HYPERLINK()",
+                "status": "new",
+                "createdAt": _AT,
+                "body": "Der Knopf geht nicht.",
+                "context": {"url": "/x", "userAgent": "UA"},
+            },
             {"number": None, "title": None, "status": None, "createdAt": None},
         ],
+        attachments=[
+            {
+                "ticketNumber": "T-0001",
+                "filename": "screen.png",
+                "mime": "image/png",
+                "size": 12,
+                "createdAt": _AT,
+            }
+        ],
     )
-    sheet = load_workbook(BytesIO(raw))["Tickets"]
-    rows = [[c.value for c in row] for row in sheet.iter_rows()]
-    assert rows[0] == ["Nummer", "Titel", "Status", "Gemeldet"]
+    book = load_workbook(BytesIO(raw))
+    rows = [[c.value for c in row] for row in book["Tickets"].iter_rows()]
+    assert rows[0] == ["Nummer", "Titel", "Status", "Gemeldet", "Text", "Technischer Kontext"]
     assert rows[1][0] == "T-0001"
     assert not str(rows[1][1]).startswith("=")
-    assert rows[2][:3] == [None, None, None]
+    assert rows[1][4] == "Der Knopf geht nicht."
+    assert rows[1][5] == '{"url": "/x", "userAgent": "UA"}'
+    assert rows[2] == [None] * 6
+    files = [[c.value for c in row] for row in book["Anhänge"].iter_rows()]
+    assert files[0][0] == "Antrag / Ticket"
+    assert files[1][:2] == ["T-0001", "screen.png"]
 
 
 def test_the_erase_route_passes_the_object_storage(monkeypatch: pytest.MonkeyPatch) -> None:

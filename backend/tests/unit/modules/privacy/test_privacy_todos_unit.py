@@ -82,6 +82,7 @@ def test_the_workbook_has_the_todo_sheets() -> None:
                 "column": "Offen",
                 "dueDate": date(2026, 11, 1),
                 "createdAt": _AT,
+                "description": "Raum buchen",
             },
             {"board": None, "title": None, "column": None, "dueDate": None, "createdAt": None},
         ],
@@ -92,10 +93,11 @@ def test_the_workbook_has_the_todo_sheets() -> None:
     )
     book = load_workbook(BytesIO(raw))
     cards = [[c.value for c in row] for row in book["To-Dos"].iter_rows()]
-    assert cards[0] == ["Board", "Titel", "Spalte", "Fällig", "Erstellt"]
+    assert cards[0] == ["Board", "Titel", "Spalte", "Fällig", "Erstellt", "Beschreibung"]
     assert cards[1][0] == "StuPa" and cards[1][3] == "2026-11-01"
+    assert cards[1][5] == "Raum buchen"
     assert not str(cards[1][1]).startswith("=")
-    assert cards[2] == [None, None, None, None, None]
+    assert cards[2] == [None] * 6
     comments = [[c.value for c in row] for row in book["To-Do-Kommentare"].iter_rows()]
     assert comments[0] == ["To-Do", "Zeitpunkt", "Gelöscht", "Text"]
     assert comments[1] == ["A", "2026-06-16 12:00", "2026-06-16 12:00", "Hi"]

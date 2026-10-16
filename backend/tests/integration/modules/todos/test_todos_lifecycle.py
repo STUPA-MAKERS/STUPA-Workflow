@@ -248,7 +248,7 @@ async def test_erasure_and_auskunft(maker: async_sessionmaker[AsyncSession]) -> 
     other, other_id = await add_person(maker, "Otto")
     mine, _ = await _personal(maker, me_id)
     theirs, _ = await _personal(maker, other_id)
-    await _create(maker, me, mine.id, title="Privat")
+    await _create(maker, me, mine.id, title="Privat", descriptionMd="Raum buchen")
     async with maker() as session:
         await session.execute(
             text("UPDATE principal SET email = :e WHERE id = :i"),
@@ -262,7 +262,10 @@ async def test_erasure_and_auskunft(maker: async_sessionmaker[AsyncSession]) -> 
         session.add(TodoComment(card_id=shared, author_id=me_id, body="Meins", mentions=[]))
         await session.commit()
         data = await AuskunftService(session).collect("ada@example.org")
-    assert {c["title"] for c in data["todos"]} == {"Privat", "Gemeinsam"}
+    assert {c["title"]: c["description"] for c in data["todos"]} == {
+        "Privat": "Raum buchen",
+        "Gemeinsam": None,
+    }
     assert [c["body"] for c in data["todo_comments"]] == ["Meins"]
     async with maker() as session:
         await PrincipalService(session).erase(me_id, actor="admin")

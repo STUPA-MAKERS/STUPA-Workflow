@@ -6,7 +6,9 @@ comments and events on the shared boards stay: their author, actor and creator i
 point to the erased principal, which shows as "Gelöschte Person".
 
 ``todo_export`` collects the cards that the person created or is assigned to, and
-the person's own comments, for the Auskunft workbook.
+the person's own comments, for the Auskunft workbook. The description of a card is
+part of it only when the person created the card, because the description is the
+creator's text.
 """
 
 from __future__ import annotations
@@ -62,6 +64,7 @@ async def todo_export(session: AsyncSession, principal_ids: list[UUID]) -> dict[
             "column": column_name,
             "dueDate": card.due_date,
             "createdAt": card.created_at,
+            "description": card.description_md if card.created_by in principal_ids else None,
         }
         for card, board_name, column_name in card_rows
     ]

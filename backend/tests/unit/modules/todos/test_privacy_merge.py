@@ -32,8 +32,8 @@ async def test_todo_export() -> None:
     assert await todo_export(ScriptedSession(), []) == {"cards": [], "comments": []}  # type: ignore[arg-type]
     b = board(name="StuPa")
     col = column(b.id, "Offen")
-    due = card(b, col, title="A", due_date=date(2026, 11, 1))
-    plain = card(b, col, title="B")
+    due = card(b, col, title="A", due_date=date(2026, 11, 1), description_md="Raum buchen")
+    plain = card(b, col, title="B", description_md="fremd", created_by=OTHER)
     note = comment(due.id, ME, body="Hi", deleted_at=NOW)
     session = ScriptedSession(
         execute=[[(due, "StuPa", "Offen"), (plain, "StuPa", "Offen")], [(note, "A")]]
@@ -45,8 +45,10 @@ async def test_todo_export() -> None:
         "column": "Offen",
         "dueDate": date(2026, 11, 1),
         "createdAt": NOW,
+        "description": "Raum buchen",
     }
     assert out["cards"][1]["dueDate"] is None
+    assert out["cards"][1]["description"] is None
     assert out["comments"] == [{"card": "A", "body": "Hi", "createdAt": NOW, "deletedAt": NOW}]
 
 
