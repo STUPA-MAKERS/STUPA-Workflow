@@ -1670,13 +1670,11 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.meetingWindow.range': 'A whole number from 0 to {max} minutes.',
   'admin.meetingWindow.order': 'At most as many minutes as "Open at the earliest".',
   'admin.loginSettings.title': 'Sign-in',
-  'admin.loginSettings.subtitle':
-    'How long a sign-in stays valid in the browser and in the installed app.',
+  'admin.loginSettings.subtitle': 'How long a sign-in stays valid in the browser and in the installed app.',
   'admin.loginSettings.web': 'Sign-in in the browser valid for',
   'admin.loginSettings.webHint': 'Applies to a sign-in in a browser tab.',
   'admin.loginSettings.pwa': 'Sign-in in the installed app valid for',
-  'admin.loginSettings.pwaHint':
-    'Applies to the app that is installed on the home screen or the desktop.',
+  'admin.loginSettings.pwaHint': 'Applies to the app that is installed on the home screen or the desktop.',
   'admin.loginSettings.daysUnit': 'days',
   'admin.loginSettings.range': 'A whole number from 1 to {max} days.',
   'admin.loginSettings.note':
@@ -1842,8 +1840,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.nav.backups': 'Backups',
   'admin.nav.backupsDesc': 'Create and restore backups',
   'admin.nav.loginSettings': 'Sign-in',
-  'admin.nav.loginSettingsDesc':
-    'How long a sign-in stays valid in the browser and in the installed app',
+  'admin.nav.loginSettingsDesc': 'How long a sign-in stays valid in the browser and in the installed app',
   'admin.health.title': 'Status',
   'admin.health.todayAt': 'today, {time}',
   'admin.health.yesterdayAt': 'yesterday, {time}',
@@ -3753,8 +3750,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'gremien.title': 'Committees',
   'gremien.filters': 'Filters',
   'gremien.none': 'Choose a committee',
-  'gremien.noneBody':
-    'Choose a committee on the left to see its meetings, members, attendance and decisions.',
+  'gremien.noneBody': 'Choose a committee on the left to see its meetings, members, attendance and decisions.',
   'gremien.list.menu': 'More actions',
   'gremien.list.subscribe': 'Subscribe to meetings',
   'gremien.list.search': 'Search {n} committees',
@@ -3920,11 +3916,9 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.mailTemplates.key.ticket_created': 'New ticket (team)',
   'admin.mailTemplates.key.ticket_received': 'Ticket confirmation',
   'account.notifications.kind.ticket_message': 'Messages on tickets',
-  'account.notifications.hint.ticket_message':
-    'When someone replies on a ticket they reported. On an assigned ticket, only the assignee.',
+  'account.notifications.hint.ticket_message': 'When someone replies on a ticket they reported. On an assigned ticket, only the assignee.',
   'account.notifications.kind.ticket_answer': 'Replies to my tickets',
-  'account.notifications.hint.ticket_answer':
-    'When the team replies on a ticket that you reported.',
+  'account.notifications.hint.ticket_answer': 'When the team replies on a ticket that you reported.',
   'admin.mailTemplates.key.ticket_message': 'Message on a ticket (team)',
   'admin.mailTemplates.key.ticket_answer': 'Reply on a ticket (reporter)',
   'account.scope.tickets_write.label': 'Edit tickets',
@@ -4225,8 +4219,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.card.linkFailed': 'The link could not be copied.',
   'todos.card.commentPlaceholder': 'Write a comment …',
   'todos.error.load': 'The board could not be loaded.',
-  'todos.error.cardVersionConflict':
-    'Somebody changed the card in the meantime. It was loaded again.',
+  'todos.error.cardVersionConflict': 'Somebody changed the card in the meantime. It was loaded again.',
   'todos.error.assignee': 'This person cannot be assigned on this board.',
   'todos.error.linkExists': 'This link exists already.',
   'todos.error.linkTarget': 'The target does not exist or you have no access.',

@@ -62,6 +62,7 @@ from app.modules.todos.hooks import TicketTodoBridge
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_ticket_payload_limit,
+    rate_limit_ticket_messages,
     rate_limit_tickets,
     verify_altcha_unless_authenticated,
 )
@@ -260,7 +261,8 @@ async def get_my_ticket(
     "/tickets/mine/{ticket_id}/notes",
     response_model=TicketNoteOut,
     status_code=status.HTTP_201_CREATED,
-    responses=_errors(401, 403, 404, 422),
+    dependencies=[Depends(rate_limit_ticket_messages)],
+    responses=_errors(401, 403, 404, 422, 429),
 )
 async def add_my_ticket_note(
     ticket_id: UUID,

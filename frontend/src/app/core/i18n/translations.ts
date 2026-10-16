@@ -1695,8 +1695,7 @@ export const de = {
     'Mit dem Link verfolgt und bearbeitet die antragstellende Person ihren Antrag. Löst sie einen neuen Link ein, verfallen die älteren. Eine Änderung gilt für neu angeforderte Links.',
   'admin.guest.loadError': 'Die Einstellungen konnten nicht geladen werden.',
   'admin.meetingWindow.title': 'Sitzung eröffnen',
-  'admin.meetingWindow.subtitle':
-    'Wann sich eine geplante Sitzung vor ihrem Beginn eröffnen lässt.',
+  'admin.meetingWindow.subtitle': 'Wann sich eine geplante Sitzung vor ihrem Beginn eröffnen lässt.',
   'admin.meetingWindow.openLead': 'Frühestens eröffnen',
   'admin.meetingWindow.openLeadHint':
     'Vorher lässt sich die Sitzung nicht eröffnen. 0 bis {max} Minuten vor dem geplanten Beginn.',
@@ -1707,21 +1706,18 @@ export const de = {
   'admin.meetingWindow.range': 'Eine ganze Zahl von 0 bis {max} Minuten.',
   'admin.meetingWindow.order': 'Höchstens so viele Minuten wie bei „Frühestens eröffnen“.',
   'admin.loginSettings.title': 'Anmeldung',
-  'admin.loginSettings.subtitle':
-    'Wie lange eine Anmeldung im Browser und in der installierten App gültig bleibt.',
+  'admin.loginSettings.subtitle': 'Wie lange eine Anmeldung im Browser und in der installierten App gültig bleibt.',
   'admin.loginSettings.web': 'Anmeldung im Browser gültig für',
   'admin.loginSettings.webHint': 'Gilt für die Anmeldung in einem Browser-Tab.',
   'admin.loginSettings.pwa': 'Anmeldung in der installierten App gültig für',
-  'admin.loginSettings.pwaHint':
-    'Gilt für die App, die auf dem Startbildschirm oder dem Desktop installiert ist.',
+  'admin.loginSettings.pwaHint': 'Gilt für die App, die auf dem Startbildschirm oder dem Desktop installiert ist.',
   'admin.loginSettings.daysUnit': 'Tage',
   'admin.loginSettings.range': 'Eine ganze Zahl von 1 bis {max} Tagen.',
   'admin.loginSettings.note':
     'Eine Anmeldung bleibt so viele Tage nach der letzten Nutzung gültig. Eine Änderung gilt für jede Anmeldung ab ihrer nächsten Verlängerung. Etwa alle 12 Stunden prüft die Plattform das Konto beim Identitätsanbieter: Ist eine Gruppe entfernt oder das Konto gesperrt, endet der Zugang trotzdem schnell. Browser löschen ein Cookie spätestens nach {max} Tagen, darum ist das der höchste Wert.',
   'admin.loginSettings.updatedAt': 'Zuletzt geändert am {date}',
   'admin.loginSettings.loadError': 'Die Einstellungen konnten nicht geladen werden.',
-  'admin.loginSettings.forbidden':
-    'Für diese Einstellungen fehlt das Recht, Personen zu verwalten.',
+  'admin.loginSettings.forbidden': 'Für diese Einstellungen fehlt das Recht, Personen zu verwalten.',
   'admin.forms.col.version': 'Version',
   'admin.forms.withBudget': 'Mit Budget',
   'admin.forms.withoutBudget': 'Ohne Budget',
@@ -1882,8 +1878,7 @@ export const de = {
   'admin.nav.backups': 'Backups',
   'admin.nav.backupsDesc': 'Sicherungen anlegen und einspielen',
   'admin.nav.loginSettings': 'Anmeldung',
-  'admin.nav.loginSettingsDesc':
-    'Wie lange eine Anmeldung im Browser und in der installierten App gültig bleibt',
+  'admin.nav.loginSettingsDesc': 'Wie lange eine Anmeldung im Browser und in der installierten App gültig bleibt',
   'admin.health.title': 'Zustand',
   'admin.health.todayAt': 'heute, {time}',
   'admin.health.yesterdayAt': 'gestern, {time}',
@@ -3827,8 +3822,7 @@ export const de = {
   'gremien.title': 'Gremien',
   'gremien.filters': 'Filter',
   'gremien.none': 'Gremium wählen',
-  'gremien.noneBody':
-    'Wähle links ein Gremium, um seine Sitzungen, Mitglieder, Anwesenheit und Beschlüsse zu sehen.',
+  'gremien.noneBody': 'Wähle links ein Gremium, um seine Sitzungen, Mitglieder, Anwesenheit und Beschlüsse zu sehen.',
   'gremien.list.menu': 'Weitere Aktionen',
   'gremien.list.subscribe': 'Sitzungen abonnieren',
   'gremien.list.search': '{n} Gremien durchsuchen',
@@ -3994,16 +3988,13 @@ export const de = {
   'admin.mailTemplates.key.ticket_created': 'Neues Ticket (Team)',
   'admin.mailTemplates.key.ticket_received': 'Eingangsbestätigung Ticket',
   'account.notifications.kind.ticket_message': 'Nachrichten zu Tickets',
-  'account.notifications.hint.ticket_message':
-    'Wenn jemand auf sein gemeldetes Ticket antwortet. Ist das Ticket zugewiesen, nur an die zuständige Person.',
+  'account.notifications.hint.ticket_message': 'Wenn jemand auf sein gemeldetes Ticket antwortet. Ist das Ticket zugewiesen, nur an die zuständige Person.',
   'account.notifications.kind.ticket_answer': 'Antworten auf meine Tickets',
-  'account.notifications.hint.ticket_answer':
-    'Wenn das Team auf ein Ticket antwortet, das du gemeldet hast.',
+  'account.notifications.hint.ticket_answer': 'Wenn das Team auf ein Ticket antwortet, das du gemeldet hast.',
   'admin.mailTemplates.key.ticket_message': 'Nachricht zu einem Ticket (Team)',
   'admin.mailTemplates.key.ticket_answer': 'Antwort auf ein Ticket (meldende Person)',
   'account.scope.tickets_write.label': 'Tickets bearbeiten',
-  'account.scope.tickets_write.desc':
-    'Gemeldete Probleme lesen, zuweisen, kommentieren und schließen.',
+  'account.scope.tickets_write.desc': 'Gemeldete Probleme lesen, zuweisen, kommentieren und schließen.',
   'help.title': 'Hilfe',
   'help.wiki': 'Handbuch im Wiki',
   'help.report': 'Problem melden',
@@ -4022,8 +4013,7 @@ export const de = {
   'help.report.emailInvalid': 'Bitte eine gültige E-Mail-Adresse eingeben.',
   'help.report.tooManyFiles': 'Höchstens {max} Dateien.',
   'help.report.removeFailed': 'Die Datei konnte nicht entfernt werden.',
-  'help.report.error.altcha':
-    'Die Prüfung „Kein Roboter“ ist abgelaufen. Bitte noch einmal bestätigen.',
+  'help.report.error.altcha': 'Die Prüfung „Kein Roboter“ ist abgelaufen. Bitte noch einmal bestätigen.',
   'help.report.error.disabled': 'Meldungen ohne Konto sind ausgeschaltet. Bitte melde dich an.',
   'help.report.error.tooLarge': 'Die Meldung ist zu groß. Bitte Anhänge entfernen.',
   'help.report.error.rateLimit': 'Zu viele Meldungen. Bitte später noch einmal versuchen.',
@@ -4301,8 +4291,7 @@ export const de = {
   'todos.card.linkFailed': 'Der Link konnte nicht kopiert werden.',
   'todos.card.commentPlaceholder': 'Kommentar schreiben …',
   'todos.error.load': 'Das Board konnte nicht geladen werden.',
-  'todos.error.cardVersionConflict':
-    'Jemand hat die Karte inzwischen geändert. Sie wurde neu geladen.',
+  'todos.error.cardVersionConflict': 'Jemand hat die Karte inzwischen geändert. Sie wurde neu geladen.',
   'todos.error.assignee': 'Diese Person kann dem Board nicht zugewiesen werden.',
   'todos.error.linkExists': 'Diese Verknüpfung gibt es schon.',
   'todos.error.linkTarget': 'Das Ziel gibt es nicht oder du hast keinen Zugriff.',
@@ -4447,10 +4436,7 @@ export function isCatalogLoaded(locale: Locale): boolean {
 }
 
 /** Put the strings of `locale` into {@link CATALOG}. */
-export function registerCatalog(
-  locale: Locale,
-  table: Partial<Record<TranslationKey, string>>,
-): void {
+export function registerCatalog(locale: Locale, table: Partial<Record<TranslationKey, string>>): void {
   CATALOG[locale] = table;
   LOADED.add(locale);
 }

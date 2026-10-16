@@ -108,7 +108,7 @@ def privacy_admin_link(settings: Settings) -> MailLink:
 
 
 def ticket_link(settings: Settings, ticket_id: UUID | str) -> MailLink:
-    """Return the link to a ticket (holders of ``ticket.manage`` only)."""
+    """Return the link to a ticket: the team and the reporter account open the same path."""
     return MailLink(f"{_base(settings)}/tickets/{ticket_id}", "ticket")
 
 

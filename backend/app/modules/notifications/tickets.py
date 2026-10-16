@@ -19,7 +19,8 @@ German.
 ``ticket_answer`` goes to the reporter account when the team writes a ``public``
 note. ``ticket_message`` goes to the team when the reporter writes: to the assignee
 while one holds ``ticket.manage``, else to every holder. An internal note, an edit
-and a note on an anonymized ticket send nothing. Each recipient can switch the kind
+a note on an anonymized ticket and an answer to a deactivated or merged reporter account
+send nothing. Each recipient can switch the kind
 off. A team author shows by name only, never by e-mail, as in the tab.
 """
 
@@ -286,6 +287,9 @@ async def notify_ticket_note(
                 # A message of files only names its files, as the comment mails do.
                 files = await FilesService(session).message_attachments("ticket_note", [note.id])
                 message = ", ".join(a.filename for a in files.get(note.id, []))
+            if not message.strip():
+                # Neither text nor files: nothing to tell.
+                return False
             if note.author_id == ticket.reporter_principal_id:
                 return await _mail_team(session, queue, settings, ticket, note, message)
             return await _mail_reporter(session, queue, settings, ticket, note, message)
@@ -302,17 +306,20 @@ async def _mail_team(
     note: TicketNote,
     message: str,
 ) -> bool:
+    """Mail the assignee, else every holder; an assignee without an address falls back.
+
+    The assignee's own opt-out of ``ticket_message`` stays an opt-out: the mail then
+    reaches nobody, as the assignee chose.
+    """
     managers = await ticket_managers(session)
-    assignee = [m for m in managers if m[0] == ticket.assignee_id]
     reporter_row = await session.get(PrincipalRow, ticket.reporter_principal_id)
     own = (reporter_row.email or "").casefold() if reporter_row is not None else ""
-    recipients = sorted(
-        {
-            email
-            for _pid, _name, email in (assignee or managers)
-            if email and email.casefold() != own
-        }
-    )
+
+    def _addresses(rows: list[tuple[UUID, str | None, str | None]]) -> list[str]:
+        return sorted({e for _pid, _name, e in rows if e and e.casefold() != own})
+
+    assignee = [m for m in managers if m[0] == ticket.assignee_id]
+    recipients = _addresses(assignee) or _addresses(managers)
     if not recipients:
         return False
     reporter = (
@@ -343,7 +350,11 @@ async def _mail_reporter(
     note: TicketNote,
     message: str,
 ) -> bool:
-    address = await TicketService(session).reporter_address(ticket)
+    # Only a live account: a deactivated or merged one cannot open the link.
+    reporter = await session.get(PrincipalRow, ticket.reporter_principal_id)
+    if reporter is None or not reporter.active or reporter.merged_into is not None:
+        return False
+    address = reporter.email
     if not address:
         return False
     author = await session.get(PrincipalRow, note.author_id) if note.author_id is not None else None

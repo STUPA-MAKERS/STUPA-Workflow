@@ -287,6 +287,19 @@ def _account_ticket(**kw: Any) -> Ticket:
     return _ticket(reporter_principal_id=REPORTER, reporter_email=None, anonymized_at=None, **kw)
 
 
+def _reporter(**kw: Any) -> PrincipalRow:
+    base: dict[str, Any] = {
+        "id": REPORTER,
+        "sub": "r",
+        "email": "rex@x.org",
+        "display_name": "Rex",
+        "active": True,
+        "merged_into": None,
+    }
+    base.update(kw)
+    return PrincipalRow(**base)
+
+
 async def _note_mail(session: ScriptedSession, note_id: uuid.UUID) -> bool:
     return await mails.notify_ticket_note(
         queue=None,
@@ -378,8 +391,8 @@ async def test_a_public_answer_of_the_team_goes_to_the_reporter(
     ticket = _account_ticket(context={"language": "en"})
     note = _note(ticket, STAFF, body="Oben rechts.")
     staff = PrincipalRow(id=STAFF, sub="s", email="mia@x.org", display_name="Mia")
-    session = ScriptedSession(scalar=["rex@x.org"])
-    session.put(ticket, note, staff)
+    session = ScriptedSession()
+    session.put(ticket, note, staff, _reporter())
     assert await _note_mail(session, note.id) is True
     (mail,) = sent
     assert mail["to"] == ["rex@x.org"]
@@ -403,22 +416,58 @@ async def test_an_answer_of_a_nameless_or_gone_author_has_no_name(
     nameless = PrincipalRow(id=STAFF, sub="s", email="mia@x.org", display_name=None)
     for author, row in ((STAFF, nameless), (None, None), (uuid.uuid4(), None)):
         note = _note(ticket, author)
-        session = ScriptedSession(scalar=["rex@x.org"])
-        session.put(ticket, note, *([row] if row is not None else []))
+        session = ScriptedSession()
+        session.put(ticket, note, _reporter(), *([row] if row is not None else []))
         assert await _note_mail(session, note.id) is True
         assert sent[-1]["context"]["author"] == ""
         assert sent[-1]["lang"] == "de"
 
 
-async def test_an_answer_without_a_reporter_address_sends_nothing(
-    sent: list[dict[str, Any]],
+@pytest.mark.parametrize(
+    "reporter",
+    [
+        None,
+        {"email": None},
+        {"active": False},
+        {"merged_into": uuid.uuid4()},
+    ],
+)
+async def test_an_answer_without_a_live_reporter_account_sends_nothing(
+    sent: list[dict[str, Any]], reporter: dict[str, Any] | None
 ) -> None:
+    # A deactivated or merged account cannot open the link, so it gets no text.
     ticket = _account_ticket()
     note = _note(ticket, STAFF)
-    session = ScriptedSession(scalar=[None])
-    session.put(ticket, note)
+    session = ScriptedSession()
+    session.put(ticket, note, *([_reporter(**reporter)] if reporter is not None else []))
     assert await _note_mail(session, note.id) is False
     assert sent == []
+
+
+async def test_a_message_without_text_or_files_sends_nothing(
+    sent: list[dict[str, Any]],
+    managers: list[tuple[uuid.UUID, str | None, str | None]],
+) -> None:
+    managers.append((STAFF, "Mia", "mia@x.org"))
+    ticket = _account_ticket()
+    note = _note(ticket, REPORTER, body=" ")
+    session = ScriptedSession(scalars=[[]])
+    session.put(ticket, note, _reporter())
+    assert await _note_mail(session, note.id) is False
+    assert sent == []
+
+
+async def test_an_assignee_without_an_address_falls_back_to_the_team(
+    sent: list[dict[str, Any]],
+    managers: list[tuple[uuid.UUID, str | None, str | None]],
+) -> None:
+    ticket = _account_ticket(assignee_id=STAFF)
+    note = _note(ticket, REPORTER)
+    managers.extend([(STAFF, "Mia", None), (uuid.uuid4(), "Bo", "bo@x.org")])
+    session = ScriptedSession()
+    session.put(ticket, note, _reporter())
+    assert await _note_mail(session, note.id) is True
+    assert sent[-1]["to"] == ["bo@x.org"]
 
 
 @pytest.mark.parametrize(

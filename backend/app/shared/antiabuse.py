@@ -149,9 +149,7 @@ def enforce_attachment_body_cap(request: Request, settings: SettingsDep) -> None
         raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
 
 
-async def _enforce(
-    limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str
-) -> None:
+async def _enforce(limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str) -> None:
     result = await limiter.hit(key, limit=limit, window_seconds=window)
     if not result.allowed:
         raise RateLimitedError(detail, retry_after=result.retry_after)
@@ -278,6 +276,23 @@ async def rate_limit_tickets(
         limit=settings.rl_tickets_ip_per_hour,
         window=_HOUR,
         detail="Too many ticket reports from this IP. Try again later.",
+    )
+
+
+async def rate_limit_ticket_messages(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /tickets/mine/{id}/notes``: 60/h per account, because each message mails the team."""
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"ticket-messages:principal:{principal.sub}",
+        limit=settings.rl_ticket_messages_per_hour,
+        window=_HOUR,
+        detail="Too many ticket messages. Try again later.",
     )
 
 
@@ -415,9 +430,7 @@ def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
         try:
             await verifier.verify(solution)
         except AltchaError as exc:
-            raise BadRequestError(
-                "Altcha verification failed.", code="altcha_failed"
-            ) from exc
+            raise BadRequestError("Altcha verification failed.", code="altcha_failed") from exc
 
     return dependency
 
