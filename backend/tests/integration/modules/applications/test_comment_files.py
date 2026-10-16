@@ -162,3 +162,53 @@ async def test_comment_files_follow_the_read_rule_of_their_comment(
         assert await session.get(Attachment, public) is None
         row = await session.get(Attachment, from_applicant)
         assert row is not None and row.comment_id is not None and row.application_id is None
+
+
+async def test_a_comment_with_files_and_the_anonymization_take_the_same_lock(
+    migrated: tuple[str, str], maker: async_sessionmaker[AsyncSession]
+) -> None:
+    from sqlalchemy import text
+    from sqlalchemy.exc import DBAPIError
+
+    from app.modules.applications.service import ApplicationsService
+    from app.modules.files.service import FilesService
+    from app.shared.errors import ValidationProblem
+
+    pepper = guest_settings(migrated[1]).magic_link_secret
+    seed = await seed_read_world(maker)
+    app_id = await create_app(maker, seed, actor="applicant")
+    storage = MemoryStorage()
+    draft = await _draft(maker, pepper, storage, "spaet.pdf")
+
+    async def _comment(session: AsyncSession) -> None:
+        await ApplicationsService(session).add_comment(
+            app_id,
+            author=_MANAGER.sub,
+            author_kind="principal",
+            body="",
+            visibility="internal",
+            attachment_ids=[draft],
+            draft_token="tok",
+            pepper=pepper,
+        )
+
+    async with maker() as anonymizing, maker() as commenting:
+        await ApplicationsService(anonymizing).anonymize(
+            app_id, files=FilesService(anonymizing, storage=storage), commit=False
+        )
+        # The open anonymization holds the row, so the comment with files waits for
+        # it instead of binding files that the anonymization does not see.
+        await commenting.execute(text("SET lock_timeout = '200ms'"))
+        with pytest.raises(DBAPIError, match="lock timeout"):
+            await _comment(commenting)
+        await commenting.rollback()
+        await anonymizing.commit()
+
+    # After the wait the comment sees the anonymization and refuses its files.
+    async with maker() as session:
+        with pytest.raises(ValidationProblem) as exc:
+            await _comment(session)
+    assert exc.value.code == "application_anonymized"
+    async with maker() as session:
+        row = await session.get(Attachment, draft)
+    assert row is not None and row.comment_id is None

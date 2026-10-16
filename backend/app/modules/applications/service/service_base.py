@@ -219,9 +219,21 @@ class ApplicationsServiceBase:
         self.session = session
 
     async def _get_app(
-        self, application_id: UUID, *, allow_unconfirmed: bool = True
+        self, application_id: UUID, *, allow_unconfirmed: bool = True, lock: bool = False
     ) -> Application:
-        app = await self.session.get(Application, application_id)
+        # ``lock`` reads the row FOR NO KEY UPDATE, the lock that serializes a comment
+        # with files against the anonymization. The mode does not block the foreign
+        # key checks of rows that point at the application.
+        app = (
+            await self.session.get(
+                Application,
+                application_id,
+                with_for_update={"key_share": True},
+                populate_existing=True,
+            )
+            if lock
+            else await self.session.get(Application, application_id)
+        )
         if app is None:
             raise NotFoundError(f"application {application_id} not found")
         # An unconfirmed guest submission stays invisible until the magic link confirms

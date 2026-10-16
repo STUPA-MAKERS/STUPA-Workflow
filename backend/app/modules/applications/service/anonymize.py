@@ -51,8 +51,12 @@ class AnonymizeOps(ApplicationsServiceBase):
         ``None`` it deletes the attachment rows only. ``actor`` names the audit
         actor for that deletion. With ``commit=False`` the transaction stays open.
         The caller, an erasure request or the cron, then commits atomically.
+
+        The application row is locked first, the lock that ``add_comment`` takes
+        before it binds files. A comment with files therefore commits before the
+        attachments are selected, or it sees the anonymization and refuses the files.
         """
-        app = await self._get_app(application_id)
+        app = await self._get_app(application_id, lock=True)
         applicant = (
             await self.session.execute(
                 select(Applicant).where(Applicant.application_id == application_id)

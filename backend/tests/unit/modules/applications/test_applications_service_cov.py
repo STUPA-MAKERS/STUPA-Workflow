@@ -109,8 +109,10 @@ class _Session:
         self.refreshed = 0
         self.commit_raises: Exception | None = None
         self.bind = None
+        self.get_kw: list[dict[str, Any]] = []
 
-    async def get(self, _model: type, _pk: Any) -> Any:
+    async def get(self, _model: type, _pk: Any, **kw: Any) -> Any:
+        self.get_kw.append(kw)
         return self.get_results.pop(0) if self.get_results else None
 
     async def execute(self, stmt: Any) -> _Result:
@@ -1489,6 +1491,12 @@ async def test_anonymize_full_with_files_service_commit(
     assert files_calls == [(app.id, "admin")]
     assert session.committed == 1
     assert session.refreshed == 1
+    # The application row is locked before the attachments go, as add_comment locks
+    # it before it binds files.
+    assert session.get_kw[0] == {
+        "with_for_update": {"key_share": True},
+        "populate_existing": True,
+    }
 
 
 def _patch_pinned_keys(monkeypatch: pytest.MonkeyPatch, fields: list[FormFieldDef]) -> None:
@@ -1793,6 +1801,8 @@ async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.Monkey
         pepper="p",
     )
     assert [k for k, _ in calls] == ["check", "bind"]
+    # A comment with files locks the application before the anonymized check.
+    assert session.get_kw == [{"with_for_update": {"key_share": True}, "populate_existing": True}]
     assert calls[1][1]["comment_id"] == out.id
     assert calls[1][1]["attachment_ids"] == [draft]
     assert session.flushed == 1
@@ -1843,6 +1853,8 @@ async def test_add_comment_without_files_on_an_anonymized_application_skips_the_
         app.id, author=None, author_kind="applicant", body="hallo", visibility="public"
     )
     assert out.body == "hallo"
+    # Without files the comment takes no lock on the application.
+    assert session.get_kw == [{}]
 
 
 async def test_delete_comment_removes_its_files_first() -> None:

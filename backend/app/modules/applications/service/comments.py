@@ -72,7 +72,12 @@ class CommentOps(ApplicationsServiceBase):
                 (``application_anonymized``), files without a draft token, or a draft
                 that is missing, expired, foreign or infected (422).
         """
-        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        # With files the application row is locked before the anonymized check, as
+        # the anonymization locks it. Otherwise a comment that binds files while the
+        # application is anonymized keeps them, because no later step looks for them.
+        app = await self._get_app(
+            application_id, allow_unconfirmed=allow_unconfirmed, lock=bool(attachment_ids)
+        )
         if attachment_ids and await self._is_anonymized(application_id):
             raise ValidationProblem(
                 "The application is anonymized and takes no files.",
