@@ -20,7 +20,9 @@ kind, internal notes, a timeline of events and the technical context of the repo
 - `service.py` — `TicketService` (create, list with `q`, counts, assignees, detail with
   `contextTarget`, patch, notes, anonymize), `ticket_managers` (role assignments plus OIDC
   group mappings plus the admin role; active, not merged), `format_number`,
-  `TicketTodoHooks` (the to-do coupling: `openTodoCount`, `completeTodos`).
+  `TicketTodoHooks` (the to-do coupling: `openTodoCount`, `completeTodos`, and
+  `readable_cards`, so a `todo_done` event shows the card title only to a reader of its
+  board; the implementation is `todos/hooks.py`).
 - `router.py` — the routes; `get_ticket_service` is where the todos module wires its
   hooks; `get_ticket_mail_sender` is the override point for tests.
 - `access.py` — `TICKET_MANAGE`.
@@ -87,5 +89,5 @@ reporter, assignee, note author and event actor (area `tickets`).
 - The unit coverage gate counts unit tests only: `tests/unit/modules/tickets` uses a
   scripted session (`fakes.py`); `tests/integration/modules/tickets` runs on Postgres.
 
-**Related:** be-files, be-antiabuse, be-notifications, be-admin, be-privacy, be-search,
-be-auth, frontend
+**Related:** be-todos, be-files, be-antiabuse, be-notifications, be-admin, be-privacy,
+be-search, be-auth, frontend
