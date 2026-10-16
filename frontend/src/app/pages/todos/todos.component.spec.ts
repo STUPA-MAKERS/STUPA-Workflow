@@ -82,22 +82,22 @@ describe('TodosComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => jest.restoreAllMocks());
 
-  it('opens the first gremium board from /todos and keeps the query', async () => {
+  it('opens the personal board from /todos and keeps the query', async () => {
     const { router, api, settle } = await start('/todos?view=list');
     await settle();
-    expect(router.url).toBe('/todos/b-1?view=list');
-    expect(api.pollBoard).toHaveBeenCalledWith('b-1', null);
-    expect(api.members).toHaveBeenCalledWith('b-1');
+    expect(router.url).toBe('/todos/b-0?view=list');
+    expect(api.pollBoard).toHaveBeenCalledWith('b-0', null);
+    expect(api.members).toHaveBeenCalledWith('b-0');
   });
 
-  it('opens the personal board when the caller belongs to none of the listed gremien', async () => {
-    const { router, settle } = await start('/todos', { gremien: ['g-9'] });
+  it('keeps a board in the URL', async () => {
+    const { router, settle } = await start('/todos/b-2');
     await settle();
-    expect(router.url).toBe('/todos/b-0');
+    expect(router.url).toBe('/todos/b-2');
   });
 
-  it('opens the board of an own gremium before a foreign one', async () => {
-    const { router, settle } = await start('/todos', { gremien: ['g-2'] });
+  it('opens the board of an own gremium before a foreign one when there is no personal board', async () => {
+    const { router, settle } = await start('/todos', { boards: BOARDS.filter((b) => b.kind !== 'personal'), gremien: ['g-2'] });
     await settle();
     expect(router.url).toBe('/todos/b-2');
   });

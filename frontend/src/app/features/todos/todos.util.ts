@@ -386,17 +386,18 @@ function recount(board: TodoBoard, cards: readonly TodoCardTile[]): TodoBoard['c
 }
 
 /**
- * The board `/todos` opens: the board of the caller's first own gremium by name, else the personal
- * board. An admin also lists the boards of gremien they do not belong to, so a gremium board outside
- * `ownGremiumIds` comes only after the personal board.
+ * The board `/todos` opens without a board in the URL: the personal board "Meine To-Dos", else
+ * the board of the caller's first own gremium by name. An admin also lists the boards of gremien
+ * they do not belong to, so a gremium board outside `ownGremiumIds` comes only after the boards
+ * of the own gremien.
  */
 export function defaultBoard(
   boards: readonly TodoBoardSummary[],
   ownGremiumIds: readonly Uuid[] = [],
 ): TodoBoardSummary | null {
   return (
-    boards.find((b) => b.kind === 'gremium' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
     boards.find((b) => b.kind === 'personal') ??
+    boards.find((b) => b.kind === 'gremium' && b.gremiumId !== null && ownGremiumIds.includes(b.gremiumId)) ??
     boards.find((b) => b.kind === 'gremium') ??
     boards[0] ??
     null
