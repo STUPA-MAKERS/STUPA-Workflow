@@ -5,7 +5,7 @@ import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoBoard, type TodoCardDetail, type TodoComment } from '@core/api/todos.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { MEMBERS, asPhone, board, detail, link, tile } from '../../../../testing/todo-fixtures';
+import { BOARDS, MEMBERS, asPhone, board, detail, link, tile } from '../../../../testing/todo-fixtures';
 import { DraftAttachmentsService } from '../../apply/draft-attachments.service';
 import { TodoCardDetailComponent } from './todo-card-detail.component';
 
@@ -41,6 +41,10 @@ function makeApi(card: TodoCardDetail) {
     addLink: answer(),
     removeLink: answer(),
     archiveCard: jest.fn(() => of(undefined)),
+    boards: jest.fn(() => of(BOARDS)),
+    transferCard: jest.fn(
+      (): Observable<TodoCardDetail> => of({ ...card, boardId: 'b-2', boardName: 'Fachschaft Informatik', columnId: 'c-1' }),
+    ),
     restoreCard: answer({ archivedAt: null }),
     addComment: jest.fn(() => of({ ...COMMENT, id: 'cm-2', body: 'Neu' })),
     editComment: jest.fn(() => of({ ...COMMENT, body: 'Geändert', editedAt: '2026-10-15T10:00:00Z' })),
@@ -531,6 +535,76 @@ describe('TodoCardDetailComponent', () => {
     api.archiveCard.mockReturnValueOnce(http(500) as never);
     cmp.archive();
     expect(toast.error).toHaveBeenCalledWith('Die Änderung konnte nicht gespeichert werden.');
+  });
+
+  it('moves the card to another board from the menu', async () => {
+    const { cmp, api, toast, changed, detect } = await setup();
+    expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([
+      ['rename', 'edit'],
+      ['transfer', 'arrow'],
+    ]);
+    expect(cmp.menuSections()[1].items[0].id).toBe('archive');
+    cmp.onMenu({ id: 'transfer', label: '' });
+    detect();
+    expect(screen.getByRole('dialog', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
+    // The current board is no target.
+    expect(api.boards).toHaveBeenCalled();
+    expect(api.board).toHaveBeenCalledWith('b-0');
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
+    expect(api.transferCard).toHaveBeenCalledWith('k-1', { boardId: 'b-2', columnId: 'c-1' });
+    expect(changed).toHaveBeenLastCalledWith(expect.objectContaining({ boardId: 'b-2' }));
+    expect(cmp.card()?.boardId).toBe('b-2');
+    expect(api.members).toHaveBeenLastCalledWith('b-2');
+    expect(toast.success).toHaveBeenCalledWith('Karte nach „Fachschaft Informatik“ verschoben');
+    expect(cmp.transferOpen()).toBe(false);
+    expect(cmp.transferring()).toBe(false);
+    expect(cmp.busy()).toBe(false);
+  });
+
+  it('names a refused transfer and reads the card again', async () => {
+    const { cmp, api, toast } = await setup();
+    const target = { boardId: 'b-2', columnId: 'c-1', boardName: 'X' };
+    for (const [err, text] of [
+      [http(409, 'card_moved'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(409, 'card_archived'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(422, 'transfer_same_board'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(422, 'column_not_on_board'), 'Die Karte konnte nicht verschoben werden.'],
+      [http(404), 'Die Karte konnte nicht verschoben werden.'],
+      [http(500), 'Die Änderung konnte nicht gespeichert werden.'],
+    ] as const) {
+      const reads = api.card.mock.calls.length;
+      cmp.transferOpen.set(true);
+      api.transferCard.mockReturnValueOnce(err as never);
+      cmp.transfer(target);
+      expect(toast.error).toHaveBeenLastCalledWith(text);
+      expect(api.card).toHaveBeenCalledTimes(reads + 1);
+      expect(cmp.transferOpen()).toBe(false);
+      expect(cmp.busy()).toBe(false);
+    }
+  });
+
+  it('drops a transfer answer for a card that is no longer shown', async () => {
+    const { cmp, api, toast, changed, fixture } = await setup();
+    const answer = new Subject<TodoCardDetail>();
+    api.transferCard.mockReturnValueOnce(answer);
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'X' });
+    expect(cmp.transferring()).toBe(true);
+    fixture.componentRef.setInput('cardId', 'k-9');
+    fixture.detectChanges();
+    answer.next(detail({ boardId: 'b-2' }));
+    const failing = new Subject<TodoCardDetail>();
+    api.transferCard.mockReturnValueOnce(failing);
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'X' });
+    fixture.componentRef.setInput('cardId', 'k-1');
+    fixture.detectChanges();
+    failing.error(new HttpErrorResponse({ status: 500 }));
+    expect(changed).not.toHaveBeenCalledWith(expect.objectContaining({ boardId: 'b-2' }));
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    cmp.card.set(null);
+    api.transferCard.mockClear();
+    cmp.transfer({ boardId: 'b-2', columnId: 'c-1', boardName: 'X' });
+    expect(api.transferCard).not.toHaveBeenCalled();
   });
 
   it('names the refusal of the server and reads the card again', async () => {

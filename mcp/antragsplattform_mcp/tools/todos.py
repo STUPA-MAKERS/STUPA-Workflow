@@ -52,7 +52,7 @@ async def todo_my_cards() -> list:
     board `labels` and only my `cards`. The personal board is left out; read it with
     `todo_board`. A board that the caller can no longer read is left out, also when
     a card of it still names the caller. Move a card with `todo_card_move` on its own
-    board only.
+    board, and with `todo_card_transfer` to another board.
     """
     return await api().get("/todos/mine/boards")
 
@@ -114,6 +114,31 @@ async def todo_card_move(
     return await api().post(
         f"/todos/cards/{card_id}/move",
         json=params(columnId=column_id, beforeId=before_id, afterId=after_id),
+    )
+
+
+@group.tool
+async def todo_card_transfer(
+    card_id: str, board_id: str, column_id: str | None = None
+) -> dict:
+    """Move a card to the end of a column of another board.
+
+    Labels are per board: a label stays when the target board has a label with the
+    same name (case-insensitive), else it is dropped. No label is created on the
+    target. Assignees who are not members of the target board are dropped, without a
+    mail. Links, comments, the checklist and the history stay with the card. The
+    done column of the target marks the card done; another column reopens it.
+    Errors: 404 for a card or target board that the caller cannot read, 422
+    `transfer_same_board` (use `todo_card_move`) or `column_not_on_board`, 409
+    `card_archived` or `card_moved` (read the card again).
+
+    Args:
+        board_id: The target board.
+        column_id: A column of the target board (default: its first column).
+    """
+    return await api().post(
+        f"/todos/cards/{card_id}/transfer",
+        json=params(boardId=board_id, columnId=column_id),
     )
 
 

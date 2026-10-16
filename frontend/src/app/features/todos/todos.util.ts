@@ -215,6 +215,9 @@ export function eventText(event: TodoEvent, locale: string, t: Translate): strin
     case 'created':
       return t('todos.event.created', { actor });
     case 'moved':
+      if (p['toBoardName'] !== undefined) {
+        return t('todos.event.movedBoard', { actor, from: str(p['fromBoardName']), to: str(p['toBoardName']) });
+      }
       return t('todos.event.moved', { actor, from: str(p['fromColumnName']), to: str(p['toColumnName']) });
     case 'assigned': {
       const person = (p['person'] ?? null) as PersonRef | null;

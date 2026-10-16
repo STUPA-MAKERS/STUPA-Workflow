@@ -464,6 +464,28 @@ describe('TodosComponent', () => {
     expect(cmp.board()?.archivedCount).toBe(0);
   });
 
+  it('takes off a card that went to another board and places one that came over', async () => {
+    const { cmp, api } = await start('/todos/b-1');
+    const reads = api.boards.mock.calls.length;
+    api.boards.mockReturnValueOnce(of([{ ...BOARDS[1], openCount: 9 }]));
+    cmp.onCardChanged(detail({ id: 'k-1', boardId: 'b-2' }));
+    expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['k-2', 'k-3']);
+    expect(cmp.board()?.archivedCount).toBe(2);
+    expect(api.boards).toHaveBeenCalledTimes(reads + 1);
+    expect(cmp.boards()[0].openCount).toBe(9);
+    // A card of another board that the shown board does not hold changes nothing.
+    cmp.onCardChanged(detail({ id: 'k-1', boardId: 'b-2', title: 'Neu' }));
+    expect(api.boards).toHaveBeenCalledTimes(reads + 1);
+    // A card that came over from another board is no restore: the archive count stays.
+    api.boards.mockReturnValueOnce(throwError(() => new Error('x')));
+    const moved = { id: 'e-1', kind: 'moved' as const, actor: null, at: '2026-10-16T10:00:00Z', payload: { toBoardId: 'b-1' } };
+    cmp.onCardChanged(detail({ id: 'k-7', columnId: 'c-1', rank: 'z', events: [moved] }));
+    expect(cmp.board()?.cards.map((c) => c.id)).toEqual(['k-2', 'k-7', 'k-3']);
+    expect(cmp.board()?.archivedCount).toBe(2);
+    expect(api.boards).toHaveBeenCalledTimes(reads + 2);
+    expect(cmp.boards()[0].openCount).toBe(9);
+  });
+
   it('toggles a card done from the list and back', async () => {
     const { cmp, api } = await start('/todos/b-1');
     cmp.toggleDone(cmp.board()!.cards[0]);
@@ -605,7 +627,7 @@ describe('TodosComponent', () => {
     expect(cmp.board()?.cards.find((c) => c.id === 'k-1')?.title).toBe('Neu benannt');
     cmp.onCardChanged(detail({ id: 'k-1', archivedAt: '2026-10-16T10:00:00Z' }));
     expect(cmp.board()?.cards.some((c) => c.id === 'k-1')).toBe(false);
-    cmp.onCardChanged(detail({ id: 'k-2', boardId: 'b-2' }));
+    cmp.onCardChanged(detail({ id: 'k-9', boardId: 'b-2' }));
     cmp.onArchived('k-2');
     expect(cmp.board()?.archivedCount).toBe(3);
     await settle();

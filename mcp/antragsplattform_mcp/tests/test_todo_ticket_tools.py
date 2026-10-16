@@ -122,6 +122,15 @@ def test_todo_card_move_between_neighbors(fake_api: _FakeApi) -> None:
     }
 
 
+def test_todo_card_transfer_with_and_without_a_column(fake_api: _FakeApi) -> None:
+    asyncio.run(todos.todo_card_transfer("c1", "b2"))
+    asyncio.run(todos.todo_card_transfer("c1", "b2", column_id="col9"))
+    assert fake_api.calls == [
+        ("POST", "/todos/cards/c1/transfer", {"boardId": "b2"}),
+        ("POST", "/todos/cards/c1/transfer", {"boardId": "b2", "columnId": "col9"}),
+    ]
+
+
 def test_todo_comment_without_and_with_mentions(fake_api: _FakeApi) -> None:
     asyncio.run(todos.todo_comment("c1", "Erledigt?"))
     asyncio.run(todos.todo_comment("c1", "@Anna bitte", mentions=["p1"]))

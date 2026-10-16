@@ -184,6 +184,12 @@ export interface TodoCardMove {
   afterId?: Uuid | null;
 }
 
+/** A move to another board: the end of `columnId` (default: the first column). */
+export interface TodoCardTransfer {
+  boardId: Uuid;
+  columnId?: Uuid | null;
+}
+
 export interface TodoMineItem extends TodoCardTile {
   boardName: string;
   boardKind: TodoBoardKind;
@@ -386,6 +392,14 @@ export class TodosApiService {
 
   moveCard(cardId: Uuid, body: TodoCardMove): Observable<TodoCardTile> {
     return this.http.post<TodoCardTile>(`${this.base}/todos/cards/${cardId}/move`, body, {
+      context: skipLoading(),
+    });
+  }
+
+  /** Move a card to another board. Labels without a match there and assignees
+   *  without access to it are dropped. */
+  transferCard(cardId: Uuid, body: TodoCardTransfer): Observable<TodoCardDetail> {
+    return this.http.post<TodoCardDetail>(`${this.base}/todos/cards/${cardId}/transfer`, body, {
       context: skipLoading(),
     });
   }

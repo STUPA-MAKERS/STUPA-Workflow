@@ -183,6 +183,9 @@ describe('todos.util', () => {
         'Selin hat die Karte von „Offen“ nach „Erledigt“ verschoben',
       );
       expect(text(event('moved', { fromColumnName: 3 }))).toBe('Selin hat die Karte von „“ nach „“ verschoben');
+      expect(
+        text(event('moved', { fromColumnName: 'Offen', toColumnName: 'Neu', fromBoardName: 'StuPa', toBoardName: 'Meine To-Dos' })),
+      ).toBe('Selin hat die Karte aus „StuPa“ nach „Meine To-Dos“ verschoben');
       expect(text(event('due', { to: '2026-11-03' }))).toBe('Selin hat die Fälligkeit auf Di, 03.11.2026 gesetzt');
       expect(text(event('due', { to: null }))).toBe('Selin hat die Fälligkeit entfernt');
       expect(text(event('renamed', { to: 'Neu' }))).toBe('Selin hat die Karte in „Neu“ umbenannt');

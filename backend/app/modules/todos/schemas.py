@@ -299,6 +299,11 @@ class CardMove(_In):
     after_id: UUID | None = Field(default=None, alias="afterId")
 
 
+class CardTransfer(_In):
+    board_id: UUID = Field(alias="boardId")
+    column_id: UUID | None = Field(default=None, alias="columnId")
+
+
 class AssigneeIn(_In):
     principal_id: UUID = Field(alias="principalId")
 

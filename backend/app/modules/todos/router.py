@@ -33,6 +33,7 @@ from app.modules.todos.schemas import (
     CardLabelIn,
     CardMove,
     CardPatch,
+    CardTransfer,
     CheckItemCreate,
     CheckItemPatch,
     ColumnCreate,
@@ -414,6 +415,18 @@ async def move_card(
 ) -> TodoCardTile:
     """Move a card between ``afterId`` and ``beforeId`` of a column (default: the end)."""
     return await service.move(card_id, payload, principal)
+
+
+@router.post(
+    "/cards/{card_id}/transfer",
+    response_model=TodoCardDetail,
+    responses=_errors(401, 404, 409, 422),
+)
+async def transfer_card(
+    card_id: UUID, payload: CardTransfer, service: ServiceDep, principal: Member
+) -> TodoCardDetail:
+    """Move a card to another board; labels by name and assignees by membership stay."""
+    return await service.transfer(card_id, payload, principal)
 
 
 @router.delete(

@@ -77,7 +77,10 @@ caller cannot read even when a card still names them; one query for the cards, o
 for columns, labels and the tile facts; weak ETag over the list, 304 on
 `If-None-Match`), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
-/cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `DELETE
+/cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `POST
+/cards/{id}/transfer` (`CardTransfer`: `boardId`, `columnId?` = default the first column;
+answers `TodoCardDetail`; 404 for a target board that the caller cannot read, 422
+`transfer_same_board` / `column_not_on_board`, 409 `card_moved` / `card_archived`), `DELETE
 /cards/{id}` (archive), `POST /cards/{id}/restore`, assignees, labels, checklist, links
 (422 `link_self`, `link_target_not_found`; 409 `link_exists`), comments (403
 `not_comment_author`). `POST /cards/{id}/comments` takes `CommentCreate` (`body`,
@@ -93,6 +96,19 @@ for columns, labels and the tile facts; weak ETag over the list, 304 on
   is longer than `MAX_LENGTH` (50): every append adds about one digit per six cards, and
   the done column never empties (`_append`, `_rank` in `service.py`). Every write bumps
   `todo_board.updated_at`, so the ETag changes.
+- `transfer` moves a card to the end of a column of another board. It locks both boards in
+  id order, because two transfers between the same two boards in opposite directions
+  deadlock in the other order, and then reads the card again (`refresh`): a card that a
+  parallel transfer moved gives 409 `card_moved`. Labels are per board, so a label stays
+  only when the target has one with the same `lower(name)`, and the others drop. The
+  transfer never creates a label, because that needs `todo.configure`. Assignees who are
+  not members of the target (`member_ids`) drop, without a mail. Entry into the target
+  done column sets `completed_at` and writes `todo_done` only for a card that was not
+  done; a done card keeps its `completed_at`; another column clears it. One `moved` event
+  carries the column keys plus `fromBoardId`/`fromBoardName`/`toBoardId`/`toBoardName`,
+  `droppedLabels` (names) and `droppedAssignees` (count). `version` does not change.
+  Links, comments with their files, the checklist and the events stay with the card, so
+  the comment files then download under the read rule of the target board.
 - `patch_column` and `delete_column` take the board lock before they read the column
   (`_column` reads with `populate_existing`), so `is_done` is the committed value and a
   parallel done-flag move cannot leave the board without a done column.

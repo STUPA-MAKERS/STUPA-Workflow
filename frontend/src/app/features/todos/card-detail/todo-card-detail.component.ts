@@ -63,6 +63,7 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
+import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
 import {
   LINK_ICON,
   eventText,
@@ -88,6 +89,10 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   link_self: 'todos.error.linkSelf',
   label_not_on_board: 'todos.error.save',
   mention_not_member: 'todos.error.mention',
+  transfer_same_board: 'todos.error.transfer',
+  card_moved: 'todos.error.transfer',
+  card_archived: 'todos.error.transfer',
+  column_not_on_board: 'todos.error.transfer',
 };
 
 /**
@@ -128,6 +133,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     TodoDueChipComponent,
     TodoLinkPickerComponent,
     TodoMoveSheetComponent,
+    TodoTransferDialogComponent,
   ],
   // The phone and the wide layout render the chat in two branches: the page owns its
   // composer files, so a breakpoint change keeps them.
@@ -184,6 +190,8 @@ export class TodoCardDetailComponent {
   readonly itemEditDraft = signal('');
   readonly pickerOpen = signal(false);
   readonly moveOpen = signal(false);
+  readonly transferOpen = signal(false);
+  readonly transferring = signal(false);
 
   private seq = 0;
   /** Counts the fresh loads: a write answer from before the card changed is dropped. */
@@ -342,7 +350,12 @@ export class TodoCardDetailComponent {
     if (!c || !c.canWrite) return [];
     if (c.archivedAt) return [{ items: [{ id: 'restore', label: this.t('todos.card.restore'), icon: 'undo' }] }];
     return [
-      { items: [{ id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' }] },
+      {
+        items: [
+          { id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' },
+          { id: 'transfer', label: this.t('todos.card.transfer'), icon: 'arrow' },
+        ],
+      },
       { items: [{ id: 'archive', label: this.t('todos.card.archive'), icon: 'archive', danger: true }] },
     ];
   });
@@ -773,8 +786,44 @@ export class TodoCardDetailComponent {
 
   onMenu(item: RowMenuItem): void {
     if (item.id === 'rename') this.startTitle();
+    else if (item.id === 'transfer') this.transferOpen.set(true);
     else if (item.id === 'archive') this.archive();
     else if (item.id === 'restore') this.restore();
+  }
+
+  /**
+   * Move the card to another board. The answer is the card on its new board: the page
+   * takes it through `changed`, and the people come from the new board.
+   */
+  transfer(target: TodoTransferTarget): void {
+    const c = this.card();
+    if (!c) return;
+    const current = this.current();
+    this.busy.set(true);
+    this.transferring.set(true);
+    this.api.transferCard(c.id, { boardId: target.boardId, columnId: target.columnId }).subscribe({
+      next: (card) => {
+        if (!current()) return;
+        this.busy.set(false);
+        this.transferring.set(false);
+        this.transferOpen.set(false);
+        this.apply(card);
+        this.loadMembers(card.boardId);
+        this.toast.success(this.t('todos.card.transferred', { board: target.boardName }));
+      },
+      error: (err: unknown) => {
+        if (!current()) return;
+        this.transferring.set(false);
+        this.transferOpen.set(false);
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.busy.set(false);
+          this.toast.error(this.t('todos.error.transfer'));
+          this.reload();
+          return;
+        }
+        this.fail(err, false);
+      },
+    });
   }
 
   archive(): void {

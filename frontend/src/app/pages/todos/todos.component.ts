@@ -497,6 +497,14 @@ export class TodosComponent implements OnDestroy {
   }
 
   /** The assignees of a card changed or may have: read "mine" again, now or at the next pick of "Ich". */
+  /** Read the board summaries again (the open counts of the picker). */
+  private refreshBoards(): void {
+    this.api.boards().subscribe({
+      next: (boards) => this.boards.set(boards),
+      error: () => undefined,
+    });
+  }
+
   private refreshMine(): void {
     this.mineLoaded = false;
     if (this.filter().assignee === 'me') this.loadMine();
@@ -650,12 +658,26 @@ export class TodosComponent implements OnDestroy {
   onCardChanged(card: TodoCardDetail): void {
     this.rowsView()?.cardChanged(card);
     const board = this.board();
-    if (!board || card.boardId !== board.id) return;
+    if (!board) return;
+    const held = board.cards.some((c) => c.id === card.id);
+    if (card.boardId !== board.id) {
+      // The card went to another board: the tile goes, the drawer stays on the card.
+      if (!held) return;
+      this.mutations++;
+      this.board.set(removeTile(board, card.id));
+      this.refreshMine();
+      this.refreshBoards();
+      return;
+    }
     this.mutations++;
     if (card.archivedAt) {
       this.board.set(removeTile(board, card.id));
-    } else if (board.cards.some((c) => c.id === card.id)) {
+    } else if (held) {
       this.board.set(placeTile(board, card));
+    } else if (cameFrom(card, board.id)) {
+      // The card came over from another board.
+      this.board.set(placeTile(board, card));
+      this.refreshBoards();
     } else {
       // A card the board does not hold came back from the archive (the drawer's restore).
       this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
@@ -703,4 +725,10 @@ export class TodosComponent implements OnDestroy {
     const id = this.boardId();
     if (id) this.loadBoard(id);
   }
+}
+
+/** True when the last event of the card is its move from another board onto `boardId`. */
+function cameFrom(card: TodoCardDetail, boardId: Uuid): boolean {
+  const last = card.events.at(-1);
+  return last?.kind === 'moved' && last.payload['toBoardId'] === boardId;
 }

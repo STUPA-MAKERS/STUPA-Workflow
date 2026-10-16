@@ -22,7 +22,13 @@ from app.modules.todos.models import (
     TodoEvent,
     TodoLink,
 )
-from app.modules.todos.schemas import CardCreate, CardMove, CardPatch, CheckItemPatch
+from app.modules.todos.schemas import (
+    CardCreate,
+    CardMove,
+    CardPatch,
+    CardTransfer,
+    CheckItemPatch,
+)
 from app.modules.todos.service import TodoMail, TodoService
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.people import PersonRef
@@ -46,6 +52,7 @@ from tests.unit.modules.todos.fakes import (
 OUT = object()
 TICKET = uuid.UUID(int=61)
 APP = uuid.UUID(int=31)
+NOW_UTC = datetime(2026, 10, 2, tzinfo=UTC)
 
 
 def _svc(session: ScriptedSession, links: FakeLinks | None = None, **kw: Any) -> TodoService:
@@ -386,6 +393,123 @@ async def test_complete_skips_a_card_archived_before_the_lock() -> None:
     assert c.column_id == col.id and c.completed_at is None
     assert _events(session) == []
     assert not any(isinstance(o, TicketEvent) for o in session.added)
+
+
+def _transfer(b: Any, col: Any = None) -> CardTransfer:
+    body: dict[str, Any] = {"boardId": str(b.id)}
+    if col is not None:
+        body["columnId"] = str(col.id)
+    return CardTransfer.model_validate(body)
+
+
+def _target(session: ScriptedSession, **kw: Any) -> tuple[Any, Any, Any]:
+    t = board(name="Ziel", **kw)
+    first, done = column(t.id, "Neu"), column(t.id, "Fertig", 1, is_done=True)
+    session.put(t, first, done)
+    return t, first, done
+
+
+async def test_transfer_errors() -> None:
+    session, b, col, c, service = _setup()
+    t, first, _done = _target(session)
+    with pytest.raises(ValidationProblem) as same:
+        await service.transfer(c.id, _transfer(b), USER)
+    assert same.value.code == "transfer_same_board"
+    with pytest.raises(NotFoundError):
+        await service.transfer(c.id, _transfer(board()), USER)
+    with pytest.raises(NotFoundError):
+        await service.transfer(uuid.uuid4(), _transfer(t), USER)
+    session.scalars_q[:] = [[first]]
+    with pytest.raises(ValidationProblem) as wrong:
+        await service.transfer(c.id, _transfer(t, col), USER)
+    assert wrong.value.code == "column_not_on_board"
+    # Both boards are locked, in id order, before the card is read again.
+    locks = [str(s) for s in session.statements if "FOR UPDATE" in str(s)]
+    assert len(locks) == 2 and session.refreshed == [c]
+    c.archived_at = NOW_UTC
+    with pytest.raises(ConflictError) as archived:
+        await service.transfer(c.id, _transfer(t), USER)
+    assert archived.value.code == "card_archived"
+    c.archived_at = None
+
+    async def _parallel(obj: Any) -> None:
+        obj.board_id = uuid.uuid4()
+
+    session.refresh = _parallel  # type: ignore[method-assign]
+    with pytest.raises(ConflictError) as moved:
+        await service.transfer(c.id, _transfer(t), USER)
+    assert moved.value.code == "card_moved"
+    assert session.committed == 0
+
+
+async def test_transfer_locks_the_boards_in_id_order() -> None:
+    session, b, _col, c, service = _setup()
+    low = board(id=uuid.UUID(int=0))
+    session.put(low)
+    seen: list[Any] = []
+
+    async def _lock(board_id: uuid.UUID) -> None:
+        seen.append(board_id)
+
+    service._lock_board = _lock  # type: ignore[method-assign]
+    session.scalars_q[:] = [[column(low.id)], [], [], [], []]
+    await service.transfer(c.id, _transfer(low), USER)
+    assert seen == [low.id, b.id]
+
+
+async def test_transfer_into_the_done_column_maps_labels_and_assignees() -> None:
+    session, b, col, c, service = _setup(title="Fix")
+    service.access.member_set = {ME}  # type: ignore[attr-defined]
+    t, _first, done = _target(session)
+    urgent, later = label(b.id, "Eilig"), label(b.id, "Später")
+    match = label(t.id, "eilig")
+    tail = card(t, done, rank="k")
+    session.scalars_q[:] = [[_first, done], [urgent, later], [match], [ME, OTHER], [tail], [TICKET]]
+    await service.transfer(c.id, _transfer(t, done), USER)
+    assert (c.board_id, c.column_id) == (t.id, done.id)
+    assert c.rank > "k" and c.completed_at is not None and c.version == 1
+    labels = [o for o in session.added if isinstance(o, TodoCardLabel)]
+    assert [x.label_id for x in labels] == [match.id]
+    deletes = [str(s) for s in session.statements if str(s).startswith("DELETE")]
+    assert len(deletes) == 2 and "todo_assignee" in deletes[1]
+    (moved,) = _events(session)
+    assert moved.payload == {
+        "fromColumnId": str(col.id),
+        "fromColumnName": "Offen",
+        "toColumnId": str(done.id),
+        "toColumnName": "Fertig",
+        "fromBoardId": str(b.id),
+        "fromBoardName": "Board",
+        "toBoardId": str(t.id),
+        "toBoardName": "Ziel",
+        "droppedLabels": ["Später"],
+        "droppedAssignees": 1,
+    }
+    (ticket,) = [o for o in session.added if isinstance(o, TicketEvent)]
+    assert ticket.payload["boardId"] == str(t.id)
+    assert min(b.updated_at, t.updated_at, c.updated_at) > NOW_UTC
+    assert session.committed == 1
+
+
+async def test_transfer_keeps_a_done_card_done_and_opens_it_elsewhere() -> None:
+    since = datetime(2026, 9, 1, tzinfo=UTC)
+    session, _b, _col, c, service = _setup(completed_at=since)
+    t, first, done = _target(session)
+    session.scalars_q[:] = [[first, done], [], [], [ME], []]
+    await service.transfer(c.id, _transfer(t, done), USER)
+    assert c.completed_at == since
+    assert not any(isinstance(o, TicketEvent) for o in session.added)
+    deletes = [str(s) for s in session.statements if str(s).startswith("DELETE")]
+    assert len(deletes) == 1  # every assignee is a member: nothing to drop
+    # Back to the first column of another board (the default): open again.
+    other = board(name="Drei")
+    other_first = column(other.id, "Offen")
+    session.put(other)
+    c.column_id = uuid.uuid4()  # a column that is gone has no name
+    session.scalars_q[:] = [[other_first], [], [], [], []]
+    await service.transfer(c.id, _transfer(other), USER)
+    assert (c.board_id, c.column_id, c.completed_at) == (other.id, other_first.id, None)
+    assert _events(session)[-1].payload["fromColumnName"] == ""
 
 
 LONG = "z" * MAX_LENGTH

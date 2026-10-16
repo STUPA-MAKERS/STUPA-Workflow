@@ -59,6 +59,7 @@ from app.modules.todos.schemas import (
     CardCreate,
     CardMove,
     CardPatch,
+    CardTransfer,
     CheckItemPatch,
     ChecklistCount,
     ColumnPatch,
@@ -1054,6 +1055,122 @@ class TodoService:
         self._touch(board)
         await self.session.commit()
         return (await self.tiles([card], principal))[0]
+
+    async def transfer(
+        self, card_id: uuid.UUID, payload: CardTransfer, principal: Principal
+    ) -> TodoCardDetail:
+        """Move a card to the end of a column of another board (default: the first column).
+
+        Labels are per board: a label of the card stays when the target board has a
+        label with the same name (case-insensitive), else it is dropped. The service
+        never creates a label on the target, because that needs ``todo.configure``.
+        Assignees who are not members of the target board are dropped, without a mail.
+        Links, comments, the checklist and the events stay with the card.
+
+        Both boards are locked in id order, so two transfers between the same two
+        boards in opposite directions wait instead of deadlocking.
+
+        Raises:
+            NotFoundError: The card or the target board is unknown or not readable
+                (HTTP 404).
+            ConflictError: ``card_moved`` (a parallel transfer moved the card) or
+                ``card_archived`` (HTTP 409).
+            ValidationProblem: ``transfer_same_board`` or ``column_not_on_board``
+                (HTTP 422).
+        """
+        actor = await self._actor(principal)
+        card, source = await self._card(card_id, principal)
+        if payload.board_id == source.id:
+            raise _invalid(
+                "The card is on this board already. Use move.", "transfer_same_board", "boardId"
+            )
+        target = await self._board(payload.board_id, principal)
+        for board_id in sorted((source.id, target.id)):
+            await self._lock_board(board_id)
+        await self.session.refresh(card)
+        if card.board_id != source.id:
+            raise ConflictError("The card was moved in the meantime.", code="card_moved")
+        if card.archived_at is not None:
+            raise ConflictError("An archived card cannot move.", code="card_archived")
+        columns = await self._columns(target.id)
+        if payload.column_id is None:
+            column = columns[0]
+        else:
+            matches = [c for c in columns if c.id == payload.column_id]
+            if not matches:
+                raise _invalid(
+                    "The column is not on this board.", "column_not_on_board", "columnId"
+                )
+            column = matches[0]
+        from_column = await self.session.get(TodoColumn, card.column_id)
+        # Every read comes before the first change of the card: a read after it
+        # autoflushes the card, and an UPDATE without ``updated_at`` expires it.
+        own_labels = list(
+            (
+                await self.session.scalars(
+                    select(TodoLabel)
+                    .join(TodoCardLabel, TodoCardLabel.label_id == TodoLabel.id)
+                    .where(TodoCardLabel.card_id == card.id)
+                    .order_by(func.lower(TodoLabel.name), TodoLabel.id)
+                )
+            ).all()
+        )
+        by_name = {label.name.lower(): label for label in await self._labels(target.id)}
+        matched = {label.id: by_name.get(label.name.lower()) for label in own_labels}
+        kept = list(dict.fromkeys(m.id for m in matched.values() if m is not None))
+        dropped_labels: list[JsonValue] = [
+            label.name for label in own_labels if matched[label.id] is None
+        ]
+        assignees = set(
+            (
+                await self.session.scalars(
+                    select(TodoAssignee.principal_id).where(TodoAssignee.card_id == card.id)
+                )
+            ).all()
+        )
+        dropped_assignees = assignees - await self.access.member_ids(target)
+        live = await self._column_cards(column.id)
+        await self.session.execute(delete(TodoCardLabel).where(TodoCardLabel.card_id == card.id))
+        if dropped_assignees:
+            await self.session.execute(
+                delete(TodoAssignee).where(
+                    TodoAssignee.card_id == card.id,
+                    TodoAssignee.principal_id.in_(dropped_assignees),
+                )
+            )
+        now = _now()
+        card.updated_at = now
+        for label_id in kept:
+            self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
+        self._event(
+            card,
+            "moved",
+            actor,
+            {
+                "fromColumnId": str(card.column_id),
+                "fromColumnName": from_column.name if from_column is not None else "",
+                "toColumnId": str(column.id),
+                "toColumnName": column.name,
+                "fromBoardId": str(source.id),
+                "fromBoardName": source.name,
+                "toBoardId": str(target.id),
+                "toBoardName": target.name,
+                "droppedLabels": dropped_labels,
+                "droppedAssignees": len(dropped_assignees),
+            },
+        )
+        _append(live, [card])
+        card.board_id = target.id
+        card.column_id = column.id
+        if not column.is_done:
+            card.completed_at = None
+        elif card.completed_at is None:
+            card.completed_at = now
+            await self._write_ticket_done(card, target, actor)
+        self._touch(source)
+        self._touch(target)
+        await self.session.commit()
+        return await self._detail(card, target, principal)
 
     async def complete(self, card: TodoCard, board: TodoBoard, actor: uuid.UUID) -> bool:
         """Move an open card to the end of the done column, without a commit.

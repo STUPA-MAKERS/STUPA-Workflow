@@ -214,9 +214,19 @@ export class TodoBoardRowsComponent {
     this.load(null);
   }
 
-  /** The card drawer changed a card: put it in its row, then read the rows again. */
+  /**
+   * The card drawer changed a card: take it out of the rows of other boards (it moved to
+   * another board), put it in its row, then read the rows again.
+   */
   cardChanged(card: TodoCardDetail): void {
-    if (!this.update(card.boardId, (b) => (card.archivedAt ? removeTile(b, card.id) : placeTile(b, card)))) return;
+    const list = this.boards();
+    const left = list.some((b) => b.id !== card.boardId && b.cards.some((c) => c.id === card.id));
+    if (left) {
+      this.mutations++;
+      this.boards.set(list.map((b) => (b.id !== card.boardId ? removeTile(b, card.id) : b)));
+    }
+    const placed = this.update(card.boardId, (b) => (card.archivedAt ? removeTile(b, card.id) : placeTile(b, card)));
+    if (!placed && !left) return;
     this.refresh();
   }
 

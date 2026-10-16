@@ -100,7 +100,7 @@ On behalf (#11): `create_application_on_behalf`, `search_on_behalf_applicants` (
 `application.create_on_behalf`).
 To-dos: `todo_boards`, `todo_board`, `todo_my_cards` (my cards on the other boards, by
 board), `todo_card_get`, `todo_card_create`, `todo_card_update` (needs the card `version`),
-`todo_card_move`, `todo_comment`.
+`todo_card_move`, `todo_card_transfer` (to another board), `todo_comment`.
 Tickets: `tickets_list`, `tickets_get`, `tickets_note`, `tickets_update`,
 `tickets_block_sender`, `tickets_unblock_sender`, `tickets_blocked_senders`,
 `tickets_delete_blocked_sender` (need `ticket.manage`).

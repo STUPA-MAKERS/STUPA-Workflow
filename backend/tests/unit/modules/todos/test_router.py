@@ -94,6 +94,7 @@ _ANSWERS: dict[str, Callable[[], Any]] = {
     "card": _detail,
     "patch": _detail,
     "move": _tile,
+    "transfer": _detail,
     "archive_card": lambda: None,
     "restore_card": _detail,
     "add_assignee": _detail,
@@ -284,6 +285,9 @@ def test_card_routes(env: _Env) -> None:
     assert c.patch(f"/api/todos/cards/{CID}", json={"version": 1}).status_code == 200
     move = c.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)})
     assert move.json()["rank"] == "i"
+    moved = c.post(f"/api/todos/cards/{CID}/transfer", json={"boardId": str(BID)})
+    assert moved.json()["boardName"] == "B"
+    assert env.last()[1][1].column_id is None
     assert c.delete(f"/api/todos/cards/{CID}").status_code == 204
     assert c.post(f"/api/todos/cards/{CID}/restore").status_code == 200
     assert (

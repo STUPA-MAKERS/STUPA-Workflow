@@ -150,6 +150,7 @@ describe('TodosApiService', () => {
       [() => api.card('k').subscribe(), 'GET', '/api/todos/cards/k', null],
       [() => api.patchCard('k', { version: 2, title: 'T' }).subscribe(), 'PATCH', '/api/todos/cards/k', { version: 2, title: 'T' }],
       [() => api.moveCard('k', { columnId: 'c', afterId: 'x' }).subscribe(), 'POST', '/api/todos/cards/k/move', { columnId: 'c', afterId: 'x' }],
+      [() => api.transferCard('k', { boardId: 'b' }).subscribe(), 'POST', '/api/todos/cards/k/transfer', { boardId: 'b' }],
       [() => api.archiveCard('k').subscribe(), 'DELETE', '/api/todos/cards/k', null],
       [() => api.restoreCard('k').subscribe(), 'POST', '/api/todos/cards/k/restore', null],
       [() => api.addAssignee('k', 'p').subscribe(), 'POST', '/api/todos/cards/k/assignees', { principalId: 'p' }],

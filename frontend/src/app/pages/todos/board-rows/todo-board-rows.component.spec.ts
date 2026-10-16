@@ -415,9 +415,21 @@ describe('TodoBoardRowsComponent', () => {
     expect(cmp.boards()[0].cards.find((c) => c.id === 'k-1')?.columnId).toBe('c-3');
     cmp.cardChanged(detail({ id: 'k-2', boardId: 'b-1', archivedAt: '2026-10-16T10:00:00Z' }));
     expect(cmp.boards()[0].cards.some((c) => c.id === 'k-2')).toBe(false);
+    // A card that went to another board leaves the row of its old board.
+    cmp.cardChanged(detail({ id: 'k-1', boardId: 'b-elsewhere' }));
+    expect(cmp.boards()[0].cards.some((c) => c.id === 'k-1')).toBe(false);
+    expect(api.pollMineBoards).toHaveBeenLastCalledWith(null);
     cmp.cardRemoved('k-9');
     expect(cmp.boards()[1].cards).toEqual([]);
     cmp.cardRemoved('nope');
     expect(api.pollMineBoards).toHaveBeenLastCalledWith(null);
+  });
+
+  it('moves a card from the row of its old board into the row of its new one', async () => {
+    const { cmp, api } = await setup();
+    api.pollMineBoards.mockImplementation(() => new Subject<TodoAssignedPoll>());
+    cmp.cardChanged(detail({ id: 'k-1', boardId: 'b-9', columnId: 't-1', assignees: [ME] }));
+    expect(cmp.boards()[0].cards.some((c) => c.id === 'k-1')).toBe(false);
+    expect(cmp.boards()[1].cards.map((c) => c.id)).toContain('k-1');
   });
 });
