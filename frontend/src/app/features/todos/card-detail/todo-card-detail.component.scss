@@ -145,13 +145,13 @@
 .cd__col--chat .cd__chat {
   flex: 1 1 auto;
 }
-/* The pane of "Aufgaben" scrolls as a whole; the thread keeps a bounded height. */
-:host(.cd--pane) .cd__chat {
-  --chat-log-max: max(20rem, calc(100dvh - 21.5rem));
-}
-/* The thread column is as tall as its thread, so the composer follows the log. */
-:host(.cd--pane) .cd__col--chat {
-  align-self: start;
+/* The sheet in the pane of "Aufgaben" is as tall as the pane, like the card drawer: the columns fill
+   it down to its foot, and the thread fills its column, as in the ticket detail. The log
+   adds only its minimum to the height of the sheet (`--chat-log-basis: 0`), so a long
+   thread scrolls inside the log, and the composer stays at the foot of the pane. The
+   details column scrolls inside itself. */
+:host(.cd--pane:not(.cd--phone)) .cd__chat {
+  --chat-log-basis: 0;
 }
 
 .cd__secTitle {

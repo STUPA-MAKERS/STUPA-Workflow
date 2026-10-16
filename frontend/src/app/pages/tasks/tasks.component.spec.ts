@@ -171,6 +171,8 @@ describe('TasksComponent', () => {
     const { cmp } = await start('/tasks/a2', [THREE]);
     expect(cmp.selectedId()).toBe('a2');
     expect(screen.getByText('detail')).toBeInTheDocument();
+    // An application sheet keeps its own height; only a to-do sheet is bounded.
+    expect(document.querySelector('.tasks__detail--todo')).toBeNull();
     // One pane at a time in the test: the list is hidden while the detail is open.
     const link = (name: string) => screen.getByRole('link', { name, hidden: true });
     expect(link('Zweiter')).toHaveAttribute('aria-current', 'true');
@@ -439,6 +441,8 @@ describe('TasksComponent', () => {
       expect(cmp.selectedId()).toBeNull();
       expect(cmp.detailOpen()).toBe(true);
       expect(screen.getByText('detail')).toBeInTheDocument();
+      // The pane bounds a to-do sheet, so its thread fills the pane height.
+      expect(document.querySelector('.tasks__detail--todo')).not.toBeNull();
     });
 
     it('leaves the group out when the To-Dos fail and drops a late answer', async () => {

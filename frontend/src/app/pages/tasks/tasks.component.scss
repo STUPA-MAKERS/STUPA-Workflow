@@ -135,6 +135,13 @@
   flex-direction: column;
   min-width: 0;
 }
+/* Side by side a to-do sheet is as tall as the pane, like the card drawer of the board:
+   the thread fills its column with the composer at the foot of the pane, and the details
+   column scrolls inside itself. An application sheet keeps its height and the pane
+   scrolls. */
+.tasks--split .tasks__detail--todo {
+  min-height: 0;
+}
 
 @include bp.phone {
   .tasks__month {

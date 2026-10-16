@@ -140,7 +140,7 @@
       </div>
     </section>
 
-    <div detail class="tasks__detail">
+    <div detail class="tasks__detail" [class.tasks__detail--todo]="selectedTodo() !== null">
       <router-outlet />
     </div>
   </app-list-detail>
