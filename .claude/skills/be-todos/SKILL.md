@@ -33,7 +33,9 @@ done (`completed_at`).
   `ensure_personal_board` (insert … on conflict do nothing, commits).
 - `hooks.py` — `TicketTodoBridge`, the `TicketTodoHooks` of the ticket service.
 - `privacy.py` — `erase_todos` (locks the personal board, then its cards `FOR UPDATE`, before
-  it reads the comment ids, like the Gremium delete), `todo_export`. `add_comment` locks the
+  it reads the comment ids, like the Gremium delete; drops the comment-file rows with
+  `drop_for_messages` and returns the storage keys, which the caller removes after its
+  commit), `todo_export`. `add_comment` locks the
   board and then the card (`_card(..., lock=True)`) before the insert, else it deadlocks with
   those two. `merge.py` — `fold_personal_board`,
   `rewrite_mentions`.

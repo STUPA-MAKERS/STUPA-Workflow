@@ -12,8 +12,10 @@ from openpyxl import load_workbook
 
 from app.modules.auth.models import Principal
 from app.modules.privacy import service as privacy_service
+from app.modules.privacy.models import ErasureRequest
 from app.modules.privacy.service import (
     AuskunftService,
+    ErasureRequestService,
     PrincipalService,
     build_auskunft_workbook,
 )
@@ -38,16 +40,83 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_the_erasure_removes_the_todo_data(monkeypatch: pytest.MonkeyPatch) -> None:
     erased: list[uuid.UUID] = []
 
-    async def _erase(_s: Any, principal_id: uuid.UUID, **kw: Any) -> None:
+    async def _erase(_s: Any, principal_id: uuid.UUID, **kw: Any) -> list[str]:
         erased.append(principal_id)
         assert kw == {"files": None, "actor": "admin"}
+        return ["k1"]
 
     monkeypatch.setattr(privacy_service, "erase_todos", _erase)
     principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
-    await PrincipalService(fake_session(gets=[principal])).erase(
-        principal.id, actor="admin", commit=False
-    )
+    service = PrincipalService(fake_session(gets=[principal]))
+    await service.erase(principal.id, actor="admin", commit=False)
     assert erased == [principal.id]
+    # Without a commit the keys wait for the caller.
+    assert service.storage_keys == ["k1"]
+
+
+class _Files:
+    """Records the committed count of the session at each object removal."""
+
+    def __init__(self, session: Any) -> None:
+        self.session = session
+        self.removed: list[tuple[list[str], int]] = []
+
+    async def remove_objects(self, keys: list[str]) -> None:
+        self.removed.append((list(keys), self.session.committed))
+
+
+def _keys(monkeypatch: pytest.MonkeyPatch, keys: list[str]) -> None:
+    async def _erase(*_a: object, **_k: object) -> list[str]:
+        return keys
+
+    async def _tickets(*_a: object, **_k: object) -> int:
+        return 0
+
+    monkeypatch.setattr(privacy_service, "erase_todos", _erase)
+    monkeypatch.setattr(privacy_service, "anonymize_reported_tickets", _tickets)
+
+
+async def test_the_erasure_removes_the_comment_objects_after_its_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _keys(monkeypatch, ["k1", "k2"])
+    principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
+    db = fake_session(gets=[principal])
+    files = _Files(db)
+    service = PrincipalService(db)
+    await service.erase(principal.id, actor="admin", files=files)  # type: ignore[arg-type]
+    assert files.removed == [(["k1", "k2"], 1)]
+    assert service.storage_keys == []
+
+
+async def test_the_erasure_without_files_removes_no_object(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _keys(monkeypatch, ["k1"])
+    principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
+    db = fake_session(gets=[principal])
+    await PrincipalService(db).erase(principal.id, actor="admin")
+    assert db.committed == 1
+
+
+async def test_the_request_removes_the_comment_objects_after_its_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _keys(monkeypatch, ["k1"])
+    principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
+    request = ErasureRequest(
+        id=uuid.uuid4(),
+        subject_type="principal",
+        principal_id=principal.id,
+        email="u@x.org",
+        status="open",
+    )
+    db = fake_session(gets=[request, principal])
+    files = _Files(db)
+    await ErasureRequestService(db).execute(request.id, actor="dpo", files=files)  # type: ignore[arg-type]
+    # The erasure itself does not commit; the request commits once, then the objects go.
+    assert files.removed == [(["k1"], 1)]
+    assert db.committed == 1
 
 
 async def test_the_export_asks_for_the_todos_of_the_account(

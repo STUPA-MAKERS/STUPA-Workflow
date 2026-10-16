@@ -26,7 +26,7 @@ async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> Non
     comment_id = uuid.uuid4()
     session = ScriptedSession(scalars=[[comment_id]])
     files = FakeFiles()
-    await erase_todos(session, ME, files=files, actor="admin")  # type: ignore[arg-type]
+    keys = await erase_todos(session, ME, files=files, actor="admin")  # type: ignore[arg-type]
     board_lock, card_lock, lookup, first, second = (str(s) for s in session.statements)
     # The board and its cards are locked, in id order, before the comment ids are read.
     assert board_lock.startswith("SELECT todo_board.id") and "todo_board.kind" in board_lock
@@ -34,14 +34,16 @@ async def test_erase_todos_drops_the_assignments_and_the_personal_board() -> Non
     assert card_lock.startswith("SELECT todo_card.id") and "todo_board.owner_id" in card_lock
     assert "ORDER BY todo_card.id" in card_lock and card_lock.endswith("FOR UPDATE")
     assert "todo_comment.id" in lookup and "todo_board.owner_id" in lookup
-    assert files.removed == [([comment_id], "admin")]
+    # Only the rows go here; the objects wait for the commit of the caller.
+    assert files.dropped == [([comment_id], "admin")] and files.removed == []
+    assert keys == [f"key-{comment_id}"]
     assert first.startswith("DELETE FROM todo_assignee")
     assert second.startswith("DELETE FROM todo_board") and "kind" in second
 
 
 async def test_erase_todos_builds_its_own_files_service() -> None:
     session = ScriptedSession(scalars=[[]])
-    await erase_todos(session, ME)  # type: ignore[arg-type]
+    assert await erase_todos(session, ME) == []  # type: ignore[arg-type]
     assert len(session.statements) == 5
 
 

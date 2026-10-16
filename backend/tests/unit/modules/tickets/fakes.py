@@ -120,6 +120,10 @@ class FakeFiles:
         self.removed.append((owner, list(ids), actor))
         return len(ids)
 
+    async def drop_for_messages(self, owner: str, ids: list[uuid.UUID], *, actor: str) -> list[str]:
+        self.removed.append((owner, list(ids), actor))
+        return []
+
     async def list_for_ticket(self, _ticket_id: uuid.UUID) -> list[AttachmentOut]:
         return self.attachments
 

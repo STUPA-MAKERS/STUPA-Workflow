@@ -278,6 +278,7 @@ class FakeFiles:
         self.messages = messages or {}
         self.asked: list[list[uuid.UUID]] = []
         self.removed: list[tuple[list[uuid.UUID], str]] = []
+        self.dropped: list[tuple[list[uuid.UUID], str]] = []
 
     async def message_attachments(
         self, _owner: str, ids: list[uuid.UUID]
@@ -288,3 +289,9 @@ class FakeFiles:
     async def delete_for_messages(self, _owner: str, ids: list[uuid.UUID], *, actor: str) -> int:
         self.removed.append((list(ids), actor))
         return len(ids)
+
+    async def drop_for_messages(
+        self, _owner: str, ids: list[uuid.UUID], *, actor: str
+    ) -> list[str]:
+        self.dropped.append((list(ids), actor))
+        return [f"key-{i}" for i in ids]

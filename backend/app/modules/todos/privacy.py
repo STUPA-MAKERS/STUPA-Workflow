@@ -1,13 +1,15 @@
 """The to-do part of the erasure and of the Auskunft.
 
 ``erase_todos`` removes the assignments of the person and deletes the personal
-board with its cards, because that board holds only the person's own notes. The files
-of the comments on that board go first with their objects, because the board cascade
-would leave the objects behind. The board and its cards are locked before the comment
-ids are read, so a comment that binds files at the same moment is part of the ids or
-fails on the deleted card. Cards, comments, their files and events on the shared
-boards stay: their author, actor and creator ids point to the erased principal, which
-shows as "Gelöschte Person".
+board with its cards, because that board holds only the person's own notes. The file
+rows of the comments on that board go first, because the board cascade would leave
+their objects behind. The objects go only after the caller commits, because a
+rollback brings the rows back and a row without its object is a broken download. The
+board and its cards are locked before the comment ids are read, so a comment that
+binds files at the same moment is part of the ids or fails on the deleted card.
+Cards, comments, their files and events on the shared boards stay: their author,
+actor and creator ids point to the erased principal, which shows as "Gelöschte
+Person".
 
 ``todo_export`` collects the cards that the person created or is assigned to, and
 the person's own comments with the names of their files, for the Auskunft workbook.
@@ -40,17 +42,21 @@ async def erase_todos(
     *,
     files: FilesService | None = None,
     actor: str = "system",
-) -> None:
-    """Remove the assignments and the personal board of the principal.
+) -> list[str]:
+    """Remove the assignments and the personal board of the principal, without a commit.
 
-    The files of the comments on the personal board go first: rows, audit entries and
-    objects (``delete_for_messages``).
+    The files of the comments on the personal board go first: rows and audit entries
+    (``drop_for_messages``). The caller commits and then passes the returned keys to
+    ``FilesService.remove_objects``.
 
     The board goes first and then its cards, the order of every to-do write. The card
     lock is ``FOR UPDATE``, which waits for the key-share lock of a comment insert. A
     comment that binds files therefore commits before the ids are read, or its insert
     waits and then fails on the deleted card. Otherwise its files would lose their row
     through the board cascade and keep their object.
+
+    Returns:
+        The storage keys of the removed comment files.
     """
     boards = select(TodoBoard.id).where(
         TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id
@@ -72,13 +78,14 @@ async def erase_todos(
             )
         ).all()
     )
-    await (files or FilesService(session)).delete_for_messages(
+    storage_keys = await (files or FilesService(session)).drop_for_messages(
         "todo_comment", comment_ids, actor=actor
     )
     await session.execute(delete(TodoAssignee).where(TodoAssignee.principal_id == principal_id))
     await session.execute(
         delete(TodoBoard).where(TodoBoard.kind == "personal", TodoBoard.owner_id == principal_id)
     )
+    return storage_keys
 
 
 async def todo_export(session: AsyncSession, principal_ids: list[UUID]) -> dict[str, Any]:

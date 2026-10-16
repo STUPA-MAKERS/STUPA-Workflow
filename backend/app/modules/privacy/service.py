@@ -60,6 +60,7 @@ class PrincipalService:
 
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
+        self.storage_keys: list[str] = []
 
     async def erase(
         self,
@@ -83,7 +84,11 @@ class PrincipalService:
 
         The to-do assignments of the principal go, and so does the personal board
         with the files of its comments. Cards, comments, their files and events on the
-        shared boards keep the principal id and show "Gelöschte Person".
+        shared boards keep the principal id and show "Gelöschte Person". The objects
+        of those comment files go only after the commit, because a rollback brings the
+        rows back and a row without its object is a broken download. With
+        ``commit=False`` the keys collect in ``storage_keys``, and the caller removes
+        them after its own commit.
 
         The sender blocks of the account and of its e-mail go too.
 
@@ -136,7 +141,7 @@ class PrincipalService:
             self.session, actor=actor, files=files, principal_id=principal_id, email=address
         )
         await erase_sender_blocks(self.session, principal_id=principal_id, email=address)
-        await erase_todos(self.session, principal_id, files=files, actor=actor)
+        storage_keys = await erase_todos(self.session, principal_id, files=files, actor=actor)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -149,8 +154,11 @@ class PrincipalService:
         )
         if commit:
             await self.session.commit()
+            if files is not None:
+                await files.remove_objects(storage_keys)
         else:
             await self.session.flush()
+            self.storage_keys.extend(storage_keys)
         return principal
 
 
@@ -377,6 +385,7 @@ class ErasureRequestService:
             ConflictError: The request is not open, or it has no resolvable subject.
         """
         request = await self._require_open(request_id)
+        storage_keys: list[str] = []
         if request.subject_type == "applicant" and request.application_id is not None:
             await ApplicationsService(self.session).anonymize(
                 request.application_id, files=files, actor=actor, commit=False
@@ -395,9 +404,9 @@ class ErasureRequestService:
             )
             await erase_sender_blocks(self.session, email=request.email)
         elif request.subject_type == "principal" and request.principal_id is not None:
-            await PrincipalService(self.session).erase(
-                request.principal_id, actor=actor, commit=False, files=files
-            )
+            principals = PrincipalService(self.session)
+            await principals.erase(request.principal_id, actor=actor, commit=False, files=files)
+            storage_keys = principals.storage_keys
         else:
             raise ConflictError(
                 "erasure request has no resolvable subject", code="erasure_no_subject"
@@ -413,6 +422,8 @@ class ErasureRequestService:
             target_id=str(request.id),
         )
         await self.session.commit()
+        if files is not None:
+            await files.remove_objects(storage_keys)
         await self.session.refresh(request)
         return request
 

@@ -2,7 +2,8 @@
 
 A comment binds its drafts, the card detail lists them, a reader of the board
 downloads them and anybody else gets 404. Deleting the comment, and the erasure of
-the owner of a personal board, remove the files with their objects.
+the owner of a personal board, remove the files with their objects. The erasure
+removes the objects only after its commit.
 """
 
 from __future__ import annotations
@@ -157,6 +158,16 @@ async def test_the_erasure_of_a_personal_board_removes_the_comment_files(
     async with maker() as session:
         files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
         await erase_todos(session, me_id, files=files, actor="dpo")
+        # The objects stay until the commit, so a rollback keeps every file whole.
+        assert storage.blobs != {}
+        await session.rollback()
+    async with maker() as session:
+        row = await session.get(Attachment, draft)
+        assert row is not None and row.storage_key in storage.blobs
+    async with maker() as session:
+        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        keys = await erase_todos(session, me_id, files=files, actor="dpo")
         await session.commit()
+        await files.remove_objects(keys)
         assert await session.get(Attachment, draft) is None
     assert storage.blobs == {}
