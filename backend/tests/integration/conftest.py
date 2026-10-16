@@ -116,6 +116,9 @@ _DATA_TABLES = (
     "audit_verification",
     # Tickets. CASCADE also clears the notes, the events and the ticket attachments.
     "ticket",
+    # To-do boards. CASCADE also clears the columns, the cards and their rows. A test
+    # creates the boards it needs (`ensure_gremium_board`, `GET /todos/boards`).
+    "todo_board",
 )
 
 

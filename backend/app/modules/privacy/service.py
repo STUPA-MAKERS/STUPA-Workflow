@@ -34,6 +34,7 @@ from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.erasure import erase_candidate_names
 from app.modules.tickets.models import Ticket
 from app.modules.tickets.service import TicketService, format_number
+from app.modules.todos.privacy import erase_todos, todo_export
 from app.modules.voting.erasure import erase_candidacies
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
@@ -71,6 +72,10 @@ class PrincipalService:
         reporter, no context, no attachments. With an object storage in `files` the
         attachment objects go too. Notes and events keep the principal id, so they
         show a deleted person.
+
+        The to-do assignments of the principal go, and so does the personal board.
+        Cards, comments and events on the shared boards keep the principal id and
+        show "Gelöschte Person".
 
         Raises:
             NotFoundError: No principal has this id.
@@ -127,6 +132,7 @@ class PrincipalService:
         ).all()
         for ticket in reported:
             await tickets.anonymize(ticket, actor=actor)
+        await erase_todos(self.session, principal_id)
         await self.session.execute(
             delete(AuthSession).where(AuthSession.principal_id == principal_id)
         )
@@ -518,6 +524,9 @@ class AuskunftService:
             }
             for t in trows
         ]
+        todos = await todo_export(
+            self.session, [principal_row.id] if principal_row is not None else []
+        )
         principal = (
             {
                 "sub": principal_row.sub,
@@ -537,6 +546,8 @@ class AuskunftService:
             "attachments": attachments,
             "attendance": attendance,
             "tickets": tickets,
+            "todos": todos["cards"],
+            "todo_comments": todos["comments"],
             "principal": principal,
         }
 
@@ -555,12 +566,15 @@ def build_auskunft_workbook(
     attachments: Sequence[Mapping[str, Any]] = (),
     attendance: Sequence[Mapping[str, Any]] = (),
     tickets: Sequence[Mapping[str, Any]] = (),
+    todos: Sequence[Mapping[str, Any]] = (),
+    todo_comments: Sequence[Mapping[str, Any]] = (),
 ) -> bytes:
     """Build the GDPR access request (Art. 15) as `.xlsx` bytes.
 
     This function extends the shared `app.shared.xlsx.build_auskunft_workbook`. It adds
-    four sheets: the comments that the subject can see, the attachment metadata, the
-    meeting attendance with the reason of an excuse, and the reported tickets.
+    six sheets: the comments that the subject can see, the attachment metadata, the
+    meeting attendance with the reason of an excuse, the reported tickets, the
+    to-dos that the subject created or is assigned to, and the own to-do comments.
     """
     from io import BytesIO
 
@@ -656,6 +670,33 @@ def build_auskunft_workbook(
                 _fmt_dt(t.get("createdAt")),
             ]
             for t in tickets
+        ],
+    )
+    _add_sheet(
+        "To-Dos",
+        ["Board", "Titel", "Spalte", "Fällig", "Erstellt"],
+        [
+            [
+                t.get("board") or "",
+                t.get("title") or "",
+                t.get("column") or "",
+                t["dueDate"].isoformat() if t.get("dueDate") else "",
+                _fmt_dt(t.get("createdAt")),
+            ]
+            for t in todos
+        ],
+    )
+    _add_sheet(
+        "To-Do-Kommentare",
+        ["To-Do", "Zeitpunkt", "Gelöscht", "Text"],
+        [
+            [
+                c.get("card") or "",
+                _fmt_dt(c.get("createdAt")),
+                _fmt_dt(c.get("deletedAt")),
+                c.get("body") or "",
+            ]
+            for c in todo_comments
         ],
     )
 

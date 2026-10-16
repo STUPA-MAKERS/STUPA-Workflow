@@ -60,6 +60,7 @@ SCOPES: dict[str, frozenset[str]] = {
     "budget:write": frozenset({"budget.structure", "budget.book"}),
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
     "tickets:write": frozenset({"ticket.manage"}),
+    "todos:write": frozenset({"todo.write", "todo.configure"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(
@@ -119,6 +120,7 @@ SCOPE_ORDER: tuple[str, ...] = (
     "applications:write",
     "votes:write",
     "meetings:write",
+    "todos:write",
     "tickets:write",
     "budget:write",
     "forms:write",

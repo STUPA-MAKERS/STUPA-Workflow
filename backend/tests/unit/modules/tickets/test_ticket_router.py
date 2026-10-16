@@ -282,8 +282,10 @@ def test_the_work_routes_answer(env: _Env) -> None:
 
 def test_the_default_wiring() -> None:
     assert get_ticket_mail_sender() is _deliver_ticket_mails
+    from app.modules.todos.hooks import TicketTodoBridge
+
     service = get_ticket_service(object())  # type: ignore[arg-type]
-    assert service.todos is None
+    assert isinstance(service.todos, TicketTodoBridge)
 
 
 async def test_the_mail_sender_sends_both_mails(monkeypatch: pytest.MonkeyPatch) -> None:

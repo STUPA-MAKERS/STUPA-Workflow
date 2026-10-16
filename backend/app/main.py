@@ -67,6 +67,7 @@ from app.modules.protocol.public_router import router as public_protocol_router
 from app.modules.protocol.router import router as protocol_router
 from app.modules.search.router import router as search_router
 from app.modules.tickets.router import router as tickets_router
+from app.modules.todos.router import router as todos_router
 from app.modules.voting.router import router as voting_router
 from app.settings import Settings, get_settings
 from app.shared.errors import register_exception_handlers, use_problem_json_contract
@@ -116,6 +117,7 @@ api_router.include_router(privacy_router)
 api_router.include_router(backup_router)
 api_router.include_router(search_router)
 api_router.include_router(tickets_router)
+api_router.include_router(todos_router)
 api_router.include_router(gremien_authed_router)
 api_router.include_router(gremien_tab_router)
 api_router.include_router(site_config_public_router)

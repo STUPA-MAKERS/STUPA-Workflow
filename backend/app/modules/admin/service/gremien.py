@@ -28,6 +28,7 @@ from app.modules.admin.service.service_base import ConfigServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
+from app.modules.todos.boards import ensure_gremium_board
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 
 
@@ -114,6 +115,8 @@ class GremiumOps(ConfigServiceBase):
         await self.session.flush()
         # Every new gremium gets the forced roles chair and secretary.
         await GremiumRoleService(self.session).ensure_forced_roles(row.id)
+        # ... and its to-do board with the four default columns.
+        await ensure_gremium_board(self.session, row.id, row.name)
         await self._audit(
             actor,
             AuditAction.CONFIG_CHANGE,

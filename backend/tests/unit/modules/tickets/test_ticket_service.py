@@ -68,15 +68,22 @@ def _create(**kw: Any) -> TicketCreate:
 
 
 class _Todos:
-    def __init__(self, count: int = 0) -> None:
+    def __init__(self, count: int = 0, readable: set[uuid.UUID] | None = None) -> None:
         self.count = count
         self.completed: list[uuid.UUID] = []
+        self.readable = readable or set()
+        self.asked: list[set[uuid.UUID]] = []
 
     async def open_count(self, _ticket_id: uuid.UUID, _principal: Principal) -> int:
         return self.count
 
     async def complete(self, ticket_id: uuid.UUID, _principal: Principal) -> None:
         self.completed.append(ticket_id)
+
+    async def readable_cards(self, card_ids: Any, _principal: Principal) -> set[uuid.UUID]:
+        wanted = set(card_ids)
+        self.asked.append(wanted)
+        return wanted & self.readable
 
 
 # -- helpers ------------------------------------------------------------------------
@@ -309,6 +316,42 @@ async def test_detail_without_an_account_row_marks_no_note_as_own() -> None:
     assert detail.notes[0].author == DELETED_PERSON
     assert detail.open_todo_count == 0
     assert detail.context == {}
+
+
+def _todo_done(ticket: Ticket, card_id: object) -> TicketEvent:
+    return TicketEvent(
+        id=uuid.uuid4(),
+        ticket_id=ticket.id,
+        actor_id=None,
+        kind="todo_done",
+        payload={"cardId": card_id, "cardTitle": "Geheim", "boardId": str(uuid.uuid4())},
+        created_at=NOW,
+    )
+
+
+async def test_detail_shows_a_todo_title_only_to_a_reader_of_its_board() -> None:
+    ticket = _ticket()
+    seen, hidden = uuid.uuid4(), uuid.uuid4()
+    events = [_todo_done(ticket, str(seen)), _todo_done(ticket, str(hidden))]
+    events.append(_todo_done(ticket, "kein-uuid"))
+    events.append(_todo_done(ticket, None))
+    session = ScriptedSession(scalar=[None], scalars=[[], events], execute=[[]])
+    session.put(ticket)
+    todos = _Todos(readable={seen})
+    detail = await _svc(session, todos=todos).detail(ticket.id, VIEWER)
+    titles = [e.payload["cardTitle"] for e in detail.events]
+    assert titles == ["Geheim", None, None, None]
+    assert todos.asked == [{seen, hidden}]
+
+
+async def test_detail_without_todo_hooks_hides_every_todo_title() -> None:
+    ticket = _ticket()
+    session = ScriptedSession(
+        scalar=[None], scalars=[[], [_todo_done(ticket, str(uuid.uuid4()))]], execute=[[]]
+    )
+    session.put(ticket)
+    detail = await _svc(session).detail(ticket.id, VIEWER)
+    assert detail.events[0].payload["cardTitle"] is None
 
 
 async def _detail_with_route(route: object, session: ScriptedSession) -> Any:

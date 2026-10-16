@@ -33,8 +33,12 @@ def test_worker_settings_registers_tasks() -> None:
     # Nightly budget rollup, deadline scan every minute (T-44), hourly task reminders,
     # daily DSGVO retention, the nightly backup, the hourly draft purge (Z4) and the
     # nightly audit-chain check (Z6), the hourly heal of the public protocols and the
-    # daily ticket anonymization.
-    assert len(WorkerSettings.cron_jobs) == 9
+    # daily ticket anonymization and the daily to-do archive.
+    assert len(WorkerSettings.cron_jobs) == 10
+    from worker.todos import archive_done_todos
+
+    assert archive_done_todos in WorkerSettings.functions
+    assert any(job.coroutine is archive_done_todos for job in WorkerSettings.cron_jobs)
     from worker.tickets import anonymize_tickets
 
     assert anonymize_tickets in WorkerSettings.functions

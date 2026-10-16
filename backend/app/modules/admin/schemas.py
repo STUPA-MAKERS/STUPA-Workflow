@@ -495,6 +495,7 @@ MergeArea = Literal[
     "memberships",
     "calendar",
     "tickets",
+    "todos",
 ]
 
 # A real conflict blocks the merge. Each kind names a rule that the merged data would

@@ -82,6 +82,20 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because you reported a problem, a "
         "question or an idea.",
     },
+    "todo_assigned": {
+        "de": "Sie erhalten diese E-Mail, weil Ihnen ein To-Do zugewiesen wurde.",
+        "en": "You are receiving this email because a to-do was assigned to you.",
+    },
+    "todo_mentioned": {
+        "de": "Sie erhalten diese E-Mail, weil Sie in einem To-Do erwähnt wurden.",
+        "en": "You are receiving this email because you were mentioned on a to-do.",
+    },
+    "todo_due": {
+        "de": "Sie erhalten diese E-Mail, weil ein To-Do, für das Sie zuständig sind, "
+        "morgen fällig ist.",
+        "en": "You are receiving this email because a to-do that you are responsible "
+        "for is due tomorrow.",
+    },
     "generic": {
         "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
         "en": "You are receiving this email from the application platform.",

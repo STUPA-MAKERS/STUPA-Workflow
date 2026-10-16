@@ -407,6 +407,8 @@ class AgendaItemOut(_CamelModel):
 
     id: UUID
     application_id: UUID | None = Field(default=None, alias="applicationId")
+    # The to-do card of an item of kind to-do (the item title is the card title).
+    todo_id: UUID | None = Field(default=None, alias="todoId")
     title: str | None = None
     # Markdown text of this agenda item.
     body: str | None = None
@@ -529,19 +531,21 @@ class MeetingVoteOpenBody(_CamelModel):
 
 
 class AgendaAddBody(_CamelModel):
-    """``POST /meetings/{id}/agenda`` — add an agenda item, application or free text.
+    """``POST /meetings/{id}/agenda`` — add an agenda item: application, free text or to-do.
 
-    Supply exactly one of ``applicationId`` and ``title``.
+    Supply exactly one of ``applicationId``, ``title`` and ``todoId``.
     """
 
     application_id: UUID | None = Field(default=None, alias="applicationId")
     title: str | None = Field(default=None, min_length=1)
+    todo_id: UUID | None = Field(default=None, alias="todoId")
     non_public: bool = Field(default=False, alias="nonPublic")
 
     @model_validator(mode="after")
     def _one_of(self) -> AgendaAddBody:
-        if (self.application_id is None) == (self.title is None):
-            raise ValueError("exactly one of applicationId or title is required")
+        given = [v for v in (self.application_id, self.title, self.todo_id) if v is not None]
+        if len(given) != 1:
+            raise ValueError("exactly one of applicationId, title or todoId is required")
         return self
 
 

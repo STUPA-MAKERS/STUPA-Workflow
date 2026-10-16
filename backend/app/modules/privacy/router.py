@@ -237,6 +237,8 @@ async def auskunft(
             "attachments": len(data["attachments"]),
             "attendance": len(data["attendance"]),
             "tickets": len(data["tickets"]),
+            "todos": len(data["todos"]),
+            "todoComments": len(data["todo_comments"]),
             "hasPrincipal": data["principal"] is not None,
         },
     )

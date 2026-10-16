@@ -74,6 +74,9 @@ HIT_URL: Mapping[SearchKind, str] = {
     # `sub` and not the row id: it is what the principal search matches on.
     "principal": "/admin/users?q={id}",
     "ticket": "/tickets/{id}",
+    # The fallback only: the source builds `/todos/{boardId}?card={id}` per hit, because
+    # the card opens on its own board.
+    "todo": "/todos?card={id}",
 }
 
 #: The status of a ticket hit, in the reader's language.
@@ -111,6 +114,7 @@ class SearchService:
             "gremium": self._gremien,
             "principal": self._principals,
             "ticket": self._tickets,
+            "todo": self._todos,
         }
         # Sequential, not gathered: they share one AsyncSession, and a session is not
         # safe for concurrent use. Each query is small and indexed.
@@ -322,6 +326,23 @@ class SearchService:
                 url=HIT_URL["ticket"].format(id=t.id),
             )
             for t in page.items
+        ]
+
+    async def _todos(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
+        """Reuses `TodoService.search`, behind the board read rule of the todos module."""
+        from app.modules.todos.links import card_url
+        from app.modules.todos.service import TodoService
+
+        rows = await TodoService(self.session).search(q, principal, limit=PER_KIND + 1)
+        return [
+            SearchHit(
+                kind="todo",
+                id=str(card.id),
+                title=card.title,
+                subtitle=f"{board.name} · {column.name}",
+                url=card_url(board.id, card.id),
+            )
+            for card, board, column in rows
         ]
 
 

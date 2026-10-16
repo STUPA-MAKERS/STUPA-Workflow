@@ -138,6 +138,11 @@ def patched(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(wd, "NotificationService", _NotifyFake)
     monkeypatch.setattr(wd, "build_worker_dispatcher", lambda *_a: object())
 
+    async def _no_todos(_ctx: dict[str, Any], _now: datetime) -> int:
+        return 0
+
+    monkeypatch.setattr(wd, "process_todo_due", _no_todos)
+
 
 def _ctx(sessions: list[FakeSession]) -> dict[str, Any]:
     return {"settings": SETTINGS, "deadlines_sessionmaker": _maker(sessions)}
@@ -559,7 +564,22 @@ async def test_process_deadlines_orchestrates_all(patched: None) -> None:
         FakeSession([[]]),             # discard of unconfirmed guest applications → none
     ]
     out = await wd.process_deadlines(_ctx(sessions))
-    assert out == "reminders=1 actions=1 votes=1 auto=0 discarded=0"
+    assert out == "reminders=1 actions=1 votes=1 auto=0 discarded=0 todos=0"
+
+
+async def test_todo_due_step_counts_and_survives_a_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _two(_ctx: dict[str, Any], _now: datetime) -> int:
+        return 2
+
+    async def _boom(_ctx: dict[str, Any], _now: datetime) -> int:
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(wd, "process_todo_due", _two)
+    assert await wd._process_todo_due({}, NOW) == 2
+    monkeypatch.setattr(wd, "process_todo_due", _boom)
+    assert await wd._process_todo_due({}, NOW) == 0
 
 
 @freeze_time(FROZEN)

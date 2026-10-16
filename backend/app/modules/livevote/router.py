@@ -60,6 +60,7 @@ from app.modules.livevote.vote_open import (
     eligible_count,
 )
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
+from app.modules.todos.service import TodoService
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
@@ -790,14 +791,31 @@ async def add_agenda_item(
     service: ServiceDep,
     principal: ReaderDep,
 ) -> list[AgendaItemOut]:
-    """Add an agenda item, either an application or a free-text item.
+    """Add an agenda item: an application, a free-text item or a to-do card.
 
     Only the meeting lead or an admin may edit the agenda. A closed meeting answers
-    409 ``meeting_closed``.
+    409 ``meeting_closed``. With ``todoId`` the card must be readable (404), live
+    and on the board of the meeting gremium (422 ``todo_archived`` /
+    ``todo_wrong_board``); a second item of the same card answers 409
+    ``todo_already_on_agenda``. The item takes the card title, and the card gets a
+    link to the item.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
+    if payload.todo_id is not None:
+        todos = TodoService(agenda.session)
+        card = await todos.card_for_agenda(payload.todo_id, meeting.gremium_id, principal)
+        item = await agenda.add_todo_in_tx(
+            meeting_id,
+            todo_id=card.id,
+            title=card.title,
+            non_public=payload.non_public,
+            actor=principal.sub,
+        )
+        await todos.link_agenda_item(card, item.id, principal)
+        await agenda.session.commit()
+        return await agenda.list(meeting_id)
     return await agenda.add(
         meeting_id,
         payload.application_id,

@@ -40,6 +40,7 @@ from app.modules.tickets.service import (
     format_number,
     principal_id_of,
 )
+from app.modules.todos.hooks import TicketTodoBridge
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_ticket_payload_limit,
@@ -63,8 +64,8 @@ Manager = Annotated[Principal, Depends(require_principal(TICKET_MANAGE))]
 
 
 def get_ticket_service(session: DbSession) -> TicketService:
-    """Wire the service. The todos module adds its hooks here."""
-    return TicketService(session)
+    """Wire the service with the to-do hooks (open count, completeTodos, titles)."""
+    return TicketService(session, todos=TicketTodoBridge(session))
 
 
 ServiceDep = Annotated[TicketService, Depends(get_ticket_service)]

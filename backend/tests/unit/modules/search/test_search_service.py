@@ -35,6 +35,7 @@ def _svc(**sources: Any) -> SearchService:
         "_gremien",
         "_principals",
         "_tickets",
+        "_todos",
     ):
 
         async def _empty(*_a: object, **_kw: object) -> list[SearchHit]:
@@ -333,3 +334,31 @@ async def test_the_ticket_source_needs_ticket_manage(monkeypatch: pytest.MonkeyP
     )
     (hit,) = await svc._tickets("drucker", manager, "fr")
     assert hit.subtitle == "In Arbeit"
+
+
+async def test_the_todo_source_links_the_card_on_its_board(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from app.modules.todos.service import TodoService
+
+    seen: dict[str, object] = {}
+    board = SimpleNamespace(id=uuid.uuid4(), name="StuPa")
+    card = SimpleNamespace(id=uuid.uuid4(), title="Plakat")
+    column = SimpleNamespace(name="Offen")
+
+    async def _search(_self: object, q: str, _p: object, *, limit: int) -> list[object]:
+        seen.update(q=q, limit=limit)
+        return [(card, board, column)]
+
+    monkeypatch.setattr(TodoService, "search", _search)
+    svc = SearchService(session=None)  # type: ignore[arg-type]
+    (hit,) = await svc._todos("plakat", ANY, "de")
+    assert seen == {"q": "plakat", "limit": PER_KIND + 1}
+    assert (hit.kind, hit.title, hit.subtitle, hit.url) == (
+        "todo",
+        "Plakat",
+        "StuPa · Offen",
+        f"/todos/{board.id}?card={card.id}",
+    )

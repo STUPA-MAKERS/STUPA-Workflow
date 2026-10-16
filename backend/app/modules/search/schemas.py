@@ -22,6 +22,7 @@ SearchKind = Literal[
     "gremium",
     "principal",
     "ticket",
+    "todo",
 ]
 
 

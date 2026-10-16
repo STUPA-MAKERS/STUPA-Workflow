@@ -14,21 +14,19 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import JsonValue
-from sqlalchemy import ColumnElement, Select, String, cast, func, or_, select
-from sqlalchemy.dialects.postgresql import array
+from sqlalchemy import ColumnElement, String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
 from app.modules.applications.access import resolve_app_read
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
-from app.modules.auth.models import GroupMapping, Role, RoleAssignment, RolePermission
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.drafts import bind_drafts, check_drafts
@@ -58,10 +56,12 @@ from app.modules.tickets.schemas import (
 from app.search import escape_like
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
-from app.shared.people import DELETED_PERSON, PersonRef, person_of
-
-#: The key of the admin role. It holds every permission, so it counts as a holder.
-ADMIN_ROLE_KEY = "admin"
+from app.shared.people import (
+    DELETED_PERSON,
+    PersonRef,
+    permission_holders,
+    person_of,
+)
 
 #: ``T-0040``, ``t0040``, ``0040`` and ``40`` all name ticket 40.
 _NUMBER_RE = re.compile(r"^(?:t-?)?0*(\d{1,9})$", re.IGNORECASE)
@@ -91,6 +91,12 @@ class TicketTodoHooks(Protocol):
         """Move the open linked cards that the principal can write into done."""
         ...
 
+    async def readable_cards(
+        self, card_ids: Iterable[uuid.UUID], principal: Principal
+    ) -> set[uuid.UUID]:
+        """Return the cards whose board the principal reads (``todo_done`` titles)."""
+        ...
+
 
 @dataclass(frozen=True, slots=True)
 class _Account:
@@ -98,47 +104,16 @@ class _Account:
     email: str | None
 
 
-def _manager_role_ids() -> Select[uuid.UUID]:
-    return (
-        select(Role.id)
-        .outerjoin(RolePermission, RolePermission.role_id == Role.id)
-        .where(or_(RolePermission.permission == TICKET_MANAGE, Role.key == ADMIN_ROLE_KEY))
-    )
-
-
 async def ticket_managers(
     session: AsyncSession, *, principal_id: uuid.UUID | None = None
 ) -> list[tuple[uuid.UUID, str | None, str | None]]:
     """Return ``(id, display_name, email)`` of the active holders of ``ticket.manage``.
 
-    A holder has a valid role assignment or an OIDC group mapped to a role that
-    carries the permission; the admin role always counts. This mirrors the RBAC
-    resolution (``auth/rbac.py``): assignments plus group mappings. A merged or
-    inactive account never counts. ``principal_id`` narrows the result to one account.
+    See ``permission_holders``: role assignments plus OIDC group mappings, the admin
+    role always counts, merged or inactive accounts never. ``principal_id`` narrows
+    the result to one account.
     """
-    now = _now()
-    roles = _manager_role_ids()
-    assigned = select(RoleAssignment.principal_id).where(
-        RoleAssignment.role_id.in_(roles),
-        or_(RoleAssignment.valid_from.is_(None), RoleAssignment.valid_from <= now),
-        or_(RoleAssignment.valid_until.is_(None), RoleAssignment.valid_until >= now),
-    )
-    groups = list(
-        (
-            await session.scalars(
-                select(GroupMapping.oidc_group).where(GroupMapping.role_id.in_(roles))
-            )
-        ).all()
-    )
-    holder = PrincipalRow.id.in_(assigned)
-    if groups:
-        holder = or_(holder, PrincipalRow.oidc_groups.has_any(array(groups, type_=String)))
-    stmt = select(PrincipalRow.id, PrincipalRow.display_name, PrincipalRow.email).where(
-        PrincipalRow.active.is_(True), PrincipalRow.merged_into.is_(None), holder
-    )
-    if principal_id is not None:
-        stmt = stmt.where(PrincipalRow.id == principal_id)
-    return [(pid, name, email) for pid, name, email in (await session.execute(stmt)).all()]
+    return await permission_holders(session, TICKET_MANAGE, principal_id=principal_id)
 
 
 async def principal_id_of(session: AsyncSession, sub: str) -> uuid.UUID | None:
@@ -353,6 +328,7 @@ class TicketService:
             if event.kind == "assignee":
                 people.update(_ids_of(event.payload))
         accounts = await self._accounts([ticket], extra=people)
+        readable = await self._readable_cards(events, principal)
         duplicate = (
             await self.session.get(Ticket, ticket.duplicate_of_id)
             if ticket.duplicate_of_id is not None
@@ -377,7 +353,7 @@ class TicketService:
                 )
                 for n in notes
             ],
-            events=[_event_out(e, accounts) for e in events],
+            events=[_event_out(e, accounts, readable) for e in events],
             duplicate_of=(
                 TicketRef(id=duplicate.id, number=format_number(duplicate.number))
                 if duplicate is not None
@@ -390,6 +366,23 @@ class TicketService:
             closed_at=ticket.closed_at,
             anonymized_at=ticket.anonymized_at,
         )
+
+    async def _readable_cards(
+        self, events: Sequence[TicketEvent], principal: Principal
+    ) -> set[uuid.UUID]:
+        """The cards of the ``todo_done`` events whose title the viewer may read.
+
+        Without the to-do hooks no title shows.
+        """
+        ids = {
+            card_id
+            for e in events
+            if e.kind == "todo_done"
+            and (card_id := _uuid_or_none((e.payload or {}).get("cardId"))) is not None
+        }
+        if not ids or self.todos is None:
+            return set()
+        return await self.todos.readable_cards(ids, principal)
 
     # -- writes -----------------------------------------------------------------
 
@@ -718,8 +711,26 @@ def _reporter(ticket: Ticket, accounts: dict[uuid.UUID, _Account]) -> TicketRepo
     )
 
 
-def _event_out(event: TicketEvent, accounts: dict[uuid.UUID, _Account]) -> TicketEventOut:
+def _uuid_or_none(raw: JsonValue) -> uuid.UUID | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        return uuid.UUID(raw)
+    except ValueError:
+        return None
+
+
+def _event_out(
+    event: TicketEvent,
+    accounts: dict[uuid.UUID, _Account],
+    readable_cards: set[uuid.UUID] | None = None,
+) -> TicketEventOut:
     payload: dict[str, JsonValue] = dict(event.payload or {})
+    if event.kind == "todo_done" and _uuid_or_none(payload.get("cardId")) not in (
+        readable_cards or set()
+    ):
+        # The card title shows only to a reader of the board of the card.
+        payload["cardTitle"] = None
     if event.kind == "assignee":
         for key in ("from", "to"):
             raw = payload.get(key)
