@@ -36,7 +36,7 @@ from app.modules.auth.principal import Principal
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos.access import TODO_WRITE, BoardAccess
 from app.modules.todos.boards import ensure_personal_board
-from app.modules.todos.lexorank import RankError, between, spread
+from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.links import HIDDEN, LinkResolver, Resolved
 from app.modules.todos.models import (
     LINK_COLUMNS,
@@ -201,6 +201,12 @@ class TodoService:
 
         Every write locks the board before a card, because a move locks the board
         and then updates the card, and the other order deadlocks with it.
+
+        The card lock is ``FOR NO KEY UPDATE``, because no write changes the key of a
+        card, and ``FOR UPDATE`` conflicts with the ``FOR KEY SHARE`` lock of a foreign
+        key check. Two cards on two boards that link each other at the same time
+        would deadlock: each holds its own card and its link insert waits for the
+        other card.
         """
         if lock:
             known = await self.session.get(TodoCard, card_id)
@@ -210,7 +216,7 @@ class TodoService:
             card = await self.session.scalar(
                 select(TodoCard)
                 .where(TodoCard.id == card_id)
-                .with_for_update()
+                .with_for_update(key_share=True)
                 .execution_options(populate_existing=True)
             )
         else:
@@ -568,7 +574,12 @@ class TodoService:
         return await self._board_out(board, principal)
 
     async def _column(self, board: TodoBoard, column_id: uuid.UUID) -> TodoColumn:
-        column = await self.session.get(TodoColumn, column_id)
+        """Load a column of the board, read again from the database.
+
+        The callers take the board lock first, so ``is_done`` is the committed one: a
+        parallel ``patch_column`` that moved the done flag has committed by then.
+        """
+        column = await self.session.get(TodoColumn, column_id, populate_existing=True)
         if column is None or column.board_id != board.id:
             raise NotFoundError(f"column {column_id} not found")
         return column
@@ -588,12 +599,12 @@ class TodoService:
         tickets, as a move into the done column does.
         """
         board = await self._configurable(board_id, principal)
+        await self._lock_board(board.id)
         column = await self._column(board, column_id)
         if payload.name is not None:
             column.name = payload.name.strip() or column.name
         if payload.is_done and not column.is_done:
             actor = await self._actor(principal)
-            await self._lock_board(board.id)
             now = _now()
             for other in await self._columns(board.id):
                 if other.is_done:
@@ -653,10 +664,12 @@ class TodoService:
             ValidationProblem: ``move_to`` is this column or not on the board (HTTP 422).
         """
         board = await self._configurable(board_id, principal)
+        # The lock comes before the read of ``is_done``: a parallel ``patch_column``
+        # can make this column the done column until then.
+        await self._lock_board(board.id)
         column = await self._column(board, column_id)
         if column.is_done:
             raise ConflictError("The done column cannot be deleted.", code="done_column_required")
-        await self._lock_board(board.id)
         cards = await self._all_column_cards(column.id)
         if cards:
             if move_to is None:
@@ -666,11 +679,9 @@ class TodoService:
                 raise _invalid("moveTo names another column of the board.", "invalid", "moveTo")
             actor = await self._actor(principal)
             live = await self._column_cards(target.id)
-            last = live[-1].rank if live else None
+            _append(live, cards)
             now = _now()
             for card in cards:
-                last = between(last, None)
-                card.rank = last
                 # The same bookkeeping as a move: the event, and on the entry into
                 # the done column ``completed_at`` and ``todo_done``.
                 self._event(
@@ -890,7 +901,7 @@ class TodoService:
             id=uuid.uuid4(),
             board_id=board.id,
             column_id=column.id,
-            rank=between(live[-1].rank if live else None, None),
+            rank="",
             title=payload.title.strip() or payload.title,
             description_md=payload.description_md,
             due_date=payload.due_date,
@@ -900,6 +911,7 @@ class TodoService:
             created_at=now,
             updated_at=now,
         )
+        _append(live, [card])
         self.session.add(card)
         await self.session.flush()
         for principal_id in assignees:
@@ -1002,13 +1014,11 @@ class TodoService:
         low = siblings[index - 1].rank if index > 0 else None
         high = siblings[index].rank if index < len(siblings) else None
         try:
-            card.rank = between(low, high)
+            card.rank = _rank(low, high)
         except RankError:
-            # Two cards share a rank (or a rank is broken): give the column a fresh order.
-            ordered = [*siblings[:index], card, *siblings[index:]]
-            for sibling, rank in zip(ordered, spread(len(ordered)), strict=True):
-                sibling.rank = rank
-                sibling.updated_at = _now()
+            # Two cards share a rank, a rank is broken or the new one is too long:
+            # give the column a fresh order.
+            _respread([*siblings[:index], card, *siblings[index:]])
         source = columns.get(card.column_id)
         if target.id != card.column_id:
             self._event(
@@ -1049,7 +1059,7 @@ class TodoService:
             return False
         source = next((c for c in columns if c.id == card.column_id), None)
         live = await self._column_cards(done.id, exclude=card.id)
-        card.rank = between(live[-1].rank if live else None, None)
+        _append(live, [card])
         self._event(
             card,
             "moved",
@@ -1583,6 +1593,38 @@ class TodoService:
         board = await self.session.get(TodoBoard, card.board_id)
         if board is not None:
             self._touch(board)
+
+
+def _rank(low: str | None, high: str | None) -> str:
+    """Return ``between(low, high)``, or raise RankError for a rank above ``MAX_LENGTH``."""
+    rank = between(low, high)
+    if len(rank) > MAX_LENGTH:
+        raise RankError(f"rank longer than {MAX_LENGTH}")
+    return rank
+
+
+def _respread(ordered: Sequence[TodoCard]) -> None:
+    """Give the cards a fresh order with ``spread``, in the order given."""
+    now = _now()
+    for card, rank in zip(ordered, spread(len(ordered)), strict=True):
+        card.rank = rank
+        card.updated_at = now
+
+
+def _append(live: Sequence[TodoCard], cards: Sequence[TodoCard]) -> None:
+    """Rank ``cards`` after the live cards ``live`` of a column, in the order given.
+
+    A rank above ``MAX_LENGTH`` or a broken rank gives the live cards and ``cards``
+    a fresh order. The caller holds the board lock, so no parallel write ranks the
+    column at the same time.
+    """
+    last = live[-1].rank if live else None
+    try:
+        for card in cards:
+            last = _rank(last, None)
+            card.rank = last
+    except RankError:
+        _respread([*live, *cards])
 
 
 def _slot(

@@ -6,7 +6,7 @@ import random
 
 import pytest
 
-from app.modules.todos.lexorank import RankError, between, spread
+from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 
 
 def test_the_open_ends() -> None:
@@ -62,3 +62,30 @@ def test_spread_is_sorted_and_unique(count: int) -> None:
     assert ranks == sorted(ranks)
     assert len(set(ranks)) == count
     assert all(r and not r.endswith("0") for r in ranks)
+
+
+def test_thousands_of_appends_and_prepends_need_no_recursion() -> None:
+    # The recursive midpoint took one frame per leading ``z`` and failed after
+    # about 6000 appends; the loop has no such limit.
+    last = between(None, None)
+    for _ in range(8000):
+        rank = between(last, None)
+        assert rank > last
+        last = rank
+    assert len(last) > 1000
+    first = between(None, None)
+    for _ in range(3000):
+        rank = between(None, first)
+        assert rank < first
+        first = rank
+    assert between("z" * 5000, None) > "z" * 5000
+    assert "z" * 5000 < between("z" * 5000, "z" * 5001 + "1") < "z" * 5001 + "1"
+
+
+def test_max_length_is_reached_by_appends() -> None:
+    last = between(None, None)
+    count = 0
+    while len(last) <= MAX_LENGTH:
+        last = between(last, None)
+        count += 1
+    assert 100 < count < 1000

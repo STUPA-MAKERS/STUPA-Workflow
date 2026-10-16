@@ -10,6 +10,7 @@ import pytest
 
 from app.modules.tickets.models import TicketEvent
 from app.modules.todos import service as svc_mod
+from app.modules.todos.lexorank import MAX_LENGTH
 from app.modules.todos.links import Resolved
 from app.modules.todos.models import (
     TodoAssignee,
@@ -365,6 +366,45 @@ async def test_complete_moves_an_open_card_into_done() -> None:
     locks = [s for s in session.statements if "FOR UPDATE" in str(s)]
     assert len(locks) == 4
     assert session.refreshed == [c] * 4
+
+
+LONG = "z" * MAX_LENGTH
+
+
+async def test_move_to_the_end_after_a_long_rank_rebalances() -> None:
+    session, b, col, c, service = _setup(rank="a")
+    a, d = card(b, col, rank="b"), card(b, col, rank=LONG)
+    session.scalars_q[:] = [[col], [a, d]]
+    await service.move(c.id, _move(col, afterId=d.id), USER)
+    assert a.rank < d.rank < c.rank
+    assert max(len(x.rank) for x in (a, c, d)) <= 2
+
+
+async def test_complete_after_a_long_rank_rebalances_the_done_column() -> None:
+    session, b, col, c, service = _setup()
+    done = column(b.id, "Erledigt", 1, is_done=True)
+    head, tail = card(b, done, rank="a"), card(b, done, rank=LONG)
+    session.scalars_q[:] = [[col, done], [head, tail], []]
+    assert await service.complete(c, b, ME) is True
+    assert head.rank < tail.rank < c.rank
+    assert len(c.rank) <= 2
+
+
+def test_append_keeps_short_ranks_and_rebalances_long_ones() -> None:
+    b = board()
+    col = column(b.id)
+    live = [card(b, col, rank="b"), card(b, col, rank="c")]
+    new = [card(b, col, rank=""), card(b, col, rank="")]
+    svc_mod._append(live, new)  # pyright: ignore[reportPrivateUsage]
+    assert [x.rank for x in live] == ["b", "c"]
+    assert "c" < new[0].rank < new[1].rank
+    live[1].rank = LONG
+    svc_mod._append(live, new)  # pyright: ignore[reportPrivateUsage]
+    ranks = [x.rank for x in (*live, *new)]
+    assert ranks == sorted(ranks) and len(set(ranks)) == 4
+    assert all(len(r) <= 2 for r in ranks)
+    svc_mod._append([], new[:1])  # pyright: ignore[reportPrivateUsage]
+    assert new[0].rank == "i"
 
 
 # -- archive ------------------------------------------------------------------------

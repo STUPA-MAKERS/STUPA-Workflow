@@ -28,7 +28,7 @@ done (`completed_at`).
   `outbox` (`TodoMail`); the router sends them after the commit.
 - `links.py` — `LinkResolver`: `resolve` (one query per kind), `readable`, `search` (the
   link picker, `PER_KIND` 5), `card_url`.
-- `lexorank.py` — `between(low, high)`, `spread(n)`; `RankError`.
+- `lexorank.py` — `between(low, high)` (a loop, no recursion), `spread(n)`; `RankError`, `MAX_LENGTH`.
 - `boards.py` — `add_default_columns`, `ensure_gremium_board` (no commit),
   `ensure_personal_board` (insert … on conflict do nothing, commits).
 - `hooks.py` — `TicketTodoBridge`, the `TicketTodoHooks` of the ticket service.
@@ -73,11 +73,20 @@ included), `GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET
 **Data rules:**
 - Create, move, `complete`, the done-flag move and column delete lock the board row; move
   and `complete` read the card again after the lock (`refresh`); a move writes one row unless two
-  ranks collide (`RankError` → `spread` over the column). Every write bumps
+  ranks collide (`RankError` → `spread` over the column). Create, move, `complete` and
+  column delete also re-rank the live cards of the column with `spread` when the new rank
+  is longer than `MAX_LENGTH` (50): every append adds about one digit per six cards, and
+  the done column never empties (`_append`, `_rank` in `service.py`). Every write bumps
   `todo_board.updated_at`, so the ETag changes.
+- `patch_column` and `delete_column` take the board lock before they read the column
+  (`_column` reads with `populate_existing`), so `is_done` is the committed value and a
+  parallel done-flag move cannot leave the board without a done column.
 - Lock order is board, then card, everywhere: `patch` (`_card(lock=True)`) locks the board
   before the card, and the archive cron locks the boards of the due cards (by id) before
-  the cards. The other order deadlocks with a move (`test_todos_locks.py`).
+  the cards. The other order deadlocks with a move (`test_todos_locks.py`). The card lock
+  is `FOR NO KEY UPDATE`, because `FOR UPDATE` conflicts with the `FOR KEY SHARE` of the
+  `todo_link.todo_id` foreign key check, and two cards on two boards that link each other
+  at the same time then deadlock.
 - The board also comes before a meeting: `card_for_agenda` locks the board and the card
   before `add_todo_in_tx` locks the meeting, because a card create locks the board and
   then inserts a meeting link (a key share on the meeting row). `TicketTodoBridge.complete`

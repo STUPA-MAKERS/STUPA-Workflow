@@ -261,3 +261,73 @@ async def test_two_identical_links_and_labels_give_one_409(
         errors = [r for r in results if isinstance(r, BaseException)]
         assert len(errors) == 1
         assert isinstance(errors[0], ConflictError) and errors[0].code == code
+
+
+async def test_a_column_delete_reads_the_done_flag_after_the_lock(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    me, me_id = await add_person(maker, "Ada")
+    board, columns = await _personal(maker, me_id)
+    first = columns[0]
+
+    async def delete_first() -> Any:
+        async with maker() as session:
+            return await TodoService(session).delete_column(board.id, first.id, me)
+
+    async with maker() as holder:
+        # A parallel ``isDone`` patch of the first column holds the lock.
+        await holder.execute(
+            text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": board.id}
+        )
+        delete = asyncio.create_task(delete_first())
+        await asyncio.sleep(0.3)
+        assert not delete.done()
+        await holder.execute(
+            text("UPDATE todo_column SET is_done = false WHERE board_id = :b"), {"b": board.id}
+        )
+        await holder.execute(
+            text("UPDATE todo_column SET is_done = true WHERE id = :c"), {"c": first.id}
+        )
+        await holder.commit()
+    with pytest.raises(ConflictError) as exc:
+        await asyncio.wait_for(delete, 10)
+    assert exc.value.code == "done_column_required"
+    async with maker() as session:
+        done = (
+            await session.execute(
+                text("SELECT count(*) FROM todo_column WHERE board_id = :b AND is_done"),
+                {"b": board.id},
+            )
+        ).scalar_one()
+        assert done == 1
+
+
+async def test_two_cards_on_two_boards_link_each_other_at_once(
+    maker: async_sessionmaker[AsyncSession],
+) -> None:
+    admin, _admin_id = await add_person(maker, "Admin")
+    lead = Principal(sub=admin.sub, roles=["admin"])
+    _, board_a = await add_gremium(maker, "StuPa")
+    _, board_b = await add_gremium(maker, "AStA")
+    async with maker() as session:
+        a1, b1 = [
+            (
+                await TodoService(session).create(
+                    CardCreate.model_validate({"boardId": str(bid), "title": "K"}), lead
+                )
+            ).id
+            for bid in (board_a, board_b)
+        ]
+
+    async def link_b_to_a() -> int:
+        async with maker() as session:
+            return len((await TodoService(session).add_link(b1, "todo", a1, lead)).links)
+
+    async with maker() as holder:
+        # The link a1 -> b1 holds a1 the way ``add_link`` does. The link b1 -> a1
+        # must not wait for it: its foreign key check needs only KEY SHARE on a1.
+        service = TodoService(holder)
+        await service._card(a1, lead, lock=True)  # pyright: ignore[reportPrivateUsage]
+        linked = await asyncio.wait_for(asyncio.create_task(link_b_to_a()), 5)
+        assert linked == 1
+        assert len((await service.add_link(a1, "todo", b1, lead)).links) == 1
