@@ -59,6 +59,7 @@ from app.modules.tickets.service import (
     principal_id_of,
 )
 from app.modules.todos.hooks import TicketTodoBridge
+from app.modules.todos.live import todo_broker
 from app.settings import Settings
 from app.shared.antiabuse import (
     enforce_ticket_payload_limit,
@@ -100,13 +101,14 @@ ReporterWriter = Annotated[Principal, Depends(require_reporter_write)]
 def get_ticket_service(session: DbSession, request: Request) -> TicketService:
     """Wire the service with the object storage and the to-do hooks.
 
-    The storage removes the objects of the files of a deleted note.
+    The storage removes the objects of the files of a deleted note. The hooks publish
+    the board pings of ``completeTodos`` on the broker of the app.
     """
     storage = getattr(request.app.state, "object_storage", None)
     return TicketService(
         session,
         files=FilesService(session, storage=storage),
-        todos=TicketTodoBridge(session),
+        todos=TicketTodoBridge(session, broker=todo_broker(request.app.state)),
     )
 
 

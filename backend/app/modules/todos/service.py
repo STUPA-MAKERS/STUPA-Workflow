@@ -43,6 +43,7 @@ from app.modules.todos.access import BoardAccess, token_reads
 from app.modules.todos.boards import ensure_personal_board
 from app.modules.todos.lexorank import MAX_LENGTH, RankError, between, spread
 from app.modules.todos.links import HIDDEN, LinkResolver, Resolved
+from app.modules.todos.live import BoardPings
 from app.modules.todos.models import (
     LINK_COLUMNS,
     TodoAssignee,
@@ -180,6 +181,8 @@ class TodoService:
         self.access = access or BoardAccess(session)
         self.links = links or LinkResolver(session, self.access)
         self.outbox: list[TodoMail] = []
+        #: The boards and cards of this request, published after the commit (``live``).
+        self.pings = BoardPings()
 
     # -- loading and rights -----------------------------------------------------
 
@@ -265,9 +268,16 @@ class TodoService:
             select(TodoBoard.id).where(TodoBoard.id == board_id).with_for_update()
         )
 
-    @staticmethod
-    def _touch(board: TodoBoard) -> None:
+    def _touch(
+        self, board: TodoBoard, card: TodoCard | None = None, *, removed: bool = False
+    ) -> None:
+        """Bump the board (its ETag changes) and record the ping of the write.
+
+        Without ``card`` the write changed the board itself; ``removed`` says the card
+        left the board (archived or transferred away).
+        """
         board.updated_at = _now()
+        self.pings.touch(board.id, card.id if card is not None else None, removed=removed)
 
     def _event(
         self,
@@ -822,6 +832,19 @@ class TodoService:
         card, board = await self._card(card_id, principal)
         return await self._detail(card, board, principal)
 
+    async def tile(self, card_id: uuid.UUID, principal: Principal) -> TodoCardTile:
+        """Return the tile of a live card, the same one that the board read holds.
+
+        A live ping names a card, and the page reads its tile here.
+
+        Raises:
+            NotFoundError: The card is unknown, archived or not readable (HTTP 404).
+        """
+        card, _board = await self._card(card_id, principal)
+        if card.archived_at is not None:
+            raise NotFoundError(f"card {card_id} not found")
+        return (await self.tiles([card], principal))[0]
+
     async def _detail(
         self, card: TodoCard, board: TodoBoard, principal: Principal
     ) -> TodoCardDetail:
@@ -963,7 +986,7 @@ class TodoService:
         await self.session.flush()
         if column.is_done:
             await self._write_ticket_done(card, board, actor)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         self._mail("assigned", card, assignees, actor)
         return await self._detail(card, board, principal)
@@ -1019,7 +1042,7 @@ class TodoService:
         if changed:
             card.version += 1
             card.updated_at = _now()
-            self._touch(board)
+            self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1070,7 +1093,7 @@ class TodoService:
             else:
                 card.completed_at = None
         card.updated_at = _now()
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return (await self.tiles([card], principal))[0]
 
@@ -1190,8 +1213,8 @@ class TodoService:
         elif card.completed_at is None:
             card.completed_at = now
             await self._write_ticket_done(card, target, actor)
-        self._touch(source)
-        self._touch(target)
+        self._touch(source, card, removed=True)
+        self._touch(target, card)
         await self.session.commit()
         return await self._detail(card, target, principal)
 
@@ -1227,7 +1250,7 @@ class TodoService:
         card.completed_at = _now()
         card.updated_at = _now()
         await self._write_ticket_done(card, board, actor)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.flush()
         return True
 
@@ -1264,7 +1287,7 @@ class TodoService:
         if card.archived_at is None:
             card.archived_at = card.updated_at = _now()
             self._event(card, "archived", actor)
-            self._touch(board)
+            self._touch(board, card, removed=True)
             await self.session.commit()
 
     async def restore_card(self, card_id: uuid.UUID, principal: Principal) -> TodoCardDetail:
@@ -1285,7 +1308,7 @@ class TodoService:
             if column is not None and column.is_done:
                 card.completed_at = card.updated_at
             self._event(card, "restored", actor)
-            self._touch(board)
+            self._touch(board, card)
             await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1309,7 +1332,7 @@ class TodoService:
         if present is None:
             self.session.add(TodoAssignee(card_id=card.id, principal_id=principal_id))
             self._event(card, "assigned", actor, {"principalId": str(principal_id), "added": True})
-            self._touch(board)
+            self._touch(board, card)
             await self.session.commit()
             self._mail("assigned", card, [principal_id], actor)
         return await self._detail(card, board, principal)
@@ -1327,7 +1350,7 @@ class TodoService:
         )
         if getattr(result, "rowcount", 0):
             self._event(card, "assigned", actor, {"principalId": str(principal_id), "added": False})
-            self._touch(board)
+            self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1346,7 +1369,7 @@ class TodoService:
         )
         if present is None:
             self.session.add(TodoCardLabel(card_id=card.id, label_id=label_id))
-            self._touch(board)
+            self._touch(board, card)
             await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1360,7 +1383,7 @@ class TodoService:
                 TodoCardLabel.card_id == card.id, TodoCardLabel.label_id == label_id
             )
         )
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1386,7 +1409,7 @@ class TodoService:
             )
         )
         self._event(card, "checklist", actor, {"action": "added", "text": value})
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1430,7 +1453,7 @@ class TodoService:
             others.insert(min(payload.position, len(others)), item)
             for position, entry in enumerate(others):
                 entry.position = position
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1443,7 +1466,7 @@ class TodoService:
         item = await self._check_item(card, item_id)
         await self.session.delete(item)
         self._event(card, "checklist", actor, {"action": "removed", "text": item.text})
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1472,7 +1495,7 @@ class TodoService:
             raise ConflictError("The card has this link.", code="link_exists")
         self.session.add(_new_link(card.id, kind, target_id, actor))
         self._event(card, "linked", actor, {"linkKind": kind, "targetId": str(target_id)})
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1488,7 +1511,7 @@ class TodoService:
         payload: dict[str, JsonValue] = {"linkKind": link.kind, "targetId": str(link.target_id)}
         await self.session.delete(link)
         self._event(card, "unlinked", actor, payload)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         return await self._detail(card, board, principal)
 
@@ -1549,7 +1572,7 @@ class TodoService:
                 pepper=pepper,
                 todo_comment_id=comment.id,
             )
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         self._mail("mentioned", card, wanted, actor, _excerpt(body))
         return await self._comment(comment, actor)
@@ -1582,7 +1605,7 @@ class TodoService:
         comment.body = body
         comment.mentions = [str(m) for m in wanted]
         comment.edited_at = _now()
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
         self._mail("mentioned", card, [m for m in wanted if m not in before], me, _excerpt(body))
         return await self._comment(comment, me)
@@ -1595,7 +1618,7 @@ class TodoService:
         comment, _me = await self._own_comment(card, comment_id, principal)
         comment.deleted_at = _now()
         await self.files.delete_for_messages("todo_comment", [comment.id], actor=principal.sub)
-        self._touch(board)
+        self._touch(board, card)
         await self.session.commit()
 
     async def _comment(self, comment: TodoComment, me: uuid.UUID) -> TodoCommentOut:
@@ -1919,7 +1942,7 @@ class TodoService:
         )
         board = await self.session.get(TodoBoard, card.board_id)
         if board is not None:
-            self._touch(board)
+            self._touch(board, card)
 
 
 def _rank(low: str | None, high: str | None) -> str:

@@ -135,7 +135,11 @@
     </div>
   </app-sticky-bar>
 
-  <div class="td__body" cdkScrollable [class.td__body--rows]="all() || (loading() ? skeleton().natural : rowsBelow())">
+  <div
+    class="td__body"
+    cdkScrollable
+    [class.td__body--fab]="canAdd()"
+    [class.td__body--rows]="all() || (loading() ? skeleton().natural : rowsBelow())">
     @if (all()) {
       <!-- "Alle": the rows of every board; they read themselves. Until they answer, the
            skeleton of a board stands in their place. -->
@@ -152,7 +156,8 @@
       }
       <app-todo-board-rows
         source="all"
-        [me]="meId()"
+        [me]="me()"
+        [liveIds]="liveRowIds()"
         [filter]="filter()"
         [filterLabels]="labelsById()"
         [today]="today()"
@@ -217,6 +222,9 @@
           [today]="today()"
           [phone]="phone()"
           [extraDrops]="boardDrops()"
+          [me]="me()"
+          [liveIds]="liveRowIds()"
+          [hold]="hold()"
           (openCard)="openCard($event)"
           (matches)="onRowMatches($event)"
           (dropIn)="onDropIntoRow($event)"

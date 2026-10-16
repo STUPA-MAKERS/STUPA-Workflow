@@ -6,6 +6,9 @@ import { Subject, of, throwError, type Observable } from 'rxjs';
 import { TodosApiService, type TodoBoard, type TodoCardDetail, type TodoComment } from '@core/api/todos.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { BOARDS, MEMBERS, asPhone, board, detail, link, tile } from '../../../../testing/todo-fixtures';
+import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo-live';
+import { TodoLiveService } from '@core/ws/todo-live.service';
+import { TestBed } from '@angular/core/testing';
 import { DraftAttachmentsService } from '../../apply/draft-attachments.service';
 import { TodoCardDetailComponent } from './todo-card-detail.component';
 
@@ -73,11 +76,13 @@ async function setup(opts: Opts = {}) {
       { provide: TodosApiService, useValue: api },
       { provide: ApiClient, useValue: files },
       { provide: ToastService, useValue: toast },
+      provideFakeTodoLive(),
     ],
   });
   const cmp = view.fixture.componentInstance;
   const detect = () => view.fixture.detectChanges();
-  return { ...view, api, toast, files, cmp, detect, ...out };
+  const live = TestBed.inject(TodoLiveService) as unknown as FakeTodoLive;
+  return { ...view, api, toast, files, cmp, detect, live, ...out };
 }
 
 describe('TodoCardDetailComponent', () => {
@@ -999,6 +1004,90 @@ describe('TodoCardDetailComponent', () => {
     expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
     expect(drafts.files()).toEqual([file]);
     expect(files.deleteDraftAttachment).not.toHaveBeenCalled();
+  });
+
+  describe('live', () => {
+    const wait = (detect: () => void) => {
+      jest.advanceTimersByTime(300);
+      detect();
+    };
+    beforeEach(() => jest.useFakeTimers({ doNotFake: ['queueMicrotask', 'setImmediate', 'nextTick'] }));
+    afterEach(() => jest.useRealTimers());
+
+    it('a ping of this card or its board reads it in the background and emits nothing', async () => {
+      const { cmp, api, live, detect, changed } = await setup();
+      expect(live.boards()).toEqual(['b-1']);
+      api.card.mockClear();
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-other' });
+      wait(detect);
+      expect(api.card).not.toHaveBeenCalled();
+      api.card.mockReturnValueOnce(of(detail({ title: 'Raum gebucht', comments: [] })));
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(cmp.card()?.title).toBe('Raum gebucht');
+      expect(screen.getByText('Raum gebucht')).toBeInTheDocument();
+      live.emit({ type: 'board', boardId: 'b-1' });
+      wait(detect);
+      expect(api.card).toHaveBeenCalledTimes(2);
+      expect(changed).not.toHaveBeenCalled();
+    });
+
+    it('waits while a field is in edit and reads when the edit ends', async () => {
+      const { cmp, api, live, detect } = await setup();
+      api.card.mockClear();
+      cmp.startTitle();
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(api.card).not.toHaveBeenCalled();
+      api.card.mockReturnValueOnce(of(detail({ title: 'Von drüben' })));
+      cmp.editingTitle.set(false);
+      detect();
+      expect(api.card).toHaveBeenCalledTimes(1);
+      expect(cmp.card()?.title).toBe('Von drüben');
+    });
+
+    it('drops a read that a local change overtook, and waits when an edit began meanwhile', async () => {
+      const { cmp, api, live, detect } = await setup();
+      const read = new Subject<TodoCardDetail>();
+      api.card.mockReturnValueOnce(read);
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      cmp.addAssignee('p-2');
+      read.next(detail({ title: 'Alt' }));
+      expect(cmp.card()?.title).not.toBe('Alt');
+      const again = new Subject<TodoCardDetail>();
+      api.card.mockReturnValueOnce(again);
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      cmp.startAddItem();
+      again.next(detail({ title: 'Später' }));
+      expect(cmp.card()?.title).not.toBe('Später');
+      api.card.mockReturnValueOnce(of(detail({ title: 'Später' })));
+      cmp.addingItem.set(false);
+      detect();
+      expect(cmp.card()?.title).toBe('Später');
+    });
+
+    it('a 404 says the card is gone; another failure or a stale one changes nothing', async () => {
+      const { cmp, api, live, detect } = await setup();
+      api.card.mockReturnValueOnce(http(500));
+      live.emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(cmp.notFound()).toBe(false);
+      const late = new Subject<TodoCardDetail>();
+      api.card.mockReturnValueOnce(late);
+      live.emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      cmp.addAssignee('p-2');
+      late.error(new HttpErrorResponse({ status: 404 }));
+      expect(cmp.notFound()).toBe(false);
+      api.card.mockReturnValueOnce(http(404));
+      live.emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-1' });
+      wait(detect);
+      expect(cmp.notFound()).toBe(true);
+      expect(cmp.card()).toBeNull();
+      expect(live.boards()).toEqual([]);
+    });
   });
 
   describe('phone', () => {

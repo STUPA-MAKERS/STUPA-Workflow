@@ -1,4 +1,5 @@
 import { CdkScrollable } from '@angular/cdk/scrolling';
+import { HttpErrorResponse } from '@angular/common/http';
 import { CdkDrag, CdkDropList, type CdkDragDrop, type CdkDragEnter } from '@angular/cdk/drag-drop';
 import {
   ChangeDetectionStrategy,
@@ -16,6 +17,7 @@ import {
   untracked,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { Subject, finalize, merge } from 'rxjs';
 import type { Uuid } from '@core/api/models';
 import {
   TodosApiService,
@@ -28,6 +30,8 @@ import {
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
+import type { TodoPing } from '@core/ws/ws-messages';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import {
@@ -175,6 +179,14 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
  *
  * The page calls `poll()` with its own poll (ETag, 304 keeps the rows), and the
  * `card…` methods after a change in the card drawer.
+ *
+ * Live: the rows take the pings of their boards and of `liveIds` (`TodoLiveService`). A
+ * `card` ping reads that tile and puts it in its row; under "Meine To-Dos" only a tile
+ * assigned to `me` stays, so a tile without me leaves and a new one with me joins. A tile
+ * of a board without a row, or an unknown `me`, reads the rows again. `card_removed` takes
+ * the tile out, a 404 of the tile read too, and `board` is the ETag read of the rows.
+ * While a card is held (here or, through `hold`, on the board above) or a move is in
+ * flight, the pings wait.
  */
 @Component({
   selector: 'app-todo-board-rows',
@@ -195,18 +207,26 @@ export class TodoBoardRowsComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly live = inject(TodoLiveService);
 
   readonly filter = input.required<BoardFilter>();
   readonly today = input.required<string>();
   readonly phone = input(false);
   /** `mine`: the rows under "Meine To-Dos"; `all`: the meta-board "Alle". */
   readonly source = input<'mine' | 'all'>('mine');
-  /** "Alle": my principal id, for "Zuständig: Ich". */
+  /**
+   * My principal id: "Alle" needs it for "Zuständig: Ich", "Meine To-Dos" for the live
+   * changes (a card without me leaves the rows).
+   */
   readonly me = input<Uuid | null>(null);
   /** The labels of the page's label filter by id (see `RowOptions.filterLabels`). */
   readonly filterLabels = input<ReadonlyMap<Uuid, TodoLabel> | undefined>(undefined);
   /** The drop lists of the personal board above the rows, which a pointer drag reaches too. */
   readonly extraDrops = input<string[]>([]);
+  /** More boards whose pings the rows take: a card of mine (or of "Alle") can appear there. */
+  readonly liveIds = input<readonly Uuid[]>([]);
+  /** The page holds a card or waits for a write: the pings wait too. */
+  readonly hold = input(false);
 
   readonly openCard = output<Uuid>();
   /** A card of `extraDrops` landed in a row: the page transfers it. */
@@ -235,6 +255,8 @@ export class TodoBoardRowsComponent implements OnInit {
   private spaceTaken = false;
   /** The pointer drag: the column the card left and the column it is over (any row). */
   readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
+  /** A card of the rows is held, by pointer or keyboard. */
+  readonly dragging = computed(() => this.ptr() !== null || this.kb() !== null);
   readonly announce = signal('');
   readonly icon = BOARD_ICON;
 
@@ -244,6 +266,15 @@ export class TodoBoardRowsComponent implements OnInit {
   private seq = 0;
   /** The first read answered or failed. */
   private readonly ready = signal(false);
+  /** Moves and transfers of the rows in flight. */
+  private pending = 0;
+  /** Pings that came while a card was held go round once more. */
+  private readonly liveRetry = new Subject<TodoPing>();
+  /** The boards of the pings: every row and `liveIds`, sorted, so an equal set is no change. */
+  private readonly liveSet = computed(
+    () => [...new Set([...this.boards().map((b) => b.id), ...this.liveIds()])].sort(),
+    { equal: (a, b) => a.join() === b.join() },
+  );
 
   readonly rows = computed(() =>
     boardRows(this.boards(), this.filter(), this.today(), {
@@ -279,6 +310,16 @@ export class TodoBoardRowsComponent implements OnInit {
     effect(() => {
       const ids = this.dropIds();
       untracked(() => this.drops.emit(ids));
+    });
+    effect((onCleanup) => {
+      const ids = this.liveSet();
+      if (!ids.length) return;
+      const sub = untracked(() =>
+        merge(this.live.changes$(ids), this.liveRetry)
+          .pipe(batchPings())
+          .subscribe((pings) => this.onPings(pings)),
+      );
+      onCleanup(() => sub.unsubscribe());
     });
   }
 
@@ -355,8 +396,15 @@ export class TodoBoardRowsComponent implements OnInit {
     this.update(boardId, (b) => insertTile(b, tile, move));
   }
 
-  /** The server answer of a transfer into a row replaces the tile. */
+  /**
+   * The server answer of a transfer into a row replaces the tile. Under "Meine To-Dos" a
+   * card that is not assigned to me leaves the rows: they show only my cards.
+   */
   accept(card: TodoCardTile): void {
+    if (!this.keeps(card)) {
+      this.removeCard(card.id);
+      return;
+    }
     this.update(card.boardId, (b) => replaceTile(b, card));
   }
 
@@ -370,6 +418,67 @@ export class TodoBoardRowsComponent implements OnInit {
       }
     }
     return null;
+  }
+
+  // ------------------------------------------------------------------ live
+
+  /** A card is held or a write is in flight: a live change waits. */
+  private busy(): boolean {
+    return this.dragging() || this.hold() || this.pending > 0;
+  }
+
+  private onPings(pings: readonly TodoPing[]): void {
+    if (this.busy()) {
+      for (const p of pings) this.liveRetry.next(p);
+      return;
+    }
+    let poll = false;
+    for (const p of pings) {
+      if (p.type === 'board') poll = true;
+      else if (p.type === 'card_removed') this.removeCard(p.cardId, null, p.boardId);
+      else this.readTile(p);
+    }
+    if (poll) this.poll();
+  }
+
+  /** Read the tile of a `card` ping and put it in place; a 404 takes it out of every row. */
+  private readTile(ping: TodoPing & { type: 'card' }): void {
+    this.api.cardTile(ping.cardId).subscribe({
+      next: (tile) => {
+        if (this.busy()) this.liveRetry.next(ping);
+        else this.placeLive(tile);
+      },
+      error: (err: unknown) => {
+        if (err instanceof HttpErrorResponse && err.status === 404) this.removeCard(ping.cardId);
+      },
+    });
+  }
+
+  private placeLive(tile: TodoCardTile): void {
+    if (this.source() === 'mine' && !this.me()) {
+      this.refresh();
+      return;
+    }
+    // A card the rows do not show leaves every row; any other leaves the rows of other boards.
+    this.removeCard(tile.id, this.keeps(tile) ? tile.boardId : null);
+    if (!this.keeps(tile)) return;
+    if (!this.update(tile.boardId, (b) => placeTile(b, tile))) this.refresh();
+  }
+
+  /** The rows show this card: "Alle" every card, "Meine To-Dos" the cards assigned to me. */
+  private keeps(card: TodoCardTile): boolean {
+    const me = this.me();
+    return this.source() === 'all' || !me || card.assignees.some((a) => a.principalId === me);
+  }
+
+  /** Take a card out of every row but `except` (or only out of `only`), when a row holds it. */
+  private removeCard(cardId: Uuid, except: Uuid | null = null, only: Uuid | null = null): void {
+    const list = this.boards();
+    const drop = (b: TodoAssignedBoard) =>
+      b.id !== except && (only === null || b.id === only) && b.cards.some((c) => c.id === cardId);
+    if (!list.some(drop)) return;
+    this.mutations++;
+    this.boards.set(list.map((b) => (drop(b) ? removeTile(b, cardId) : b)));
   }
 
   /** Replace one board through `fn`; false when the rows do not hold it. */
@@ -480,7 +589,8 @@ export class TodoBoardRowsComponent implements OnInit {
     if (!before?.canWrite) return;
     const optimistic = applyMove(before, cardId, move);
     this.update(boardId, () => optimistic);
-    this.api.moveCard(cardId, move).subscribe({
+    this.pending++;
+    this.api.moveCard(cardId, move).pipe(finalize(() => this.pending--)).subscribe({
       next: (tile) => this.update(boardId, (b) => replaceTile(b, tile)),
       error: () => {
         this.toast.error(this.i18n.translate('todos.error.move'));
@@ -504,7 +614,8 @@ export class TodoBoardRowsComponent implements OnInit {
     );
     this.mutations++;
     this.boards.set(optimistic);
-    this.api.transferCard(tile.id, { boardId: toId, ...move }).subscribe({
+    this.pending++;
+    this.api.transferCard(tile.id, { boardId: toId, ...move }).pipe(finalize(() => this.pending--)).subscribe({
       next: (card) => {
         this.accept(card);
         this.transferred.emit(card);

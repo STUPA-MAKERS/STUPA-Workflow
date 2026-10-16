@@ -134,3 +134,30 @@ export type ServerMessage =
 export type ClientMessage =
   | { type: 'cast'; voteId: string; choice: string | string[]; asDelegation?: boolean }
   | { type: 'subscribe' };
+
+// ------------------------------------------------------------------ to-do boards (`/api/ws/todos`)
+
+/**
+ * A change ping of a board. It names what changed, never the content: the page reads the
+ * card (`GET /todos/cards/{id}/tile`) or the board through REST, which keeps every rule.
+ */
+export type TodoPing =
+  | { type: 'card'; boardId: string; cardId: string }
+  | { type: 'card_removed'; boardId: string; cardId: string }
+  | { type: 'board'; boardId: string };
+
+/**
+ * Server to client on the to-do channel. `closed` is not a server frame: the channel adds
+ * it with the close code when the socket goes down.
+ */
+export type TodoServerMessage =
+  | TodoPing
+  | { type: 'subscribed'; boardIds: string[] }
+  | { type: 'error'; code: string }
+  | { type: 'closed'; code: number };
+
+/** Client to server on the to-do channel: the boards of the socket (it replaces the set). */
+export interface TodoSubscribeMsg {
+  type: 'subscribe';
+  boardIds: string[];
+}

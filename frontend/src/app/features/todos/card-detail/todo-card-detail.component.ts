@@ -35,6 +35,8 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
+import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
@@ -109,6 +111,13 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * Every change goes to the server at once and the answer replaces the card; `changed`
  * gives it to the board. The content edits (title, description, due date) carry the
  * version; a 409 says "Karte wurde geändert" and reads the card again.
+ *
+ * Live: a ping of this card (or a `board` ping of its board) from `TodoLiveService` reads
+ * the card in the background and takes the server copy, comments included. While a field
+ * is in edit (title, description, a checklist item), the transfer dialog is open or a
+ * write is in flight, the read waits and runs when that ends. A read that a local change
+ * overtook is dropped; a 404 says the card is gone. Nothing goes out: the page takes its
+ * own pings.
  */
 @Component({
   selector: 'app-todo-card-detail',
@@ -151,6 +160,7 @@ export class TodoCardDetailComponent {
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly live = inject(TodoLiveService);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly cardId = input.required<Uuid>();
@@ -207,6 +217,22 @@ export class TodoCardDetailComponent {
   private patchQueue: ((version: number) => void)[] = [];
   private patching = false;
   private membersOf: Uuid | null = null;
+  /** Counts the local changes of the card: a background read from before one is dropped. */
+  private localSeq = 0;
+  /** A ping came while the card could not take a read: read it when that ends. */
+  private readonly stale = signal(false);
+  /** The board of the shown card, for its pings. */
+  private readonly liveBoard = computed(() => this.card()?.boardId ?? null);
+  /** A field is in edit or a write is in flight: a background read would overwrite it. */
+  readonly editing = computed(
+    () =>
+      this.editingTitle() ||
+      this.editingDesc() ||
+      this.addingItem() ||
+      this.editingItem() !== null ||
+      this.transferOpen() ||
+      this.busy(),
+  );
 
   readonly today = signal(isoDay(new Date()));
 
@@ -226,6 +252,22 @@ export class TodoCardDetailComponent {
     effect(() => {
       const id = this.cardId();
       untracked(() => this.load(id, true));
+    });
+    effect((onCleanup) => {
+      const boardId = this.liveBoard();
+      if (!boardId) return;
+      const sub = untracked(() =>
+        this.live
+          .changes$([boardId])
+          .pipe(batchPings())
+          .subscribe((pings) => this.onPings(pings)),
+      );
+      onCleanup(() => sub.unsubscribe());
+    });
+    // The edit ended after a ping: read the card now.
+    effect(() => {
+      if (this.editing() || !this.stale()) return;
+      untracked(() => this.liveRead());
     });
   }
 
@@ -433,9 +475,43 @@ export class TodoCardDetailComponent {
     });
   }
 
+  private onPings(pings: readonly TodoPing[]): void {
+    const id = this.cardId();
+    if (!pings.some((p) => p.type === 'board' || p.cardId === id)) return;
+    if (this.editing()) this.stale.set(true);
+    else this.liveRead();
+  }
+
+  /** Read the card in the background after a ping; see the class comment. */
+  private liveRead(): void {
+    this.stale.set(false);
+    const id = this.cardId();
+    const gen = this.gen;
+    const local = this.localSeq;
+    this.api.card(id).subscribe({
+      next: (card) => {
+        if (id !== this.cardId() || gen !== this.gen || local !== this.localSeq) return;
+        if (this.editing()) {
+          this.stale.set(true);
+          return;
+        }
+        this.card.set(card);
+        this.loadMembers(card.boardId);
+      },
+      error: (err: unknown) => {
+        if (id !== this.cardId() || gen !== this.gen || local !== this.localSeq) return;
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.notFound.set(true);
+          this.card.set(null);
+        }
+      },
+    });
+  }
+
   private load(id: Uuid, fresh: boolean): void {
     const seq = ++this.seq;
     if (fresh) {
+      this.stale.set(false);
       this.gen++;
       this.patchQueue = [];
       this.patching = false;
@@ -544,6 +620,7 @@ export class TodoCardDetailComponent {
   }
 
   private apply(card: TodoCardDetail): void {
+    this.localSeq++;
     this.card.set(card);
     this.changed.emit(card);
   }
@@ -559,6 +636,7 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     const next = fn(c);
+    this.localSeq++;
     this.card.set(next);
     this.commentsChanged.emit({ id: next.id, commentCount: next.commentCount });
   }

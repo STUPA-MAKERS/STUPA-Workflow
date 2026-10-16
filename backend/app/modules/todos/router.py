@@ -12,15 +12,18 @@ never 403; a card write on a board that the caller reads but cannot write 403
 
 ``GET /todos/boards/{id}``, ``GET /todos/mine/boards`` and ``GET /todos/all/boards``
 carry a weak ``ETag`` over their body and answer 304 to a matching
-``If-None-Match``; the frontend polls them every 30 s. Mails of a write
-(``todo_assigned``, ``todo_mentioned``) go out as a background task after the commit.
+``If-None-Match``; the frontend polls them every 30 s (120 s while its live socket is
+open). Mails of a write (``todo_assigned``, ``todo_mentioned``) go out as a background
+task after the commit. The change pings of a write (``live``) go to the broker after
+the route, so after its commit; ``GET /todos/cards/{id}/tile`` answers the tile that
+a ping names, and ``socket`` is the channel ``WS /api/ws/todos``.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -28,9 +31,11 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request,
 
 from app.deps import DbSession, Principal, SettingsDep, require_principal
 from app.modules.files.service import FilesService
+from app.modules.livevote.broker import PatternBroker
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.todos import notify_todo_mails
 from app.modules.todos.access import token_reads
+from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.schemas import (
     AssigneeIn,
     BoardPatch,
@@ -88,7 +93,25 @@ def get_todo_service(session: DbSession, request: Request) -> TodoService:
     return TodoService(session, files=FilesService(session, storage=storage))
 
 
-ServiceDep = Annotated[TodoService, Depends(get_todo_service)]
+def get_todo_broker(request: Request) -> PatternBroker:
+    """The broker of the board pings (Redis in production); a test overrides it."""
+    return todo_broker(request.app.state)
+
+
+async def get_live_todo_service(
+    service: Annotated[TodoService, Depends(get_todo_service)],
+    broker: Annotated[PatternBroker, Depends(get_todo_broker)],
+) -> AsyncIterator[TodoService]:
+    """The service of a route; after the route (and its commit) the pings go out.
+
+    A route that raises sends none. ``publish_pings`` logs a broker fault and never
+    raises, so a write never fails on Redis.
+    """
+    yield service
+    await publish_pings(broker, service.pings.drain())
+
+
+ServiceDep = Annotated[TodoService, Depends(get_live_todo_service)]
 
 #: Sends the mails of a write after the commit (background task).
 TodoMailSender = Callable[[Settings, Sequence[TodoMail], object], Awaitable[None]]
@@ -425,6 +448,12 @@ async def create_card(
 async def get_card(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardDetail:
     """The whole card with links, checklist, events and comments (archived too)."""
     return await service.card(card_id, principal)
+
+
+@router.get("/cards/{card_id}/tile", response_model=TodoCardTile, responses=_errors(401, 404))
+async def get_card_tile(card_id: UUID, service: ServiceDep, principal: Member) -> TodoCardTile:
+    """The tile of a live card as the board read has it (404 when archived): a ping read."""
+    return await service.tile(card_id, principal)
 
 
 @router.patch(

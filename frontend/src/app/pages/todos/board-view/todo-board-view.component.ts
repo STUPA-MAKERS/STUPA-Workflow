@@ -142,6 +142,8 @@ export class TodoBoardViewComponent {
   private spaceTaken = false;
   /** The pointer drag: the column the card left and the column it is over. */
   readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
+  /** A card is held, by pointer or keyboard: the page holds a live read until it lands. */
+  readonly dragging = computed(() => this.ptr() !== null || this.kb() !== null);
   readonly announce = signal('');
   /** Phone: the column on screen. */
   readonly phoneColumn = signal(0);

@@ -13,12 +13,16 @@ import {
   type TodoBoardPoll,
   type TodoBoardSummary,
   type TodoCardDetail,
+  type TodoCardTile,
   type TodoMine,
 } from '@core/api/todos.service';
 import { AuthService } from '@core/auth/auth.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { BOARDS, MEMBERS, asPhone, board, detail, tile } from '../../../testing/todo-fixtures';
+import { type FakeTodoLive } from '../../../testing/todo-live';
+import { TodoLiveService } from '@core/ws/todo-live.service';
+import { provideFakeTodoLive } from '../../../testing/todo-live';
 import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
 
 interface Opts {
@@ -71,6 +75,7 @@ async function start(url: string, opts: Opts = {}) {
         { path: 'todos/:boardId', component: TodosComponent },
       ]),
       { provide: TodosApiService, useValue: api },
+      provideFakeTodoLive(),
       { provide: ToastService, useValue: toast },
     ],
   });
@@ -358,6 +363,102 @@ describe('TodosComponent', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  describe('live', () => {
+    const wait = async (settle: () => Promise<void>) => {
+      jest.advanceTimersByTime(300);
+      await settle();
+    };
+    const live = () => TestBed.inject(TodoLiveService) as unknown as FakeTodoLive;
+    const ids = (cmp: TodosComponent) => cmp.board()?.cards.map((c) => `${c.id}/${c.columnId}`);
+
+    beforeEach(() => jest.useFakeTimers({ advanceTimers: true }));
+    afterEach(() => jest.useRealTimers());
+
+    it('takes the pings of the shown board: a tile in place, gone elsewhere or 404, a board read', async () => {
+      const { cmp, api, settle } = await start('/todos/b-1');
+      expect(live().boards()).toEqual(['b-1']);
+      const tiles: Record<string, Observable<TodoCardTile>> = {
+        'k-1': of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' })),
+        'k-2': of(tile({ id: 'k-2', boardId: 'b-2', columnId: 'x' })),
+        'k-3': throwError(() => new HttpErrorResponse({ status: 404 })),
+        'k-7': of(tile({ id: 'k-7', columnId: 'c-1', title: 'Neu von Jonas' })),
+        'k-8': throwError(() => new Error('offline')),
+      };
+      (api as unknown as { cardTile: jest.Mock }).cardTile = jest.fn((id: string) => tiles[id]);
+      for (const cardId of Object.keys(tiles)) live().emit({ type: 'card', boardId: 'b-1', cardId });
+      live().emit({ type: 'card', boardId: 'b-9', cardId: 'k-1' });
+      // A ping that went round again after a change of the board is for another board.
+      (cmp as unknown as { onPings(p: unknown[]): void }).onPings([{ type: 'board', boardId: 'b-9' }]);
+      await wait(settle);
+      expect(ids(cmp)?.sort()).toEqual(['k-1/c-2', 'k-7/c-1']);
+      live().emit({ type: 'card_removed', boardId: 'b-1', cardId: 'k-7' });
+      live().emit({ type: 'card_removed', boardId: 'b-1', cardId: 'nope' });
+      await wait(settle);
+      expect(ids(cmp)).toEqual(['k-1/c-2']);
+      api.pollBoard.mockClear();
+      live().emit({ type: 'board', boardId: 'b-1' });
+      await wait(settle);
+      expect(api.pollBoard).toHaveBeenCalledWith('b-1', 'W/"1"');
+      expect(api.pollMineBoards).not.toHaveBeenCalled();
+    });
+
+    it('waits while a move is in flight or a card is held, and drops a tile of a board left behind', async () => {
+      const move = new Subject<TodoCardTile>();
+      const { cmp, api, settle, router } = await start('/todos/b-1');
+      api.moveCard.mockReturnValueOnce(move);
+      const read = new Subject<TodoCardTile>();
+      const cardTile = jest.fn((): Observable<TodoCardTile> => read);
+      (api as unknown as { cardTile: jest.Mock }).cardTile = cardTile;
+      cmp.moveCard({ cardId: 'k-2', move: { columnId: 'c-3' } });
+      expect(cmp.hold()).toBe(true);
+      live().emit({ type: 'card', boardId: 'b-1', cardId: 'k-1' });
+      await wait(settle);
+      expect(cardTile).not.toHaveBeenCalled();
+      move.next(tile({ id: 'k-2', columnId: 'c-3' }));
+      move.complete();
+      await wait(settle);
+      expect(cardTile).toHaveBeenCalledTimes(1);
+      // The answer comes while a card is held: it goes round again.
+      const view = (cmp as unknown as { boardView(): { ptr: { set(v: unknown): void } } }).boardView();
+      view.ptr.set({ from: 'c-1', over: 'c-1' });
+      read.next(tile({ id: 'k-1', columnId: 'c-2' }));
+      view.ptr.set(null);
+      await wait(settle);
+      expect(cardTile).toHaveBeenCalledTimes(2);
+      // A late tile of a board that is gone is dropped.
+      await router.navigateByUrl('/todos/b-2');
+      await settle();
+      read.next(tile({ id: 'k-1', columnId: 'c-2' }));
+      read.error(new HttpErrorResponse({ status: 404 }));
+      await settle();
+      expect(cmp.board()?.cards.some((c) => c.columnId === 'c-2')).toBe(false);
+    });
+
+    it('polls every 120 s while the socket is up, every 30 s without it', async () => {
+      const { api } = await start('/todos/b-1');
+      live().connected.set(true);
+      api.pollBoard.mockClear();
+      jest.advanceTimersByTime(BOARD_POLL_MS * 3);
+      expect(api.pollBoard).not.toHaveBeenCalled();
+      jest.advanceTimersByTime(BOARD_POLL_MS);
+      expect(api.pollBoard).toHaveBeenCalledTimes(1);
+      live().connected.set(false);
+      jest.advanceTimersByTime(BOARD_POLL_MS);
+      expect(api.pollBoard).toHaveBeenCalledTimes(2);
+    });
+
+    it('"Alle" leaves the pings to its rows; a ping with no board shown does nothing', async () => {
+      const { cmp } = await start(`/todos/${ALL_BOARDS}`);
+      expect(cmp.liveRowIds()).toEqual(['b-0', 'b-1', 'b-2', 'b-3']);
+      (cmp as unknown as { onPings(p: unknown[]): void }).onPings([{ type: 'board', boardId: 'b-1' }]);
+    });
+
+    it('leaves room for the floating button below the board', async () => {
+      const { harness } = await start('/todos/b-1');
+      expect(harness.routeNativeElement?.querySelector('.td__body')).toHaveClass('td__body--fab');
+    });
   });
 
   it('moves a card at once and replaces it with the answer, or reloads on a failure', async () => {
@@ -810,12 +911,33 @@ describe('TodosComponent', () => {
       expect(cmp.board()?.cards).toEqual([]);
       const rows = () => harnessRows(cmp);
       expect(rows().find((c) => c.id === 'p-1')).toMatchObject({ boardId: 'b-1', columnId: 'c-2' });
-      answer.next(detail({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat (neu)' }));
+      // Still assigned to me (the one member of my personal board): it stays in the row.
+      const me = [{ principalId: 'p-1', displayName: 'Selin Yıldız' }];
+      answer.next(detail({ id: 'p-1', boardId: 'b-1', columnId: 'c-2', title: 'Privat (neu)', assignees: me }));
       expect(rows().find((c) => c.id === 'p-1')?.title).toBe('Privat (neu)');
       expect(api.boards).toHaveBeenCalledTimes(reads + 1);
       // A card the board does not hold, and no board: nothing.
       cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'nope', move: { columnId: 'c-2' } });
       expect(api.transferCard).toHaveBeenCalledTimes(1);
+    });
+
+    it('a card dropped into a row leaves the rows when it is not assigned to me', async () => {
+      const { cmp } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      expect(cmp.me()).toBe('p-1');
+      cmp.members.set([]);
+      expect(cmp.me()).toBeNull();
+      cmp.members.set(MEMBERS);
+      cmp.onDropIntoRow({ boardId: 'b-1', cardId: 'p-1', move: { columnId: 'c-2' } });
+      expect(harnessRows(cmp).some((c) => c.id === 'p-1')).toBe(false);
+    });
+
+    it('passes me, the live boards and the hold to the rows', async () => {
+      const { cmp, harness } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+      expect(cmp.liveRowIds()).toEqual(['b-1', 'b-2', 'b-3']);
+      const live = TestBed.inject(TodoLiveService) as unknown as FakeTodoLive;
+      expect(live.boards()).toEqual(['b-0', 'b-1', 'b-2', 'b-3']);
+      expect(cmp.hold()).toBe(false);
+      harness.detectChanges();
     });
 
     it('puts a refused drop into a row back and reads both again', async () => {

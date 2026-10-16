@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { WsService } from './ws.service';
-import type { ServerMessage } from './ws-messages';
+import type { ServerMessage, TodoServerMessage } from './ws-messages';
 import { createLocationMock, provideLocationMock } from '../../../testing/location-mock';
 
 /** Minimal WebSocket mock that captures event listeners and fires them manually. */
@@ -165,6 +165,47 @@ describe('WsService', () => {
     const closeSpy = jest.spyOn(MockWebSocket.instances[0], 'close');
     ch.close();
     expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it('opens the to-do channel, buffers the subscribe and reports the close code', () => {
+    MockWebSocket.startState = MockWebSocket.CONNECTING;
+    const ch = svc.connectTodos();
+    const sock = MockWebSocket.instances[0];
+    expect(sock.url).toBe('ws://localhost/api/ws/todos');
+    const received: TodoServerMessage[] = [];
+    let completed = false;
+    ch.messages$.subscribe({ next: (m) => received.push(m), complete: () => (completed = true) });
+    ch.send({ type: 'subscribe', boardIds: ['b'] });
+    expect(sock.sent).toEqual([]);
+    sock.openNow();
+    ch.send({ type: 'subscribe', boardIds: [] });
+    expect(sock.sent).toEqual([
+      JSON.stringify({ type: 'subscribe', boardIds: ['b'] }),
+      JSON.stringify({ type: 'subscribe', boardIds: [] }),
+    ]);
+    sock.readyState = MockWebSocket.CLOSED;
+    ch.send({ type: 'subscribe', boardIds: ['x'] });
+    expect(sock.sent).toHaveLength(2);
+    sock.emit('message', { data: JSON.stringify({ type: 'board', boardId: 'b' }) });
+    sock.emit('message', { data: '{bad' });
+    sock.emit('close', { code: 4403 });
+    expect(received).toEqual([
+      { type: 'board', boardId: 'b' },
+      { type: 'error', code: 'malformed_message' },
+      { type: 'closed', code: 4403 },
+    ]);
+    expect(completed).toBe(true);
+    const closeSpy = jest.spyOn(sock, 'close');
+    ch.close();
+    expect(closeSpy).toHaveBeenCalled();
+  });
+
+  it('reports 1006 for a close without a code', () => {
+    const ch = svc.connectTodos();
+    const received: TodoServerMessage[] = [];
+    ch.messages$.subscribe((m) => received.push(m));
+    MockWebSocket.instances[0].emit('close', {});
+    expect(received).toEqual([{ type: 'closed', code: 1006 }]);
   });
 
   /** Build a fresh service with its own `LOCATION`, one protocol and host per test. */

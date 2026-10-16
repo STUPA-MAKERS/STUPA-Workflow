@@ -17,7 +17,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
-import { filter, interval, map } from 'rxjs';
+import { Subject, filter, finalize, interval, map, merge, type Observable } from 'rxjs';
 import type { Uuid } from '@core/api/models';
 import {
   TodosApiService,
@@ -32,6 +32,8 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
+import type { TodoPing } from '@core/ws/ws-messages';
 import { liveSearch } from '@shared/live-search';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
@@ -79,6 +81,8 @@ import { TodoListViewComponent } from './list-view/todo-list-view.component';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;
+/** While the live socket holds the boards, only every this many poll ticks reads (120 s). */
+export const LIVE_POLL_EVERY = 4;
 
 /** The route segment of the meta-board "Alle" (`/todos/alle`): every readable board at once. */
 export const ALL_BOARDS = 'alle';
@@ -113,6 +117,13 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * `?view=list` shows the table. The board reads itself again every 30 seconds while the
  * tab is visible and when the window gets the focus; the ETag makes an unchanged board
  * a 304.
+ *
+ * Live (`TodoLiveService`): the shown board takes the pings of other people's changes. A
+ * `card` ping reads that tile (`GET /todos/cards/{id}/tile`) and puts it in place, or takes
+ * it out when it is on another board now or answers 404; `card_removed` takes the tile out;
+ * `board` is the ETag read of the board. The rows below the board and "Alle" take their
+ * own pings. While a card is held or a move of the page is in flight, the pings wait.
+ * While the socket is up, the poll reads every 120 seconds instead of 30.
  */
 @Component({
   selector: 'app-todos',
@@ -157,6 +168,7 @@ export class TodosComponent implements OnDestroy {
   private readonly frame = inject(PageFrameService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private readonly live = inject(TodoLiveService);
 
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
@@ -189,6 +201,12 @@ export class TodosComponent implements OnDestroy {
   private mutations = 0;
   private mineLoaded = false;
   private mineSeq = 0;
+  /** The poll ticks; while the socket is up only every `LIVE_POLL_EVERY`-th reads. */
+  private ticks = 0;
+  /** Moves and transfers of the page in flight: a live change waits for them. */
+  private readonly pending = signal(0);
+  /** Pings that came while a card was held go round once more. */
+  private readonly liveRetry = new Subject<TodoPing>();
 
   readonly filter = signal<BoardFilter>(NO_FILTER);
   readonly search = liveSearch<void>({
@@ -210,6 +228,25 @@ export class TodosComponent implements OnDestroy {
   private readonly drawer = viewChild<ElementRef<HTMLElement>>('drawer');
   /** The rows of the other boards under "Meine To-Dos" (board view only). */
   private readonly rowsView = viewChild(TodoBoardRowsComponent);
+  private readonly boardView = viewChild(TodoBoardViewComponent);
+  /** A card of the board is held or a write of the page is in flight: the rows wait too. */
+  readonly hold = computed(() => !!this.boardView()?.dragging() || this.pending() > 0);
+  /** The board whose pings the page takes ("Alle" has none: its rows take theirs). */
+  private readonly liveBoard = computed(() => (this.all() ? null : (this.board()?.id ?? null)));
+  /**
+   * My principal id: known in "Alle", else the one member of my personal board. The rows
+   * of "Meine To-Dos" keep only the cards assigned to it.
+   */
+  readonly me = computed(() => {
+    if (this.meId()) return this.meId();
+    return this.board()?.kind === 'personal' ? (this.members()[0]?.principalId ?? null) : null;
+  });
+  /** The boards whose pings the rows take besides their own: a card can join a row there. */
+  readonly liveRowIds = computed(() =>
+    this.boards()
+      .filter((b) => this.all() || b.kind !== 'personal')
+      .map((b) => b.id),
+  );
   /** The cards the rows show after the filters; null until the rows of this board answered. */
   readonly rowMatches = signal<number | null>(null);
   readonly withRows = computed(() => this.board()?.kind === 'personal' && this.view() === 'board');
@@ -419,10 +456,24 @@ export class TodosComponent implements OnDestroy {
     // Side by side the page fills the viewport and only the columns scroll.
     effect(() => this.frame.fill.set(!this.phone()));
 
-    // Poll every 30 s while the tab is visible, and on the focus of the window.
+    // The pings of the shown board.
+    effect((onCleanup) => {
+      const id = this.liveBoard();
+      if (!id) return;
+      const sub = untracked(() =>
+        merge(this.live.changes$([id]), this.liveRetry)
+          .pipe(batchPings())
+          .subscribe((pings) => this.onPings(pings)),
+      );
+      onCleanup(() => sub.unsubscribe());
+    });
+
+    // Poll every 30 s while the tab is visible (120 s while the socket is up), and on the
+    // focus of the window.
     interval(BOARD_POLL_MS)
       .pipe(
         filter(() => typeof document === 'undefined' || document.visibilityState !== 'hidden'),
+        filter(() => !this.live.connected() || ++this.ticks % LIVE_POLL_EVERY === 0),
         takeUntilDestroyed(),
       )
       .subscribe(() => this.poll());
@@ -522,9 +573,14 @@ export class TodosComponent implements OnDestroy {
     const board = this.board();
     if (!board) return;
     this.rowsView()?.poll();
+    this.today.set(isoDay(new Date()));
+    this.pollBoard(board);
+  }
+
+  /** The ETag read of the shown board alone (the poll, and a `board` ping). */
+  private pollBoard(board: TodoBoard): void {
     const seq = this.loadSeq;
     const muts = this.mutations;
-    this.today.set(isoDay(new Date()));
     this.api.pollBoard(board.id, this.etag).subscribe({
       next: (res) => {
         if (seq !== this.loadSeq || muts !== this.mutations || !res.board) return;
@@ -534,6 +590,68 @@ export class TodosComponent implements OnDestroy {
       },
       error: () => undefined,
     });
+  }
+
+  // ------------------------------------------------------------------ live
+
+  /** A card is held anywhere on the page or a write is in flight: a live change waits. */
+  private busy(): boolean {
+    return this.hold() || !!this.rowsView()?.dragging();
+  }
+
+  private onPings(pings: readonly TodoPing[]): void {
+    const board = this.board();
+    if (!board) return;
+    if (this.busy()) {
+      for (const p of pings) this.liveRetry.next(p);
+      return;
+    }
+    for (const p of pings) {
+      if (p.boardId !== board.id) continue;
+      if (p.type === 'board') this.pollBoard(board);
+      else if (p.type === 'card_removed') this.dropTile(p.cardId);
+      else this.readTile(p);
+    }
+  }
+
+  /** Read the tile of a `card` ping and put it in place; a 404 or another board takes it out. */
+  private readTile(ping: TodoPing & { type: 'card' }): void {
+    const seq = this.loadSeq;
+    this.api.cardTile(ping.cardId).subscribe({
+      next: (tile) => {
+        if (seq !== this.loadSeq) return;
+        // The same load: the board answered before its first ping, and only a new load clears it.
+        const board = this.board() as TodoBoard;
+        if (this.busy()) {
+          this.liveRetry.next(ping);
+          return;
+        }
+        if (tile.boardId !== board.id) {
+          this.dropTile(tile.id);
+          return;
+        }
+        this.mutations++;
+        this.board.set(placeTile(board, tile));
+        this.refreshMine();
+      },
+      error: (err: unknown) => {
+        if (seq === this.loadSeq && err instanceof HttpErrorResponse && err.status === 404) this.dropTile(ping.cardId);
+      },
+    });
+  }
+
+  /** Take a tile off the shown board when it holds it. */
+  private dropTile(cardId: Uuid): void {
+    const board = this.board();
+    if (!board?.cards.some((c) => c.id === cardId)) return;
+    this.mutations++;
+    this.board.set(removeTile(board, cardId));
+  }
+
+  /** Count a write of the page in flight until `req` ends. */
+  private track<T>(req: Observable<T>): Observable<T> {
+    this.pending.update((n) => n + 1);
+    return req.pipe(finalize(() => this.pending.update((n) => n - 1)));
   }
 
   /**
@@ -693,7 +811,7 @@ export class TodosComponent implements OnDestroy {
     const optimistic = applyMove(board, event.cardId, event.move);
     this.mutations++;
     this.board.set(optimistic);
-    this.api.moveCard(event.cardId, event.move).subscribe({
+    this.track(this.api.moveCard(event.cardId, event.move)).subscribe({
       next: (tile) => {
         this.mutations++;
         const now = this.board();
@@ -817,8 +935,8 @@ export class TodosComponent implements OnDestroy {
 
   /**
    * A card of the personal board landed in a row below it: it moves at once, and back with
-   * a toast when the server refuses. It stays in that row (it is still mine) until the
-   * rows read themselves again.
+   * a toast when the server refuses. After the answer it stays in that row only when it is
+   * assigned to me (`accept`).
    */
   onDropIntoRow(event: RowDrop): void {
     const board = this.board();
@@ -829,7 +947,7 @@ export class TodosComponent implements OnDestroy {
     this.mutations++;
     this.board.set(optimistic);
     rows.receive(tile, event.boardId, event.move);
-    this.api.transferCard(tile.id, { boardId: event.boardId, ...event.move }).subscribe({
+    this.track(this.api.transferCard(tile.id, { boardId: event.boardId, ...event.move })).subscribe({
       next: (card) => {
         this.rowsView()?.accept(card);
         this.refreshBoards();
@@ -847,7 +965,7 @@ export class TodosComponent implements OnDestroy {
     const optimistic = insertTile(board, tile, event.move);
     this.mutations++;
     this.board.set(optimistic);
-    this.api.transferCard(tile.id, { boardId: board.id, ...event.move }).subscribe({
+    this.track(this.api.transferCard(tile.id, { boardId: board.id, ...event.move })).subscribe({
       next: (card) => {
         const now = this.board();
         if (now?.id === board.id) {

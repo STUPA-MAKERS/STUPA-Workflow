@@ -390,6 +390,11 @@ export class TodosApiService {
     return this.http.get<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, { context: skipLoading() });
   }
 
+  /** The tile of a live card, as the board read has it: what a live ping reads (404 when archived). */
+  cardTile(cardId: Uuid): Observable<TodoCardTile> {
+    return this.http.get<TodoCardTile>(`${this.base}/todos/cards/${cardId}/tile`, { context: skipLoading() });
+  }
+
   patchCard(cardId: Uuid, body: TodoCardPatch): Observable<TodoCardDetail> {
     return this.http.patch<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, body, {
       context: skipLoading(),

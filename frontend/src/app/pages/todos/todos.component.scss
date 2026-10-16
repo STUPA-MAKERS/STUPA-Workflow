@@ -112,9 +112,15 @@
 .td__body--rows > app-todo-board-rows {
   flex: none;
 }
-/* "Alle" ends with the floating "+ To-Do": room for it below the last row. */
-.td__body--rows > app-todo-board-rows:last-child {
+/* The floating "+ To-Do" (56px high, --space-6 from the bottom) must not cover the end of
+   the last column or the last row: the scroll area ends above it, on every width. */
+.td__body--fab {
   padding-bottom: calc(56px + var(--space-6));
+}
+@include bp.phone {
+  .td__body--fab {
+    padding-bottom: calc(56px + var(--space-4));
+  }
 }
 .td__state {
   display: flex;

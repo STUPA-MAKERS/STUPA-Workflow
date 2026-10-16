@@ -162,6 +162,7 @@ describe('TodosApiService', () => {
   it('reads and changes a card and its parts', () => {
     const cases: [() => unknown, string, string, unknown][] = [
       [() => api.card('k').subscribe(), 'GET', '/api/todos/cards/k', null],
+      [() => api.cardTile('k').subscribe(), 'GET', '/api/todos/cards/k/tile', null],
       [() => api.patchCard('k', { version: 2, title: 'T' }).subscribe(), 'PATCH', '/api/todos/cards/k', { version: 2, title: 'T' }],
       [() => api.moveCard('k', { columnId: 'c', afterId: 'x' }).subscribe(), 'POST', '/api/todos/cards/k/move', { columnId: 'c', afterId: 'x' }],
       [() => api.transferCard('k', { boardId: 'b' }).subscribe(), 'POST', '/api/todos/cards/k/transfer', { boardId: 'b' }],

@@ -1,6 +1,6 @@
 ---
 name: be-todos
-description: To-do boards (Kanban) — gremium boards, the personal board "Meine To-Dos" and team boards behind a permission (todo_board/todo_column/todo_card and the assignee, label, checklist, comment, event and link tables). Covers the RBAC (gremium permissions todo.write/todo.configure, OAuth scope todos:write), lexorank moves with board locks, the optimistic lock (version, 409 card_version_conflict), the ETag/304 board read, link targets with per-kind read checks and "kein Zugriff" redaction, back-references (GET /api/todos/linked), agenda items from a card (agenda_item.todo_id), the ticket coupling (todo_done event, completeTodos), the mails todo_assigned/todo_mentioned/todo_due, the archive cron, the search source, privacy and the account merge. Use when working on backend/app/modules/todos, TodoService, BoardAccess, LinkResolver, worker/todos.py or the to-do parts of tickets, livevote, search, privacy or the merge.
+description: To-do boards (Kanban) — gremium boards, the personal board "Meine To-Dos" and team boards behind a permission (todo_board/todo_column/todo_card and the assignee, label, checklist, comment, event and link tables). Covers the RBAC (gremium permissions todo.write/todo.configure, OAuth scope todos:write), lexorank moves with board locks, the optimistic lock (version, 409 card_version_conflict), the ETag/304 board read, link targets with per-kind read checks and "kein Zugriff" redaction, back-references (GET /api/todos/linked), agenda items from a card (agenda_item.todo_id), the ticket coupling (todo_done event, completeTodos), the mails todo_assigned/todo_mentioned/todo_due, the archive cron, the live board pings (WS /api/ws/todos, GET cards/{id}/tile), the search source, privacy and the account merge. Use when working on backend/app/modules/todos, TodoService, BoardAccess, LinkResolver, worker/todos.py or the to-do parts of tickets, livevote, search, privacy or the merge.
 ---
 
 # To-dos — `backend/app/modules/todos`
@@ -35,6 +35,9 @@ done (`completed_at`).
 - `boards.py` — `add_default_columns`, `ensure_gremium_board` (no commit),
   `ensure_personal_board` (insert … on conflict do nothing, commits).
 - `hooks.py` — `TicketTodoBridge`, the `TicketTodoHooks` of the ticket service.
+- `live.py` — the board pings: `board_channel(id)` → `todo-board:{id}`, `CHANNEL_PATTERN`,
+  `BoardPings` (the collector of one request), `publish_pings`, `todo_broker(app.state)`.
+- `socket.py` — `WS /api/ws/todos` (`ws_router`, `TodoLiveConnection`).
 - `privacy.py` — `erase_todos` (locks the personal board, then its cards `FOR UPDATE`, before
   it reads the comment ids, like the Gremium delete; drops the comment-file rows with
   `drop_for_messages` and returns the storage keys, which the caller removes after its
@@ -172,6 +175,40 @@ write into done (`TicketTodoBridge.complete`). `POST /meetings/{id}/agenda` with
 checks the card (404, 422 `todo_archived` / `todo_wrong_board`: only a card of the board of
 the meeting gremium), adds an item with the card title (409 `todo_already_on_agenda`) and
 links the card to the item.
+
+**Live (board pings):** the client reads only what changed, through REST, so every
+read rule stays in force (a tile is per viewer, `primaryLink` is redacted).
+- Messages on `todo-board:{board_id}`: `{"type":"card","boardId","cardId"}` (a card of the
+  board was created or changed: any field, a sub-resource, a comment, a move inside the
+  board, a restore), `{"type":"card_removed",…}` (the card left the board: archived or
+  transferred away), `{"type":"board","boardId"}` (name, settings, columns, labels, or more
+  than one card of the board in one request). A transfer sends `card_removed` on the source
+  and `card` on the target.
+- Collector: `TodoService._touch(board, card=None, *, removed=False)` runs at every board
+  write and records the ping in `service.pings` (`BoardPings`). A card that left stays
+  `card_removed` in the same request.
+- Publish after the commit: `router.get_live_todo_service` wraps `get_todo_service`, and its
+  exit runs after the response (the commit of `get_session` runs first), so a refused
+  write sends nothing. `publish_pings` logs and swallows a broker fault. The ticket coupling
+  (`TicketTodoBridge.complete`, `broker=`) and the agenda add with `todoId`
+  (`livevote/router.add_agenda_item`) publish after their own commit. The archive cron sends
+  no pings (the poll covers it).
+- `GET /api/todos/cards/{id}/tile` → `TodoCardTile` (the tile of the board read, for this
+  viewer). 404 when unreadable or archived.
+- Socket `WS /api/ws/todos`: the session cookie only (`app.shared.ws.resolve_ws_principal`,
+  Origin check; 4401 without a session, 4403 for a foreign origin). Client frame
+  `{"type":"subscribe","boardIds":[…]}` replaces the set (at most `MAX_BOARDS` = 100, more
+  gives the error `too_many_boards`). The server keeps the ids that `BoardAccess.can_read`
+  allows, drops the rest silently, answers `{"type":"subscribed","boardIds":[…]}` and checks
+  the rights again on every subscribe. It rolls back after each subscribe, so the socket
+  holds no transaction. One `PSUBSCRIBE todo-board:*` per socket
+  (`PatternBroker.subscribe_pattern`), filtered by the subscribed ids. Limits: 5 sockets per
+  principal (error `too_many_connections`, close 4403; per process, like the meeting
+  socket), a token bucket of 5 frames/s (burst 10, `rate_limited`). Bad frames get
+  `invalid_message` / `unknown_type` and keep the socket. No heartbeat of its own (uvicorn's
+  WebSocket pings, like the meeting socket).
+- Tests: `tests/unit/modules/todos/test_live.py`, `tests/integration/modules/todos/test_todos_live.py`
+  (override `get_todo_broker` and `get_todo_ws_broker` with one `InMemoryBroker`).
 
 **Mails:** `todo_assigned` (new assignee except the actor), `todo_mentioned` (new mentions
 except the author, with an excerpt), both after the commit and best effort; `todo_due` from
