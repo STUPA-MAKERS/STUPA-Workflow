@@ -633,6 +633,8 @@ async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPat
     assert calls[1][1]["ticket_note_id"] == out.id
     assert calls[1][1]["attachment_ids"] == [draft]
     assert session.flushed == 1
+    # With files the ticket row is locked against the retention cron.
+    assert session.get_kw[0] == {"with_for_update": True, "populate_existing": True}
 
 
 async def test_add_note_with_files_on_an_anonymized_ticket_is_422() -> None:
@@ -655,6 +657,8 @@ async def test_add_note_without_files_on_an_anonymized_ticket_passes() -> None:
     session.put(ticket)
     out = await _svc(session).add_note(ticket.id, _note_in(), VIEWER, pepper="p")
     assert out.body == "hallo"
+    # Without files nothing is locked.
+    assert session.get_kw[0] == {}
 
 
 def test_a_note_needs_a_text_or_a_file() -> None:

@@ -262,28 +262,50 @@ class TicketService:
         one the block names the given e-mail, or an account with that e-mail. Both
         compares are case-insensitive.
         """
-        if reporter_id is not None:
-            account_email = (
-                select(func.lower(cast(PrincipalRow.email, String)))
-                .where(PrincipalRow.id == reporter_id)
-                .scalar_subquery()
-            )
-            cond = or_(
-                TicketSenderBlock.principal_id == reporter_id,
-                TicketSenderBlock.email == account_email,
-            )
-        elif email:
-            address = normalize_email(email)
-            cond = or_(
-                TicketSenderBlock.email == address,
-                TicketSenderBlock.principal_id.in_(
-                    select(PrincipalRow.id).where(PrincipalRow.email == address)
-                ),
-            )
-        else:
+        cond = self._sender_condition(reporter_id=reporter_id, email=email)
+        if cond is None:
             return None
         return await self.session.scalar(
             select(TicketSenderBlock.id).where(cond).order_by(TicketSenderBlock.created_at).limit(1)
+        )
+
+    @classmethod
+    def _sender_condition(
+        cls, *, reporter_id: uuid.UUID | None, email: str | None
+    ) -> ColumnElement[bool] | None:
+        """Return the condition of the blocks that hold back this sender, else None.
+
+        The report, the ``senderBlocked`` flag and the unblock of a ticket share this
+        condition, so a block that swallows a report always shows on the ticket and
+        lifts there.
+        """
+        if reporter_id is not None:
+            return cls._account_condition(reporter_id)
+        if email:
+            return cls._email_condition(normalize_email(email))
+        return None
+
+    @staticmethod
+    def _account_condition(reporter_id: uuid.UUID) -> ColumnElement[bool]:
+        """Match a block of the account or of the account e-mail (case-insensitive)."""
+        account_email = (
+            select(func.lower(cast(PrincipalRow.email, String)))
+            .where(PrincipalRow.id == reporter_id)
+            .scalar_subquery()
+        )
+        return or_(
+            TicketSenderBlock.principal_id == reporter_id,
+            TicketSenderBlock.email == account_email,
+        )
+
+    @staticmethod
+    def _email_condition(address: str) -> ColumnElement[bool]:
+        """Match a block of the normalized e-mail or of an account with that e-mail."""
+        return or_(
+            TicketSenderBlock.email == address,
+            TicketSenderBlock.principal_id.in_(
+                select(PrincipalRow.id).where(PrincipalRow.email == address)
+            ),
         )
 
     async def _swallow(self, block_id: uuid.UUID) -> SwallowedReport:
@@ -317,18 +339,19 @@ class TicketService:
             return ("email", normalize_email(ticket.reporter_email))
         return None
 
-    @staticmethod
-    def _target_condition(target: BlockTarget) -> ColumnElement[bool]:
+    @classmethod
+    def _target_condition(cls, target: BlockTarget) -> ColumnElement[bool]:
+        """Return the condition of every block that holds back the sender of a target."""
         if target[0] == "principal":
-            return TicketSenderBlock.principal_id == target[1]
-        return TicketSenderBlock.email == target[1]
+            return cls._account_condition(target[1])
+        return cls._email_condition(target[1])
 
     async def _sender_blocked(self, ticket: Ticket) -> bool:
         target = self.block_target(ticket)
         if target is None:
             return False
         found = await self.session.scalar(
-            select(TicketSenderBlock.id).where(self._target_condition(target))
+            select(TicketSenderBlock.id).where(self._target_condition(target)).limit(1)
         )
         return found is not None
 
@@ -377,7 +400,10 @@ class TicketService:
         return await self.detail(ticket.id, principal)
 
     async def unblock_sender(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
-        """Lift the block of a ticket's sender; without a block nothing changes.
+        """Lift every block that holds back a ticket's sender; without one nothing changes.
+
+        That is the block of the account and of its e-mail, or the block of the e-mail
+        and of every account with that e-mail, the same blocks that swallow a report.
 
         Raises:
             NotFoundError: No ticket has this id (HTTP 404).
@@ -774,10 +800,12 @@ class TicketService:
                 files without a draft token, or a draft that is missing, expired,
                 foreign or infected (HTTP 422).
         """
-        ticket = await self._get(ticket_id)
+        # With files the ticket row is locked, so the retention cron (which locks it
+        # too) cannot anonymize it between this check and the commit: it ran once and
+        # would not see the file again.
+        ticket = await self._get(ticket_id, lock=bool(payload.attachment_ids))
         author = await self._require_account(principal)
         if payload.attachment_ids and ticket.anonymized_at is not None:
-            # The retention ran once and would not see the file again.
             raise ValidationProblem(
                 "The ticket is anonymized and takes no files.",
                 code=TICKET_ANONYMIZED,
@@ -882,8 +910,13 @@ class TicketService:
 
     # -- helpers ----------------------------------------------------------------
 
-    async def _get(self, ticket_id: uuid.UUID) -> Ticket:
-        ticket = await self.session.get(Ticket, ticket_id)
+    async def _get(self, ticket_id: uuid.UUID, *, lock: bool = False) -> Ticket:
+        if lock:
+            ticket = await self.session.get(
+                Ticket, ticket_id, with_for_update=True, populate_existing=True
+            )
+        else:
+            ticket = await self.session.get(Ticket, ticket_id)
         if ticket is None:
             raise NotFoundError(f"ticket {ticket_id} not found")
         return ticket

@@ -334,6 +334,35 @@ async def test_a_blocked_address_also_holds_back_its_account(
     assert hits == 2
 
 
+async def test_a_block_of_the_other_identity_shows_and_lifts_on_the_ticket(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    await add_principal(maker, sub=MANAGER.sub, email=MANAGER.email, name="Mia")
+    pid = await add_principal(maker, sub=PLAIN.sub, email="Ada@Example.org")
+    by_mail = await _ticket(maker, email="ada@example.org")
+    by_account = await _ticket(maker, reporter=pid)
+    with TestClient(api.app) as client:
+        api.login(MANAGER)
+        assert client.post(f"/api/tickets/{by_mail}/block-sender").status_code == 200
+        # The e-mail block swallows the reports of the account, so the account ticket
+        # shows the sender as blocked.
+        assert client.get(f"/api/tickets/{by_account}").json()["senderBlocked"] is True
+        lifted = client.delete(f"/api/tickets/{by_account}/block-sender")
+        assert lifted.status_code == 200 and lifted.json()["senderBlocked"] is False
+        assert client.get("/api/tickets/blocked-senders").json() == []
+        assert client.get(f"/api/tickets/{by_mail}").json()["senderBlocked"] is False
+
+        # The other way round: an account block shows and lifts on the e-mail ticket.
+        assert client.post(f"/api/tickets/{by_account}/block-sender").status_code == 200
+        assert client.get(f"/api/tickets/{by_mail}").json()["senderBlocked"] is True
+        assert client.delete(f"/api/tickets/{by_mail}/block-sender").status_code == 200
+        assert client.get("/api/tickets/blocked-senders").json() == []
+        api.login(PLAIN)
+        report = client.post("/api/tickets", json=_REPORT)
+        assert report.status_code == 201
+    assert await _by_number(maker, report.json()["number"]) is not None
+
+
 async def test_the_block_routes_refuse_the_caller_an_unknown_sender_and_non_managers(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:

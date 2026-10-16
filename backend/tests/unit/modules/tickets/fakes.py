@@ -4,7 +4,8 @@
 that the test fills in the order of the queries of the code under test. An empty
 ``scalar`` queue answers None (no row), so a trailing lookup such as the sender
 block of a detail needs no entry. ``get``
-reads an in-memory store that ``add`` fills. Every statement is kept, so a test can
+reads an in-memory store that ``add`` fills and keeps its keyword arguments (a lock
+shows as ``with_for_update``). Every statement is kept, so a test can
 look at the SQL of a query.
 """
 
@@ -49,6 +50,7 @@ class ScriptedSession:
         self.statements: list[Any] = []
         self.committed = 0
         self.flushed = 0
+        self.get_kw: list[dict[str, Any]] = []
 
     def put(self, *objs: Any) -> None:
         for obj in objs:
@@ -64,7 +66,8 @@ class ScriptedSession:
         self.added.append(obj)
         self.store[obj.id] = obj
 
-    async def get(self, model: type, ident: Any, **_kw: Any) -> Any:
+    async def get(self, model: type, ident: Any, **kw: Any) -> Any:
+        self.get_kw.append(kw)
         obj = self.store.get(ident)
         return obj if isinstance(obj, model) else None
 

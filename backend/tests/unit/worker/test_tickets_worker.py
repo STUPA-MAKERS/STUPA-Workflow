@@ -117,6 +117,8 @@ async def test_due_tickets_are_anonymized_one_by_one(
     assert due.reporter_email is None
     assert due.context == {}
     assert work.committed == 1
+    # The row lock serializes the run with a note that binds files.
+    assert work.get_kw == [{"with_for_update": True}]
     assert [(a["action"], a["target_id"]) for a in audits[:1]] == [("anonymization", str(due.id))]
     sql = str(lookup.statements[0])
     assert "ticket.closed_at IS NOT NULL" in sql

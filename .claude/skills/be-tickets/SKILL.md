@@ -67,13 +67,18 @@ kind, internal notes, a timeline of events and the technical context of the repo
   (`BOUND`), so a ticket file never shows there.
 - Note files: `POST /notes` takes `NoteCreate` (`body` may be empty with a file,
   `attachmentIds` ≤ 5, `draftToken`) and binds with `ticket_note_id`; files on an
-  anonymized ticket give 422 `ticket_anonymized`. `TicketNoteOut.attachments` lists them;
+  anonymized ticket give 422 `ticket_anonymized`. With files `add_note` reads the ticket
+  `FOR UPDATE`, and the cron `anonymize_tickets` locks it too, so a note cannot bind files
+  between the check and the anonymization. `TicketNoteOut.attachments` lists them;
   `delete_note` and `delete_for_ticket` (anonymization, retention) remove them.
 - **Sender block** (`ticket_sender_block`): exactly one of `principal_id` (the reporter
   account, cascade) or `email` (lowercase), plus `source_ticket_id`, `created_by`,
   `hit_count`, `last_hit_at`; a partial unique index per target, so a second block is a
   no-op. Blocking yourself (account or own account e-mail) is 422 `sender_is_self`; an
-  anonymized or sender-less ticket is 409 `ticket_sender_unknown`. `TicketDetail.senderBlocked`.
+  anonymized or sender-less ticket is 409 `ticket_sender_unknown`. `TicketDetail.senderBlocked`
+  and the per-ticket unblock use the same cross-identity condition as `matching_block`
+  (`_sender_condition`): the flag shows every block that swallows the sender, and the
+  unblock lifts all of them (account and account e-mail, or e-mail and its accounts).
   `create` checks `matching_block` after the draft check: an account matches by id or by
   its e-mail, an address matches the address or an account with it, case-insensitive. A
   match takes a number from the sequence, counts the hit, commits and answers the normal

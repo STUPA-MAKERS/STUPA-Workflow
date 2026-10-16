@@ -86,7 +86,9 @@ async def anonymize_tickets(ctx: dict[str, Any], now: datetime | None = None) ->
     for ticket_id in await _due(maker):
         try:
             async with maker() as session:
-                ticket = await session.get(Ticket, ticket_id)
+                # The lock serializes the run with a note that binds files
+                # (``TicketService.add_note`` locks the row too).
+                ticket = await session.get(Ticket, ticket_id, with_for_update=True)
                 if ticket is None or ticket.anonymized_at is not None:
                     continue
                 files = FilesService(session, storage=storage)

@@ -152,10 +152,16 @@ async def test_sender_blocked_reads_the_target() -> None:
     session = ScriptedSession(scalar=[uuid.uuid4(), None])
     service = _svc(session)
     assert await service._sender_blocked(_ticket()) is True
-    assert "ticket_sender_block.email = 'a@example.org'" in _sql(session.statements[0])
+    by_email = _sql(session.statements[0])
+    assert "ticket_sender_block.email = 'a@example.org'" in by_email
+    # A block of an account with that e-mail holds the sender back too.
+    assert "ticket_sender_block.principal_id IN" in by_email
     account = _ticket(reporter_principal_id=ME, reporter_email=None)
     assert await service._sender_blocked(account) is False
-    assert "ticket_sender_block.principal_id =" in _sql(session.statements[1])
+    by_account = _sql(session.statements[1])
+    assert "ticket_sender_block.principal_id =" in by_account
+    # A block of the account e-mail holds the account back too.
+    assert "lower(CAST(principal.email AS VARCHAR))" in by_account
     assert await service._sender_blocked(_ticket(anonymized_at=NOW)) is False
     assert len(session.statements) == 2
 
@@ -233,6 +239,8 @@ async def test_unblock_deletes_the_target_and_answers_the_detail() -> None:
     delete = _sql(session.statements[0])
     assert delete.startswith("DELETE FROM ticket_sender_block")
     assert "'a@example.org'" in delete
+    # Every block that swallows the sender's reports goes, the account ones included.
+    assert "ticket_sender_block.principal_id IN" in delete
     assert session.committed == 1
 
 
