@@ -8,11 +8,13 @@ from __future__ import annotations
 
 from datetime import datetime
 from typing import Literal
+from urllib.parse import urlsplit
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue, field_validator
 
 from app.modules.files.schemas import AttachmentOut
+from app.settings import get_settings
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.people import PersonRef
 
@@ -32,8 +34,39 @@ class _CamelIn(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
 
+def _origin(url: str) -> tuple[str, str] | None:
+    try:
+        parts = urlsplit(url)
+    except ValueError:
+        return None
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        return None
+    return parts.scheme, parts.netloc.lower()
+
+
+def platform_page_url(value: str | None) -> str | None:
+    """Keep ``value`` only when it names a page of the platform, else ``None``.
+
+    A page is an absolute http(s) URL on the origin of ``PUBLIC_BASE_URL``, or a path
+    that starts with one ``/``. The route is public and the ticket detail shows the url
+    as a link, so a url to another host is dropped instead of being stored.
+    """
+    if value is None:
+        return None
+    if value.startswith("/") and not value.startswith("//") and "\\" not in value:
+        return value
+    origin = _origin(value)
+    if origin is not None and origin == _origin(get_settings().public_base_url):
+        return value
+    return None
+
+
 class TicketContext(_CamelIn):
-    """The technical context of a report. Every field is optional."""
+    """The technical context of a report. Every field is optional.
+
+    ``url`` keeps a platform page only (``platform_page_url``); any other value is
+    dropped, so the report still goes through.
+    """
 
     url: str | None = Field(default=None, max_length=2048)
     route: str | None = Field(default=None, max_length=512)
@@ -42,6 +75,11 @@ class TicketContext(_CamelIn):
     viewport: str | None = Field(default=None, max_length=32)
     language: Literal["de", "en"] | None = None
     color_scheme: Literal["light", "dark"] | None = Field(default=None, alias="colorScheme")
+
+    @field_validator("url")
+    @classmethod
+    def _platform_url(cls, value: str | None) -> str | None:
+        return platform_page_url(value)
 
 
 class TicketCreate(_CamelIn):

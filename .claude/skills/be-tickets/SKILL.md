@@ -89,6 +89,9 @@ reporter, assignee, note author and event actor (area `tickets`).
 **Conventions & gotchas:**
 - The migration `86718c748401_tickets` is idempotent (baseline `create_all` already builds
   the tables) and widens `ck_attachment_draft_xor_application` to three owners.
+- `TicketContext.url` keeps a platform page only: an http(s) URL on the origin of
+  `PUBLIC_BASE_URL` or a path with one leading `/` (`platform_page_url`). Any other value is
+  dropped, not rejected, because the detail shows it as a link and the route is public.
 - `ticket.manage` is in `PERMISSION_CATALOGUE`, granted to the `admin` role by the
   migration, and in the OAuth scope `tickets:write`.
 - The unit coverage gate counts unit tests only: `tests/unit/modules/tickets` uses a
