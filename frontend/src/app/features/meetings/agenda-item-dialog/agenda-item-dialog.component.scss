@@ -24,7 +24,7 @@
   width: 100%;
 }
 
-/* The area between the kind and the switch row: the search, the caption and the list
+/* The area between the kind and the switch row: the search and the list
    (or the empty state, the loading rows or the title field). On a desktop it has one
    height for every kind and every state, so the dialog keeps its height from the opening
    to the close: the list scrolls inside it. The height follows the viewport, so the
@@ -47,16 +47,8 @@
   }
 }
 
-/* The caption of the list: small, medium weight, muted, sentence case. */
-.aid__cap {
-  flex: none;
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-}
 
-/* The rest of the area below the caption: the list, the loading rows or the empty state. */
+/* The rest of the area below the search: the list, the loading rows or the empty state. */
 .aid__slot {
   display: flex;
   flex: 1 1 auto;

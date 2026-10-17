@@ -65,7 +65,6 @@ describe('AgendaItemDialogComponent', () => {
     expect(dialog).not.toHaveTextContent('34. Sitzung');
     expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
     flushApps(http, fixture);
-    expect(screen.getByText('Zuweisbare Anträge · 3')).toBeInTheDocument();
     const group = screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ });
     expect(within(group).getAllByRole('radio')).toHaveLength(3);
     expect(within(group).getByText('Auf Tagesordnung')).toBeInTheDocument();
@@ -91,7 +90,6 @@ describe('AgendaItemDialogComponent', () => {
     await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), 'kurs');
     const group = screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ });
     expect(within(group).getAllByRole('radio')).toHaveLength(1);
-    expect(screen.getByText('Zuweisbare Anträge · 1')).toBeInTheDocument();
     cmp.query.set('zzz');
     fixture.detectChanges();
     expect(screen.getByText('Kein Antrag passt zu „zzz“')).toBeInTheDocument();
@@ -215,13 +213,12 @@ describe('AgendaItemDialogComponent', () => {
     expect(document.querySelectorAll('.aid__area')).toHaveLength(1);
   });
 
-  it('shows the caption without a count while loading and none for an empty list', async () => {
+  it('shows no caption above the list', async () => {
     const { http, fixture } = await setup();
-    const cap = () => document.querySelector('#aid-apps');
-    expect(cap()).toHaveTextContent(/^\s*Zuweisbare Anträge\s*$/);
-    flushApps(http, fixture, []);
-    expect(cap()).toBeNull();
-    expect(screen.queryByText(/· 0/)).toBeNull();
+    flushApps(http, fixture);
+    expect(document.querySelector('.aid__cap')).toBeNull();
+    expect(screen.queryByText(/Zuweisbare Anträge/)).toBeNull();
+    expect(screen.getByRole('radiogroup', { name: 'Zuweisbare Anträge' })).toBeInTheDocument();
   });
 
   it('shows ghost rows behind the message of an empty list, hidden from the screen reader', async () => {
@@ -350,7 +347,7 @@ describe('AgendaItemDialogComponent', () => {
       const { http, fixture } = await todoSetup();
       expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
       flushBoard(http, fixture);
-      expect(screen.getByText('Offene To-Dos · 3')).toBeInTheDocument();
+      expect(within(screen.getByRole('radiogroup', { name: 'Offene To-Dos' })).getAllByRole('radio')).toHaveLength(3);
       const group = screen.getByRole('radiogroup', { name: /Offene To-Dos/ });
       const radios = within(group).getAllByRole('radio');
       expect(radios.map((r) => r.closest('label')?.querySelector('.aid__title')?.textContent)).toEqual([
@@ -390,7 +387,7 @@ describe('AgendaItemDialogComponent', () => {
       await userEvent.click(screen.getByRole('radio', { name: /Kassenprüfer/ }));
       expect(submitButton()).toBeEnabled();
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'haushalt');
-      expect(screen.getByText('Offene To-Dos · 1')).toBeInTheDocument();
+      expect(within(screen.getByRole('radiogroup', { name: 'Offene To-Dos' })).getAllByRole('radio')).toHaveLength(1);
       expect(submitButton()).toBeDisabled();
       cmp.submit();
       http.expectNone('/api/meetings/m-1/agenda');
@@ -419,7 +416,7 @@ describe('AgendaItemDialogComponent', () => {
       const { http, fixture, cmp } = await todoSetup();
       http.expectOne((r) => r.url === '/api/todos/boards').flush([BOARDS[0], BOARDS[2]]);
       fixture.detectChanges();
-      expect(document.querySelector('#aid-todos')).toBeNull();
+      expect(screen.queryByRole('radiogroup', { name: 'Offene To-Dos' })).toBeNull();
       expect(document.querySelector('.aid__ghosts')).toHaveAttribute('aria-hidden', 'true');
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Grillfest');
       expect(screen.getByText('Keine offenen To-Dos')).toBeInTheDocument();
@@ -430,14 +427,13 @@ describe('AgendaItemDialogComponent', () => {
 
     it('resets the to-do search when nothing matches it', async () => {
       const { http, fixture, cmp } = await todoSetup();
-      expect(document.querySelector('#aid-todos')).toHaveTextContent(/^\s*Offene To-Dos\s*$/);
       flushBoard(http, fixture);
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Mensa');
       expect(screen.getByText('Kein To-Do passt zu „Mensa“')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
       expect(cmp.todoQuery()).toBe('');
       expect(cmp.kind()).toBe('todo');
-      expect(screen.getByText('Offene To-Dos · 3')).toBeInTheDocument();
+      expect(within(screen.getByRole('radiogroup', { name: 'Offene To-Dos' })).getAllByRole('radio')).toHaveLength(3);
     });
 
     it('starts again on every opening', async () => {

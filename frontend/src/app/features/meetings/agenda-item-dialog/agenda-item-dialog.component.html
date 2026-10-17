@@ -23,20 +23,11 @@
           [value]="query()"
           (valueChange)="query.set($event)"
         />
-        @if (loading() || shown().length) {
-          <span class="aid__cap" id="aid-apps">
-            @if (loading()) {
-              {{ 'meetings.agenda.assignableLabel' | t }}
-            } @else {
-              {{ 'meetings.agenda.assignableCount' | t: { n: shown().length } }}
-            }
-          </span>
-        }
         <div class="aid__slot">
           @if (loading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shown().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-apps">
+            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.assignableLabel' | t">
               @for (a of shown(); track a.applicationId) {
                 @let on = pick() === a.applicationId;
                 <label class="aid__row" [class.aid__row--on]="on">
@@ -69,20 +60,11 @@
           [value]="todoQuery()"
           (valueChange)="todoQuery.set($event)"
         />
-        @if (todosLoading() || shownTodos().length) {
-          <span class="aid__cap" id="aid-todos">
-            @if (todosLoading()) {
-              {{ 'meetings.agenda.openTodosLabel' | t }}
-            } @else {
-              {{ 'meetings.agenda.openTodos' | t: { n: shownTodos().length } }}
-            }
-          </span>
-        }
         <div class="aid__slot">
           @if (todosLoading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shownTodos().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-todos">
+            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.openTodosLabel' | t">
               @for (c of shownTodos(); track c.id) {
                 @let on = todoPick() === c.id;
                 <label class="aid__row" [class.aid__row--on]="on">
