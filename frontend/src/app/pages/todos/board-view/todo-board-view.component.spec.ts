@@ -428,7 +428,7 @@ describe('TodoBoardViewComponent', () => {
       }
     });
 
-    it('shows one column behind tabs, its cards and the dots', async () => {
+    it('shows one column behind tabs with the ink, and its cards', async () => {
       const { cmp, on, fixture, container } = await setup(board(), { phone: true });
       expect(screen.getAllByRole('tab').map((t) => t.textContent?.replace(/\s+/g, '').trim())).toEqual([
         'Offen2',
@@ -437,7 +437,8 @@ describe('TodoBoardViewComponent', () => {
         'Erledigt1',
       ]);
       expect(within(screen.getByRole('list', { name: 'Offen' })).getAllByRole('listitem')).toHaveLength(2);
-      expect(container.querySelectorAll('.bv__dot')).toHaveLength(4);
+      expect(container.querySelector('.bv__ink')).not.toBeNull();
+      expect(container.querySelector('.bv__dots')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
       expect(on.openCard).toHaveBeenCalledWith('k-2');
       // Every column is a page of the pager; an empty one says so.
@@ -455,14 +456,13 @@ describe('TodoBoardViewComponent', () => {
       expect(cmp.kb()).toBeNull();
     });
 
-    it('opens the rest of the done column and has no dots for one column', async () => {
+    it('opens the rest of the done column', async () => {
       const done = Array.from({ length: 5 }, (_, i) => tile({ id: `d-${i}`, columnId: 'c-4', title: `Fertig ${i}` }));
       const one = board({
         cards: done,
         columns: [{ id: 'c-4', name: 'Erledigt', position: 0, isDone: true, cardCount: 0 }],
       });
-      const { fixture, container } = await setup(one, { phone: true });
-      expect(container.querySelector('.bv__dots')).toBeNull();
+      const { fixture } = await setup(one, { phone: true });
       fireEvent.click(screen.getByRole('button', { name: '2 weitere' }));
       fixture.detectChanges();
       expect(within(screen.getByRole('list', { name: 'Erledigt' })).getAllByRole('listitem')).toHaveLength(5);
@@ -476,32 +476,37 @@ describe('TodoBoardViewComponent', () => {
       pager.scrollTo = scrollTo as unknown as typeof pager.scrollTo;
       cmp.selectPhoneColumn('c-3');
       expect(scrollTo).toHaveBeenCalledWith({ left: 780, behavior: 'smooth' });
-      // A swipe: the tab follows once the scroll comes to rest.
-      jest.useFakeTimers();
-      try {
-        pager.scrollLeft = 390;
-        fireEvent.scroll(pager);
-        expect(cmp.phoneCol()?.id).toBe('c-3');
-        jest.advanceTimersByTime(150);
-        expect(cmp.phoneCol()?.id).toBe('c-2');
-        // `scrollend` syncs at once and clamps to the last page.
-        pager.scrollLeft = 5000;
-        fireEvent.scroll(pager);
-        pager.dispatchEvent(new Event('scrollend'));
-        expect(cmp.phoneCol()?.id).toBe('c-4');
-        jest.advanceTimersByTime(150);
-        expect(cmp.phoneCol()?.id).toBe('c-4');
-      } finally {
-        jest.useRealTimers();
-      }
+      // On the way to a tapped tab, the tabs between do not light up.
+      pager.scrollLeft = 390;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-3');
+      pager.scrollLeft = 780;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-3');
+      // A swipe: the tab changes at the half way and clamps to the last page.
+      pager.scrollLeft = 900;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-3');
+      pager.scrollLeft = 1000;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-4');
+      pager.scrollLeft = 5000;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-4');
       fixture.detectChanges();
       expect(screen.getByRole('tab', { name: /Erledigt/ })).toHaveAttribute('aria-selected', 'true');
+      // A finger on the pager ends the way to a tapped tab.
+      cmp.selectPhoneColumn('c-1');
+      fireEvent.touchStart(pager);
+      pager.scrollLeft = 400;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-2');
       // Without a laid-out pager nothing moves.
       Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 0 });
       cmp.syncPage();
       cmp.selectPhoneColumn('c-1');
       expect(cmp.phoneCol()?.id).toBe('c-1');
-      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(scrollTo).toHaveBeenCalledTimes(2);
     });
 
     it('jumps without animation under reduced motion and right to left', async () => {
@@ -519,24 +524,79 @@ describe('TodoBoardViewComponent', () => {
         window.matchMedia = mm;
       }
       expect(scrollTo).toHaveBeenCalledWith({ left: -300, behavior: 'auto' });
+      pager.scrollLeft = -300;
+      cmp.syncPage();
       pager.scrollLeft = -600;
       cmp.syncPage();
       expect(cmp.phoneCol()?.id).toBe('c-3');
     });
 
-    it('stops a pending sync when it goes away', async () => {
-      jest.useFakeTimers();
+    it('moves the ink between two tabs while the pager is between two pages', async () => {
+      const { container } = await setup(board(), { phone: true });
+      const bar = container.querySelector('.bv__tabBar') as HTMLElement;
+      const ink = container.querySelector('.bv__ink') as HTMLElement;
+      const pager = container.querySelector('.bv__pager') as HTMLElement;
+      const rect = (left: number, width: number) =>
+        ({ left, right: left + width, width, top: 0, bottom: 44, height: 44 }) as DOMRect;
+      bar.getBoundingClientRect = () => rect(16, 380);
+      const tabs = Array.from(container.querySelectorAll<HTMLElement>('[role="tab"]'));
+      tabs.forEach((t, i) => (t.getBoundingClientRect = () => rect(16 + i * 100, 60 + i * 20)));
+      const strip = container.querySelector('[role="tablist"]') as HTMLElement;
+      strip.getBoundingClientRect = () => rect(16, 380);
+      strip.scrollBy = jest.fn() as unknown as typeof strip.scrollBy;
+      Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 400 });
+      const frame = jest.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => {
+        cb(0);
+        return 1;
+      });
       try {
-        const { cmp, fixture } = await setup(board(), { phone: true });
-        const sync = jest.spyOn(cmp, 'syncPage');
-        cmp.onPagerScroll();
-        cmp.onPagerScroll();
-        fixture.destroy();
-        jest.advanceTimersByTime(500);
-        expect(sync).not.toHaveBeenCalled();
+        pager.scrollLeft = 200;
+        fireEvent.scroll(pager);
+        expect(ink.style.transform).toBe('translateX(50px)');
+        expect(ink.style.width).toBe('70px');
+        // Past the last page the ink stays under the last tab.
+        pager.scrollLeft = 4000;
+        fireEvent.scroll(pager);
+        expect(ink.style.transform).toBe('translateX(300px)');
+        expect(ink.style.width).toBe('120px');
       } finally {
-        jest.useRealTimers();
+        frame.mockRestore();
       }
+    });
+
+    it('shows the active tab when the tab bar is wider than the screen', async () => {
+      const { cmp, fixture, container } = await setup(board(), { phone: true });
+      const strip = container.querySelector('[role="tablist"]') as HTMLElement;
+      const rect = (left: number, width: number) =>
+        ({ left, right: left + width, width, top: 0, bottom: 44, height: 44 }) as DOMRect;
+      strip.getBoundingClientRect = () => rect(0, 300);
+      const tabs = Array.from(container.querySelectorAll<HTMLElement>('[role="tab"]'));
+      tabs.forEach((t, i) => (t.getBoundingClientRect = () => rect(-150 + i * 160, 120)));
+      const scrollBy = jest.fn();
+      strip.scrollBy = scrollBy as unknown as typeof strip.scrollBy;
+      // c-1 starts left of the strip, c-4 ends right of it, c-2 lies inside.
+      cmp.selectPhoneColumn('c-4');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(scrollBy).toHaveBeenLastCalledWith({ left: 150 });
+      cmp.selectPhoneColumn('c-1');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(scrollBy).toHaveBeenLastCalledWith({ left: -150 });
+      scrollBy.mockClear();
+      cmp.selectPhoneColumn('c-2');
+      fixture.detectChanges();
+      await fixture.whenStable();
+      expect(scrollBy).not.toHaveBeenCalled();
+    });
+
+    it('stops a pending ink frame when it goes away', async () => {
+      const { container, fixture } = await setup(board(), { phone: true });
+      const cancel = jest.spyOn(window, 'cancelAnimationFrame');
+      fireEvent.scroll(container.querySelector('.bv__pager') as HTMLElement);
+      fixture.destroy();
+      expect(cancel).toHaveBeenCalled();
+      cancel.mockRestore();
     });
 
     it('shows nothing for a board without columns', async () => {

@@ -2,18 +2,27 @@
 
 @if (phone()) {
   <div class="bv bv--phone">
-    <app-tabs
-      class="bv__tabs"
-      idPrefix="bv"
-      [ariaLabel]="board().name"
-      [tabs]="tabs()"
-      [active]="phoneCol()?.id ?? null"
-      (activeChange)="selectPhoneColumn($event)"
-    />
+    <div #tabBar class="bv__tabBar">
+      <app-tabs
+        class="bv__tabs"
+        idPrefix="bv"
+        [ariaLabel]="board().name"
+        [tabs]="tabs()"
+        [active]="phoneCol()?.id ?? null"
+        (activeChange)="selectPhoneColumn($event)"
+      />
+      <span #ink class="bv__ink" aria-hidden="true"></span>
+    </div>
     @if (columns().length) {
       <!-- One page per column side by side; a swipe snaps to the next page (CSS scroll
-           snap), and the tab follows the page that the scroll ends on. -->
-      <div #pager class="bv__pager" (scroll)="onPagerScroll()" (scrollend)="syncPage()">
+           snap), and the ink under the tabs moves with the scroll. -->
+      <div
+        #pager
+        class="bv__pager"
+        (scroll)="onPagerScroll()"
+        (touchstart)="onPagerTouch()"
+        (pointerdown)="onPagerTouch()"
+      >
         @for (col of columns(); track col.id) {
           <div class="bv__page" appScrollFade="y" [class.bv__page--empty]="!list(col).length">
             <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
@@ -41,13 +50,6 @@
           </div>
         }
       </div>
-      @if (columns().length > 1) {
-        <div class="bv__dots" aria-hidden="true">
-          @for (c of columns(); track c.id) {
-            <span class="bv__dot" [class.bv__dot--on]="c.id === phoneCol()?.id"></span>
-          }
-        </div>
-      }
     }
   </div>
 } @else {
