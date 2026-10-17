@@ -14,10 +14,19 @@
     @if (code(); as c) {
       <p class="es__code">{{ c }}</p>
     }
-    @if (fill()) {
-      <h2 class="es__heading">{{ heading() }}</h2>
-    } @else {
-      <p class="es__heading">{{ heading() }}</p>
+    @switch (headingLevel()) {
+      @case (1) {
+        <h1 class="es__heading">{{ heading() }}</h1>
+      }
+      @case (2) {
+        <h2 class="es__heading">{{ heading() }}</h2>
+      }
+      @case (3) {
+        <h3 class="es__heading">{{ heading() }}</h3>
+      }
+      @default {
+        <p class="es__heading">{{ heading() }}</p>
+      }
     }
     @if (body(); as text) {
       <p class="es__body">{{ text }}</p>

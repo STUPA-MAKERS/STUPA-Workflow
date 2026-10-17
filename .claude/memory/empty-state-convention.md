@@ -18,7 +18,7 @@ them. It is the "Geister-Zeilen" state of the "TOP hinzufügen" dialog (Frederik
 - `rows` = ghost rows, default 5; 3 in sheets, side panes, small dialogs; 2 in tiles; 1 for
   a per-board or per-group line.
 - `fill` when it is the only content of a flex-column pane or page: it centres vertically
-  and renders the heading as `h2`. Otherwise the heading is a `<p>`.
+  and renders the heading as `h2`. Otherwise the heading is a `<p>`; `level` (1–3) sets it explicitly.
 - Render it in the `@else` of the list, never as an `<li>` or table row; a data table drops
   `[emptyText]` and renders only while loading or with rows.
 - Not for: no-option lines in dropdowns/popovers, inline field values, errors, loading text,

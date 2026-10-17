@@ -44,6 +44,19 @@ export class EmptyStateComponent {
    * column that has that height.
    */
   readonly fill = input(false, { transform: booleanAttribute });
+  /**
+   * Heading level of the message, 1 to 3. Without it, a `fill` state is an `h2` and any
+   * other state a plain line, so a list inside a page adds no heading.
+   */
+  readonly level = input<number | undefined, unknown>(undefined, {
+    transform: (v: unknown) => (v == null || v === '' ? undefined : numberAttribute(v)),
+  });
+
+  protected readonly headingLevel = computed(() => {
+    const level = this.level();
+    if (level === undefined || Number.isNaN(level)) return this.fill() ? 2 : 0;
+    return Math.min(3, Math.max(1, Math.round(level)));
+  });
 
   protected readonly ghosts = computed(() =>
     GHOST_ROWS.slice(0, Math.min(GHOST_ROWS.length, Math.max(1, this.rows() || 1))),

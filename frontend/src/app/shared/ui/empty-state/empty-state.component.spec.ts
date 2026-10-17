@@ -50,6 +50,16 @@ describe('EmptyStateComponent', () => {
     expect(screen.getByText('Leer')).toBeInTheDocument();
   });
 
+  it('takes an explicit heading level', async () => {
+    await render(EmptyStateComponent, { inputs: { heading: 'Leer', level: 3 } });
+    expect(screen.getByRole('heading', { level: 3, name: 'Leer' })).toBeInTheDocument();
+  });
+
+  it('accepts the level as a bare attribute', async () => {
+    await render(`<app-empty-state heading="Leer" level="1" />`, { imports: [EmptyStateComponent] });
+    expect(screen.getByRole('heading', { level: 1, name: 'Leer' })).toBeInTheDocument();
+  });
+
   it('projects the way on below the message', async () => {
     await render(
       `<app-empty-state heading="Leer"><button type="button">Zurücksetzen</button></app-empty-state>`,
