@@ -147,7 +147,9 @@
         <app-todo-board-skeleton view="board" [phone]="phone()" [natural]="true" />
         <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
       } @else if (allEmpty()) {
-        <app-empty-state icon="circleok" [heading]="'todos.all.empty' | t" />
+        <div class="td__state">
+          <app-empty-state icon="circleok" [heading]="'todos.all.empty' | t" />
+        </div>
       } @else if (noMatch()) {
         <div class="td__state">
           <app-empty-state icon="filter" [heading]="'todos.noMatch' | t" />
@@ -176,7 +178,9 @@
       />
       <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
     } @else if (notFound()) {
-      <app-empty-state icon="circleok" [heading]="'todos.notFound' | t" />
+      <div class="td__state">
+        <app-empty-state icon="circleok" [heading]="'todos.notFound' | t" />
+      </div>
     } @else if (error()) {
       <div class="td__state" role="alert">
         <p class="td__error">{{ 'todos.error.load' | t }}</p>
