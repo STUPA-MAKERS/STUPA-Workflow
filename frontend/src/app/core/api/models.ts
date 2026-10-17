@@ -472,6 +472,8 @@ export interface CommentOutWire {
   editedAt?: IsoDateTime | null;
   /** The files of the comment, oldest first; absent on an older server. */
   attachments?: MessageAttachment[];
+  /** The people the comment mentions; empty in the applicant view, absent on an older server. */
+  mentions?: PersonRef[];
 }
 
 /** `ApplicationTypeListItem`. */
@@ -597,6 +599,8 @@ export interface ApplicationCreateBody {
 export interface CommentCreateBody extends MessageFiles {
   body: string;
   visibility: CommentVisibility;
+  /** The ids of the people the text mentions; only a member sends them. */
+  mentions?: Uuid[];
 }
 
 /** Body for `POST /applications/{id}/transition` (`TransitionRequest`). */
@@ -776,6 +780,8 @@ export interface ApplicationComment {
   editedAt?: IsoDateTime | null;
   /** The files of the comment, oldest first. */
   attachments: MessageAttachment[];
+  /** The people the comment mentions. */
+  mentions: PersonRef[];
 }
 
 /** Application type, frontend view, for the wizard selection. */

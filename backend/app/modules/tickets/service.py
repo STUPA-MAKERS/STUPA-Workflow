@@ -13,6 +13,12 @@ no existence oracle. An anonymized ticket has no reporter any more.
 The to-do coupling (``openTodoCount`` and ``completeTodos``) runs through
 ``TicketTodoHooks``. Without hooks the count is 0 and ``completeTodos`` changes no
 card.
+
+A team note can mention holders of ``ticket.manage`` (``mentions``, the set of
+``assignees``); another id is 422 ``mention_not_member``. ``add_note`` and
+``edit_note`` put the mentions that they added into ``added_mentions``, and the router
+mails exactly those after the commit. A message of the reporter mentions nobody, its
+edit keeps the stored mentions, and the view of the reporter never shows them.
 """
 
 from __future__ import annotations
@@ -71,6 +77,13 @@ from app.modules.tickets.schemas import (
 )
 from app.search import escape_like
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.mentions import (
+    check_mentions,
+    mention_ids,
+    new_mentions,
+    stored_mentions,
+    unique_mentions,
+)
 from app.shared.paging import Page
 from app.shared.people import (
     DELETED_PERSON,
@@ -173,6 +186,9 @@ async def principal_id_of(session: AsyncSession, sub: str) -> uuid.UUID | None:
 
 class TicketService:
     """Ticket operations bound to an ``AsyncSession``."""
+
+    #: The mentions that the last ``add_note`` or ``edit_note`` added, for the mail.
+    added_mentions: Sequence[uuid.UUID] = ()
 
     def __init__(
         self,
@@ -592,6 +608,25 @@ class TicketService:
         named = [p for p in people if p.principal_id is not None]
         return sorted(named, key=lambda p: ((p.display_name or "").casefold(), str(p.principal_id)))
 
+    async def _checked_mentions(
+        self, mentions: Sequence[uuid.UUID], before: Sequence[uuid.UUID] = ()
+    ) -> list[uuid.UUID]:
+        """Return the mentions without duplicates, after the check against ``assignees``.
+
+        Only the mentions that are not in ``before`` are checked, so an edit keeps a
+        mention of a person who lost ``ticket.manage`` since the create.
+
+        Raises:
+            ValidationProblem: A new mention of a person who does not hold
+                ``ticket.manage`` (HTTP 422, ``mention_not_member``).
+        """
+        wanted = unique_mentions(mentions)
+        added = new_mentions(wanted, before)
+        if added:
+            allowed = {p.principal_id for p in await self.assignees()}
+            check_mentions(added, {pid for pid in allowed if pid is not None})
+        return wanted
+
     async def detail(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
         """Return the whole ticket: notes, events, attachments and the links.
 
@@ -619,6 +654,8 @@ class TicketService:
             ).all()
         )
         people: set[uuid.UUID | None] = {n.author_id for n in notes}
+        for note in notes:
+            people.update(mention_ids(note.mentions))
         for event in events:
             people.add(event.actor_id)
             if event.kind == "assignee":
@@ -799,14 +836,16 @@ class TicketService:
                 (HTTP 404).
             ValidationProblem: Files on an anonymized ticket (``ticket_anonymized``),
                 files without a draft token, or a draft that is missing, expired,
-                foreign or infected (HTTP 422).
+                foreign or infected, or a mention of a person who does not hold
+                ``ticket.manage`` (``mention_not_member``) (HTTP 422).
         """
         # With files the ticket row is locked, so the retention cron (which locks it
         # too) cannot anonymize it between this check and the commit: it ran once and
         # would not see the file again.
         ticket = await self._get(ticket_id, lock=bool(payload.attachment_ids))
         author = await self._require_account(principal)
-        return await self._insert_note(
+        wanted = await self._checked_mentions(payload.mentions)
+        note = await self._insert_note(
             ticket,
             author,
             body=payload.body,
@@ -814,7 +853,10 @@ class TicketService:
             attachment_ids=payload.attachment_ids,
             draft_token=payload.draft_token,
             pepper=pepper,
+            mentions=wanted,
         )
+        self.added_mentions = wanted
+        return note
 
     async def _insert_note(
         self,
@@ -827,6 +869,7 @@ class TicketService:
         draft_token: str | None,
         pepper: str,
         for_reporter: bool = False,
+        mentions: Sequence[uuid.UUID] = (),
     ) -> TicketNoteOut:
         """Store a note, bind its files and commit. The caller read the ticket."""
         if attachment_ids and ticket.anonymized_at is not None:
@@ -847,6 +890,7 @@ class TicketService:
             author_id=author,
             body=body,
             visibility=visibility,
+            mentions=stored_mentions(mentions),
         )
         self.session.add(note)
         if token is not None:
@@ -864,15 +908,32 @@ class TicketService:
         return await self._note_out(note, author, ticket, for_reporter=for_reporter)
 
     async def edit_note(
-        self, ticket_id: uuid.UUID, note_id: uuid.UUID, body: str, principal: Principal
+        self,
+        ticket_id: uuid.UUID,
+        note_id: uuid.UUID,
+        body: str,
+        principal: Principal,
+        *,
+        mentions: Sequence[uuid.UUID] | None = None,
     ) -> TicketNoteOut:
         """Change the text of an own note and set ``edited_at``; the files stay.
+
+        ``mentions`` None keeps the stored mentions; a list replaces them after the
+        check of ``add_note``. ``added_mentions`` holds the ids that the list adds.
 
         Raises:
             NotFoundError: No live note with this id on this ticket (HTTP 404).
             ForbiddenError: The note has another author (HTTP 403, ``not_note_author``).
+            ValidationProblem: A mention of a person who does not hold
+                ``ticket.manage`` (HTTP 422, ``mention_not_member``).
         """
         note, me = await self._own_note(ticket_id, note_id, principal)
+        self.added_mentions = []
+        if mentions is not None:
+            before = mention_ids(note.mentions)
+            wanted = await self._checked_mentions(mentions, before)
+            self.added_mentions = new_mentions(wanted, before)
+            note.mentions = stored_mentions(wanted)
         note.body = body
         note.edited_at = _now()
         await self.session.commit()
@@ -906,7 +967,10 @@ class TicketService:
     async def _note_out(
         self, note: TicketNote, me: uuid.UUID, ticket: Ticket, *, for_reporter: bool = False
     ) -> TicketNoteOut:
-        accounts = await self._load_accounts({note.author_id})
+        wanted: set[uuid.UUID | None] = {note.author_id}
+        if not for_reporter:
+            wanted.update(mention_ids(note.mentions))
+        accounts = await self._load_accounts(wanted)
         files = await self.files.message_attachments("ticket_note", [note.id])
         return _note_row(
             note, ticket, accounts, me, files.get(note.id, []), for_reporter=for_reporter
@@ -1297,7 +1361,8 @@ def _note_row(
 
     For the reporter a team author shows by name only: neither the e-mail nor the
     account id of a holder of ``ticket.manage`` reaches the reporter, because the id
-    opens the avatar of that e-mail.
+    opens the avatar of that e-mail. For the same reason the reporter gets no
+    mentions (an empty list).
     """
     author = _person(accounts, note.author_id)
     if for_reporter and note.author_id is not None:
@@ -1318,6 +1383,9 @@ def _note_row(
         visibility=note.visibility or "internal",  # pyright: ignore[reportArgumentType]
         from_reporter=(
             note.author_id is not None and note.author_id == ticket.reporter_principal_id
+        ),
+        mentions=(
+            [] if for_reporter else [_person(accounts, pid) for pid in mention_ids(note.mentions)]
         ),
     )
 

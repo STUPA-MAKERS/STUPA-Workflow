@@ -67,6 +67,7 @@ from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.captured import notify_application_captured
 from app.modules.notifications.comments import comment_mail_text
+from app.modules.notifications.mentions import notify_comment_mentions
 from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import (
@@ -88,6 +89,7 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from app.shared.paging import Page, PageParams
+from app.shared.people import PersonRef
 
 router = APIRouter(tags=["applications"])
 
@@ -861,6 +863,71 @@ def get_comment_mail_sender() -> CommentMailSender:
     return _deliver_comment_mails
 
 
+async def _deliver_mention_mails(
+    settings: Settings,
+    comment_id: UUID,
+    recipients: list[UUID],
+    actor_sub: str,
+    pool: object,
+) -> None:
+    """Send the mention mails in an own session, in the background after the commit."""
+    await notify_comment_mentions(
+        queue=mail_queue_from_pool(pool),  # type: ignore[arg-type]
+        settings=settings,
+        comment_id=comment_id,
+        recipients=recipients,
+        actor_sub=actor_sub,
+    )
+
+
+#: Sends ``comment_mentioned`` to the new mentions of a comment (background task).
+MentionMailSender = Callable[[Settings, UUID, list[UUID], str, object], Awaitable[None]]
+
+
+def get_mention_mail_sender() -> MentionMailSender:
+    """Return the injectable mention-mail sender that a test can override."""
+    return _deliver_mention_mails
+
+
+def _queue_mention_mails(
+    background: BackgroundTasks,
+    send: MentionMailSender,
+    settings: Settings,
+    request: Request,
+    access: Access,
+    comment_id: UUID,
+    added: list[UUID],
+) -> None:
+    """Queue the mention mails of the mentions that a write added; none, no task."""
+    if not added or access.principal is None:
+        return
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(send, settings, comment_id, added, access.principal.sub, pool)
+
+
+@router.get(
+    "/applications/{application_id}/mentionable",
+    response_model=list[PersonRef],
+    responses=_errors(401, 403, 404),
+)
+async def list_mentionable(
+    service: ServiceDep,
+    access: Annotated[Access, Depends(require_app_read)],
+) -> list[PersonRef]:
+    """List the persons whom a comment on this application may mention.
+
+    These are the principals who read the internal comments of the application: the
+    holders of ``application.read`` or ``application.read_all``, the active members
+    of the committee Gremien of the application (budget view Gremien, vote Gremium,
+    the Gremien of the meetings that voted on it) and the creator while the creator
+    holds a member right. Sorted by display name, then id. A caller who does not read
+    the internal comments (the applicant view) gets 403.
+    """
+    if not access.can_see_internal:
+        raise ForbiddenError("Only a member reads the mentionable persons.")
+    return await service.mentionable(access.application_id)
+
+
 @router.post(
     "/applications/{application_id}/comments",
     response_model=CommentOut,
@@ -874,6 +941,7 @@ async def add_comment(
     background: BackgroundTasks,
     request: Request,
     send_comment_mails: Annotated[CommentMailSender, Depends(get_comment_mail_sender)],
+    send_mention_mails: Annotated[MentionMailSender, Depends(get_mention_mail_sender)],
     # ``require_app_read`` on purpose, because the view scope is enough. A
     # comment is communication, not a data change. An applicant still posts
     # a public question while the state is locked to view-only.
@@ -892,6 +960,11 @@ async def add_comment(
     ``attachmentIds`` and ``draftToken`` bind up to five draft uploads to the
     comment. The body may be empty then. A draft that is missing, expired, foreign
     or infected gives 422 ``draft_attachments_missing``.
+
+    ``mentions`` names members from ``GET .../mentionable``; another id, or any
+    mention by a caller in the applicant view, gives 422 ``mention_not_member``. Each
+    mentioned member except the author gets the mail ``comment_mentioned``, for an
+    internal comment too.
     """
     if payload.visibility == "internal" and not access.can_see_internal:
         raise ForbiddenError("Applicants may only post public comments.")
@@ -906,8 +979,19 @@ async def add_comment(
         attachment_ids=payload.attachment_ids,
         draft_token=payload.draft_token,
         pepper=settings.magic_link_secret,
+        mentions=payload.mentions,
+        may_mention=access.can_see_internal,
     )
     pool = getattr(request.app.state, "arq_pool", None)
+    _queue_mention_mails(
+        background,
+        send_mention_mails,
+        settings,
+        request,
+        access,
+        comment.id,
+        list(service.added_mentions),
+    )
     background.add_task(
         send_comment_mails,
         settings,
@@ -957,6 +1041,10 @@ async def update_comment(
     comment_id: UUID,
     payload: CommentPatch,
     service: ServiceDep,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_mention_mails: Annotated[MentionMailSender, Depends(get_mention_mail_sender)],
     # ``require_app_read`` like the create: a comment is communication, not a
     # data change. The per-comment author check runs in the service.
     access: Annotated[Access, Depends(require_app_read)],
@@ -967,8 +1055,12 @@ async def update_comment(
     may do this. The author comes from the session, never from the body. A
     comment keeps no version history, so the new text replaces the old one and
     the audit log records the change.
+
+    ``mentions`` null keeps the stored mentions; a list replaces them, with the
+    rules of the create. Only a member that the list adds gets the mail
+    ``comment_mentioned``, never the editor.
     """
-    return await service.update_comment(
+    comment = await service.update_comment(
         access.application_id,
         comment_id,
         body=payload.body,
@@ -978,7 +1070,19 @@ async def update_comment(
         can_manage=access.principal is not None
         and access.principal.has(MANAGE_PERMISSION),
         allow_unconfirmed=access.is_owning_applicant,
+        mentions=payload.mentions,
+        may_mention=access.can_see_internal,
     )
+    _queue_mention_mails(
+        background,
+        send_mention_mails,
+        settings,
+        request,
+        access,
+        comment.id,
+        list(service.added_mentions),
+    )
+    return comment
 
 
 @router.delete(

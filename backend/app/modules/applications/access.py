@@ -53,6 +53,8 @@ TRANSITION_PERMISSION = "application.transition"
 # The rights that make a creator read the own application as a member and not as the
 # applicant. None of them grants read access alone.
 _MEMBER_PERMISSIONS = (MANAGE_PERMISSION, TRANSITION_PERMISSION, EDIT_ANY_PERMISSION)
+#: The public name of the member rights, for the mentionable persons.
+MEMBER_PERMISSIONS = _MEMBER_PERMISSIONS
 
 
 # The path that granted the access: a permission, the magic link of the applicant,
@@ -179,7 +181,9 @@ async def _committee_can_read(
 
     This mirrors ``ApplicationsService._committee_read_clauses``, the list query.
     Both must cover the same paths. A listed application must open in the detail
-    view, and a readable application must appear in the list.
+    view, and a readable application must appear in the list. `committee_gremium_ids`
+    returns the Gremien of the same three paths for the mentions, so a change here
+    is a change there too.
     """
     from app.modules.admin.gremium_roles import gremium_member_ids
 
@@ -219,6 +223,61 @@ async def _committee_can_read(
         .limit(1)
     )
     return voted is not None
+
+
+async def committee_gremium_ids(db: AsyncSession, application_id: UUID) -> set[UUID]:
+    """Return the Gremien whose members read the application through the committee scope.
+
+    This is the inverse of `_committee_can_read`: a member of a Gremium in the result
+    passes `_committee_can_read` for this application, and a member of no Gremium in
+    the result does not. Both functions must cover the same three paths:
+
+    1. the ``view_gremium_id`` of the cost center of the application and of each of
+       its ancestors (the ``path_key`` prefixes, as ``can_view_node`` reads them);
+    2. the deciding Gremium of the current vote state (``application.vote_gremium_id``);
+    3. the Gremium of each meeting that voted on the application.
+
+    The mentionable persons of the comments (`applications/mentions.py`) read this
+    set, because a mention must name a person who reads the internal comments.
+    """
+    from app.modules.budget.tree_models import Budget
+    from app.modules.budget.tree_rules import _SEP
+    from app.modules.livevote.models import Meeting
+    from app.modules.voting.models import Vote
+
+    out: set[UUID] = set()
+    row = (
+        await db.execute(
+            select(Application.budget_id, Application.vote_gremium_id).where(
+                Application.id == application_id
+            )
+        )
+    ).first()
+    if row is None:
+        return out
+    budget_id, vote_gremium_id = row
+    # Case 2: the snapshot of the deciding Gremium of the current vote state.
+    if vote_gremium_id is not None:
+        out.add(vote_gremium_id)
+    # Case 1: the node and its ancestors, through the prefixes of its path key.
+    if budget_id is not None:
+        path_key = await db.scalar(select(Budget.path_key).where(Budget.id == budget_id))
+        if path_key is not None:
+            segments = path_key.split(_SEP)
+            prefixes = [_SEP.join(segments[: i + 1]) for i in range(len(segments))]
+            views = await db.scalars(
+                select(Budget.view_gremium_id).where(Budget.path_key.in_(prefixes))
+            )
+            out.update(v for v in views if v is not None)
+    # Case 3: the history, every meeting that voted on the application.
+    meetings = await db.scalars(
+        select(Meeting.gremium_id)
+        .join(Vote, Vote.meeting_id == Meeting.id)
+        .where(Vote.application_id == application_id)
+        .distinct()
+    )
+    out.update(meetings)
+    return out
 
 
 async def _resolve_with_creator(

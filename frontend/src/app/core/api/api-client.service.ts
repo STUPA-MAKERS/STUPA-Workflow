@@ -31,6 +31,7 @@ import type {
   McpSetup,
   NotificationPreference,
   OAuthGrant,
+  PersonRef,
   Application,
   ApplicationComment,
   ApplicationCreated,
@@ -395,8 +396,10 @@ export class ApiClient {
     body: string,
     visibility: CommentVisibility = 'public',
     files: MessageFiles = {},
+    mentions?: Uuid[],
   ): Observable<ApplicationComment> {
     const payload: CommentCreateBody = { body, visibility, ...messageFiles(files) };
+    if (mentions?.length) payload.mentions = mentions;
     return this.http
       .post<CommentOutWire>(`${this.base}/applications/${id}/comments`, payload)
       .pipe(map(mapComment));
@@ -406,12 +409,31 @@ export class ApiClient {
    * PATCH /applications/{id}/comments/{commentId} — replace the body.
    *
    * The visibility is deliberately not patchable. Allowed for the author of the
-   * comment and for a holder of `application.manage`. The server decides.
+   * comment and for a holder of `application.manage`. The server decides. `mentions`
+   * replaces the people the comment mentions; without it they stay.
    */
-  updateComment(id: Uuid, commentId: Uuid, body: string): Observable<ApplicationComment> {
+  updateComment(
+    id: Uuid,
+    commentId: Uuid,
+    body: string,
+    mentions?: Uuid[],
+  ): Observable<ApplicationComment> {
     return this.http
-      .patch<CommentOutWire>(`${this.base}/applications/${id}/comments/${commentId}`, { body })
+      .patch<CommentOutWire>(
+        `${this.base}/applications/${id}/comments/${commentId}`,
+        mentions ? { body, mentions } : { body },
+      )
       .pipe(map(mapComment));
+  }
+
+  /**
+   * GET /applications/{id}/mentionable — the people who read the internal comments, the
+   * "@" list of the composer. Only a member reads it; anyone else gets 403.
+   */
+  mentionable(id: Uuid): Observable<PersonRef[]> {
+    return this.http.get<PersonRef[]>(`${this.base}/applications/${id}/mentionable`, {
+      context: skipLoading(),
+    });
   }
 
   /** DELETE /applications/{id}/comments/{commentId} — author or `application.manage`. */

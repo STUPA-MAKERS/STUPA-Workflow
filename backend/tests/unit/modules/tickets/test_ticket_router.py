@@ -85,6 +85,7 @@ class _FakeService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
         self.swallow = False
+        self.added_mentions: list[uuid.UUID] = []
 
     async def create(self, payload: Any, **kw: Any) -> _Created | SwallowedReport:
         self.calls.append(("create", kw))
@@ -126,7 +127,8 @@ class _FakeService:
         self.calls.append(("add_note", (a, kw)))
         return _note().model_copy(update={"visibility": a[1].visibility})
 
-    async def edit_note(self, *_a: Any) -> TicketNoteOut:
+    async def edit_note(self, *a: Any, **kw: Any) -> TicketNoteOut:
+        self.calls.append(("edit_note", (a, kw)))
         return _note()
 
     async def delete_note(self, *_a: Any) -> None:
@@ -547,3 +549,46 @@ def test_a_manager_note_takes_a_visibility(env: _Env) -> None:
     assert args[1].visibility == "internal"
     bad = client.post(f"/api/tickets/{TID}/notes", json={"body": "n", "visibility": "secret"})
     assert bad.status_code == 422
+
+
+class _MentionMails:
+    def __init__(self) -> None:
+        self.sent: list[tuple[uuid.UUID, list[uuid.UUID]]] = []
+
+    async def __call__(
+        self, _settings: object, note_id: uuid.UUID, ids: list[uuid.UUID], _pool: object
+    ) -> None:
+        self.sent.append((note_id, ids))
+
+
+def test_a_note_queues_the_mention_mail_of_the_added_mentions(env: _Env) -> None:
+    mentions = _MentionMails()
+    env.app.dependency_overrides[router_mod.get_mention_mail_sender] = lambda: mentions
+    env.login(MANAGER)
+    client = TestClient(env.app)
+    ada = uuid.uuid4()
+    assert client.post(f"/api/tickets/{TID}/notes", json={"body": "n"}).status_code == 201
+    assert mentions.sent == []
+    env.service.added_mentions = [ada]
+    note = client.post(f"/api/tickets/{TID}/notes", json={"body": "n", "mentions": [str(ada)]})
+    assert note.status_code == 201
+    _kind, (args, _kw) = env.service.calls[-1]
+    assert args[1].mentions == [ada]
+    assert mentions.sent == [(uuid.UUID(note.json()["id"]), [ada])]
+    env.service.added_mentions = []
+    edit = client.patch(f"/api/tickets/{TID}/notes/{TID}", json={"body": "m"})
+    assert edit.status_code == 200
+    assert env.service.calls[-1][1][1] == {"mentions": None}
+    assert len(mentions.sent) == 1
+    env.service.added_mentions = [ada]
+    client.patch(f"/api/tickets/{TID}/notes/{TID}", json={"body": "m", "mentions": [str(ada)]})
+    assert env.service.calls[-1][1][1] == {"mentions": [ada]}
+    assert len(mentions.sent) == 2
+
+
+def test_the_reporter_routes_take_no_mentions(env: _Env) -> None:
+    env.login(Principal(sub="u"))
+    client = TestClient(env.app)
+    body = {"body": "n", "mentions": [str(uuid.uuid4())]}
+    assert client.post(f"/api/tickets/mine/{TID}/notes", json=body).status_code == 422
+    assert client.patch(f"/api/tickets/mine/{TID}/notes/{TID}", json=body).status_code == 422

@@ -34,6 +34,7 @@ from app.modules.applications.schemas import (
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.schemas import MessageAttachmentOut
 from app.shared.paging import Page
+from app.shared.people import PersonRef
 
 _NOW = datetime(2026, 6, 5, tzinfo=UTC)
 
@@ -104,6 +105,7 @@ class _FakeService:
         self.comment_args: dict[str, object] | None = None
         self.comment_write_args: dict[str, object] | None = None
         self.session = _FakeAuditSession()
+        self.added_mentions: list[UUID] = []
 
     async def create(  # noqa: ANN001
         self,
@@ -218,12 +220,16 @@ class _FakeService:
         attachment_ids=(),
         draft_token=None,
         pepper="",
+        mentions=(),
+        may_mention=False,
     ):
         self.comment_args = {
             "author": author,
             "author_kind": author_kind,
             "visibility": visibility,
         }
+        self.comment_mentions = (list(mentions), may_mention)
+        self.added_mentions = list(mentions)
         self.comment_files = (list(attachment_ids), draft_token, pepper)
         return CommentOut(
             id=uuid4(),
@@ -240,6 +246,10 @@ class _FakeService:
                 for i, aid in enumerate(attachment_ids)
             ],
         )
+
+    async def mentionable(self, application_id):  # noqa: ANN001
+        self.mentionable_for = application_id
+        return [PersonRef(principal_id=uuid4(), display_name="Ada")]
 
     async def list_comments(  # noqa: ANN001
         self,
@@ -268,6 +278,8 @@ class _FakeService:
         viewer_is_applicant,
         can_manage,
         allow_unconfirmed=True,
+        mentions=None,
+        may_mention=False,
     ):
         self.comment_write_args = {
             "comment_id": comment_id,
@@ -276,6 +288,8 @@ class _FakeService:
             "viewer_is_applicant": viewer_is_applicant,
             "can_manage": can_manage,
         }
+        self.comment_write_mentions = (mentions, may_mention)
+        self.added_mentions = list(mentions or [])
         return CommentOut(
             id=comment_id,
             author=viewer_sub,

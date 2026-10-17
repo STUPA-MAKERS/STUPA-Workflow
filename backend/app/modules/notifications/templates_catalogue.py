@@ -22,6 +22,7 @@ from app.modules.notifications import (
     auto,
     captured,
     comments,
+    mentions,
     privacy,
     tickets,
     todos,
@@ -194,6 +195,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         },
     ),
     MailTemplateSpec(
+        mentions.COMMENT_MENTIONED_KEY,
+        mentions.MENTION_KIND,
+        mentions.COMMENT_MENTIONED_SUBJECT,
+        mentions.COMMENT_MENTIONED_BODY,
+        mentions.COMMENT_MENTIONED_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
         "meeting_created",
         "meeting",
         auto._BUILTIN_MEETING_SUBJECT,  # noqa: SLF001
@@ -320,6 +328,13 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         todos.TODO_DUE_SUBJECT,
         todos.TODO_DUE_BODY,
         todos.TODO_DUE_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        mentions.TICKET_MENTIONED_KEY,
+        mentions.MENTION_KIND,
+        mentions.TICKET_MENTIONED_SUBJECT,
+        mentions.TICKET_MENTIONED_BODY,
+        mentions.TICKET_MENTIONED_PLACEHOLDERS,
     ),
 )
 

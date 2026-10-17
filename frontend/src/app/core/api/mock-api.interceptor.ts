@@ -408,6 +408,13 @@ const MOCK_TYPES: Page<ApplicationTypeListItemWire> = {
 };
 
 const MOCK_APP_ID = '33333333-3333-3333-3333-333333333333';
+/** The readers of the internal comments of the mock application: the "@" list. */
+const MOCK_MENTIONABLE = [
+  { principalId: 'p1000000-0000-0000-0000-000000000011', displayName: 'Demo Mitglied' },
+  { principalId: 'p1000000-0000-0000-0000-000000000012', displayName: 'Mara Keller' },
+  { principalId: 'p1000000-0000-0000-0000-000000000013', displayName: 'Jonas Weber' },
+  { principalId: 'p1000000-0000-0000-0000-000000000014', displayName: 'Selin Yıldız' },
+];
 
 const MOCK_EFFECTIVE_FORM: EffectiveForm = {
   applicationTypeId: MOCK_TYPES.items[0].id,
@@ -1869,6 +1876,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/timeline')) return ok(MOCK_TIMELINE);
     if (p.endsWith('/versions')) return ok([...MOCK_VERSIONS]);
     if (p.endsWith('/comments')) return ok([...MOCK_COMMENTS]);
+    if (p.endsWith('/mentionable')) return ok([...MOCK_MENTIONABLE]);
     if (p.endsWith('/transitions')) return ok([...MOCK_TRANSITIONS]);
     if (/\/attachments\/[^/]+$/.test(p)) {
       const signed: SignedUrlOutWire = {
@@ -2085,6 +2093,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/comments')) {
       const body = (req.body as { body?: string } | null)?.body ?? '';
       const visibility = (req.body as { visibility?: 'internal' | 'public' } | null)?.visibility;
+      const mentions = (req.body as { mentions?: string[] } | null)?.mentions ?? [];
       const created: CommentOutWire = {
         id: `c0000000-0000-0000-0000-0000000000${MOCK_COMMENTS.length + 1}`,
         author: null,
@@ -2093,6 +2102,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         visibility: visibility ?? 'public',
         at: '2026-06-05T14:00:00Z',
         isOwn: true, // the mock viewer created it
+        mentions: MOCK_MENTIONABLE.filter((m) => mentions.includes(m.principalId)),
       };
       MOCK_COMMENTS.push(created);
       return ok(created, 201);
