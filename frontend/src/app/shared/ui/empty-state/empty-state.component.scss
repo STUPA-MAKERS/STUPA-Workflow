@@ -1,5 +1,6 @@
 :host {
   display: block;
+  width: 100%;
   min-width: 0;
 }
 
@@ -16,12 +17,11 @@
 /* Ghost rows in the geometry of the list rows, faint and hidden from the screen reader,
    and over them the message on a radial scrim. The rows mix the text colour into
    transparent and the scrim is a mask on the rows, so the state reads the same on every
-   surface and in both themes. The block is at most 36rem wide and centred. Rows and message share one
+   surface and in both themes. The block takes the full width of the list it replaces. Rows and message share one
    grid cell, so a long message grows the block instead of being cut. Nothing moves. */
 .es {
   display: grid;
   width: 100%;
-  max-width: 36rem;
   min-width: 0;
   margin-inline: auto;
   overflow: hidden;
@@ -43,19 +43,144 @@
   flex: none;
   align-items: center;
   gap: 14px;
-  min-height: 52px;
-  padding: 6px 14px;
-  border-radius: var(--radius-lg);
+  min-height: 4rem;
+  padding: 10px var(--space-4);
+  border-radius: 4px;
   background: color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
-.es__ghostMark {
+/* The geometry of `.rowgroup` and `app-list-item`: rows 2px apart, 4rem high, only the
+   outer corners round. */
+.es__ghost:first-child {
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+}
+.es__ghost:last-child {
+  border-bottom-left-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+/* A pick list of a dialog: the 52px rows with the radio ring of the "TOP hinzufügen" list,
+   each one round. */
+.es__ghosts--choice .es__ghost--choice {
+  min-height: 52px;
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
+}
+
+.es__ghostLead {
   flex: none;
   box-sizing: border-box;
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+.es__ghostLead--ring {
   width: 20px;
   height: 20px;
   border: 1.5px solid color-mix(in srgb, var(--color-text) 32%, transparent);
   border-radius: var(--radius-pill);
+  background: none;
+}
+.es__ghostLead--avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+}
+/* The size of `app-date-block`. */
+.es__ghostLead--date {
+  width: 3rem;
+  height: 3.25rem;
+  border-radius: var(--radius-field);
+}
+.es__ghostLead--number {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+}
+.es__ghostLead--file {
+  width: 32px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+}
+
+/* The tag at the end of a plain row (a state, a count). */
+.es__ghostChip {
+  flex: none;
+  width: 56px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
+}
+.es__ghostChip--short {
+  width: 36px;
+}
+.es__ghostDot {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+/* A data table: cells in columns, the last one at the end. */
+.es__ghost--table {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr 1fr 0.8fr;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 48px;
+}
+.es__ghost--table .es__ghostBar--end {
+  justify-self: end;
+}
+
+/* A to-do card: title, sub line, a foot of chips and an avatar. */
+.es__ghost--card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+}
+.es__ghost--card + .es__ghost--card {
+  margin-top: 6px;
+}
+.es__ghostFoot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* A conversation: bubbles on the left, own ones on the right. */
+.es__ghosts--chat {
+  gap: 10px;
+}
+.es__ghosts--chat .es__ghost--chat {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  max-width: 80%;
+  min-height: 0;
+  padding: 10px 14px;
+  border-radius: 16px;
+}
+.es__ghost--mine {
+  align-self: flex-end;
+}
+
+/* Running text: lines, no row boxes. */
+.es__ghosts--text {
+  gap: 10px;
+}
+.es__ghost--text {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: 0;
+  padding: 0;
+  background: none;
 }
 
 .es__ghostText {
@@ -121,4 +246,38 @@
   justify-content: center;
   gap: var(--space-2);
   margin-top: 10px;
+}
+
+/* `plain`: no ghost rows, for a detail pane with nothing open, a missing record or a page
+   without access. A muted glyph, the message and the way on, centred in the space. */
+.es--plain {
+  display: block;
+  max-width: 32rem;
+  overflow: visible;
+}
+
+.es--plain .es__msg {
+  gap: 0;
+  padding-block: var(--space-10);
+}
+
+.es__icon {
+  /* A block box, so the glyph never sits on a text baseline. */
+  display: block;
+  margin-bottom: var(--space-3);
+  color: var(--color-text-subtle);
+}
+
+.es--plain .es__heading {
+  font-size: var(--fs-h1);
+  line-height: var(--lh-h1);
+}
+
+.es--plain .es__body {
+  margin-top: var(--space-2);
+  font-size: var(--fs-body);
+}
+
+.es--plain .es__action:not(:empty) {
+  margin-top: var(--space-5);
 }

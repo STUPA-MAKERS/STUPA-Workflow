@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
@@ -59,6 +59,7 @@ function makeApi(card: TodoCardDetail) {
 interface Opts {
   card?: TodoCardDetail;
   mode?: 'drawer' | 'pane';
+  split?: boolean;
   board?: TodoBoard | null;
 }
 
@@ -69,7 +70,7 @@ async function setup(opts: Opts = {}) {
   const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
   const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
   const view = await render(TodoCardDetailComponent, {
-    inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null },
+    inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null, split: opts.split ?? false },
     on: out,
     providers: [
       provideRouter([]),
@@ -98,7 +99,9 @@ describe('TodoCardDetailComponent', () => {
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
     expect(document.querySelector('.cd__kicker')).toHaveTextContent('Studierendenparlament · To-Do');
-    expect(screen.getByText(/^Angelegt von Selin Yıldız · /)).toBeInTheDocument();
+    // Each part of the line wraps as a whole; the dot ends the first part.
+    const created = [...document.querySelectorAll('.cd__created .cd__seg')].map((e) => e.textContent);
+    expect(created).toEqual(['Angelegt von Selin Yıldız\u00a0·', expect.stringMatching(/2026$/)]);
     // The thread has no heading of its own; its column carries the name.
     expect(screen.queryByRole('heading', { name: 'Aktivität' })).toBeNull();
     expect(screen.getByRole('region', { name: 'Aktivität' })).toBeInTheDocument();
@@ -122,11 +125,26 @@ describe('TodoCardDetailComponent', () => {
   });
 
   it('shows the board link in the pane and no close or copy button', async () => {
-    const { container } = await setup({ mode: 'pane' });
+    const { container, cmp } = await setup({ mode: 'pane', split: true });
     expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toHaveAttribute('href', '/todos/b-1?card=k-1');
     expect(screen.queryByRole('button', { name: 'Schließen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
-    expect(container.querySelector('app-sheet-bar')).not.toBeNull();
+    // Beside the list the pane is a sheet: the bar bleeds into its padding.
+    expect(container.querySelector('app-sheet-bar')).toHaveClass('sheet-bar--bleed');
+    // The link sits in the bar, so the menu does not repeat it.
+    expect(cmp.menuSections()[0].items[0].id).toBe('rename');
+  });
+
+  it('does not bleed the bar of the pane one pane at a time (tablet)', async () => {
+    const { container, cmp } = await setup({ mode: 'pane' });
+    expect(container.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
+    expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toBeInTheDocument();
+    expect(cmp.menuSections()[0].items[0].id).toBe('rename');
+  });
+
+  it('does not bleed the bar of the drawer', async () => {
+    const { container } = await setup({ split: true });
+    expect(container.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
   });
 
   it('reads a card without write right and an archived one', async () => {
@@ -863,7 +881,10 @@ describe('TodoCardDetailComponent', () => {
 
   it('does nothing without a card', async () => {
     const { cmp, api } = await setup();
+    const nav = jest.spyOn(TestBed.inject(Router), 'navigate');
     cmp.card.set(null);
+    cmp.openInBoard();
+    expect(nav).not.toHaveBeenCalled();
     cmp.setColumn('c-2');
     cmp.moveTo({ columnId: 'c-2', position: 'top' });
     cmp.toggleDone();
@@ -898,7 +919,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.titleDraft()).toBe('');
     expect(cmp.descDraft()).toBe('');
     expect(cmp.kicker()).toBe('');
-    expect(cmp.createdLine()).toBe('');
+    expect(cmp.createdParts()).toEqual([]);
     expect(cmp.moveColumns()).toEqual([]);
     expect(cmp.boardLink()).toBeNull();
     expect(cmp.labelOptions()).toEqual([]);
@@ -1033,7 +1054,7 @@ describe('TodoCardDetailComponent', () => {
     });
     expect(cmp.events()[0].text).toBe('Selin hat die Karte angelegt');
     expect(cmp.events()[1].text).toBe('STUPA hat die Karte wiederhergestellt');
-    expect(cmp.createdLine()).toBe('Angelegt von Selin Yıldız · ');
+    expect(cmp.createdParts()).toEqual(['Angelegt von Selin Yıldız']);
     expect(cmp.name(null)).toBe('Gelöschte Person');
   });
 
@@ -1195,6 +1216,35 @@ describe('TodoCardDetailComponent', () => {
       expect(cmp.tab()).toBe('details');
       fireEvent.click(screen.getByRole('button', { name: /Zum Board/ }));
       expect(closed).toHaveBeenCalled();
+    });
+
+    it('puts "Im Board öffnen" into the ⋮ menu of the pane and lets the kicker wrap', async () => {
+      const { cmp, fixture } = await setup({ mode: 'pane' });
+      const router = TestBed.inject(Router);
+      const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+      expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
+      expect(document.querySelector('.cd__kicker')).not.toHaveClass('ell');
+      expect(fixture.nativeElement.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
+      expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([['openInBoard', 'kanban']]);
+      cmp.onMenu(cmp.menuSections()[0].items[0]);
+      expect(nav).toHaveBeenCalledWith(['/todos', 'b-1'], { queryParams: { card: 'k-1' } });
+    });
+
+    it('offers "Im Board öffnen" in the pane without the write right and on an archived card', async () => {
+      const { cmp } = await setup({ mode: 'pane', card: detail({ canWrite: false }) });
+      const ids = () => cmp.menuSections().map((s) => s.items.map((i) => i.id));
+      expect(ids()).toEqual([['openInBoard']]);
+      // Read-only and archived: no "Wiederherstellen", only the link.
+      cmp.card.set(detail({ canWrite: false, archivedAt: '2026-10-15T08:00:00Z' }));
+      expect(ids()).toEqual([['openInBoard']]);
+      // Writable and archived: the link, then "Wiederherstellen".
+      cmp.card.set(detail({ archivedAt: '2026-10-15T08:00:00Z' }));
+      expect(ids()).toEqual([['openInBoard'], ['restore']]);
+    });
+
+    it('has no "Im Board öffnen" in the menu of the drawer', async () => {
+      const { cmp } = await setup();
+      expect(cmp.menuSections()[0].items[0].id).toBe('rename');
     });
 
     it('shows "Wieder öffnen" on a done card', async () => {

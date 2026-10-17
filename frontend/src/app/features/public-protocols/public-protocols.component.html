@@ -11,7 +11,7 @@
 
   @if (!loading() && !error() && total() === 0 && !hasFilters()) {
     <div class="pp__none">
-      <app-empty-state
+      <app-empty-state shape="date"
         [heading]="'publicProtocols.empty.none' | t"
         [body]="'publicProtocols.empty.noneBody' | t"
       >
@@ -63,7 +63,7 @@
       <app-note kind="error" icon="alert" role="alert">{{ 'publicProtocols.error' | t }}</app-note>
     } @else if (items().length === 0) {
       <div class="pp__none">
-        <app-empty-state
+        <app-empty-state shape="date"
           [heading]="'publicProtocols.empty.filtered' | t"
           [body]="'publicProtocols.empty.filteredBody' | t"
         >

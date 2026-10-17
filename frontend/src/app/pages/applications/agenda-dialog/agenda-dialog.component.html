@@ -41,7 +41,7 @@
           }
         </div>
       } @else {
-        <app-empty-state rows="3" [heading]="'applications.agenda.none' | t" />
+        <app-empty-state shape="date" rows="3" [heading]="'applications.agenda.none' | t" />
       }
       @if (refusal(); as key) {
         <p class="agd__refusal" role="alert">{{ key | t }}</p>

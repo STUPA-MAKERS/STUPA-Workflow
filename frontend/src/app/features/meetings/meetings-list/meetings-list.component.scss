@@ -31,11 +31,6 @@
 /* The column, its header and the search bar are the shared list geometry: `.ld-pane`
    (styles.scss) and `app-page-header` with `pane`. */
 
-/* The gap between the icon and the text of a header button; an icon button has none. */
-app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
-  margin-inline-end: 4px;
-}
-
 .mtl__chips {
   display: flex;
   flex-wrap: wrap;
@@ -129,9 +124,6 @@ app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
   color: var(--color-text-muted);
 }
 
-.mtl__empty {
-  margin-block: var(--space-6);
-}
 .mtl__upcoming {
   margin-block: var(--space-3);
 }
@@ -143,9 +135,6 @@ app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
 .mtl__more--start {
   justify-content: flex-start;
   padding-inline: var(--space-2);
-}
-.mtl__more app-icon {
-  margin-inline-end: 6px;
 }
 
 /* "Neue Sitzung": at the end of the list pane side by side, else fixed at the end of the

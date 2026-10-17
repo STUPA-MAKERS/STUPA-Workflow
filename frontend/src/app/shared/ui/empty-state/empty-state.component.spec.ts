@@ -60,6 +60,46 @@ describe('EmptyStateComponent', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Leer' })).toBeInTheDocument();
   });
 
+  it('draws no ghost rows but a glyph when plain, for a pane with nothing open', async () => {
+    const { container, fixture } = await render(EmptyStateComponent, {
+      inputs: { heading: 'Keine Aufgabe geöffnet', plain: true, icon: 'tasks' },
+    });
+    expect(container.querySelector('.es__ghosts')).toBeNull();
+    expect(container.querySelector('.es__icon')).toBeTruthy();
+    expect(fixture.nativeElement).toHaveClass('es-host--plain');
+  });
+
+  it('shows the code instead of the glyph when plain', async () => {
+    const { container } = await render(EmptyStateComponent, {
+      inputs: { heading: 'Nicht gefunden', plain: true, code: '404' },
+    });
+    expect(screen.getByText('404')).toBeInTheDocument();
+    expect(container.querySelector('.es__icon')).toBeNull();
+  });
+
+  it('draws plain rows with a tag by default, no radio ring', async () => {
+    const { container } = await render(EmptyStateComponent, { inputs: { heading: 'Leer' } });
+    expect(container.querySelector('.es__ghostLead--ring')).toBeNull();
+    expect(container.querySelectorAll('.es__ghostChip')).toHaveLength(5);
+  });
+
+  it('shapes the ghost rows after the real rows of the list', async () => {
+    const { container, rerender } = await render(EmptyStateComponent, {
+      inputs: { heading: 'Leer', shape: 'person', rows: 2 },
+    });
+    expect(container.querySelectorAll('.es__ghostLead--avatar')).toHaveLength(2);
+    await rerender({ inputs: { heading: 'Leer', shape: 'choice', rows: 2 }, partialUpdate: true });
+    expect(container.querySelectorAll('.es__ghostLead--ring')).toHaveLength(2);
+    await rerender({ inputs: { heading: 'Leer', shape: 'date', rows: 2 }, partialUpdate: true });
+    expect(container.querySelectorAll('.es__ghostLead--date')).toHaveLength(2);
+    await rerender({ inputs: { heading: 'Leer', shape: 'card', rows: 2 }, partialUpdate: true });
+    expect(container.querySelectorAll('.es__ghost--card .es__ghostFoot')).toHaveLength(2);
+    await rerender({ inputs: { heading: 'Leer', shape: 'chat', rows: 2 }, partialUpdate: true });
+    expect(container.querySelectorAll('.es__ghost--mine')).toHaveLength(1);
+    await rerender({ inputs: { heading: 'Leer', shape: 'table', rows: 2 }, partialUpdate: true });
+    expect(container.querySelectorAll('.es__ghost--table')).toHaveLength(2);
+  });
+
   it('projects the way on below the message', async () => {
     await render(
       `<app-empty-state heading="Leer"><button type="button">Zurücksetzen</button></app-empty-state>`,

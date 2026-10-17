@@ -434,7 +434,7 @@
         }
         @case ('missing') {
           <div class="exp__none">
-            <app-empty-state
+            <app-empty-state plain icon="search"
               [fill]="true"
               [heading]="'expenses.notFound' | t"
               [body]="'expenses.notFoundBody' | t"
@@ -456,7 +456,7 @@
               </div>
             } @else {
               <div class="exp__none">
-                <app-empty-state
+                <app-empty-state plain icon="receipt"
                   [fill]="true"
                   [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
                 />

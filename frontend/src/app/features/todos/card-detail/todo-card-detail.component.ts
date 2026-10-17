@@ -15,7 +15,7 @@ import {
   untracked,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import type { Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -165,11 +165,17 @@ export class TodoCardDetailComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly live = inject(TodoLiveService);
+  private readonly router = inject(Router);
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly cardId = input.required<Uuid>();
   /** `drawer`: over the board, with a close button. `pane`: the detail of "Aufgaben". */
   readonly mode = input<'drawer' | 'pane'>('drawer');
+  /**
+   * The pane is a sheet beside the list (wide). Only then the sheet bar bleeds into the
+   * padding of the sheet; one pane at a time the detail lies on the page with its gutter.
+   */
+  readonly split = input(false);
   /** The board around the card, when the page has it: counts and the first card of a column. */
   readonly board = input<TodoBoard | null>(null);
 
@@ -301,12 +307,18 @@ export class TodoCardDetailComponent {
     return c ? this.t('todos.card.kicker', { board: c.boardName }) : '';
   });
 
-  readonly createdLine = computed(() => {
+  /**
+   * The line under the title: "Angelegt von <name>" and the day. Each part is one segment
+   * that wraps as a whole, so a narrow sheet breaks the line between them, never inside the
+   * date.
+   */
+  readonly createdParts = computed<string[]>(() => {
     const c = this.card();
-    if (!c) return '';
+    if (!c) return [];
     const d = new Date(c.createdAt);
     const day = Number.isNaN(d.getTime()) ? '' : longDay(isoDay(d), this.i18n.formatLocale());
-    return this.t('todos.card.created', { name: personName(c.createdBy, this.t), date: day });
+    const by = this.t('todos.card.createdBy', { name: personName(c.createdBy, this.t) });
+    return day ? [by, day] : [by];
   });
 
   readonly archivedLine = computed(() => {
@@ -408,11 +420,21 @@ export class TodoCardDetailComponent {
     { id: 'activity', label: this.t('todos.card.activity'), count: this.card()?.comments.length ?? 0 },
   ]);
 
+  /**
+   * The ⋮ menu. In the pane of "Aufgaben" on a phone it also holds "Im Board öffnen": the
+   * header of a phone keeps the title and one action, so the link leaves the kicker line.
+   */
   readonly menuSections = computed<RowMenuSection[]>(() => {
     const c = this.card();
-    if (!c || !c.canWrite) return [];
-    if (c.archivedAt) return [{ items: [{ id: 'restore', label: this.t('todos.card.restore'), icon: 'undo' }] }];
+    if (!c) return [];
+    const open: RowMenuSection[] =
+      this.mode() === 'pane' && this.phone()
+        ? [{ items: [{ id: 'openInBoard', label: this.t('todos.card.openInBoard'), icon: 'kanban' }] }]
+        : [];
+    if (!c.canWrite) return open;
+    if (c.archivedAt) return [...open, { items: [{ id: 'restore', label: this.t('todos.card.restore'), icon: 'undo' }] }];
     return [
+      ...open,
       {
         items: [
           { id: 'rename', label: this.t('todos.card.rename'), icon: 'edit' },
@@ -884,10 +906,18 @@ export class TodoCardDetailComponent {
   }
 
   onMenu(item: RowMenuItem): void {
-    if (item.id === 'rename') this.startTitle();
+    if (item.id === 'openInBoard') this.openInBoard();
+    else if (item.id === 'rename') this.startTitle();
     else if (item.id === 'transfer') this.transferOpen.set(true);
     else if (item.id === 'archive') this.archive();
     else if (item.id === 'restore') this.restore();
+  }
+
+  /** Open the card in the drawer of its board ("Im Board öffnen" of the phone menu). */
+  openInBoard(): void {
+    const c = this.card();
+    if (!c) return;
+    void this.router.navigate(['/todos', c.boardId], { queryParams: { card: c.id } });
   }
 
   /**

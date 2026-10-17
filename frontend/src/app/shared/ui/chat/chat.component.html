@@ -167,7 +167,7 @@
           </div>
         }
       } @empty {
-        <app-empty-state class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
+        <app-empty-state shape="chat" class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
       }
     }
   </div>
@@ -278,7 +278,7 @@
         [iconOnly]="true"
         [disabled]="uploading()"
         [ariaLabel]="'chat.send' | t"
-      ><app-icon class="chat__sendIcon" name="send" [size]="17" /></app-button>
+      ><app-icon name="send" [size]="17" /></app-button>
     </div>
   </form>
 }

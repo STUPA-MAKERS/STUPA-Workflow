@@ -151,7 +151,7 @@
   </article>
 } @else {
   <div class="gd gd--none" [class.gd--split]="split()" role="alert">
-    <app-empty-state
+    <app-empty-state plain icon="landmark"
       fill
       [heading]="(store.error() ? 'gremien.list.error' : 'gremien.detail.notFound') | t"
       [body]="store.error() ? null : ('gremien.detail.notFoundBody' | t)"

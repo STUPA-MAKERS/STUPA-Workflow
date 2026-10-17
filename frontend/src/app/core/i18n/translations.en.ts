@@ -3936,7 +3936,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.linked.due': 'due {date}',
   'todos.card.kicker': '{board} · To-do',
   'todos.card.kickerKind': 'To-do',
-  'todos.card.created': 'Created by {name} · {date}',
+  'todos.card.createdBy': 'Created by {name}',
   'todos.card.archivedOn': 'Archived on {date}',
   'todos.card.loading': 'Loading the card…',
   'todos.card.notFound': 'This card does not exist or you have no access.',

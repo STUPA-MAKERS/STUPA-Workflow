@@ -114,7 +114,7 @@
             @if (vote.status === 'open' && canVote()) {
               <div class="mtg__voteActions">
                 @for (opt of voteOptionsFor(vote); track opt) {
-                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)">{{ voteOptionLabel(opt) }}@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)"><span>{{ voteOptionLabel(opt) }}</span>@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
                 }
               </div>
             }
