@@ -398,7 +398,7 @@ export class TodosComponent implements OnDestroy {
     if (this.board()?.canConfigure) {
       items.push({ id: 'settings', label: this.i18n.translate('todos.settings.title'), icon: 'tune' });
     }
-    if (this.board()?.archivedCount) {
+    if (this.board()) {
       items.push({ id: 'archive', label: this.i18n.translate('todos.archive.title'), icon: 'archive' });
     }
     return [{ items }];

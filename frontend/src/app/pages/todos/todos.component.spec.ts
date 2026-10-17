@@ -150,10 +150,12 @@ describe('TodosComponent', () => {
     // The board list already knows the count and the rights of the board.
     expect(cmp.openCount()).toBe(2);
     expect(screen.getByPlaceholderText('2 offene To-Dos durchsuchen')).toBeInTheDocument();
-    expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
-    // The place of the settings is at the end, after the view switch.
+    // The places of the archive and the settings follow the view switch, the settings last.
+    const icons = document.querySelectorAll('.td__skelIcon');
+    expect(icons).toHaveLength(2);
     const views = document.querySelector('app-segmented')!;
-    expect(views.compareDocumentPosition(document.querySelector('.td__skelIcon')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(views.compareDocumentPosition(icons[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(icons[1].nextElementSibling).toBeNull();
     // "+ To-Do" floats; the header has no button and no place for one.
     expect(document.querySelector('.td__skelNew')).toBeNull();
     expect(screen.queryByTestId('td-new')).toBeNull();
@@ -164,7 +166,8 @@ describe('TodosComponent', () => {
     const { cmp } = await start('/todos/b-2', { pending: true });
     expect(cmp.summary()?.canConfigure).toBe(false);
     expect(cmp.openCount()).toBe(4);
-    expect(document.querySelector('.td__skelIcon')).toBeNull();
+    // Only the place of the archive, which every board has.
+    expect(document.querySelectorAll('.td__skelIcon')).toHaveLength(1);
   });
 
   it('draws the list in its loaded shape while it loads', async () => {
@@ -1097,6 +1100,16 @@ describe('TodosComponent', () => {
     expect(screen.getByRole('dialog', { name: 'Board-Einstellungen' })).toBeInTheDocument();
   });
 
+  it('shows the archive button in the header also for a board with no archived card', async () => {
+    const { cmp, harness } = await start('/todos/b-1', { board: board({ archivedCount: 0 }) });
+    const archive = screen.getByTestId('td-archive');
+    expect(archive.nextElementSibling).toBe(screen.getByTestId('td-settings'));
+    expect(cmp.phoneMenu()[0].items.map((i) => i.id)).toContain('archive');
+    fireEvent.click(archive);
+    harness.detectChanges();
+    expect(cmp.archiveOpen()).toBe(true);
+  });
+
   describe('"Alle"', () => {
     const row = (over: Partial<TodoAssignedBoard>): TodoAssignedBoard => {
       const { id, name, kind, gremiumId, canWrite, columns, labels } = board();
@@ -1279,11 +1292,11 @@ describe('TodosComponent', () => {
       expect(screen.queryByTestId('td-fab')).toBeNull();
     });
 
-    it('offers the board view from the list and leaves out settings and archive without them', async () => {
+    it('offers the board view from the list and the archive, and leaves out the settings without the right', async () => {
       const { cmp, settle, router } = await start('/todos/b-1?view=list', {
         board: board({ canConfigure: false, archivedCount: 0 }),
       });
-      expect(cmp.phoneMenu()[0].items.map((i) => i.id)).toEqual(['board']);
+      expect(cmp.phoneMenu()[0].items.map((i) => i.id)).toEqual(['board', 'archive']);
       cmp.onPhoneMenu({ id: 'board', label: '' });
       await settle();
       expect(router.url).toBe('/todos/b-1');
