@@ -10,7 +10,7 @@
           {{ 'todos.card.back' | t }}
         </button>
       }
-      <app-sheet-bar [kicker]="loadingKicker()" [bleed]="mode() === 'pane'">
+      <app-sheet-bar [kicker]="loadingKicker()" [bleed]="mode() === 'pane' && !phone()">
         @if (!phone() && mode() === 'drawer') {
           <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         }
@@ -68,12 +68,13 @@
           {{ 'todos.card.back' | t }}
         </button>
       }
-      <app-sheet-bar [bleed]="mode() === 'pane'">
-        <span appSheetBarKicker class="cd__kicker ell" [title]="kicker()">
+      <app-sheet-bar [bleed]="mode() === 'pane' && !phone()">
+        <!-- A phone wraps the kicker: the board name is key information and never ends in "…". -->
+        <span appSheetBarKicker class="cd__kicker" [class.ell]="!phone()" [title]="kicker()">
           <a class="cd__kickerBoard" data-testid="cd-board" [routerLink]="['/todos', card.boardId]">{{ card.boardName }}</a>
           · {{ 'todos.card.kickerKind' | t }}
         </span>
-        @if (mode() === 'pane' && boardLink(); as link) {
+        @if (mode() === 'pane' && !phone() && boardLink(); as link) {
           <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
             {{ 'todos.card.openInBoard' | t }}
             <app-icon name="arrow" [size]="16" />
@@ -114,7 +115,16 @@
       } @else {
         <h2 id="cd-title" class="cd__title">{{ card.title }}</h2>
       }
-      <p class="cd__created">{{ createdLine() }}</p>
+      <p class="cd__created">
+        <!-- The dot ends the part before it, so a wrapped line never starts with it. -->
+        @for (part of createdParts(); track $index; let last = $last) {
+          @if (last) {
+            <span class="cd__seg">{{ part }}</span>
+          } @else {
+            <span class="cd__seg">{{ part }}&nbsp;·</span>{{ ' ' }}
+          }
+        }
+      </p>
       @if (archivedLine(); as day) {
         <app-note class="cd__note" icon="archive">{{ 'todos.card.archivedOn' | t: { date: day } }}</app-note>
       }

@@ -15,8 +15,8 @@ import { TasksComponent } from './tasks.component';
 @Component({ standalone: true, template: '' })
 class ListStub {}
 
-async function start(withPage: boolean) {
-  const page = { loadTodos: jest.fn() };
+async function start(withPage: boolean, split = true) {
+  const page = { loadTodos: jest.fn(), split: () => split };
   TestBed.configureTestingModule({
     providers: [
       provideHttpClient(),
@@ -49,6 +49,14 @@ describe('TaskTodoComponent', () => {
     expect(page.loadTodos).toHaveBeenCalledTimes(1);
   });
 
+  it('is a sheet side by side and lies on the page one pane at a time', async () => {
+    const wide = await start(true);
+    expect(wide.harness.routeNativeElement).toHaveClass('tt--split');
+    TestBed.resetTestingModule();
+    const narrow = await start(true, false);
+    expect(narrow.harness.routeNativeElement).not.toHaveClass('tt--split');
+  });
+
   it('closes to the list and refreshes after an archive', async () => {
     const { cmp, page, router, harness } = await start(true);
     cmp.onArchived();
@@ -59,6 +67,7 @@ describe('TaskTodoComponent', () => {
 
   it('works without the page around it', async () => {
     const { cmp, router, harness } = await start(false);
+    expect(cmp.split()).toBe(false);
     cmp.refresh();
     cmp.close();
     await harness.fixture.whenStable();

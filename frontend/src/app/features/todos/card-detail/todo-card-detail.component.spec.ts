@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
@@ -98,7 +98,9 @@ describe('TodoCardDetailComponent', () => {
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
     expect(document.querySelector('.cd__kicker')).toHaveTextContent('Studierendenparlament · To-Do');
-    expect(screen.getByText(/^Angelegt von Selin Yıldız · /)).toBeInTheDocument();
+    // Each part of the line wraps as a whole; the dot ends the first part.
+    const created = [...document.querySelectorAll('.cd__created .cd__seg')].map((e) => e.textContent);
+    expect(created).toEqual(['Angelegt von Selin Yıldız\u00a0·', expect.stringMatching(/2026$/)]);
     // The thread has no heading of its own; its column carries the name.
     expect(screen.queryByRole('heading', { name: 'Aktivität' })).toBeNull();
     expect(screen.getByRole('region', { name: 'Aktivität' })).toBeInTheDocument();
@@ -863,7 +865,10 @@ describe('TodoCardDetailComponent', () => {
 
   it('does nothing without a card', async () => {
     const { cmp, api } = await setup();
+    const nav = jest.spyOn(TestBed.inject(Router), 'navigate');
     cmp.card.set(null);
+    cmp.openInBoard();
+    expect(nav).not.toHaveBeenCalled();
     cmp.setColumn('c-2');
     cmp.moveTo({ columnId: 'c-2', position: 'top' });
     cmp.toggleDone();
@@ -898,7 +903,7 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.titleDraft()).toBe('');
     expect(cmp.descDraft()).toBe('');
     expect(cmp.kicker()).toBe('');
-    expect(cmp.createdLine()).toBe('');
+    expect(cmp.createdParts()).toEqual([]);
     expect(cmp.moveColumns()).toEqual([]);
     expect(cmp.boardLink()).toBeNull();
     expect(cmp.labelOptions()).toEqual([]);
@@ -1033,7 +1038,7 @@ describe('TodoCardDetailComponent', () => {
     });
     expect(cmp.events()[0].text).toBe('Selin hat die Karte angelegt');
     expect(cmp.events()[1].text).toBe('STUPA hat die Karte wiederhergestellt');
-    expect(cmp.createdLine()).toBe('Angelegt von Selin Yıldız · ');
+    expect(cmp.createdParts()).toEqual(['Angelegt von Selin Yıldız']);
     expect(cmp.name(null)).toBe('Gelöschte Person');
   });
 
@@ -1195,6 +1200,30 @@ describe('TodoCardDetailComponent', () => {
       expect(cmp.tab()).toBe('details');
       fireEvent.click(screen.getByRole('button', { name: /Zum Board/ }));
       expect(closed).toHaveBeenCalled();
+    });
+
+    it('puts "Im Board öffnen" into the ⋮ menu of the pane and lets the kicker wrap', async () => {
+      const { cmp, fixture } = await setup({ mode: 'pane' });
+      const router = TestBed.inject(Router);
+      const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
+      expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
+      expect(document.querySelector('.cd__kicker')).not.toHaveClass('ell');
+      expect(fixture.nativeElement.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
+      expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([['openInBoard', 'kanban']]);
+      cmp.onMenu(cmp.menuSections()[0].items[0]);
+      expect(nav).toHaveBeenCalledWith(['/todos', 'b-1'], { queryParams: { card: 'k-1' } });
+    });
+
+    it('offers "Im Board öffnen" in the pane without the write right, and keeps "Wiederherstellen"', async () => {
+      const readOnly = await setup({ mode: 'pane', card: detail({ canWrite: false }) });
+      expect(readOnly.cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['openInBoard']]);
+      readOnly.cmp.card.set(detail({ archivedAt: '2026-10-15T08:00:00Z' }));
+      expect(readOnly.cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['openInBoard'], ['restore']]);
+    });
+
+    it('has no "Im Board öffnen" in the menu of the drawer', async () => {
+      const { cmp } = await setup();
+      expect(cmp.menuSections()[0].items[0].id).toBe('rename');
     });
 
     it('shows "Wieder öffnen" on a done card', async () => {

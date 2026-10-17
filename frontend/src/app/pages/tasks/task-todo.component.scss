@@ -1,12 +1,14 @@
-/* The detail sheet of a to-do: a round panel on the surface, like the sheet of an
-   application in the same pane. */
 :host {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
-  /* Side by side the pane bounds the sheet (`.tasks__detail--todo`); the card detail
-     fills it, and its columns scroll inside. */
+}
+/* Side by side the detail of a to-do is a round sheet on the surface, like the sheet of an
+   application in the same pane. The pane bounds the sheet (`.tasks__detail--todo`); the
+   card detail fills it, and its columns scroll inside. One pane at a time (narrow, phone)
+   it loses the sheet and lies on the page with the page gutter, like the other details. */
+:host(.tt--split) {
   min-height: 0;
   padding: 0 var(--space-6) var(--space-6);
   border-radius: var(--ld-detail-radius, var(--radius-2xl));
