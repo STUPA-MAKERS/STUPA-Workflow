@@ -16,10 +16,22 @@ export const THEME_COLOR: Record<ResolvedTheme, string> = {
 };
 
 /**
+ * The manifest per theme. An installed Android app paints its status and navigation bar
+ * with `theme_color` and `background_color` of the manifest, and a manifest has no
+ * per-scheme variant, so the service links the dark manifest while the dark theme is in
+ * effect. The light one keeps the plain URL of `index.html`.
+ */
+export const MANIFEST_HREF: Record<ResolvedTheme, string> = {
+  light: 'manifest.webmanifest',
+  dark: 'manifest.webmanifest?scheme=dark',
+};
+
+/**
  * Theme control:
  * - The preference is `system` (follows the OS), `light` or `dark`. It is persisted.
  * - The service writes the effective theme to `data-theme` on <html> and its page
- *   background to every `<meta name="theme-color">`.
+ *   background to every `<meta name="theme-color">`, and links the manifest of that
+ *   theme (`MANIFEST_HREF`).
  * - In `system` mode a matchMedia listener picks up an OS change live.
  */
 @Injectable({ providedIn: 'root' })
@@ -80,6 +92,9 @@ export class ThemeService {
     document
       .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
       .forEach((meta) => meta.setAttribute('content', THEME_COLOR[theme]));
+    document
+      .querySelector<HTMLLinkElement>('link[rel="manifest"]')
+      ?.setAttribute('href', MANIFEST_HREF[theme]);
   }
 
   private readStored(): ThemePreference {
