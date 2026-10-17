@@ -49,8 +49,9 @@ describe('TodoDueChipComponent', () => {
     expect(changed).toHaveBeenCalledWith('2026-11-05');
   });
 
-  it('is locked while disabled', async () => {
-    await setup('2026-11-03', true);
+  it('is locked while disabled and drops the chevron', async () => {
+    const { container } = await setup('2026-11-03', true);
     expect(screen.getByRole('button', { name: /Fälligkeit ändern/ })).toBeDisabled();
+    expect(container.querySelector('.dc__chev')).toBeNull();
   });
 });

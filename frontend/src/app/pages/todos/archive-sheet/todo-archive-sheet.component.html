@@ -37,7 +37,14 @@
               <span class="as__sub">{{ doneOn(card) }}</span>
             }
           </button>
-          <app-button variant="tonal" size="sm" [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }" (click)="restore(card)">
+          <app-button
+            class="as__restore"
+            variant="tonal"
+            size="sm"
+            [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
+            (click)="restore(card)"
+          >
+            <app-icon name="undo" [size]="16" />
             {{ 'todos.archive.restore' | t }}
           </app-button>
         </li>

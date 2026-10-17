@@ -167,6 +167,53 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.archivedLine()).toBeNull();
   });
 
+  it('hides the empty fields and sections of an archived card', async () => {
+    const empty = detail({
+      archivedAt: '2026-10-12T10:00:00Z',
+      dueDate: null,
+      labels: [],
+      links: [],
+      descriptionMd: null,
+      checklistItems: [],
+    });
+    const { container, cmp, detect } = await setup({ card: empty });
+    cmp.today.set('2026-10-16');
+    detect();
+    const terms = () => [...container.querySelectorAll('.cd__field dt')].map((dt) => dt.textContent?.trim());
+    const sections = () => screen.queryAllByRole('heading', { level: 3 }).map((h) => h.textContent?.trim());
+    expect(terms()).toEqual(['Spalte', 'Zuständig']);
+    expect(sections()).toEqual([]);
+    expect(container.querySelector('.cd__col--chat')).toHaveClass('cd__col--readonly');
+    // A writable card keeps every field and section, so that it can be filled.
+    cmp.card.set({ ...empty, archivedAt: null });
+    detect();
+    expect(terms()).toEqual(['Spalte', 'Zuständig', 'Fällig', 'Label']);
+    expect(sections()).toEqual(['Verknüpft', 'Beschreibung', 'Checkliste']);
+    expect(container.querySelector('.cd__col--chat')).not.toHaveClass('cd__col--readonly');
+  });
+
+  it('reads the filled fields and sections of an archived card', async () => {
+    const { container, cmp, detect } = await setup({ card: detail({ archivedAt: '2026-10-12T10:00:00Z' }) });
+    cmp.today.set('2026-10-16');
+    detect();
+    expect(screen.getByText('Fällig')).toBeInTheDocument();
+    expect(screen.getByText('in 7 Tagen')).toBeInTheDocument();
+    expect(container.querySelector('.dc__chev')).toBeNull();
+    const label = screen.getByText('Haushalt').closest('.cd__label');
+    expect(label).toHaveAttribute('data-color', 'amber');
+    expect(within(label as HTMLElement).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Label hinzufügen' })).toBeNull();
+    expect(screen.getByRole('link', { name: 'Lerncafé' })).toHaveAttribute('href', '/applications/a-1');
+    expect(screen.queryByRole('button', { name: /Verknüpfung mit .* entfernen/ })).toBeNull();
+    expect(screen.getByText('A 101')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Beschreibung bearbeiten' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte zeigen/ }));
+    expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toBeDisabled();
+    expect(screen.getByRole('checkbox', { name: 'Raum anfragen' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Punkt hinzufügen/ })).toBeNull();
+  });
+
   it('shows a missing card, an error with retry, and drops a late answer', async () => {
     const { cmp, api, detect, closed, fixture } = await setup();
     api.card.mockReturnValueOnce(http(404));
