@@ -6,6 +6,7 @@ import {
   DestroyRef,
   ElementRef,
   Injector,
+  NgZone,
   afterNextRender,
   computed,
   effect,
@@ -27,6 +28,13 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
 import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
+
+/** The pager counts as at a page within this share of a page (a fractional screen width). */
+const ARRIVED = 0.05;
+
+function reduceMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 /** The done column shows this many cards until "n weitere" opens the rest. */
 export const DONE_PREVIEW = 3;
@@ -181,7 +189,13 @@ export class TodoBoardViewComponent {
     this.resize?.disconnect();
   });
 
-  /** The ink and the tab strip follow a new active tab, new counts and a new size of the bar. */
+  private readonly zone = inject(NgZone);
+  /** A web font that loads after the first frame changes the width of the tabs. */
+  private readonly fontsReady = (typeof document !== 'undefined' ? document.fonts?.ready : undefined)?.then(
+    () => this.placeInk(),
+  );
+
+  /** The ink follows a new active tab, new counts and a new size of the bar. */
   private readonly inkFollows = effect((onCleanup) => {
     this.tabs();
     this.phoneColumn();
@@ -193,8 +207,7 @@ export class TodoBoardViewComponent {
     const ref = afterNextRender(
       () => {
         strip = bar.querySelector<HTMLElement>('[role="tablist"]');
-        strip?.addEventListener('scroll', place, { passive: true });
-        this.revealTab();
+        this.zone.runOutsideAngular(() => strip?.addEventListener('scroll', place, { passive: true }));
         this.placeInk();
       },
       { injector: this.injector },
@@ -204,6 +217,14 @@ export class TodoBoardViewComponent {
       strip?.removeEventListener('scroll', place);
       this.resize?.unobserve(bar);
     });
+  });
+
+  /** Only a new active tab moves the tab strip, so a strip scrolled by hand stays put. */
+  private readonly tabFollows = effect((onCleanup) => {
+    this.phoneColumn();
+    if (!this.tabBar()) return;
+    const ref = afterNextRender(() => this.revealTab(), { injector: this.injector });
+    onCleanup(() => ref.destroy());
   });
 
   /** The cards of each column as shown: the filters, the keyboard drag, the done preview. */
@@ -483,23 +504,32 @@ export class TodoBoardViewComponent {
     this.phoneColumn.set(i);
     const el = this.pager()?.nativeElement;
     if (!el?.clientWidth) return;
-    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // A scroll to the page that is already there fires no scroll event to end the hold.
+    if (Math.abs(Math.abs(el.scrollLeft) / el.clientWidth - i) < ARRIVED) return;
     // `scrollLeft` is negative in a right-to-left page; the sign follows the direction.
     const sign = getComputedStyle(el).direction === 'rtl' ? -1 : 1;
     this.target = i;
-    el.scrollTo({ left: sign * i * el.clientWidth, behavior: reduce ? 'auto' : 'smooth' });
+    el.scrollTo({ left: sign * i * el.clientWidth, behavior: reduceMotion() ? 'auto' : 'smooth' });
   }
 
   /** The pager moved: the ink follows in the next frame, the tab at the half way. */
   onPagerScroll(): void {
     this.syncPage();
     cancelAnimationFrame(this.inkFrame);
-    this.inkFrame = requestAnimationFrame(() => this.placeInk());
+    this.zone.runOutsideAngular(() => {
+      this.inkFrame = requestAnimationFrame(() => this.placeInk());
+    });
   }
 
   /** A finger on the pager ends the scroll to a tapped tab: the tabs follow the swipe. */
   onPagerTouch(): void {
     this.target = null;
+  }
+
+  /** The scroll came to rest: whatever page it rests on is the active tab, a tapped tab or not. */
+  onPagerRest(): void {
+    this.target = null;
+    this.syncPage();
   }
 
   /**
@@ -510,7 +540,7 @@ export class TodoBoardViewComponent {
     const pos = this.pagerPos();
     if (pos === null) return;
     if (this.target !== null) {
-      if (Math.abs(pos - this.target) > 0.01) return;
+      if (Math.abs(pos - this.target) > ARRIVED) return;
       this.target = null;
     }
     const last = this.columns().length - 1;
@@ -552,7 +582,7 @@ export class TodoBoardViewComponent {
     const start = s.left + pad;
     const end = s.right - pad;
     const by = t.left < start ? t.left - start : t.right > end ? t.right - end : 0;
-    if (by) strip.scrollBy({ left: by });
+    if (by) strip.scrollBy({ left: by, behavior: reduceMotion() ? 'auto' : 'smooth' });
   }
 
   /** The pager position in pages: 1.5 is half way from the second page to the third. */

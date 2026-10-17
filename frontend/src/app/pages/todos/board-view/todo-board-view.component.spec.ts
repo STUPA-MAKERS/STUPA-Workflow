@@ -497,7 +497,17 @@ describe('TodoBoardViewComponent', () => {
       expect(screen.getByRole('tab', { name: /Erledigt/ })).toHaveAttribute('aria-selected', 'true');
       // A finger on the pager ends the way to a tapped tab.
       cmp.selectPhoneColumn('c-1');
-      fireEvent.touchStart(pager);
+      fireEvent.pointerDown(pager);
+      pager.scrollLeft = 400;
+      fireEvent.scroll(pager);
+      expect(cmp.phoneCol()?.id).toBe('c-2');
+      // A scroll that comes to rest ends the hold of a tapped tab, wherever it rests.
+      cmp.selectPhoneColumn('c-4');
+      pager.scrollLeft = 790;
+      pager.dispatchEvent(new Event('scrollend'));
+      expect(cmp.phoneCol()?.id).toBe('c-3');
+      // A tab whose page is already there scrolls nothing and holds nothing.
+      cmp.selectPhoneColumn('c-3');
       pager.scrollLeft = 400;
       fireEvent.scroll(pager);
       expect(cmp.phoneCol()?.id).toBe('c-2');
@@ -506,7 +516,7 @@ describe('TodoBoardViewComponent', () => {
       cmp.syncPage();
       cmp.selectPhoneColumn('c-1');
       expect(cmp.phoneCol()?.id).toBe('c-1');
-      expect(scrollTo).toHaveBeenCalledTimes(2);
+      expect(scrollTo).toHaveBeenCalledTimes(3);
     });
 
     it('jumps without animation under reduced motion and right to left', async () => {
@@ -578,16 +588,32 @@ describe('TodoBoardViewComponent', () => {
       cmp.selectPhoneColumn('c-4');
       fixture.detectChanges();
       await fixture.whenStable();
-      expect(scrollBy).toHaveBeenLastCalledWith({ left: 150 });
+      expect(scrollBy).toHaveBeenLastCalledWith({ left: 150, behavior: 'smooth' });
       cmp.selectPhoneColumn('c-1');
       fixture.detectChanges();
       await fixture.whenStable();
-      expect(scrollBy).toHaveBeenLastCalledWith({ left: -150 });
+      expect(scrollBy).toHaveBeenLastCalledWith({ left: -150, behavior: 'smooth' });
       scrollBy.mockClear();
       cmp.selectPhoneColumn('c-2');
       fixture.detectChanges();
       await fixture.whenStable();
       expect(scrollBy).not.toHaveBeenCalled();
+    });
+
+    it('places the ink again once the web fonts are in', async () => {
+      let loaded = (): void => undefined;
+      const ready = new Promise<void>((resolve) => (loaded = resolve));
+      Object.defineProperty(document, 'fonts', { configurable: true, value: { ready } });
+      try {
+        const { cmp } = await setup(board(), { phone: true });
+        const place = jest.spyOn(cmp, 'placeInk');
+        loaded();
+        await ready;
+        await Promise.resolve();
+        expect(place).toHaveBeenCalled();
+      } finally {
+        delete (document as { fonts?: unknown }).fonts;
+      }
     });
 
     it('stops a pending ink frame when it goes away', async () => {

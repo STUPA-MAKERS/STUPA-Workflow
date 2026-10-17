@@ -20,7 +20,7 @@
         #pager
         class="bv__pager"
         (scroll)="onPagerScroll()"
-        (touchstart)="onPagerTouch()"
+        (scrollend)="onPagerRest()"
         (pointerdown)="onPagerTouch()"
       >
         @for (col of columns(); track col.id) {
