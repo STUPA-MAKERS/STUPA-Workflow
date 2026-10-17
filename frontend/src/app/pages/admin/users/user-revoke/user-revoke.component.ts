@@ -46,6 +46,7 @@ import {
   toggleEntry,
   type RevokeEntry,
 } from './revoke-selection';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
 export interface RevokeLine {
@@ -97,6 +98,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,

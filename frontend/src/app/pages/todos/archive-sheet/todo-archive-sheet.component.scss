@@ -8,6 +8,9 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  box-sizing: border-box;
+  /* The whole body, so an empty archive centres its state in the free height. */
+  min-height: 100%;
   padding-bottom: var(--space-4);
 }
 .as__list {
@@ -58,15 +61,13 @@
   font-weight: var(--fw-medium);
   overflow-wrap: anywhere;
 }
-.as__sub,
-.as__note {
+.as__sub {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
 .as__note {
   margin: 0;
-}
-.as__note--error {
+  font-size: var(--fs-small);
   color: var(--color-danger);
 }
 

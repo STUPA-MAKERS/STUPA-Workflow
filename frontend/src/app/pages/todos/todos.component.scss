@@ -169,7 +169,7 @@
     padding-bottom: calc(56px + 2 * var(--space-4));
   }
 }
-/* An empty, filtered or failed body stands in the middle of the free height. */
+/* A failed body stands in the middle of the free height. */
 .td__state {
   display: flex;
   flex: 1 1 auto;

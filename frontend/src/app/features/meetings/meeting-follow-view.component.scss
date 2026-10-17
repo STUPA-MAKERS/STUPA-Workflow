@@ -209,6 +209,11 @@ app-button ::ng-deep .btn:not(.btn--icon) .btn__label > app-icon:first-child {
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
+/* A closed meeting without items: the empty state spans the card and sits in its middle. */
+.fv__empty {
+  align-self: stretch;
+  margin-block: auto;
+}
 .fv__startTitle {
   margin: 0;
   font-size: var(--fs-h1);

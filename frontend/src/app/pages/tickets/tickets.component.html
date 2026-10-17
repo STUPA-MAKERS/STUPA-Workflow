@@ -73,9 +73,13 @@
           </div>
         } @else if (!hasRows()) {
           @if (activeFilterCount() > 0) {
-            <p class="tk__status">{{ 'tickets.list.noMatch' | t }}</p>
+            <app-empty-state class="tk__empty" [heading]="'tickets.list.noMatch' | t">
+              <app-button variant="tonal" size="sm" (click)="reset()">
+                {{ 'tickets.list.filter.reset' | t }}
+              </app-button>
+            </app-empty-state>
           } @else {
-            <app-empty-state class="tk__empty" icon="ticket" [heading]="'tickets.list.empty' | t" />
+            <app-empty-state class="tk__empty" [heading]="'tickets.list.empty' | t" />
           }
         } @else {
           @for (group of groups(); track group.key) {

@@ -27,6 +27,7 @@ import {
 import { scanStatus } from '@shared/status-kind.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { formatBytes } from './applications.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Attachments panel.
@@ -51,6 +52,7 @@ import { formatBytes } from './applications.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

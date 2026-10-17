@@ -30,6 +30,7 @@ import {
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
@@ -44,6 +45,7 @@ import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     SheetBarComponent,
     ButtonComponent,
     IconComponent,

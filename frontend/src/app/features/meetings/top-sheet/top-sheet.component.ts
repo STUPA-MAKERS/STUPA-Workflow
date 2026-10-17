@@ -37,6 +37,7 @@ import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { applyRawFormat } from './raw-format';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -89,6 +90,7 @@ const TOOLS: readonly FormatTool[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     RouterLink,
     TranslatePipe,

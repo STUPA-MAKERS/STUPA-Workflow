@@ -116,12 +116,6 @@
   align-items: center;
   gap: 2px;
 }
-.att__empty {
-  margin: 0;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 
 /* Drop overlay over the whole panel. */
 .att__dropOverlay {

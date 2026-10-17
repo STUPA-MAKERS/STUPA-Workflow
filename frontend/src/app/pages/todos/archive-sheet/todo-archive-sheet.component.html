@@ -26,30 +26,32 @@
       </ul>
       <span class="sr-only" role="status">{{ 'todos.archive.loading' | t }}</span>
     } @else if (!items().length) {
-      <p class="as__note">{{ 'todos.archive.empty' | t }}</p>
+      <app-empty-state fill rows="3" [heading]="'todos.archive.empty' | t" />
     }
-    <ul class="as__list">
-      @for (card of items(); track card.id) {
-        <li class="as__row">
-          <button type="button" class="as__open" (click)="pick(card)">
-            <span class="as__title">{{ card.title }}</span>
-            @if (doneOn(card)) {
-              <span class="as__sub">{{ doneOn(card) }}</span>
-            }
-          </button>
-          <app-button
-            class="as__restore"
-            variant="tonal"
-            size="sm"
-            [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
-            (click)="restore(card)"
-          >
-            <app-icon name="undo" [size]="16" />
-            {{ 'todos.archive.restore' | t }}
-          </app-button>
-        </li>
-      }
-    </ul>
+    @if (items().length) {
+      <ul class="as__list">
+        @for (card of items(); track card.id) {
+          <li class="as__row">
+            <button type="button" class="as__open" (click)="pick(card)">
+              <span class="as__title">{{ card.title }}</span>
+              @if (doneOn(card)) {
+                <span class="as__sub">{{ doneOn(card) }}</span>
+              }
+            </button>
+            <app-button
+              class="as__restore"
+              variant="tonal"
+              size="sm"
+              [ariaLabel]="'todos.archive.restoreOne' | t: { title: card.title }"
+              (click)="restore(card)"
+            >
+              <app-icon name="undo" [size]="16" />
+              {{ 'todos.archive.restore' | t }}
+            </app-button>
+          </li>
+        }
+      </ul>
+    }
     @if (items().length < total()) {
       <app-button variant="text" [loading]="loading()" (click)="more()">{{ 'todos.archive.more' | t }}</app-button>
     }

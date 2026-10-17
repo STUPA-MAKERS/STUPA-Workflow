@@ -23,6 +23,7 @@ import { ButtonComponent, IconComponent, SegmentedComponent, type SegmentedOptio
 import type { BallotCaster } from '../voting/ballot/ballot.component';
 import { VotePanelComponent } from '../voting/vote-panel/vote-panel.component';
 import { guestVoteToVote } from './guest-vote.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One agenda row of the guest view. */
 interface AgendaRow {
@@ -48,6 +49,7 @@ interface AgendaRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

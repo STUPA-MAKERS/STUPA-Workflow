@@ -1,12 +1,11 @@
-/* Centred in the space it is given, so a missing page and an empty list read the same
-   way instead of one being a corner note and the other a full screen. */
 :host {
   display: block;
+  min-width: 0;
 }
 
-/* `fill`: the whole page is empty. The host takes the free height of its flex-column
-   parent and centres the block in it, so the state does not sit at the top of an empty
-   page. */
+/* `fill`: the whole page or pane is empty. The host takes the free height of its
+   flex-column parent and centres the block in it, so the state does not sit at the top of
+   an empty page. */
 :host(.es-host--fill) {
   display: flex;
   flex: 1 0 auto;
@@ -14,45 +13,112 @@
   justify-content: center;
 }
 
+/* Ghost rows in the geometry of the list rows, faint and hidden from the screen reader,
+   and over them the message on a radial scrim. The rows mix the text colour into
+   transparent and the scrim is a mask on the rows, so the state reads the same on every
+   surface and in both themes. The block is at most 36rem wide and centred. Rows and message share one
+   grid cell, so a long message grows the block instead of being cut. Nothing moves. */
 .es {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding-block: var(--space-10);
+  display: grid;
+  width: 100%;
+  max-width: 36rem;
+  min-width: 0;
+  margin-inline: auto;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
   color: var(--color-text);
 }
 
-.es__icon {
-  /* A block box, so the glyph never sits on a text baseline. */
+.es__ghosts {
+  grid-area: 1 / 1;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  mask-image: radial-gradient(closest-side, rgb(0 0 0 / 2%), rgb(0 0 0 / 12%) 55%, rgb(0 0 0 / 50%));
+}
+
+.es__ghost {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+}
+
+.es__ghostMark {
+  flex: none;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid color-mix(in srgb, var(--color-text) 32%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.es__ghostText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.es__ghostBar {
   display: block;
-  color: var(--color-text-subtle);
+  height: 10px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-text) 18%, transparent);
+}
+
+.es__ghostBar--sub {
+  height: 8px;
+  background: color-mix(in srgb, var(--color-text) 12%, transparent);
+}
+
+.es__msg {
+  grid-area: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
 }
 
 .es__code {
   margin: 0;
   font-family: var(--font-mono);
-  font-size: var(--fs-3xl);
+  font-size: var(--fs-2xl);
   line-height: var(--lh-tight);
   font-weight: var(--fw-medium);
   color: var(--color-accent-text);
 }
 
 .es__heading {
-  margin: var(--space-3) 0 0;
-  font-size: var(--fs-h1);
-  line-height: var(--lh-h1);
+  margin: 0;
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.5rem;
   font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
 }
 
 .es__body {
-  margin: var(--space-2) 0 0;
-  max-width: 32rem;
-  font-size: var(--fs-body);
+  margin: 0;
+  max-width: 28rem;
+  font-size: var(--fs-sm);
   line-height: var(--lh-body);
   color: var(--color-text-muted);
+  overflow-wrap: anywhere;
 }
 
 .es__action:not(:empty) {
-  margin-top: var(--space-5);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: 10px;
 }

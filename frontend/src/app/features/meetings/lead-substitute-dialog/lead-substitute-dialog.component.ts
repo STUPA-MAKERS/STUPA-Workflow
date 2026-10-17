@@ -28,6 +28,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -51,6 +52,7 @@ const SEARCH_ABOVE = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
     TranslatePipe,

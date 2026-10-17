@@ -12,7 +12,6 @@
   @if (!loading() && !error() && total() === 0 && !hasFilters()) {
     <div class="pp__none">
       <app-empty-state
-        icon="archive"
         [heading]="'publicProtocols.empty.none' | t"
         [body]="'publicProtocols.empty.noneBody' | t"
       >
@@ -65,11 +64,10 @@
     } @else if (items().length === 0) {
       <div class="pp__none">
         <app-empty-state
-          icon="search"
           [heading]="'publicProtocols.empty.filtered' | t"
           [body]="'publicProtocols.empty.filteredBody' | t"
         >
-          <app-button variant="outlined" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
+          <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'publicProtocols.filter.resetAll' | t }}</app-button>
         </app-empty-state>
       </div>
     } @else {

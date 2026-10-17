@@ -72,7 +72,7 @@
       }
     </ul>
   } @else {
-    <p class="sld__none">{{ 'applications.share.none' | t }}</p>
+    <app-empty-state rows="3" [heading]="'applications.share.none' | t" />
   }
 
   <div dialog-footer>

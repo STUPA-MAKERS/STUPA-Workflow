@@ -5,57 +5,60 @@
     </app-button>
   </app-page-header>
 
-  <app-data-table
-    surface="rowgroup"
-    [loading]="loading()"
-    [loadingText]="'common.loading' | t"
-    [columns]="columns()"
-    [rows]="policies()"
-    [rowKey]="rowId"
-    [emptyText]="'admin.deadlines.empty' | t"
-  >
-    <ng-template appCell="label" let-r>
-      <span class="dl__name">{{ label($any(r)) }}</span>
-    </ng-template>
-    <ng-template appCell="key" let-r><span class="dl__key mono">{{ $any(r).key }}</span></ng-template>
-    <ng-template appCell="kind" let-r><span class="dl__muted">{{ kindLabel($any(r).kind) }}</span></ng-template>
-    <ng-template appCell="value" let-r>
-      @let v = valueOf($any(r));
-      <span class="dl__value" [class.dl__muted]="v.muted" [title]="v.title">{{ v.text }}</span>
-    </ng-template>
-    <ng-template appCell="actions" let-r let-i="index">
-      @if (phone()) {
-        <app-row-menu
-          [label]="('admin.common.actions' | t) + ': ' + label($any(r))"
-          [sections]="rowMenu()"
-          (selected)="onRowMenu($any(r), i, $event)"
-        />
-      } @else {
-        <span class="dl__actions">
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="('admin.common.edit' | t) + ': ' + label($any(r))"
-            [title]="'admin.common.edit' | t"
-            (click)="openEdit(i)"
-          >
-            <app-icon name="edit" />
-          </app-button>
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [ariaLabel]="('admin.common.remove' | t) + ': ' + label($any(r))"
-            [title]="'admin.common.remove' | t"
-            (click)="askDelete($any(r))"
-          >
-            <app-icon name="trash" />
-          </app-button>
-        </span>
-      }
-    </ng-template>
-  </app-data-table>
+  @if (loading() || policies().length) {
+    <app-data-table
+      surface="rowgroup"
+      [loading]="loading()"
+      [loadingText]="'common.loading' | t"
+      [columns]="columns()"
+      [rows]="policies()"
+      [rowKey]="rowId"
+    >
+      <ng-template appCell="label" let-r>
+        <span class="dl__name">{{ label($any(r)) }}</span>
+      </ng-template>
+      <ng-template appCell="key" let-r><span class="dl__key mono">{{ $any(r).key }}</span></ng-template>
+      <ng-template appCell="kind" let-r><span class="dl__muted">{{ kindLabel($any(r).kind) }}</span></ng-template>
+      <ng-template appCell="value" let-r>
+        @let v = valueOf($any(r));
+        <span class="dl__value" [class.dl__muted]="v.muted" [title]="v.title">{{ v.text }}</span>
+      </ng-template>
+      <ng-template appCell="actions" let-r let-i="index">
+        @if (phone()) {
+          <app-row-menu
+            [label]="('admin.common.actions' | t) + ': ' + label($any(r))"
+            [sections]="rowMenu()"
+            (selected)="onRowMenu($any(r), i, $event)"
+          />
+        } @else {
+          <span class="dl__actions">
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="('admin.common.edit' | t) + ': ' + label($any(r))"
+              [title]="'admin.common.edit' | t"
+              (click)="openEdit(i)"
+            >
+              <app-icon name="edit" />
+            </app-button>
+            <app-button
+              variant="text"
+              size="sm"
+              [iconOnly]="true"
+              [ariaLabel]="('admin.common.remove' | t) + ': ' + label($any(r))"
+              [title]="'admin.common.remove' | t"
+              (click)="askDelete($any(r))"
+            >
+              <app-icon name="trash" />
+            </app-button>
+          </span>
+        }
+      </ng-template>
+    </app-data-table>
+  } @else {
+    <app-empty-state [heading]="'admin.deadlines.empty' | t" />
+  }
 
   <app-meeting-window-settings />
 

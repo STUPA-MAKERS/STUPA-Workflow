@@ -36,6 +36,7 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 const PAGE_SIZE = 50;
 
@@ -250,6 +251,7 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,

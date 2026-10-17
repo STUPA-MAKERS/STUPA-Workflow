@@ -35,6 +35,7 @@ import type {
   MergePreview,
   MergeResult,
 } from '../../admin.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The steps of the merge: pick the account that stays, check the preview, the result. */
 type MergeStep = 'pick' | 'preview' | 'done';
@@ -88,6 +89,7 @@ interface ConflictProblem {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,

@@ -153,7 +153,7 @@
       }
     </ol>
   } @else {
-    <p class="ins__hint">{{ 'admin.flow.actionsEmpty' | t }}</p>
+    <app-empty-state rows="2" [heading]="'admin.flow.actionsEmpty' | t" />
   }
 
   <div class="td__add">

@@ -1,15 +1,39 @@
 <div class="es">
-  @if (code(); as c) {
-    <p class="es__code">{{ c }}</p>
-  } @else {
-    <app-icon class="es__icon" [name]="icon()" [size]="iconSize()" />
-  }
-  <h1 class="es__heading">{{ heading() }}</h1>
-  @if (body(); as text) {
-    <p class="es__body">{{ text }}</p>
-  }
-  <!-- Projected, so the caller decides whether there is a way forward at all. -->
-  <div class="es__action">
-    <ng-content />
+  <div class="es__ghosts" aria-hidden="true">
+    @for (g of ghosts(); track $index) {
+      <div class="es__ghost">
+        <span class="es__ghostMark"></span>
+        <span class="es__ghostText">
+          <span class="es__ghostBar" [style.width.%]="g.title"></span>
+          <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub"></span>
+        </span>
+      </div>
+    }
+  </div>
+  <div class="es__msg">
+    @if (code(); as c) {
+      <p class="es__code">{{ c }}</p>
+    }
+    @switch (headingLevel()) {
+      @case (1) {
+        <h1 class="es__heading">{{ heading() }}</h1>
+      }
+      @case (2) {
+        <h2 class="es__heading">{{ heading() }}</h2>
+      }
+      @case (3) {
+        <h3 class="es__heading">{{ heading() }}</h3>
+      }
+      @default {
+        <p class="es__heading">{{ heading() }}</p>
+      }
+    }
+    @if (body(); as text) {
+      <p class="es__body">{{ text }}</p>
+    }
+    <!-- Projected, so the caller decides whether there is a way forward at all. -->
+    <div class="es__action">
+      <ng-content />
+    </div>
   </div>
 </div>

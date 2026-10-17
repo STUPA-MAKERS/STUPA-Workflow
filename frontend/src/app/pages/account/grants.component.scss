@@ -166,13 +166,6 @@
 }
 
 /* No grants: one muted line in the row group, the height of a row. */
-.gr__empty {
-  padding: var(--space-3) var(--space-5);
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  color: var(--color-text-muted);
-}
-
 .gr__dialogText {
   margin: 0 0 var(--space-4);
 }

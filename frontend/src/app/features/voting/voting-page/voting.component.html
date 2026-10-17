@@ -82,14 +82,14 @@
           </div>
         } @else if (!rows().length) {
           @if (activeFilterCount() > 0) {
-            <p class="vl__status">{{ 'voting.list.noMatch' | t }}</p>
+            <app-empty-state [heading]="'voting.list.noMatch' | t">
+              <app-button variant="tonal" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
+            </app-empty-state>
           } @else if (split()) {
             <!-- Side by side the detail pane shows the empty state; one is enough. -->
             <p class="vl__status">{{ 'voting.list.empty' | t }}</p>
           } @else {
             <app-empty-state
-              class="vl__empty"
-              icon="vote"
               fill
               [heading]="'voting.list.empty' | t"
               [body]="'voting.list.emptyBody' | t"

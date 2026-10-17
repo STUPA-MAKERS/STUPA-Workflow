@@ -230,10 +230,7 @@
   display: flex;
 }
 /* A row without a card: one muted line, no frame. */
+/* A board without cards: the shared empty state with one ghost row. */
 .br__empty {
-  margin: 0;
   padding: 0 var(--space-2);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  line-height: 1.5rem;
 }

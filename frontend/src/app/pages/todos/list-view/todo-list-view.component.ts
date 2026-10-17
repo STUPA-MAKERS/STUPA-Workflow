@@ -13,6 +13,7 @@ import {
   type DueInfo,
   type Translate,
 } from '../../../features/todos/todos.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 export type DueSort = 'none' | 'asc' | 'desc';
 
@@ -40,7 +41,7 @@ interface ListGroup {
   selector: 'app-todo-list-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, AvatarStackComponent, IconComponent],
+  imports: [TranslatePipe, AvatarStackComponent, IconComponent, EmptyStateComponent],
   templateUrl: './todo-list-view.component.html',
   styleUrl: './todo-list-view.component.scss',
 })

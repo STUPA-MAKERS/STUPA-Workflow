@@ -23,6 +23,7 @@ import {
 import { CostCentrePickerComponent } from './cost-centre-picker.component';
 import { GuardEditorComponent } from './guard-editor.component';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Guard and actions of the selected transition. They follow the transition settings in
@@ -34,6 +35,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

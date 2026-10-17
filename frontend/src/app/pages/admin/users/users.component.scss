@@ -145,10 +145,6 @@
   overflow-wrap: anywhere;
 }
 
-.au__empty {
-  padding: var(--space-6);
-}
-
 @container (max-width: 54rem) {
   .au__row {
     grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) auto;

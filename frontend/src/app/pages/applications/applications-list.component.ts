@@ -58,6 +58,7 @@ import {
   type RowMenuSection,
   type StatusKind,
 } from '@shared/ui';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { downloadBlob } from '@shared/download.util';
 import { mediaQuerySignal } from '../../layout/media-query';
@@ -153,6 +154,7 @@ type FilterSheet = 'budget' | 'more' | null;
     CurrencyInputComponent,
     DatepickerComponent,
     DialogComponent,
+    EmptyStateComponent,
     FilterSelectComponent,
     IconComponent,
     ListDetailLayoutComponent,

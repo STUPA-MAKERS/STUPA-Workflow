@@ -42,6 +42,7 @@ import { GuestRequestsComponent } from '../guests/guest-requests.component';
 import { JoinLinkComponent } from '../public-join/join-link.component';
 import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -125,6 +126,7 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
     TranslatePipe,

@@ -17,6 +17,7 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The gap between the anchor and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
@@ -61,6 +62,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,

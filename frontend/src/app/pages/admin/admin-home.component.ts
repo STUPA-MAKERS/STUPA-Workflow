@@ -16,25 +16,15 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, EmptyStateComponent],
   template: `
-    <div class="none">
-      <app-empty-state
-        icon="shield"
-        [heading]="'admin.home.none' | t"
-        [body]="'admin.home.noneBody' | t"
-      />
-    </div>
+    <app-empty-state fill [heading]="'admin.home.none' | t" [body]="'admin.home.noneBody' | t" />
   `,
   styles: [
     `
       :host {
         display: flex;
         flex: 1 1 auto;
+        flex-direction: column;
         min-height: 0;
-      }
-      .none {
-        display: grid;
-        flex: 1 1 auto;
-        place-items: center;
       }
     `,
   ],
