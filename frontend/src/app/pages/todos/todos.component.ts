@@ -289,6 +289,8 @@ export class TodosComponent implements OnDestroy {
   readonly tileMenuOpen = signal(false);
   readonly tileTransferOpen = signal(false);
   readonly tileTransferring = signal(false);
+  /** The live region of the sheet: the move of a column pick, as the keyboard drag says it. */
+  readonly tileSaid = signal('');
   /**
    * The rows held cards at their last answer. Until the rows answer, the board and its
    * skeleton keep that shape, so the board does not resize when the rows land.
@@ -490,6 +492,17 @@ export class TodosComponent implements OnDestroy {
         this.focusedFor = id;
         el.nativeElement.focus();
       }
+    });
+
+    // The sheet and its transfer dialog live on the phone only: a wider window closes
+    // them and forgets the tile, so they do not open again on the way back.
+    effect(() => {
+      if (this.phone()) return;
+      untracked(() => {
+        this.tileMenuOpen.set(false);
+        this.tileTransferOpen.set(false);
+        this.tileMenu.set(null);
+      });
     });
 
     // Side by side the page fills the viewport and only the columns scroll.
@@ -988,13 +1001,29 @@ export class TodosComponent implements OnDestroy {
     this.tileMenuOpen.set(true);
   }
 
-  /** The sheet picked a column: the card goes to its end, as with a drag. */
+  /**
+   * The sheet picked a column: the card goes to its end, as with a drag. The live region
+   * says so, the sheet forgets the tile, and the focus goes back to the moved tile.
+   */
   onTileColumn(columnId: Uuid): void {
     const req = this.tileMenu();
     if (!req) return;
     const cardId = req.card.id;
     if (this.board()?.cards.some((c) => c.id === cardId)) this.moveCard({ cardId, move: { columnId } });
     else this.rowsView()?.moveTo(cardId, columnId);
+    const column = req.columns.find((c) => c.id === columnId)?.name ?? '';
+    this.tileSaid.set(this.i18n.translate('todos.drag.dropped', { title: req.card.title, column }));
+    this.tileMenu.set(null);
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>(`[data-card-id="${cardId}"]`)?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  /** The transfer dialog of the sheet opened or closed; closed, it forgets the tile. */
+  onTileTransferOpen(open: boolean): void {
+    this.tileTransferOpen.set(open);
+    if (!open) this.tileMenu.set(null);
   }
 
   /**
@@ -1014,6 +1043,7 @@ export class TodosComponent implements OnDestroy {
         this.onCardChanged(card);
         if (!this.board()) this.refreshBoards();
         this.toast.success(this.i18n.translate('todos.card.transferred', { board: target.boardName }));
+        this.tileMenu.set(null);
       },
       error: (err: unknown) => {
         this.tileTransferring.set(false);
@@ -1022,6 +1052,7 @@ export class TodosComponent implements OnDestroy {
         const board = this.board();
         if (board) this.resync(board.id);
         this.rowsView()?.refresh();
+        this.tileMenu.set(null);
       },
     });
   }

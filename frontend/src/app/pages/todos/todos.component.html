@@ -289,15 +289,18 @@
 }
 
 @if (phone()) {
+  <p class="sr-only" aria-live="assertive">{{ tileSaid() }}</p>
   <app-todo-tile-menu
     [(open)]="tileMenuOpen"
     [request]="tileMenu()"
     (column)="onTileColumn($event)"
     (transfer)="tileTransferOpen.set(true)"
+    (dismissed)="tileMenu.set(null)"
   />
   @if (tileMenu(); as m) {
     <app-todo-transfer-dialog
-      [(open)]="tileTransferOpen"
+      [open]="tileTransferOpen()"
+      (openChange)="onTileTransferOpen($event)"
       [boardId]="m.boardId"
       [boardKind]="m.boardKind"
       [busy]="tileTransferring()"

@@ -255,8 +255,13 @@ export class TodoBoardRowsComponent implements OnInit {
   readonly liveIds = input<readonly Uuid[]>([]);
   /** The page holds a card or waits for a write: the pings wait too. */
   readonly hold = input(false);
-  /** Phone, "Meine To-Dos": the personal board as the first section of the list. */
+  /**
+   * Phone, "Meine To-Dos": the personal board as the first section of the list. Its head
+   * has no link to the board, because the page shows that board.
+   */
   readonly lead = input<RowLead | null>(null);
+  /** The id of the board of `lead`: its section head has no link to the board. */
+  readonly leadId = computed(() => this.lead()?.board.id ?? null);
 
   readonly openCard = output<Uuid>();
   /** Phone: a long press on a tile of a writable row asks for the "Verschieben" sheet. */

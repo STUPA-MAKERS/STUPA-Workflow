@@ -23,6 +23,7 @@
           {{ 'todos.rows.readOnly' | t }}
         </span>
       }
+      @if (row.board.id !== leadId()) {
       <a
         class="br__open"
         [routerLink]="['/todos', row.board.id]"
@@ -31,6 +32,7 @@
       >
         <app-icon name="chevron-right" [size]="18" />
       </a>
+      }
     </header>
 
     @if (isOpen(row) && phone()) {

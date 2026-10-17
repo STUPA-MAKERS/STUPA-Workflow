@@ -106,6 +106,29 @@ describe('LongPressDirective', () => {
     expect(host.clicks).toBe(1);
   });
 
+  it('captures the pointer on the pressed element and stops when the pointer leaves the host', async () => {
+    const { host, el, inner } = await setup();
+    const capture = jest.fn();
+    Object.defineProperty(inner, 'setPointerCapture', { value: capture, configurable: true });
+    const down = pointer('pointerdown');
+    Object.defineProperty(down, 'pointerId', { value: 7 });
+    inner.dispatchEvent(down);
+    expect(capture).toHaveBeenCalledWith(7);
+    el.dispatchEvent(new MouseEvent('pointerleave'));
+    jest.advanceTimersByTime(LONG_PRESS_MS);
+    expect(host.presses).toBe(0);
+    // A capture that the browser refuses still lets the press run.
+    Object.defineProperty(inner, 'setPointerCapture', {
+      value: () => {
+        throw new DOMException('no pointer', 'NotFoundError');
+      },
+      configurable: true,
+    });
+    inner.dispatchEvent(pointer('pointerdown'));
+    jest.advanceTimersByTime(LONG_PRESS_MS);
+    expect(host.presses).toBe(1);
+  });
+
   it('ignores a secondary button and a pointer that is not the primary one', async () => {
     const { host, inner } = await setup();
     inner.dispatchEvent(pointer('pointerdown', { button: 2 }));

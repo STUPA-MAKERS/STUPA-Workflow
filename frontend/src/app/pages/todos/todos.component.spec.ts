@@ -3,7 +3,7 @@ import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { fireEvent, screen } from '@testing-library/angular';
+import { fireEvent, screen, within } from '@testing-library/angular';
 import { Subject, of, throwError, type Observable } from 'rxjs';
 import {
   TodosApiService,
@@ -1375,6 +1375,77 @@ describe('TodosComponent', () => {
         expect(harness.routeNativeElement).toBeTruthy();
       });
 
+      it('says the move of a column pick, forgets the tile and gives the focus back to the moved tile', async () => {
+        const { cmp, settle, harness } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+        cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: personal().columns });
+        await settle();
+        fireEvent.click(screen.getByRole('button', { name: 'Wartet' }));
+        await settle();
+        harness.detectChanges();
+        expect(cmp.tileSaid()).toBe('„Privat“ abgelegt in Wartet.');
+        expect(screen.getByText('„Privat“ abgelegt in Wartet.')).toHaveAttribute('aria-live', 'assertive');
+        expect(cmp.tileMenu()).toBeNull();
+        expect(document.activeElement).toBe(harness.routeNativeElement!.querySelector('[data-card-id="p-1"]'));
+        // An id the sheet does not list still moves, with no column name.
+        cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: [] });
+        cmp.onTileColumn('c-9');
+        expect(cmp.tileSaid()).toBe('„Privat“ abgelegt in .');
+      });
+
+      it('forgets the tile when the sheet or the transfer dialog closes without a choice', async () => {
+        const { cmp, settle } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+        cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: personal().columns });
+        await settle();
+        fireEvent.click(within(screen.getByRole('dialog', { name: 'Verschieben' })).getByRole('button', { name: 'Schließen' }));
+        await settle();
+        expect(cmp.tileMenuOpen()).toBe(false);
+        expect(cmp.tileMenu()).toBeNull();
+        cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: personal().columns });
+        cmp.onTileTransferOpen(true);
+        expect(cmp.tileTransferOpen()).toBe(true);
+        expect(cmp.tileMenu()).not.toBeNull();
+        cmp.onTileTransferOpen(false);
+        expect(cmp.tileMenu()).toBeNull();
+      });
+
+      it('closes the sheet and the dialog and forgets the tile when the window gets wide', async () => {
+        const media = { matches: true, listeners: [] as ((e: { matches: boolean }) => void)[] };
+        jest.spyOn(window, 'matchMedia').mockImplementation(
+          (query: string) =>
+            ({
+              get matches() {
+                return query === MEDIA.phone && media.matches;
+              },
+              media: query,
+              onchange: null,
+              addEventListener: (_: string, cb: (e: { matches: boolean }) => void) => media.listeners.push(cb),
+              removeEventListener: () => undefined,
+              addListener: (cb: (e: { matches: boolean }) => void) => media.listeners.push(cb),
+              removeListener: () => undefined,
+              dispatchEvent: () => false,
+            }) as unknown as MediaQueryList,
+        );
+        const { cmp, settle } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+        expect(cmp.phone()).toBe(true);
+        cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: personal().columns });
+        cmp.tileTransferOpen.set(true);
+        media.matches = false;
+        for (const cb of media.listeners) cb({ matches: false });
+        await settle();
+        expect(cmp.phone()).toBe(false);
+        expect(cmp.tileMenuOpen()).toBe(false);
+        expect(cmp.tileTransferOpen()).toBe(false);
+        expect(cmp.tileMenu()).toBeNull();
+        expect(document.querySelector('app-todo-tile-menu')).toBeNull();
+      });
+
+      it('has no link to the board in the head of the personal section', async () => {
+        const { harness } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+        const root = harness.routeNativeElement!;
+        expect(root.querySelector('[data-board-id="b-0"] .br__open')).toBeNull();
+        expect(root.querySelector('[data-board-id="b-1"] .br__open')).not.toBeNull();
+      });
+
       it('does nothing for a column or a transfer without a tile', async () => {
         const { cmp, api } = await start('/todos/b-0', { board: personal() });
         cmp.onTileColumn('c-2');
@@ -1430,8 +1501,10 @@ describe('TodosComponent', () => {
         await settle();
         expect(api.boards.mock.calls.length).toBe(lists + 1);
         expect(toast.success).toHaveBeenCalled();
+        expect(cmp.tileMenu()).toBeNull();
         // A refusal in "Alle" reads only the rows.
         api.transferCard.mockImplementationOnce(() => throwError(() => new Error('x')));
+        cmp.onTileMenu({ card: rows[0].cards[0], boardId: 'b-1', boardKind: 'gremium', columns: rows[0].columns });
         cmp.transferTile({ boardId: 'b-2', columnId: 'c-1', boardName: 'Fachschaft Informatik' });
         await settle();
         expect(toast.error).toHaveBeenCalledWith('Die Karte konnte nicht verschoben werden.');

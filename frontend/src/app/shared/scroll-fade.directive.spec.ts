@@ -141,6 +141,18 @@ describe('ScrollFadeDirective', () => {
       expect(fades((await setupList(900, 300, 300)).el)).toEqual([true, true]);
     });
 
+    it('fades nothing while the host does not scroll (overflow visible), and again once it does', async () => {
+      const { el } = await setupList(900, 300, 300);
+      el.style.overflowY = 'visible';
+      ResizeObserverStub.last?.cb();
+      expect(fades(el)).toEqual([false, false]);
+      // Only the axis of the directive counts.
+      el.style.overflowY = 'auto';
+      el.style.overflowX = 'visible';
+      ResizeObserverStub.last?.cb();
+      expect(fades(el)).toEqual([true, true]);
+    });
+
     it('re-measures on scroll and ignores the horizontal geometry', async () => {
       const { el } = await setupList(900, 300, 0);
       geometry(el, 800, 400, 200);

@@ -10,11 +10,12 @@ function request(over: Partial<TileMenuRequest> = {}): TileMenuRequest {
 async function setup(req: TileMenuRequest | null = request()) {
   const column = jest.fn();
   const transfer = jest.fn();
+  const dismissed = jest.fn();
   const view = await render(TodoTileMenuComponent, {
     inputs: { open: true, request: req },
-    on: { column, transfer },
+    on: { column, transfer, dismissed },
   });
-  return { ...view, column, transfer };
+  return { ...view, column, transfer, dismissed };
 }
 
 describe('TodoTileMenuComponent', () => {
@@ -47,6 +48,13 @@ describe('TodoTileMenuComponent', () => {
     await setup(request({ columns: [] }));
     expect(document.querySelector('.tm__sep')).toBeNull();
     expect(screen.getByRole('button', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
+  });
+
+  it('says when it closes without a choice', async () => {
+    const { dismissed, column } = await setup();
+    fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    expect(dismissed).toHaveBeenCalled();
+    expect(column).not.toHaveBeenCalled();
   });
 
   it('shows nothing without a request', async () => {

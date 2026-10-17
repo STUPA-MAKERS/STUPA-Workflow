@@ -18,7 +18,8 @@ export interface TileMenuRequest {
  * the columns of the board of the card; the column of the card has the check and is not a
  * choice. A tap on another column emits `column` (the page moves the card to the end of
  * it). Below a line, "In anderes Board verschieben" emits `transfer` (the page opens the
- * transfer dialog). Each choice closes the sheet first.
+ * transfer dialog). Each choice closes the sheet first; a close without a choice emits
+ * `dismissed`.
  */
 @Component({
   selector: 'app-todo-tile-menu',
@@ -36,6 +37,8 @@ export class TodoTileMenuComponent {
   readonly column = output<Uuid>();
   /** "In anderes Board verschieben" was picked. */
   readonly transfer = output<void>();
+  /** The sheet closed without a choice (Escape, the scrim, the close button). */
+  readonly dismissed = output<void>();
 
   pick(col: TodoColumn): void {
     if (col.id === this.request()?.card.columnId) return;

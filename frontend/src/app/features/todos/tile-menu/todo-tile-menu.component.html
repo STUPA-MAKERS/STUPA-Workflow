@@ -1,4 +1,4 @@
-<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open">
+<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open" (closed)="dismissed.emit()">
   @if (request(); as r) {
     <div class="tm">
       <p class="tm__sub">{{ r.card.title }}</p>

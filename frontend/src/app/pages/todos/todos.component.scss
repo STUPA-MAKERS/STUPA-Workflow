@@ -138,10 +138,12 @@
   min-width: 0;
   min-height: 0;
 }
-/* The shared top and bottom fade: an end fades only while more content lies past it
-   (`appScrollFade="y"` sets the classes), so the cards do not end at a hard cut under the
-   bar. */
-.td__body {
+/* The shared top and bottom fade where the body scrolls as a whole (the rows): an end
+   fades only while more content lies past it (`appScrollFade="y"` sets the classes), so
+   the cards do not end at a hard cut under the bar. Elsewhere the body does not scroll
+   (overflow visible), the directive sets no class, and a mask would cut off the list view
+   or a tall state. */
+.td__body--rows {
   @include fade.fade-y(var(--space-5));
 }
 /* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the

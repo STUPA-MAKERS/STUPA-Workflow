@@ -11,7 +11,12 @@ const CLICK_AFTER_MS = 600;
  * Press and hold: a press of `LONG_PRESS_MS` on the host emits `appLongPress` and gives a
  * short vibration where the device has one. A drift of the pointer by more than
  * `LONG_PRESS_SLOP` pixels, a scroll anywhere on the page, the release and a cancel of the
- * pointer stop the press, so a swipe or a scroll over the host stays a swipe or a scroll.
+ * pointer, a pointer that leaves the host stop the press, so a swipe or a scroll over the
+ * host stays a swipe or a scroll. The pressed element captures the pointer, so a mouse
+ * that leaves the tile still reports its moves and the drift stops the press. The capture
+ * is on the pressed element, not on the host: the click of a tap goes to the common
+ * ancestor of the targets of pointerdown and pointerup, so a capture on the host would
+ * take the click from the button inside.
  *
  * The click of the release after a long press does not reach the host (a capture listener
  * stops it), so a tile that opens on a tap does not open after its menu. The context
@@ -30,6 +35,7 @@ const CLICK_AFTER_MS = 600;
     '(pointermove)': 'onMove($event)',
     '(pointerup)': 'onUp()',
     '(pointercancel)': 'cancel()',
+    '(pointerleave)': 'cancel()',
     '(keydown)': 'fired = false',
     '(contextmenu)': 'onContextMenu($event)',
   },
@@ -65,6 +71,13 @@ export class LongPressDirective {
     if (this.off() || event.button > 0 || event.isPrimary === false) return;
     this.cancel();
     this.origin = { x: event.clientX, y: event.clientY };
+    // A pointer event on the host always has an element of the host as its target.
+    const target = event.target as Element;
+    try {
+      target.setPointerCapture?.(event.pointerId);
+    } catch {
+      // No active pointer of that id (a synthetic event): the moves reach the host anyway.
+    }
     // A scroll does not bubble: the capture phase of the document sees every scroll.
     document.addEventListener('scroll', this.onScroll, true);
     this.timer = setTimeout(() => this.fire(), LONG_PRESS_MS);
