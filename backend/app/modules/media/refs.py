@@ -17,11 +17,10 @@ _UUID: Final = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 #: The whole canonical path, for one image destination.
 IMAGE_PATH_RE: Final[re.Pattern[str]] = re.compile(rf"^/api/media/images/({_UUID})$")
 
-# The destination of a Markdown image or link: `](` + the path + an optional title
-# + `)`. The angle-bracket form `](<path>)` is CommonMark too.
-_REF_RE: Final[re.Pattern[str]] = re.compile(
-    rf"\]\(\s*<?/api/media/images/({_UUID})>?\s*(?:\"[^\"\n]*\"\s*|'[^'\n]*'\s*)?\)"
-)
+# The destination of a Markdown image or link: exactly `](/api/media/images/<id>)`. The
+# renderers (the SPA, the typst service) show only this plain form, so a form with a
+# title, white space or angle brackets is no reference here either.
+_REF_RE: Final[re.Pattern[str]] = re.compile(rf"\]\(/api/media/images/({_UUID})\)")
 
 
 def image_path(image_id: UUID) -> str:

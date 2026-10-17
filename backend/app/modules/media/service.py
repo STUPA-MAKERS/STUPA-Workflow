@@ -4,7 +4,7 @@
 decode, strip the metadata, downscale, encode again), stores the result under
 ``media/images/<id>`` in the attachment bucket and inserts the ``markdown_image``
 row. The stored bytes come from Pillow, never from the client, so an image gets no
-ClamAV scan.
+ClamAV scan. At most ``CLEAN_CONCURRENCY`` cleans run at the same time in one process.
 
 ``open`` streams one image. The router applies the read rule before.
 
@@ -46,6 +46,13 @@ RENDER_MAX_IMAGES: Final[int] = 48
 RENDER_MAX_BYTES: Final[int] = 24 * 1024 * 1024
 #: The largest single image of a render: the asset cap of the typst service.
 RENDER_MAX_ASSET_BYTES: Final[int] = 8 * 1024 * 1024
+#: The most image cleans that run at the same time in one process.
+CLEAN_CONCURRENCY: Final[int] = 2
+
+# The clean is CPU and memory work in a thread. The semaphore holds the number of
+# parallel cleans in one process at ``CLEAN_CONCURRENCY``, so parallel uploads cannot
+# take all the CPU or the memory of the API.
+_clean_slots: Final[asyncio.Semaphore] = asyncio.Semaphore(CLEAN_CONCURRENCY)
 
 # Stored type -> the extension of the typst asset name.
 _ASSET_EXT: Final[dict[str, str]] = {
@@ -95,7 +102,8 @@ class MediaService:
         if self.storage is None:
             raise ServiceUnavailableError("Object storage unavailable.")
         try:
-            image = await asyncio.to_thread(clean_image, data)
+            async with _clean_slots:
+                image = await asyncio.to_thread(clean_image, data)
         except ImageRejected as exc:
             raise UnsupportedMediaTypeError(str(exc)) from exc
         if len(image.data) > self.max_bytes:

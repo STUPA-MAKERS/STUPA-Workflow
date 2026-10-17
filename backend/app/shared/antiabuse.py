@@ -346,9 +346,11 @@ async def rate_limit_media_images(
     """``POST /media/images``: ``rl_media_images_per_hour`` per principal.
 
     Only a principal may upload, so the key is the ``sub``. The route answers 401
-    without one; this dependency then does nothing. The logged-in MCP is exempt.
+    without one; this dependency then does nothing. The limit applies to an OAuth
+    token (MCP) too and shares the budget of the person: every upload costs a Pillow
+    decode, and an agent can loop.
     """
-    if principal is None or _is_oauth_principal(principal):
+    if principal is None:
         return
     await _enforce(
         limiter,

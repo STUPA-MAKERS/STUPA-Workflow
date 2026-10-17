@@ -47,12 +47,18 @@ async def test_upload_limit_per_principal() -> None:
     await antiabuse.rate_limit_media_images(settings, limiter, None)
 
 
-async def test_upload_limit_skips_the_logged_in_mcp() -> None:
+async def test_upload_limit_applies_to_the_logged_in_mcp() -> None:
     settings = get_settings().model_copy(update={"rl_media_images_per_hour": 1})
     limiter = InMemoryRateLimiter()
-    mcp = Principal(sub="mcp", permissions=set(), scope_permissions=frozenset())
-    for _ in range(3):
+    mcp = Principal(sub="mcp", permissions=set(), scope_permissions=frozenset({"todo.write"}))
+    await antiabuse.rate_limit_media_images(settings, limiter, mcp)
+    with pytest.raises(RateLimitedError):
         await antiabuse.rate_limit_media_images(settings, limiter, mcp)
+    # The token shares the budget of the person behind it.
+    with pytest.raises(RateLimitedError):
+        await antiabuse.rate_limit_media_images(
+            settings, limiter, Principal(sub="mcp", permissions=set())
+        )
 
 
 async def test_public_image_limit_per_ip() -> None:

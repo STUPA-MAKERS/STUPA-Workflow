@@ -25,9 +25,19 @@ def test_is_image_path_refuses_every_other_form() -> None:
 def test_ids_in_order_of_first_appearance_without_duplicates() -> None:
     text = (
         f"![b](/api/media/images/{B}) text ![a](/api/media/images/{A})\n"
-        f'![b again](/api/media/images/{B} "Titel") and ![c](</api/media/images/{A}>)'
+        f"![b again](/api/media/images/{B}) and ![a again](/api/media/images/{A})"
     )
     assert image_ids_in(text) == [B, A]
+
+
+def test_ids_take_only_the_plain_form() -> None:
+    text = (
+        f'![t](/api/media/images/{A} "Titel") '
+        f"![s](/api/media/images/{A} 'Titel') "
+        f"![a](</api/media/images/{A}>) "
+        f"![w]( /api/media/images/{A} )"
+    )
+    assert image_ids_in(text) == []
 
 
 def test_ids_over_several_texts_and_none() -> None:

@@ -91,7 +91,7 @@ def test_sixteen_bit_png_becomes_rgb() -> None:
 def test_animation_keeps_its_frames(fmt: str, mime: str) -> None:
     out = clean_image(animation(fmt, size=(4800, 100)))
     assert out.mime == mime
-    assert (out.width, out.height) == (2400, 50)
+    assert (out.width, out.height) == (images.MAX_ANIMATION_SIDE, 17)
     img = opened(out.data)
     assert getattr(img, "n_frames", 1) == 3
 
@@ -117,6 +117,22 @@ def test_too_many_pixels_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(images, "MAX_PIXELS", 100)
     with pytest.raises(ImageRejected, match="too many pixels"):
         clean_image(encode("PNG"))
+
+
+def test_limits_hold_the_memory_of_an_animation_small() -> None:
+    assert images.MAX_TOTAL_PIXELS == 50_000_000
+    assert images.MAX_FRAMES == 100
+    assert images.MAX_ANIMATION_SIDE == 800
+
+
+def test_small_animation_keeps_its_size() -> None:
+    out = clean_image(animation("GIF", size=(800, 10)))
+    assert (out.width, out.height) == (800, 10)
+
+
+def test_still_image_keeps_the_larger_side() -> None:
+    out = clean_image(encode("PNG", size=(2000, 10)))
+    assert (out.width, out.height) == (2000, 10)
 
 
 def test_too_many_frames_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:

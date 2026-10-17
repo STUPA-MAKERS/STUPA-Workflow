@@ -236,6 +236,39 @@ describe('markdownToSafeHtml', () => {
     );
   });
 
+  describe('placeholder injection', () => {
+    const id = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
+
+    it('strips control characters, so a forged placeholder cannot break an attribute', () => {
+      const html = markdownToSafeHtml(
+        `![\u00001\u0000](/api/media/images/${id}) [x](https://a/onerror=alert(1)//)`,
+      );
+      // eslint-disable-next-line no-control-regex -- the NUL sentinel must not survive
+      expect(html).not.toMatch(/[\u0000-\u001f]/);
+      expect(html).toContain(`<img src="/api/media/images/${id}" alt="1" loading="lazy"`);
+      expect(html).toContain('<a href="https://a/onerror=alert(1)//" target="_blank"');
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const img = doc.querySelector('img');
+      expect(img?.getAttributeNames().sort()).toEqual(['alt', 'decoding', 'loading', 'src']);
+      expect(doc.querySelectorAll('[onerror]').length).toBe(0);
+    });
+
+    it('terminates on a self-referencing placeholder', () => {
+      expect(markdownToSafeHtml(`![\u00000\u0000](/api/media/images/${id})`)).toBe(
+        `<p><img src="/api/media/images/${id}" alt="0" loading="lazy" decoding="async"></p>`,
+      );
+      expect(markdownToSafeHtml('`a\u00000\u0000` b\u0007c')).toBe('<p><code>a0</code> bc</p>');
+    });
+
+    it('keeps tabs and line breaks', () => {
+      expect(markdownToSafeHtml('a\tb\r\nc')).toBe('<p>a\tb<br>c</p>');
+    });
+
+    it('puts the plain text of a code span into the alt text', () => {
+      expect(markdownToSafeHtml(`![\`a\` b](/api/media/images/${id})`)).toContain('alt="a b"');
+    });
+  });
+
   it('closes an unterminated fence at the end', () => {
     expect(markdownToSafeHtml('```\na')).toBe('<pre><code>a</code></pre>');
   });

@@ -3,6 +3,9 @@
 ``POST /api/media/images`` takes one image (multipart field ``file``) from a principal.
 An applicant and an anonymous caller get 401. The route caps the body, applies its own
 rate limit, cleans the image (``MediaService.upload``) and answers the canonical path.
+The rate limit applies to an OAuth token (MCP) too. A token also needs a write scope
+that edits a Markdown text with images (``UPLOAD_SCOPES``), else it gets 403: a
+``read`` token has no text to put an image into.
 
 ``GET /api/media/images/{id}`` streams one image to any session: a principal or a
 magic-link applicant. The id is a random uuid4, so it is unguessable on top of the
@@ -28,6 +31,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from app.deps import DbSession, SettingsDep, get_current_applicant, get_current_principal
+from app.modules.auth.oauth import SCOPES
 from app.modules.auth.principal import Applicant, Principal
 from app.modules.files.router import _read_capped  # pyright: ignore[reportPrivateUsage]
 from app.modules.files.storage import ObjectStorage
@@ -39,7 +43,7 @@ from app.shared.antiabuse import (
     rate_limit_media_images,
     rate_limit_public_protocol_images,
 )
-from app.shared.errors import NotFoundError, ProblemDetail, UnauthorizedError
+from app.shared.errors import ForbiddenError, NotFoundError, ProblemDetail, UnauthorizedError
 
 router = APIRouter(tags=["media"])
 public_router = APIRouter(prefix="/public", tags=["public-protocols"])
@@ -49,7 +53,19 @@ _PROBLEM: dict[str, Any] = {"model": ProblemDetail}
 #: The CSP of an image answer: no active content, also when opened directly.
 IMAGE_CSP = "default-src 'none'; sandbox"
 _PRIVATE_CACHE = "private, max-age=31536000, immutable"
-_PUBLIC_CACHE = "public, max-age=86400"
+# A public protocol can go private again (hold-back, gremium flag), so a shared cache
+# keeps its images for a short time only.
+_PUBLIC_CACHE = "public, max-age=300"
+
+#: The OAuth scopes whose texts take images: protocol TOPs, to-do cards and their
+#: comments, ticket notes, application comments.
+UPLOAD_SCOPES: tuple[str, ...] = (
+    "meetings:write",
+    "todos:write",
+    "tickets:write",
+    "applications:write",
+)
+_UPLOAD_PERMISSIONS: frozenset[str] = frozenset().union(*(SCOPES[s] for s in UPLOAD_SCOPES))
 
 
 def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
@@ -87,9 +103,9 @@ def _image_response(image: ImageStream, cache_control: str) -> StreamingResponse
     response_model=MarkdownImageOut,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(enforce_media_body_cap), Depends(rate_limit_media_images)],
-    # 401 no principal, 413 too large, 415 no accepted image, 429 rate limit,
-    # 503 storage off.
-    responses=_errors(401, 413, 415, 429, 503),
+    # 401 no principal, 403 token without a write scope, 413 too large, 415 no
+    # accepted image, 429 rate limit, 503 storage off.
+    responses=_errors(401, 403, 413, 415, 429, 503),
 )
 async def upload_image(
     service: ServiceDep,
@@ -104,6 +120,9 @@ async def upload_image(
     """
     if principal is None:
         raise UnauthorizedError("Authentication required.")
+    scope = principal.scope_permissions
+    if scope is not None and not (scope & _UPLOAD_PERMISSIONS):
+        raise ForbiddenError("The token has no write scope for a text with images.")
     data = await _read_capped(file, service.max_bytes)
     return await service.upload(data)
 

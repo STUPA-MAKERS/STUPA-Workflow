@@ -22,6 +22,9 @@ describe('routeInternalLink', () => {
     const b = click('<a data-t href="#top">x</a>');
     routeInternalLink(b.event, r);
     expect(router.navigateByUrl).toHaveBeenLastCalledWith('/a/b#top');
+    const c = click('<a data-t href="/apix/s">x</a>');
+    routeInternalLink(c.event, r);
+    expect(router.navigateByUrl).toHaveBeenLastCalledWith('/apix/s');
   });
 
   it.each([
@@ -31,6 +34,10 @@ describe('routeInternalLink', () => {
     ['text outside a link', '<p data-t>x</p>', {}],
     ['a middle click', '<a data-t href="/a">x</a>', { button: 1 }],
     ['a ctrl click', '<a data-t href="/a">x</a>', { ctrlKey: true }],
+    ['an API path', '<a data-t href="/api/attachments/1/download">x</a>', {}],
+    ['the API root', '<a data-t href="/api">x</a>', {}],
+    ['a share link', '<a data-t href="/s/abc">x</a>', {}],
+    ['a well-known path', '<a data-t href="/.well-known/security.txt">x</a>', {}],
   ])('leaves %s to the browser', (_k, html, init) => {
     const { event } = click(html, init);
     routeInternalLink(event, r);

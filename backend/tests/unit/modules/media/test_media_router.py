@@ -15,8 +15,14 @@ from fastapi.testclient import TestClient
 
 from app.deps import get_current_applicant, get_current_principal, get_session
 from app.main import create_app
+from app.modules.auth import oauth
 from app.modules.auth.principal import Applicant, Principal
-from app.modules.media.router import IMAGE_CSP, get_media_service, get_public_protocols
+from app.modules.media.router import (
+    IMAGE_CSP,
+    UPLOAD_SCOPES,
+    get_media_service,
+    get_public_protocols,
+)
 from app.modules.media.service import MediaService
 from app.settings import get_settings, load_settings
 from app.shared.errors import NotFoundError
@@ -177,6 +183,27 @@ def test_upload_applicant_is_401(app: FastAPI, client: TestClient) -> None:
     assert r.status_code == 401  # pyright: ignore[reportAttributeAccessIssue]
 
 
+def _as_token(app: FastAPI, *scopes: str) -> None:
+    perms = oauth.scope_permissions(list(scopes))
+    app.dependency_overrides[get_current_principal] = lambda: Principal(
+        sub="p", permissions=set(), scope_permissions=perms
+    )
+
+
+def test_upload_with_a_read_token_is_403(app: FastAPI, client: TestClient) -> None:
+    _as_token(app, "read", "budget:write")
+    r = client.post("/api/media/images", files={"file": ("a.png", encode("PNG"), "image/png")})
+    assert r.status_code == 403
+    assert r.headers["content-type"].startswith("application/problem+json")
+
+
+@pytest.mark.parametrize("scope", list(UPLOAD_SCOPES))
+def test_upload_with_a_write_token_is_201(app: FastAPI, client: TestClient, scope: str) -> None:
+    _as_token(app, "read", scope)
+    r = client.post("/api/media/images", files={"file": ("a.png", encode("PNG"), "image/png")})
+    assert r.status_code == 201
+
+
 def test_upload_without_storage_is_503(app: FastAPI, client: TestClient) -> None:
     _as_principal(app)
     app.dependency_overrides[get_media_service] = lambda: MediaService(
@@ -264,7 +291,7 @@ def test_public_image_of_a_visible_protocol(
     r = client.get(f"/api/public/protocols/{PROTOCOL_ID}/images/{image_id}")
     assert r.status_code == 200
     assert r.content == b"PNGBYTES"
-    _assert_image_headers(r.headers, "public, max-age=86400")
+    _assert_image_headers(r.headers, "public, max-age=300")
     assert r.headers["x-robots-tag"] == "noindex"
 
 

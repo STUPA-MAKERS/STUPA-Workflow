@@ -127,28 +127,30 @@ describe('MarkdownImageUploadDirective', () => {
     expect(error).toHaveBeenCalledWith('Bild zu groß (max. 10 MB).');
   });
 
-  it('appends the image when the user deleted the placeholder', async () => {
-    const { host, area, calls } = await setup('x');
+  it('drops the image when the user deleted the placeholder', async () => {
+    const { host, area, calls, dir } = await setup('x');
     fireEvent.paste(area, { clipboardData: { files: [png()] } });
     area.value = 'neu';
     fireEvent.input(area);
     calls[0].next(image(ID));
-    expect(host.text()).toBe(`neu\n![Plan](/api/media/images/${ID})`);
+    calls[0].complete();
+    expect(host.text()).toBe('neu');
+    expect(dir.uploading()).toBe(0);
   });
 
-  it('appends to an empty text, and drops a failed upload whose placeholder is gone', async () => {
-    const { host, area, calls, dir, error } = await setup();
+  it('drops the results when the textarea shows another text', async () => {
+    const { host, area, calls, dir, error } = await setup('Dokument A');
     dir.upload([png(), png('b.png')]);
-    area.value = '';
+    host.text.set('Dokument B');
+    area.value = 'Dokument B';
     fireEvent.input(area);
     calls[0].next(image(ID));
     calls[0].complete();
-    expect(host.text()).toBe(`![Plan](/api/media/images/${ID})`);
-    area.value = '';
-    fireEvent.input(area);
+    expect(host.text()).toBe('Dokument B');
     calls[1].error(null);
-    expect(host.text()).toBe('');
+    expect(host.text()).toBe('Dokument B');
     expect(error).toHaveBeenCalledWith('Bild-Upload fehlgeschlagen.');
+    expect(dir.uploading()).toBe(0);
   });
 
   it('does nothing on a read-only textarea', async () => {

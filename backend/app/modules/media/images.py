@@ -3,7 +3,8 @@
 The upload never stores the bytes of the client. The function here decodes the image,
 applies the EXIF orientation, drops every metadata block (EXIF with GPS, XMP, text
 chunks, comments; an ICC profile stays, so the colors stay right), scales the longest
-side down to ``MAX_SIDE`` and encodes the pixels again in the input format. A
+side down to ``MAX_SIDE`` (``MAX_ANIMATION_SIDE`` for an animation) and encodes the
+pixels again in the input format. A
 polyglot file or a payload in a metadata block therefore does not survive the
 upload, and the images skip the ClamAV scan of the attachments.
 
@@ -11,6 +12,10 @@ The guards against a decompression bomb: libmagic must sniff one of the four typ
 Pillow must read the same format, the pixel count of one frame must stay under
 ``MAX_PIXELS``, and an animation must stay under ``MAX_FRAMES`` frames and
 ``MAX_TOTAL_PIXELS`` pixels in all. Every decode error gives ``ImageRejected``.
+
+An animation decodes one frame at a time, and each frame is scaled down before the
+next one decodes. Only the scaled frames stay in memory until the encode, because
+the GIF and WEBP encoders of Pillow take all frames at once.
 
 The module imports Pillow lazily, so a process that never takes an upload does not
 load it.
@@ -33,10 +38,13 @@ if TYPE_CHECKING:
 MAX_SIDE: Final[int] = 2400
 #: The most pixels of one decoded frame (40 MP).
 MAX_PIXELS: Final[int] = 40_000_000
+#: The longest side of a stored animation, in pixels. The encoder keeps every frame in
+#: memory, so an animation is stored smaller than a still image.
+MAX_ANIMATION_SIDE: Final[int] = 800
 #: The most frames of an animated GIF or WEBP.
-MAX_FRAMES: Final[int] = 300
-#: The most pixels of all frames of an animation together.
-MAX_TOTAL_PIXELS: Final[int] = 200_000_000
+MAX_FRAMES: Final[int] = 100
+#: The most pixels of all frames of an animation together, before the scale-down.
+MAX_TOTAL_PIXELS: Final[int] = 50_000_000
 #: The largest ICC profile that the image keeps. A larger one is dropped.
 MAX_ICC_BYTES: Final[int] = 256 * 1024
 #: The quality of a lossy JPEG or WEBP encode.
@@ -65,11 +73,11 @@ class CleanImage:
     height: int
 
 
-def _target_size(width: int, height: int) -> tuple[int, int]:
+def _target_size(width: int, height: int, max_side: int = MAX_SIDE) -> tuple[int, int]:
     longest = max(width, height)
-    if longest <= MAX_SIDE:
+    if longest <= max_side:
         return width, height
-    scale = MAX_SIDE / longest
+    scale = max_side / longest
     return max(1, round(width * scale)), max(1, round(height * scale))
 
 
@@ -103,13 +111,17 @@ def _still(img: Image, mime: str) -> Image:
 
 
 def _frames(img: Image) -> tuple[list[Image], list[int]]:
-    """Return the scaled RGBA frames of an animation and the duration of each."""
+    """Return the scaled RGBA frames of an animation and the duration of each.
+
+    Each frame is converted and scaled before the next one decodes, so only one frame
+    is in memory at full size.
+    """
     from PIL import Image as PILImage
     from PIL import ImageSequence
 
     frames: list[Image] = []
     durations: list[int] = []
-    size = _target_size(img.width, img.height)
+    size = _target_size(img.width, img.height, MAX_ANIMATION_SIDE)
     for frame in ImageSequence.Iterator(img):
         durations.append(int(frame.info.get("duration") or 100))
         rgba = frame.convert("RGBA")

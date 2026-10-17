@@ -22,6 +22,11 @@ import { linkify } from './linkify';
 const IMAGE_PATH_RE =
   /^\/api\/media\/images\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
 
+/** The control characters except tab and line feed (and carriage return, which becomes
+ *  a line feed first). */
+// eslint-disable-next-line no-control-regex -- control characters are the point
+const CONTROL_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g;
+
 export interface MarkdownOptions {
   /** The number of levels that a heading moves down. The default 3 renders `#` as h4.
    *  A full-size document uses 0. */
@@ -133,8 +138,17 @@ type Inline = (text: string) => string;
 function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
   return (text: string): string => {
     const parts: string[] = [];
-    const stash = (html: string): string => {
-      parts.push(html);
+    const texts: string[] = [];
+    // eslint-disable-next-line no-control-regex -- NUL sentinel (the source has no control characters)
+    const sentinel = /\u0000(\d+)\u0000/g;
+    // A fragment can hold the placeholder of an earlier fragment (a code span in a link
+    // label). The fill happens when the fragment is stashed, so the final restore is one
+    // pass and never scans a restored fragment again.
+    const fill = (s: string, plain = false): string =>
+      s.replace(sentinel, (_m, i: string) => (plain ? texts : parts)[Number(i)] ?? '');
+    const stash = (html: string, plain = html): string => {
+      parts.push(fill(html));
+      texts.push(fill(plain, true));
       return `\u0000${parts.length - 1}\u0000`;
     };
     const emphasis = (s: string): string =>
@@ -144,30 +158,26 @@ function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
         .replace(/(^|[\s(>])\*([^*\n]+)\*(?=[\s).,!?:;<]|$)/g, '$1<em>$2</em>')
         .replace(/(^|[\s(>])_([^_\n]+)_(?=[\s).,!?:;<]|$)/g, '$1<em>$2</em>');
 
-    let out = text.replace(/`([^`]+)`/g, (_m, code: string) => stash(`<code>${code}</code>`));
+    let out = text.replace(/`([^`]+)`/g, (_m, code: string) =>
+      stash(`<code>${code}</code>`, code),
+    );
     out = replaceRefs(out, true, (alt, dest) => {
       const id = IMAGE_PATH_RE.exec(dest)?.[1];
       if (!id || !imageSrc) return alt ? stash(alt) : '';
-      // The alt text is escaped text. The source is escaped again: it is the output of a
-      // consumer function and must never break out of the attribute.
+      // The alt text is escaped text and takes the plain text of a stashed fragment, so
+      // no tag gets into the attribute. The source is escaped again: it is the output of
+      // a consumer function and must never break out of the attribute.
       const src = escapeHtml(imageSrc(id));
-      return stash(`<img src="${src}" alt="${alt}" loading="lazy" decoding="async">`);
+      const plain = fill(alt, true);
+      return stash(`<img src="${src}" alt="${plain}" loading="lazy" decoding="async">`, plain);
     });
     out = replaceRefs(out, false, (label, href) => {
       const kind = label ? hrefKind(href) : null;
       if (!kind) return null;
       const attrs = kind === 'external' ? ' target="_blank" rel="noopener noreferrer"' : '';
-      return stash(`<a href="${href}"${attrs}>${emphasis(label)}</a>`);
+      return stash(`<a href="${href}"${attrs}>${emphasis(label)}</a>`, label);
     });
-    out = emphasis(out);
-    // A link label can hold a code span, so the restore runs until no placeholder stays.
-    // eslint-disable-next-line no-control-regex -- NUL sentinel (collision-free in escaped text)
-    const sentinel = /\u0000(\d+)\u0000/g;
-    while (sentinel.test(out)) {
-      sentinel.lastIndex = 0;
-      out = out.replace(sentinel, (_m, i: string) => parts[Number(i)]);
-    }
-    return out;
+    return fill(emphasis(out));
   };
 }
 
@@ -239,7 +249,10 @@ function renderItem(text: string, inline: Inline): string {
 export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): string {
   const offset = opts.headingOffset ?? 3;
   const inline = inlineRenderer(opts.imageSrc === undefined ? defaultImageSrc : opts.imageSrc);
-  const lines = escapeHtml(src.replace(/\r\n?/g, '\n')).split('\n');
+  // A control character has no meaning in Markdown. The NUL character is the placeholder
+  // sentinel of the inline renderer, so a source that holds one could forge a placeholder.
+  const clean = src.replace(/\r\n?/g, '\n').replace(CONTROL_RE, '');
+  const lines = escapeHtml(clean).split('\n');
   const out: string[] = [];
   let para: string[] = [];
   let list: { tag: 'ul' | 'ol'; items: string[] } | null = null;

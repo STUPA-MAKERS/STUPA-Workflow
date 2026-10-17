@@ -142,15 +142,16 @@ export class MarkdownImageUploadDirective {
     return mark;
   }
 
-  /** Replace the placeholder. When the user deleted it, append a result at the end. */
+  /**
+   * Replace the placeholder. When the placeholder is gone, the result is dropped: the user
+   * deleted it or the textarea now shows another text, and the image must not go into
+   * that text.
+   */
   private replace(mark: string, text: string): void {
     const area = this.el.nativeElement;
     const value = area.value;
     const at = value.indexOf(mark);
-    if (at < 0) {
-      if (text) this.write(value + (value && !value.endsWith('\n') ? '\n' : '') + text, null);
-      return;
-    }
+    if (at < 0) return;
     let end = at + mark.length;
     // A removed placeholder takes its line break with it.
     if (!text && value[end] === '\n') end++;

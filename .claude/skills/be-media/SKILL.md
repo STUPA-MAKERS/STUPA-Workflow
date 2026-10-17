@@ -15,21 +15,24 @@ images of a protocol for the typst render.
 - `refs.py` — the canonical reference. `IMAGE_PATH_RE`
   (`^/api/media/images/<lowercase uuid>$`), `image_path`, `is_image_path`,
   `image_ids_in(*texts)` (ids of `](/api/media/images/<uuid>)` destinations, first
-  appearance order, no duplicates; a title and the `<…>` form count).
+  appearance order, no duplicates). Only the plain form counts: a title, white space
+  or the `<…>` form is no reference, because the renderers show the plain form only.
 - `images.py` — `clean_image(data) -> CleanImage` (`data, mime, width, height`),
   `ImageRejected`. libmagic sniff (`files.mime.sniff_mime`) must be PNG, JPEG, GIF or
   WEBP; `Image.open(..., formats=[<sniffed>])`; guards `MAX_PIXELS` (40 MP per frame),
-  `MAX_FRAMES` (300), `MAX_TOTAL_PIXELS` (200 MP), Pillow's own bomb warning raised as
+  `MAX_FRAMES` (100), `MAX_TOTAL_PIXELS` (50 MP over all frames), Pillow's own bomb
+  warning raised as
   an error. `ImageOps.exif_transpose`, `MAX_SIDE` 2400 px (LANCZOS; a palette image
   goes through RGBA), `info` cleared except `transparency`, ICC kept up to 256 KiB.
   JPEG/WEBP quality 85. An animated GIF or WEBP keeps its frames (RGBA, durations,
-  loop); an APNG keeps its first frame.
+  loop), scaled to `MAX_ANIMATION_SIDE` 800 px frame by frame while it decodes, because
+  the Pillow encoder holds every frame in memory; an APNG keeps its first frame.
 - `models.py` — `MarkdownImage` (`markdown_image`: `id` uuid4 set in Python,
   `storage_key`, `mime`, `size`, `width`, `height`, `created_at`; CHECKs
   `ck_markdown_image_mime|size|dimensions`). `IMAGE_KEY_PREFIX` `media/images/`,
   `image_storage_key`, `IMAGE_MIMES`. Migration `066ff25554e2` (idempotent).
 - `service.py` — `MediaService(session, storage, max_bytes)`: `upload` (clean in a
-  thread, 413 when the result passes `max_bytes`, add + flush, `put`, commit), `open`
+  thread behind the process-wide `asyncio.Semaphore(CLEAN_CONCURRENCY)`, 2, 413 when the result passes `max_bytes`, add + flush, `put`, commit), `open`
   (404 unknown, 503 storage), `render_assets(markdown)` with `RENDER_MAX_IMAGES` 48,
   `RENDER_MAX_BYTES` 24 MiB, `RENDER_MAX_ASSET_BYTES` 8 MiB; `render_asset_name`
   (`img-<uuid>.png|jpg|gif|webp`).
@@ -39,9 +42,12 @@ images of a protocol for the typst render.
 **API surface:**
 - `POST /api/media/images` — multipart `file`. Principal only (applicant and anonymous:
   401). `enforce_media_body_cap` (`markdown_image_max_bytes` + 64 KiB),
-  `rate_limit_media_images` (`rl_media_images_per_hour` 120 per `sub`, MCP exempt),
-  capped read. 201 `{id, url, mime, width, height, size}`. 413 / 415 (SVG, PDF, text,
-  undecodable, bomb) / 429 / 503 (storage off or `put` failed).
+  `rate_limit_media_images` (`rl_media_images_per_hour` 120 per `sub`; an OAuth token
+  shares the budget of its person, no MCP exemption), capped read. An OAuth token
+  needs one of `UPLOAD_SCOPES` (`meetings:write`, `todos:write`, `tickets:write`,
+  `applications:write`), else 403. 201 `{id, url, mime, width, height, size}`. 403 /
+  413 / 415 (SVG, PDF, text, undecodable, bomb) / 429 / 503 (storage off or `put`
+  failed).
 - `GET /api/media/images/{id}` — any session: principal or magic-link applicant, else
   401. 404 unknown id. Streams from storage. Headers: stored `Content-Type`,
   `Content-Disposition: inline`, `X-Content-Type-Options: nosniff`,
@@ -51,7 +57,8 @@ images of a protocol for the typst render.
   `rate_limit_public_protocol_images` (`rl_public_protocol_images_ip_per_hour` 3000).
   404 unless the protocol is visible (`PublicProtocolService._visible`) AND
   `public_image_ids` (snapshot `markdown` plus the `markdown` of every public TOP)
-  holds the id. Same headers with `Cache-Control: public, max-age=86400`, plus the
+  holds the id. Same headers with `Cache-Control: public, max-age=300` (a protocol can
+  go private again, so a shared cache keeps the image for a short time only), plus the
   `X-Robots-Tag: noindex` of every `/api/public/` answer.
 
 **Conventions & gotchas:**
@@ -61,6 +68,10 @@ images of a protocol for the typst render.
 - **No uploader column.** A principal FK would pull the table into the account merge
   and the erasure. The id is a random uuid4; reading needs a session on top. The
   backup mirrors the image objects with the attachment bucket.
+- **Images outlive their texts (follow-up needed).** Nothing deletes an image when
+  its text (TOP, card, comment, note) is deleted or edited, and the privacy erasure
+  and the anonymization do not cover the images. A garbage collection of
+  unreferenced images and an erasure path are open work.
 - **The image headers win.** `SecurityHeadersMiddleware` sets its defaults with
   `setdefault`, so the route's CSP replaces the API CSP. The edge nginx maps both image
   paths to an empty `Cache-Control` (`map $ap_cache_control`) and gives

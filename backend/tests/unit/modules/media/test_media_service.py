@@ -163,3 +163,45 @@ async def test_render_assets_checks_the_real_size_of_the_object() -> None:
     # The object grew behind the row: the real bytes count.
     storage.objects[image_storage_key(a)] = (b"x" * 50, "image/png")
     assert await _service(session, storage).render_assets(_md(a), max_asset_bytes=8) == {}
+
+
+async def test_upload_runs_at_most_two_cleans_at_once(monkeypatch: pytest.MonkeyPatch) -> None:
+    import asyncio
+    import threading
+
+    from app.modules.media import service as media_service
+    from app.modules.media.images import clean_image
+
+    lock = threading.Lock()
+    running = 0
+    peak = 0
+    release = threading.Event()
+
+    def slow_clean(data: bytes) -> object:
+        nonlocal running, peak
+        with lock:
+            running += 1
+            peak = max(peak, running)
+        release.wait(5)
+        with lock:
+            running -= 1
+        return clean_image(data)
+
+    monkeypatch.setattr(media_service, "clean_image", slow_clean)
+    monkeypatch.setattr(media_service, "_clean_slots", asyncio.Semaphore(2))
+    storage = MediaStorage()
+    tasks = [
+        asyncio.create_task(_service(MediaSession(), storage).upload(encode("PNG")))
+        for _ in range(4)
+    ]
+    for _ in range(50):
+        await asyncio.sleep(0.01)
+        if peak == 2:
+            break
+    await asyncio.sleep(0.05)
+    assert peak == 2
+    release.set()
+    outs = await asyncio.gather(*tasks)
+    assert len({o.id for o in outs}) == 4
+    assert peak == 2
+    assert media_service.CLEAN_CONCURRENCY == 2
