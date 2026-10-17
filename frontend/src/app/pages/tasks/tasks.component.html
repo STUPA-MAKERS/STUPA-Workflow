@@ -37,12 +37,11 @@
           <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
         } @else if (!rows().length && !hasTodos()) {
           @if (split()) {
-            <!-- Side by side the detail pane shows the empty state; one is enough. -->
-            <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
+            <!-- Side by side the detail pane carries the line below the heading. -->
+            <app-empty-state rows="3" [heading]="'tasks.empty' | t" />
           } @else {
             <app-empty-state
               class="tasks__empty"
-              icon="check"
               [heading]="'tasks.empty' | t"
               [body]="'tasks.emptyBody' | t"
             />
@@ -53,7 +52,7 @@
               {{ 'tasks.group.applications' | t }}
             </h2>
             @if (!rows().length) {
-              <p class="tasks__status">{{ 'tasks.empty' | t }}</p>
+              <app-empty-state rows="3" [heading]="'tasks.empty' | t" />
             }
           }
           @for (group of showApplications() ? groups() : []; track group.key + $index) {
@@ -105,35 +104,36 @@
                 {{ 'tasks.group.todos' | t }}
               </h2>
               @if (!todoRows().length) {
-                <p class="tasks__status">{{ 'todos.noMatch' | t }}</p>
-              }
-              <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
-                @for (row of todoRows(); track row.item.id) {
-                  <app-list-item
-                    role="listitem"
-                    class="tasks__row"
-                    [title]="row.item.title"
-                    [link]="['/tasks', 'todo', row.item.id]"
-                    [selected]="row.item.id === selectedTodo()"
-                  >
-                    <app-icon lead class="tasks__circle" name="circle" [size]="20" />
-                    <span sub class="tasks__board">
-                      <app-icon name="kanban" [size]="14" />{{ row.item.boardName }}
-                    </span>
-                    <span trail class="tasks__trail">
-                      <span class="tasks__due" [attr.data-tone]="row.tone">
-                        @if (row.due) {
-                          <app-icon name="cal" [size]="14" />
-                        }
-                        {{ row.due ?? ('todos.due.none' | t) }}
+                <app-empty-state rows="3" [heading]="'todos.noMatch' | t" />
+              } @else {
+                <div class="tasks__rows" [class.rowgroup]="!split()" role="list">
+                  @for (row of todoRows(); track row.item.id) {
+                    <app-list-item
+                      role="listitem"
+                      class="tasks__row"
+                      [title]="row.item.title"
+                      [link]="['/tasks', 'todo', row.item.id]"
+                      [selected]="row.item.id === selectedTodo()"
+                    >
+                      <app-icon lead class="tasks__circle" name="circle" [size]="20" />
+                      <span sub class="tasks__board">
+                        <app-icon name="kanban" [size]="14" />{{ row.item.boardName }}
                       </span>
-                      @if (!split()) {
-                        <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
-                      }
-                    </span>
-                  </app-list-item>
-                }
-              </div>
+                      <span trail class="tasks__trail">
+                        <span class="tasks__due" [attr.data-tone]="row.tone">
+                          @if (row.due) {
+                            <app-icon name="cal" [size]="14" />
+                          }
+                          {{ row.due ?? ('todos.due.none' | t) }}
+                        </span>
+                        @if (!split()) {
+                          <app-icon class="tasks__chev" name="chevron-right" [size]="17" />
+                        }
+                      </span>
+                    </app-list-item>
+                  }
+                </div>
+              }
             </section>
           }
         }

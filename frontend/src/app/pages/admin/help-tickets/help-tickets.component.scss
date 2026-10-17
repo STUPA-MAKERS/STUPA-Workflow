@@ -104,12 +104,6 @@
 .ht__link {
   color: var(--color-accent-text);
 }
-.ht__empty {
-  margin: 0;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-}
-
 /* ------------------------------------------------------------------ loading */
 /* A filled field with its label inside (56px), as `app-input` draws it. */
 .ht__skelField {

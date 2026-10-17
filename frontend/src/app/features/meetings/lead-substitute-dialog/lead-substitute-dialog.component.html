@@ -26,10 +26,12 @@
           />
         </label>
       }
-      <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
-        @if (pool() === null) {
-          <p class="dd__empty">{{ 'meetings.leadSubstitute.loading' | t }}</p>
-        } @else {
+      @if (pool() === null || failed()) {
+        <div class="dd__rows rowgroup rowgroup--bg3">
+          <p class="dd__empty">{{ (failed() ? 'meetings.leadSubstitute.loadFailed' : 'meetings.leadSubstitute.loading') | t }}</p>
+        </div>
+      } @else if (shown().length) {
+        <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
           @for (r of shown(); track r.principalId) {
             <label class="dd__row" [class.dd__row--on]="selected() === r.principalId" [class.dd__row--off]="!allowed()">
               <input
@@ -47,13 +49,14 @@
                 <span class="dd__sub">{{ (r.isMember ? 'participant.delegation.member' : 'participant.delegation.substitute') | t }}</span>
               </span>
             </label>
-          } @empty {
-            <p class="dd__empty">
-              {{ (failed() ? 'meetings.leadSubstitute.loadFailed' : query() ? 'participant.delegation.noMember' : 'meetings.leadSubstitute.empty') | t: { name: memberName() } }}
-            </p>
           }
-        }
-      </div>
+        </div>
+      } @else {
+        <app-empty-state
+          rows="3"
+          [heading]="(query() ? 'participant.delegation.noMember' : 'meetings.leadSubstitute.empty') | t: { name: memberName() }"
+        />
+      }
     </section>
 
     @if (votingEnabled()) {

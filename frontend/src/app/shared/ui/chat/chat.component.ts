@@ -59,6 +59,7 @@ import type {
   ChatVisibility,
 } from './chat.models';
 import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, linkify, newCount } from './chat.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The log counts as "at the newest message" this close to its end, in px. */
 const BOTTOM_SLACK = 24;
@@ -171,6 +172,7 @@ function writeStore(key: string, value: string | null): void {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     AvatarComponent,
     ButtonComponent,
     ChatBodyPipe,

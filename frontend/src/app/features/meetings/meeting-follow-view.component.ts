@@ -39,6 +39,7 @@ import { ParticipantVoteService } from './participant-vote/participant-vote.serv
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The length of the protocol excerpt on a phone, in characters. */
 const EXCERPT_LENGTH = 160;
@@ -73,6 +74,7 @@ const EXCERPT_LENGTH = 160;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ParticipantVoteService],
   imports: [
+    EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ScrollFadeDirective,

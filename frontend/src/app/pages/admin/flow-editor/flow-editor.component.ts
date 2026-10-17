@@ -83,6 +83,7 @@ import { StateInspectorComponent, type GuardPriorityRow } from './state-inspecto
 import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
@@ -106,6 +107,7 @@ import { TransitionListsComponent } from './transition-lists.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [FlowEditorOptionsService],
   imports: [
+    EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
     VersionHistoryComponent,

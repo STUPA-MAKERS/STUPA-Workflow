@@ -236,7 +236,7 @@ describe('PublicProtocolsComponent', () => {
         gremien: jest.fn(() => throwError(() => new Error('down'))),
       }),
     );
-    expect(screen.getByRole('heading', { name: 'Noch keine öffentlichen Protokolle' })).toBeInTheDocument();
+    expect(screen.getByText('Noch keine öffentlichen Protokolle')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Zur Startseite/ })).toHaveAttribute('href', '/');
     expect(screen.queryByRole('searchbox')).toBeNull();
   });
@@ -249,7 +249,7 @@ describe('PublicProtocolsComponent', () => {
       .mockReturnValue(of(pageFixture([summaryFixture()])));
     const { api } = await setup(makeApi({ list }));
     await userEvent.type(screen.getByRole('searchbox'), 'Haushalt 2025{enter}');
-    expect(screen.getByRole('heading', { name: 'Keine Protokolle gefunden' })).toBeInTheDocument();
+    expect(screen.getByText('Keine Protokolle gefunden')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
     expect(api.list).toHaveBeenLastCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
     expect(screen.getByRole('article')).toBeInTheDocument();

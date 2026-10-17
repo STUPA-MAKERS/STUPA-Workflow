@@ -158,10 +158,6 @@
 .ad__progress {
   inset-inline: var(--radius-2xl);
 }
-.ad--center {
-  align-items: center;
-  justify-content: center;
-}
 .ad__error {
   margin: 0;
   padding: var(--space-5) 0;
@@ -303,12 +299,6 @@
 }
 .ad__secTitle {
   padding: 0 var(--space-1);
-}
-.ad__none {
-  margin: 0;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
 }
 
 /* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at

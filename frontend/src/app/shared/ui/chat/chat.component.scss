@@ -95,11 +95,9 @@
 .chat__dot {
   padding: 0 6px;
 }
+/* The empty thread sits in the middle of the log. */
 .chat__empty {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  text-align: center;
+  margin-block: auto;
 }
 
 /* ------------------------------------------------------------------ messages */

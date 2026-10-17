@@ -55,6 +55,7 @@ import { DraftAttachmentsService } from './draft-attachments.service';
 import { DraftFilesComponent } from './draft-files/draft-files.component';
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The steps of the wizard. `contact` drops out for a signed-in user without PII fields. */
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
@@ -126,6 +127,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     SkeletonComponent,
     ReactiveFormsModule,
     FormlyForm,

@@ -14,6 +14,7 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { downloadBlob } from '@shared/download.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
@@ -43,6 +44,7 @@ const COPIED_MS = 2000;
   imports: [
     ButtonComponent,
     DialogComponent,
+    EmptyStateComponent,
     IconComponent,
     LocalizedDatePipe,
     NoteComponent,

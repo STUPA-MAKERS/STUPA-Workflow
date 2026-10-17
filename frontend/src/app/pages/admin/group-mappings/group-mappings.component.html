@@ -16,7 +16,7 @@
 
       @if (sec.loading) {
         <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-      } @else {
+      } @else if (sec.rows.length) {
         <ul class="rowgroup gm__list">
           @for (r of sec.rows; track r.id) {
             <li class="gm__row">
@@ -51,10 +51,10 @@
                 </app-button>
               </span>
             </li>
-          } @empty {
-            <li class="gm__empty">{{ key(sec.kind, 'empty') | t }}</li>
           }
         </ul>
+      } @else {
+        <app-empty-state rows="3" [heading]="key(sec.kind, 'empty') | t" />
       }
     </section>
   }

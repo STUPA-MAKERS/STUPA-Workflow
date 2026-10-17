@@ -11,66 +11,69 @@
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.forms.overviewError' | t }}</app-note>
   } @else {
-    <app-data-table
-      surface="rowgroup"
-      [loading]="loading()"
-      [loadingText]="'admin.forms.overviewLoading' | t"
-      [columns]="columns()"
-      [rows]="types()"
-      [rowKey]="rowId"
-      [emptyText]="'admin.forms.overviewEmpty' | t"
-    >
-      <ng-template appCell="name" let-t>
-        <a class="fl__name ell" [routerLink]="['/admin/forms', $any(t).id]" [title]="name($any(t))">{{ name($any(t)) }}</a>
-      </ng-template>
-      <ng-template appCell="gremium" let-t>
-        <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
-      </ng-template>
-      <ng-template appCell="budget" let-t>
-        <span [class.fl__muted]="!$any(t).hasBudget">{{ ($any(t).hasBudget ? 'admin.forms.withBudget' : 'admin.forms.withoutBudget') | t }}</span>
-      </ng-template>
-      <ng-template appCell="status" let-t>
-        @if ($any(t).activeFormVersionId) {
-          <app-status-text kind="accent">{{ 'admin.forms.status.active' | t }}</app-status-text>
-        } @else {
-          <app-status-text kind="warn">{{ 'admin.forms.status.draft' | t }}</app-status-text>
-        }
-      </ng-template>
-      <ng-template appCell="version" let-t>
-        <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
-      </ng-template>
-      <ng-template appCell="actions" let-t>
-        @if (phone()) {
-          <app-row-menu
-            [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
-            [sections]="rowMenu()"
-            (selected)="onRowMenu($any(t), $event)"
-          />
-        } @else {
-          <span class="fl__actions">
-            <a
-              class="fl__iconLink"
-              [routerLink]="['/admin/forms', $any(t).id]"
-              [attr.aria-label]="('admin.forms.edit' | t) + ': ' + name($any(t))"
-              [attr.title]="'admin.forms.edit' | t"
-              ><app-icon name="edit" [size]="18"
-            /></a>
-            @if (canDelete()) {
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="('admin.forms.delete' | t) + ': ' + name($any(t))"
-                [title]="'admin.forms.delete' | t"
-                (click)="askDelete($any(t))"
-              >
-                <app-icon name="trash" />
-              </app-button>
-            }
-          </span>
-        }
-      </ng-template>
-    </app-data-table>
+    @if (loading() || types().length) {
+      <app-data-table
+        surface="rowgroup"
+        [loading]="loading()"
+        [loadingText]="'admin.forms.overviewLoading' | t"
+        [columns]="columns()"
+        [rows]="types()"
+        [rowKey]="rowId"
+      >
+        <ng-template appCell="name" let-t>
+          <a class="fl__name ell" [routerLink]="['/admin/forms', $any(t).id]" [title]="name($any(t))">{{ name($any(t)) }}</a>
+        </ng-template>
+        <ng-template appCell="gremium" let-t>
+          <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
+        </ng-template>
+        <ng-template appCell="budget" let-t>
+          <span [class.fl__muted]="!$any(t).hasBudget">{{ ($any(t).hasBudget ? 'admin.forms.withBudget' : 'admin.forms.withoutBudget') | t }}</span>
+        </ng-template>
+        <ng-template appCell="status" let-t>
+          @if ($any(t).activeFormVersionId) {
+            <app-status-text kind="accent">{{ 'admin.forms.status.active' | t }}</app-status-text>
+          } @else {
+            <app-status-text kind="warn">{{ 'admin.forms.status.draft' | t }}</app-status-text>
+          }
+        </ng-template>
+        <ng-template appCell="version" let-t>
+          <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
+        </ng-template>
+        <ng-template appCell="actions" let-t>
+          @if (phone()) {
+            <app-row-menu
+              [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
+              [sections]="rowMenu()"
+              (selected)="onRowMenu($any(t), $event)"
+            />
+          } @else {
+            <span class="fl__actions">
+              <a
+                class="fl__iconLink"
+                [routerLink]="['/admin/forms', $any(t).id]"
+                [attr.aria-label]="('admin.forms.edit' | t) + ': ' + name($any(t))"
+                [attr.title]="'admin.forms.edit' | t"
+                ><app-icon name="edit" [size]="18"
+              /></a>
+              @if (canDelete()) {
+                <app-button
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="('admin.forms.delete' | t) + ': ' + name($any(t))"
+                  [title]="'admin.forms.delete' | t"
+                  (click)="askDelete($any(t))"
+                >
+                  <app-icon name="trash" />
+                </app-button>
+              }
+            </span>
+          }
+        </ng-template>
+      </app-data-table>
+    } @else {
+      <app-empty-state [heading]="'admin.forms.overviewEmpty' | t" />
+    }
   }
 </section>
 

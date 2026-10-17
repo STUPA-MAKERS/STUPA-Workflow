@@ -25,6 +25,7 @@ import {
   MEMBER_GREMIUM_ROLE_KEY,
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One row of the member list. */
 interface Member {
@@ -55,6 +56,7 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     RouterLink,
     TranslatePipe,
     CapitalizePipe,

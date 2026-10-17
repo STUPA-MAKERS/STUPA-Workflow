@@ -151,48 +151,49 @@
             }
           </div>
           @if (!bookings().length) {
-            <p class="fd__none">{{ 'invoices.detail.noBookings' | t }}</p>
-          }
-          <div class="rowgroup">
-            @for (b of bookings(); track b.id) {
-              @let c = cc(b);
-              <a class="fd__link" routerLink="/expenses" [queryParams]="{ id: bookingTarget(b) }">
-                <span class="fd__linkBody">
-                  <span class="fd__linkTitle">{{ b.description }}</span>
-                  <span class="fd__linkMeta">
-                    <span>{{ (b.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
-                    <span class="fd__dot" aria-hidden="true">·</span>
-                    @if (c.color) {
-                      <span class="fd__swatch" aria-hidden="true" [style.background]="c.color"></span>
-                    }
-                    <span class="fd__linkCc" [title]="c.name">{{ c.name }}</span>
-                    @if (day(b.paymentDate); as d) {
-                      <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
-                    }
+            <app-empty-state rows="3" [heading]="'invoices.detail.noBookings' | t" />
+          } @else {
+            <div class="rowgroup">
+              @for (b of bookings(); track b.id) {
+                @let c = cc(b);
+                <a class="fd__link" routerLink="/expenses" [queryParams]="{ id: bookingTarget(b) }">
+                  <span class="fd__linkBody">
+                    <span class="fd__linkTitle">{{ b.description }}</span>
+                    <span class="fd__linkMeta">
+                      <span>{{ (b.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
+                      <span class="fd__dot" aria-hidden="true">·</span>
+                      @if (c.color) {
+                        <span class="fd__swatch" aria-hidden="true" [style.background]="c.color"></span>
+                      }
+                      <span class="fd__linkCc" [title]="c.name">{{ c.name }}</span>
+                      @if (day(b.paymentDate); as d) {
+                        <span class="fd__dot" aria-hidden="true">·</span><span class="mono">{{ d }}</span>
+                      }
+                    </span>
                   </span>
-                </span>
-                <span class="mono fd__linkAmount">{{ signed(b) }}</span>
-                <app-icon class="fd__chev" name="chevron-right" [size]="17" />
-              </a>
-            }
-            @if (bookings().length && booked(); as bk) {
-              <div class="fd__booked">
-                <div class="fd__bookedLine">
-                  <span>{{ 'invoices.booked' | t }}</span>
-                  <span class="mono">{{ 'invoices.bookedOf' | t: { booked: money(bk.booked), gross: money(bk.gross) } }}</span>
+                  <span class="mono fd__linkAmount">{{ signed(b) }}</span>
+                  <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+                </a>
+              }
+              @if (bookings().length && booked(); as bk) {
+                <div class="fd__booked">
+                  <div class="fd__bookedLine">
+                    <span>{{ 'invoices.booked' | t }}</span>
+                    <span class="mono">{{ 'invoices.bookedOf' | t: { booked: money(bk.booked), gross: money(bk.gross) } }}</span>
+                  </div>
+                  <app-seg-bar
+                    size="thin"
+                    [segments]="[{ value: bk.booked, tone: 'filled' }]"
+                    [total]="bk.gross"
+                    [label]="bookedLabel(bk.booked, bk.gross)"
+                  />
+                  @if (bk.open > 0) {
+                    <p class="fd__bookedRest">{{ 'invoices.notBooked' | t: { amount: money(bk.open) } }}</p>
+                  }
                 </div>
-                <app-seg-bar
-                  size="thin"
-                  [segments]="[{ value: bk.booked, tone: 'filled' }]"
-                  [total]="bk.gross"
-                  [label]="bookedLabel(bk.booked, bk.gross)"
-                />
-                @if (bk.open > 0) {
-                  <p class="fd__bookedRest">{{ 'invoices.notBooked' | t: { amount: money(bk.open) } }}</p>
-                }
-              </div>
-            }
-          </div>
+              }
+            </div>
+          }
         </section>
       }
     </div>

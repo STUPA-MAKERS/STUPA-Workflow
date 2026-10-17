@@ -206,7 +206,7 @@ describe('AgendaItemDialogComponent', () => {
     expect(area().querySelector('.aid__list')).not.toBeNull();
     cmp.query.set('zzz');
     fixture.detectChanges();
-    expect(area().querySelector('.aid__empty')).not.toBeNull();
+    expect(area().querySelector('app-empty-state')).not.toBeNull();
     await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
     expect(area()).toHaveAttribute('data-kind', 'freetext');
     expect(area().querySelector('#aid-title')).not.toBeNull();
@@ -224,9 +224,9 @@ describe('AgendaItemDialogComponent', () => {
   it('shows ghost rows behind the message of an empty list, hidden from the screen reader', async () => {
     const { http, fixture } = await setup();
     flushApps(http, fixture, []);
-    const ghosts = document.querySelector('.aid__ghosts') as HTMLElement;
+    const ghosts = document.querySelector('.es__ghosts') as HTMLElement;
     expect(ghosts).toHaveAttribute('aria-hidden', 'true');
-    expect(ghosts.querySelectorAll('.aid__ghost')).toHaveLength(5);
+    expect(ghosts.querySelectorAll('.es__ghost')).toHaveLength(5);
     expect(screen.queryByRole('radiogroup', { name: /Zuweisbare Anträge/ })).toBeNull();
     expect(screen.getByRole('button', { name: 'Als Freitext anlegen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
@@ -417,7 +417,7 @@ describe('AgendaItemDialogComponent', () => {
       http.expectOne((r) => r.url === '/api/todos/boards').flush([BOARDS[0], BOARDS[2]]);
       fixture.detectChanges();
       expect(screen.queryByRole('radiogroup', { name: 'Offene To-Dos' })).toBeNull();
-      expect(document.querySelector('.aid__ghosts')).toHaveAttribute('aria-hidden', 'true');
+      expect(document.querySelector('.es__ghosts')).toHaveAttribute('aria-hidden', 'true');
       await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Grillfest');
       expect(screen.getByText('Keine offenen To-Dos')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Als Freitext anlegen' }));

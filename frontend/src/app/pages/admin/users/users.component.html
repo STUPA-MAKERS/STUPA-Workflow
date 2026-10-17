@@ -52,7 +52,7 @@
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="5" [label]="'admin.users.loading' | t" />
-  } @else {
+  } @else if (principals().length) {
     <ul class="rowgroup au__list" [attr.aria-label]="'admin.users.title' | t">
       @for (p of principals(); track p.id) {
         <li class="au__row" [class.au__row--off]="p.active === false || !!p.mergedIntoId">
@@ -140,12 +140,10 @@
             }
           </div>
         </li>
-      } @empty {
-        <li class="au__empty">
-          <app-empty-state icon="users" [heading]="'admin.users.noResults' | t" />
-        </li>
       }
     </ul>
+  } @else {
+    <app-empty-state [heading]="'admin.users.noResults' | t" />
   }
 </section>
 

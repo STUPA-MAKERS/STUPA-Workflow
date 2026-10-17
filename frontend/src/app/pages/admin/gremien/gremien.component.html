@@ -20,7 +20,7 @@
     <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
   } @else if (loadError()) {
     <p class="grem__error" role="alert">{{ 'admin.gremien.error' | t }}</p>
-  } @else {
+  } @else if (gremien().length) {
     <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
       @for (g of gremien(); track g.id) {
         <li class="grem__item">
@@ -123,12 +123,10 @@
             </div>
           }
         </li>
-      } @empty {
-        <li class="grem__emptyRow">
-          <app-empty-state icon="landmark" [heading]="'admin.gremien.empty' | t" />
-        </li>
       }
     </ul>
+  } @else {
+    <app-empty-state [heading]="'admin.gremien.empty' | t" />
   }
 </section>
 

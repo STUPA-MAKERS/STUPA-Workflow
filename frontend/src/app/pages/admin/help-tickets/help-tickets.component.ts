@@ -27,6 +27,7 @@ import {
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The choices of the retention chip, in months. */
 export const RETENTION_CHOICES: readonly number[] = [1, 3, 6, 12, 24, 36, 60, 120];
@@ -67,6 +68,7 @@ export function isHttpUrl(text: string): boolean {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     RouterLink,
     TranslatePipe,

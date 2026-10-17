@@ -9,7 +9,7 @@
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
-  } @else {
+  } @else if (hooks().length) {
     <ul class="rowgroup wh__list" [attr.aria-label]="'admin.webhook.title' | t">
       @for (h of hooks(); track h.id; let i = $index) {
         @let s = statusOf(h.id);
@@ -96,15 +96,15 @@
                   <p class="wh__dead" role="alert">{{ 'admin.webhook.delivery.deadHint' | t }}</p>
                 }
               } @else {
-                <p class="wh__muted">{{ 'admin.webhook.delivery.none' | t }}</p>
+                <app-empty-state rows="2" [heading]="'admin.webhook.delivery.none' | t" />
               }
             </section>
           }
         </li>
-      } @empty {
-        <li class="wh__empty">{{ 'admin.webhook.none' | t }}</li>
       }
     </ul>
+  } @else {
+    <app-empty-state [heading]="'admin.webhook.none' | t" />
   }
 </section>
 

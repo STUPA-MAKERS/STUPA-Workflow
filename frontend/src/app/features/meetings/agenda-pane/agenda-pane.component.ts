@@ -30,6 +30,7 @@ import {
   type NewTodoLink,
 } from '../../todos/new-dialog/todo-new-dialog.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
@@ -74,6 +75,7 @@ export interface AgendaMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     CdkDrag,
     CdkDragPlaceholder,
     CdkDropList,

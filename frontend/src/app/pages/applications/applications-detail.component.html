@@ -37,8 +37,9 @@
     <span class="sr-only" role="status">{{ 'applications.detail.loading' | t }}</span>
   </article>
 } @else if (notFound()) {
-  <div class="ad ad--center">
+  <div class="ad">
     <app-empty-state
+      fill
       [heading]="'applications.detail.notFound' | t"
       [body]="'applications.detail.notFoundBody' | t"
     >
@@ -425,7 +426,7 @@
     @if (historyEntries().length) {
       <app-history [entries]="historyEntries()" />
     } @else {
-      <p class="ad__none">{{ 'applications.history.empty' | t }}</p>
+      <app-empty-state rows="3" [heading]="'applications.history.empty' | t" />
     }
   </section>
 </ng-template>

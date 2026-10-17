@@ -22,6 +22,8 @@
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
   } @else if (failed()) {
     <p class="rm__error" role="alert">{{ 'admin.gremiumRoles.loadFailed' | t }}</p>
+  } @else if (!sorted().length) {
+    <app-empty-state rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
   } @else {
     <div
       class="rowgroup rm__table"
@@ -116,10 +118,6 @@
               </app-button>
             }
           </div>
-        </div>
-      } @empty {
-        <div class="rm__row rm__row--empty" role="row">
-          <span role="cell">{{ 'admin.gremiumRoles.empty' | t }}</span>
         </div>
       }
     </div>

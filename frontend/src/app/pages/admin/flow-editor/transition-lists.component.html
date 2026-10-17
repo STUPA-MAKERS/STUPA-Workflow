@@ -28,7 +28,7 @@
           }
         </ul>
       } @else {
-        <p class="ins__hint">{{ 'admin.flow.list.empty' | t }}</p>
+        <app-empty-state rows="2" [heading]="'admin.flow.list.empty' | t" />
       }
     </div>
   }

@@ -23,6 +23,7 @@ import {
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * The public share links of one application (`application.share`): mint a link, read it
@@ -40,6 +41,7 @@ import { SelectFieldComponent } from '@shared/ui/select/select.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     LocalizedDatePipe,
     TranslatePipe,
