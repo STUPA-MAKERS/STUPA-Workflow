@@ -306,7 +306,7 @@ def build_document(
         # custom title-page set.
         footer_names = [_FOOTER_SWAP.get(n, n) for n in defaults]
 
-    blocks: list[Node] = _handover_lines(convert_body(body, meta), keepers)
+    blocks: list[Node] = _handover_lines(convert_body(body, meta, assets), keepers)
     signers = _signers(options, keepers)
     if signers:
         blocks.append({"t": "signatures", "signers": signers})

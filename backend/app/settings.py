@@ -234,6 +234,9 @@ class Settings(BaseSettings):
     attachment_draft_ttl_days: int = Field(default=7, ge=1)
     attachment_draft_max_files: int = Field(default=20, ge=1)
     attachment_draft_max_bytes: int = Field(default=50 * 1024 * 1024, ge=1)
+    # Markdown images (POST /media/images): the cap on the uploaded file and on the
+    # encoded result. A larger file gives 413.
+    markdown_image_max_bytes: int = Field(default=10 * 1024 * 1024, ge=1)
 
     # Whole-platform backups (/admin/backups). An archive holds the pg_dump plus a
     # mirror of the attachment bucket, age-encrypted, in its own MinIO bucket. Without
@@ -369,6 +372,9 @@ class Settings(BaseSettings):
     # mails the team, so a flood of messages must not become a flood of mails.
     rl_ticket_messages_per_hour: int = 60
     rl_attachments_per_hour: int = 30  # POST /attachments: 30 per hour per applicant
+    # POST /media/images: uploads per hour per principal. A protocol with many pasted
+    # screenshots needs more than the attachment limit.
+    rl_media_images_per_hour: int = 120
     # Default limit on all writing endpoints. It keys on the IP and stays generous. It
     # catches an endpoint without its own stricter limit (defense in depth).
     rl_default_write_per_hour: int = 100
@@ -398,6 +404,9 @@ class Settings(BaseSettings):
     # generous; they stop a scraper that walks every protocol.
     rl_public_protocols_ip_per_hour: int = 3000
     rl_public_protocol_pdf_ip_per_hour: int = 600
+    # The images of a public protocol, per IP. One detail page loads every image of
+    # the protocol, so the limit is the one of the reads.
+    rl_public_protocol_images_ip_per_hour: int = 3000
 
     # Gravatar proxy (GET /principals/{id}/avatar). The API fetches the image from the
     # fixed host gravatar.com and keeps the result in Redis. A found image and a missing

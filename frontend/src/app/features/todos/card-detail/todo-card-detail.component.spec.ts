@@ -435,6 +435,11 @@ describe('TodoCardDetailComponent', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Beschreibung bearbeiten' }));
     detect();
     expect(cmp.descDraft()).toBe('');
+    // The image button opens the file dialog of the upload directive.
+    const click = jest.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => undefined);
+    fireEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
+    expect(click).toHaveBeenCalled();
+    click.mockRestore();
     cmp.descDraft.set('  Neu  ');
     cmp.saveDesc();
     expect(api.patchCard).toHaveBeenLastCalledWith('k-1', { version: 1, descriptionMd: 'Neu' });

@@ -66,7 +66,10 @@
               (ngModelChange)="toggleSelect(att.id, $event)"
               [attr.aria-label]="att.filename"
             />
-          } @else {
+          }
+          @if (isImage(att)) {
+            <app-image-thumb class="att__thumb" size="sm" [src]="thumbUrl(att)" />
+          } @else if (!deleteAllowed()) {
             <app-icon class="att__icon" name="clip" [size]="19" />
           }
           <div class="att__meta">

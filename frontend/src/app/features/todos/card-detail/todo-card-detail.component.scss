@@ -399,6 +399,9 @@ a.cd__linkTitle:hover {
   justify-content: flex-end;
   gap: var(--space-2);
 }
+.cd__formStart {
+  margin-inline-end: auto;
+}
 
 /* ------------------------------------------------------------------ checklist */
 .cd__progress {

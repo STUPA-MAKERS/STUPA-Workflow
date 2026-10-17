@@ -1,4 +1,4 @@
-import { applyRawFormat } from './raw-format';
+import { applyRawFormat, insertRawTable } from './raw-format';
 
 describe('applyRawFormat', () => {
   it('puts bold marks around the selection and takes them away again', () => {
@@ -36,5 +36,26 @@ describe('applyRawFormat', () => {
 
   it('adds the prefix when only some lines have it', () => {
     expect(applyRawFormat({ text: '- a\nb', start: 0, end: 5 }, 'bulletList').text).toBe('- - a\n- b');
+  });
+});
+
+describe('insertRawTable', () => {
+  const TABLE = '|  |  |  |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |';
+
+  it('puts a table into an empty text with the cursor in the first cell', () => {
+    expect(insertRawTable({ text: '', start: 0, end: 0 })).toEqual({ text: `${TABLE}\n`, start: 2, end: 2 });
+  });
+
+  it('separates the table from the text around it by an empty line', () => {
+    const next = insertRawTable({ text: 'vorher\nnachher', start: 6, end: 6 }, 2, 1);
+    expect(next.text).toBe('vorher\n\n|  |\n| --- |\n|  |\n\nnachher');
+    expect(next.start).toBe(10);
+  });
+
+  it('adds no extra line where one is already', () => {
+    const next = insertRawTable({ text: 'a\n\n\n\nb', start: 3, end: 3 }, 1, 1);
+    expect(next.text).toBe('a\n\n|  |\n| --- |\n\nb');
+    expect(insertRawTable({ text: 'a\n', start: 2, end: 2 }, 1, 1).text).toBe('a\n\n|  |\n| --- |\n');
+    expect(insertRawTable({ text: 'a\nb', start: 1, end: 1 }, 1, 1).text).toBe('a\n\n|  |\n| --- |\n\nb');
   });
 });

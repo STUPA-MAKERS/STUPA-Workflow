@@ -5,6 +5,7 @@ import {
   effect,
   type ElementRef,
   inject,
+  Injector,
   input,
   model,
   output,
@@ -13,6 +14,7 @@ import {
   viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { firstValueFrom } from 'rxjs';
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -21,13 +23,22 @@ import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
   IconComponent,
   SegmentedComponent,
+  ToastService,
   type IconName,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
 import {
   MarkdownEditorComponent,
   type MarkdownFormat,
+  type MarkdownImageUploader,
+  type MarkdownTableCommand,
 } from '@stupa-makers/ui-kit/markdown-editor';
+import { MediaApiService } from '@shared/markdown/media-api.service';
+import {
+  MarkdownImageUploadDirective,
+  imageUploadErrorKey,
+} from '@shared/markdown/markdown-image-upload.directive';
+import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import type { StatusKind } from '@shared/status-kind.util';
@@ -36,7 +47,7 @@ import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
-import { applyRawFormat } from './raw-format';
+import { applyRawFormat, insertRawTable } from './raw-format';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -60,6 +71,20 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
 ];
 
+/** The items of the table menu, in the order of the menu. */
+const TABLE_ITEMS: readonly { id: MarkdownTableCommand; label: TranslationKey; icon: IconName; danger?: boolean }[] = [
+  { id: 'addRowAfter', label: 'meetings.editor.addRow', icon: 'plus' },
+  { id: 'addColumnAfter', label: 'meetings.editor.addColumn', icon: 'plus' },
+  { id: 'deleteRow', label: 'meetings.editor.deleteRow', icon: 'minus' },
+  { id: 'deleteColumn', label: 'meetings.editor.deleteColumn', icon: 'minus' },
+  { id: 'deleteTable', label: 'meetings.editor.deleteTable', icon: 'trash', danger: true },
+];
+
+/** The file name without its extension, as the alt text of an uploaded image. */
+function altOf(file: File): string {
+  return file.name.replace(/\.[^.]*$/, '');
+}
+
 /**
  * The sheet of the open agenda item: "TOP 3 · Antrag", the title, "Antrag öffnen", the
  * format bar with the save state, and the Markdown editor of the text.
@@ -80,6 +105,9 @@ const TOOLS: readonly FormatTool[] = [
  *
  * A switch in the format bar shows the text formatted or as its Markdown source. The
  * format buttons work in both views. The choice stays when another item opens.
+ * "Tabelle einfügen" and "Bild einfügen" also work in both views; in a table of the
+ * formatted view a menu edits its rows and columns. A paste or a drop of an image file
+ * uploads it to the media store and inserts the image (`MediaApiService`).
  *
  * A vote result in the text shows as a card with "Beschluss · 18:52 · Einfache Mehrheit",
  * the counts and the result (a tie is "Abgelehnt", O18), from the votes of this meeting.
@@ -94,7 +122,9 @@ const TOOLS: readonly FormatTool[] = [
     TranslatePipe,
     IconComponent,
     MarkdownEditorComponent,
+    MarkdownImageUploadDirective,
     NoteComponent,
+    RowMenuComponent,
     ProtocolBarComponent,
     SegmentedComponent,
     StatusTextComponent,
@@ -105,6 +135,8 @@ const TOOLS: readonly FormatTool[] = [
 })
 export class TopSheetComponent {
   private readonly i18n = inject(I18nService);
+  private readonly injector = inject(Injector);
+  private readonly toast = inject(ToastService);
 
   readonly meeting = input.required<Meeting>();
   readonly protocol = input.required<Protocol | null>();
@@ -230,6 +262,41 @@ export class TopSheetComponent {
 
   private readonly editor = viewChild<MarkdownEditorComponent>('ed');
   private readonly rawArea = viewChild<ElementRef<HTMLTextAreaElement>>('raw');
+  private readonly rawUpload = viewChild(MarkdownImageUploadDirective);
+
+  /**
+   * Upload an image of the formatted view. The service resolves on the first upload, so
+   * a sheet that never uploads needs no HTTP client. An error shows as a toast.
+   */
+  protected readonly imageUpload: MarkdownImageUploader = async (file) => {
+    try {
+      const image = await firstValueFrom(this.injector.get(MediaApiService).uploadImage(file));
+      return { src: `/api/media/images/${image.id}`, alt: altOf(file) };
+    } catch (err) {
+      this.toast.error(this.i18n.translate(imageUploadErrorKey((err as { status?: number } | null)?.status)));
+      throw err;
+    }
+  };
+
+  /** The cursor of the formatted view is in a table. */
+  protected readonly inTable = computed(
+    () => this.mode() !== 'raw' && (this.editor()?.inTable() ?? false),
+  );
+
+  /** The table menu: rows, columns and the whole table. */
+  protected readonly tableMenu = computed<RowMenuSection[]>(() => {
+    this.i18n.locale();
+    return [
+      {
+        items: TABLE_ITEMS.map((item) => ({
+          id: item.id,
+          icon: item.icon,
+          danger: item.danger,
+          label: this.i18n.translate(item.label),
+        })),
+      },
+    ];
+  });
 
   /** The formats at the cursor. The Markdown source shows none as pressed. */
   protected readonly activeFormats = computed(() =>
@@ -257,6 +324,42 @@ export class TopSheetComponent {
     area.focus();
     area.setSelectionRange(next.start, next.end);
     this.bodyChange.emit({ itemId: t.id, body: next.text });
+  }
+
+  /** "Tabelle einfügen": in the editor, or as a Markdown table in the source. */
+  protected insertTable(): void {
+    if (this.mode() !== 'raw') {
+      this.editor()?.insertTable();
+      return;
+    }
+    const area = this.rawArea()?.nativeElement;
+    const t = this.top();
+    if (!area || !t || area.readOnly) return;
+    const next = insertRawTable({ text: area.value, start: area.selectionStart, end: area.selectionEnd });
+    area.value = next.text;
+    area.focus();
+    area.setSelectionRange(next.start, next.end);
+    this.bodyChange.emit({ itemId: t.id, body: next.text });
+  }
+
+  /** "Bild einfügen": the file dialog of the editor or of the Markdown source. */
+  protected insertImage(): void {
+    if (this.mode() !== 'raw') {
+      this.editor()?.pickImage();
+      return;
+    }
+    this.rawUpload()?.pick();
+  }
+
+  /** An item of the table menu. */
+  protected onTableMenu(item: RowMenuItem): void {
+    this.editor()?.tableCommand(item.id as MarkdownTableCommand);
+  }
+
+  /** An edit of the Markdown source. A reader changes nothing. */
+  protected onRawInput(t: AgendaItem, value: string): void {
+    if (!this.editable()) return;
+    this.bodyChange.emit({ itemId: t.id, body: value });
   }
 
   /** "TOP 3 · Antrag", or "TOP 3" for a free-text item ("Freitext" says nothing). */

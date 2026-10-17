@@ -36,6 +36,7 @@ import { markdownToSafeHtml } from '@shared/markdown/markdown.util';
 import { PressSelectDirective } from '@shared/press-select.directive';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
+import { ImageThumbComponent, inlineUrl, isThumbImage } from '../image-thumb/image-thumb.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 import { SkeletonComponent } from '../skeleton/skeleton.component';
 import { scanStatus, type StatusView } from '../../status-kind.util';
@@ -169,6 +170,7 @@ function writeStore(key: string, value: string | null): void {
     ChatBodyPipe,
     DialogComponent,
     IconComponent,
+    ImageThumbComponent,
     NgTemplateOutlet,
     PressSelectDirective,
     SegmentedComponent,
@@ -444,6 +446,16 @@ export class ChatComponent {
       return { kind: 'error', key: 'apply.files.lost' };
     }
     return scanStatus(file.scanState ?? 'clean');
+  }
+
+  /** A clean raster image shows as a thumbnail instead of a file chip. */
+  protected isImage(file: ChatAttachment): boolean {
+    return isThumbImage(file);
+  }
+
+  /** The inline preview URL of a message file. */
+  protected inline(url: string): string {
+    return inlineUrl(url);
   }
 
   /** A file of a message opens only when the scan found it clean. */

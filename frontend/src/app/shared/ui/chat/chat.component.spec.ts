@@ -262,7 +262,34 @@ describe('ChatComponent', () => {
     });
     expect(screen.getByRole('link', { name: /^angebot\.pdf/ })).toHaveAttribute('href', '/api/attachments/f/download');
     const metas = [...document.querySelectorAll('.chat__fileMeta')].map((m) => m.textContent?.trim());
-    expect(metas).toEqual(['PDF · 1 KB', 'PNG · 96 KB', '2 KB']);
+    expect(metas).toEqual(['PDF · 1 KB', '2 KB']);
+    // A clean image shows as a thumbnail that opens the inline preview in a new tab.
+    const img = screen.getByRole('img', { name: 'kopf.png' });
+    expect(img).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
+    const thumb = screen.getByRole('link', { name: 'kopf.png' });
+    expect(thumb).toHaveAttribute('href', '/api/attachments/g/download?inline=1');
+    expect(thumb).toHaveAttribute('target', '_blank');
+    expect(thumb).toHaveAttribute('rel', 'noopener');
+  });
+
+  it('keeps the chip for an image in the scan and renders Markdown tables and images', async () => {
+    await setup({
+      messages: [
+        msg('a', today(9), {
+          body: '| a | b |\n|---|--:|\n| 1 | 2 |\n\n![Plan](/api/media/images/0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40)',
+          attachments: [
+            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 10, url: '/x?sig=1', scanState: 'scanning' },
+          ],
+        }),
+      ],
+    });
+    expect(document.querySelector('.chat__file--off')).not.toBeNull();
+    expect(screen.queryByRole('img', { name: 'kopf.png' })).toBeNull();
+    expect(document.querySelector('.chat__text .mdv__table table')).not.toBeNull();
+    expect(screen.getByRole('img', { name: 'Plan' })).toHaveAttribute(
+      'src',
+      '/api/media/images/0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40',
+    );
   });
 
   it('shows pending, failed and edited states', async () => {

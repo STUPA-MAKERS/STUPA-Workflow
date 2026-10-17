@@ -248,3 +248,82 @@ def test_code_block_and_rule() -> None:
 def test_too_deep_nesting_raises() -> None:
     with pytest.raises(ConversionError):
         conv("> " * (MAX_DEPTH + 2) + "x")
+
+
+# -- uploaded images ------------------------------------------------------------
+
+IMG_ID = "0b7c6f0e-3a51-4c3e-9b8e-6f1d2a3b4c5d"
+IMG_PATH = f"/api/media/images/{IMG_ID}"
+IMG_ASSET = f"img-{IMG_ID}.png"
+
+
+def conv_assets(md: str, *assets: str) -> list[Node]:
+    return convert_body(md, META, assets)
+
+
+def test_canonical_image_with_asset_becomes_a_block_image() -> None:
+    (block,) = conv_assets(f"![Foto vom Stand]({IMG_PATH})\n", IMG_ASSET, "a1-logo.png")
+    assert block == {"t": "figure", "asset": IMG_ASSET, "alt": "Foto vom Stand"}
+
+
+def test_canonical_image_without_asset_keeps_the_alt_text() -> None:
+    (block,) = conv_assets(f"![Foto]({IMG_PATH})\n", "a1-logo.png")
+    assert block == {"t": "par", "c": [{"t": "image", "alt": "Foto"}]}
+
+
+def test_image_in_a_line_stays_inline_with_its_asset() -> None:
+    (block,) = conv_assets(f"Vorher ![Foto]({IMG_PATH}) nachher\n", IMG_ASSET)
+    assert block["t"] == "par"
+    assert {"t": "image", "asset": IMG_ASSET, "alt": "Foto"} in block["c"]  # pyright: ignore[reportOperatorIssue]
+
+
+@pytest.mark.parametrize(
+    "dest",
+    [
+        f"https://evil.example{IMG_PATH}",
+        f"{IMG_PATH}/../../etc/passwd",
+        f"/api/media/images/{IMG_ID.upper()}",
+        f"assets/{IMG_ASSET}",
+        f"/assets/{IMG_ASSET}",
+        "data:image/png;base64,AAAA",
+    ],
+)
+def test_other_image_destinations_keep_the_alt_text(dest: str) -> None:
+    (block,) = conv_assets(f"![Bild]({dest})\n", IMG_ASSET)
+    assert block == {"t": "par", "c": [{"t": "image", "alt": "Bild"}]}
+
+
+def test_image_without_alt_gets_a_default_alt() -> None:
+    (block,) = conv_assets(f"![]({IMG_PATH})\n", IMG_ASSET)
+    assert block == {"t": "figure", "asset": IMG_ASSET, "alt": "Bild"}
+
+
+def test_image_in_a_table_cell_names_its_asset() -> None:
+    (table,) = conv_assets(f"| Bild | Text |\n|---|---|\n| ![a]({IMG_PATH}) | b |\n", IMG_ASSET)
+    assert table["t"] == "table"
+    image = {"t": "image", "asset": IMG_ASSET, "alt": "a"}
+    assert table["rows"] == [[[image], [{"t": "text", "v": "b"}]]]
+
+
+def test_table_with_inline_markup_still_converts() -> None:
+    (table,) = conv("| **a** | `b` |\n|---|--:|\n| ~~c~~ | [d](https://x.org) |\n")
+    assert table["align"] == ["left", "right"]
+    assert table["head"] == [
+        [{"t": "strong", "c": [{"t": "text", "v": "a"}]}],
+        [{"t": "code", "v": "b"}],
+    ]
+    assert table["rows"] == [
+        [
+            [{"t": "strike", "c": [{"t": "text", "v": "c"}]}],
+            [{"t": "link", "url": "https://x.org", "c": [{"t": "text", "v": "d"}]}],
+        ]
+    ]
+
+
+def test_image_assets_maps_only_image_names() -> None:
+    from typst_service.markdown import image_assets
+
+    other = "img-not-a-uuid.png"
+    assert image_assets([IMG_ASSET, "a1-logo.png", other, f"img-{IMG_ID}.svg"]) == {
+        IMG_ID: IMG_ASSET
+    }

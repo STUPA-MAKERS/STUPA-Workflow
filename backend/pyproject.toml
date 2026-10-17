@@ -60,6 +60,11 @@ dependencies = [
     # Python and has no dependencies. The API sends the module matrix; the browser
     # draws it, so no QR library runs in the frontend bundle.
     "segno>=1.6",
+    # Markdown images (media module): decode, strip the metadata, downscale and encode
+    # every upload again, so the stored bytes come from Pillow and not from the client.
+    # The manylinux wheels bundle libjpeg, libpng, zlib and libwebp, so the slim image
+    # needs no system library for it.
+    "pillow>=11.0",
 ]
 
 [project.optional-dependencies]

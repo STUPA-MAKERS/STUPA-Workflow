@@ -70,3 +70,21 @@ function togglePrefix({ text, start, end }: RawText, prefix: string): RawText {
     end: from + block.length - (to - end),
   };
 }
+
+/**
+ * Insert an empty GFM table with a header row at the cursor of the Markdown source, as
+ * "Tabelle einfügen" does in the formatted view. The table stands as a block of its own,
+ * with an empty line before and after it, and the cursor goes into its first cell.
+ */
+export function insertRawTable({ text, end }: RawText, rows = 3, cols = 3): RawText {
+  const row = `|${'  |'.repeat(cols)}`;
+  const delimiter = `|${' --- |'.repeat(cols)}`;
+  const table = [row, delimiter, ...Array.from({ length: rows - 1 }, () => row)].join('\n');
+  const before = text.slice(0, end);
+  const after = text.slice(end);
+  const lead = !before ? '' : before.endsWith('\n\n') ? '' : before.endsWith('\n') ? '\n' : '\n\n';
+  const tail = !after ? '\n' : after.startsWith('\n\n') ? '' : after.startsWith('\n') ? '\n' : '\n\n';
+  const next = before + lead + table + tail + after;
+  const cell = before.length + lead.length + 2;
+  return { text: next, start: cell, end: cell };
+}

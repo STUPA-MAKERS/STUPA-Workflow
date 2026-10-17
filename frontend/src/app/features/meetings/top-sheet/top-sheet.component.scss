@@ -132,6 +132,8 @@
 }
 .ts__tools {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 2px;
 }
 .ts__tool {

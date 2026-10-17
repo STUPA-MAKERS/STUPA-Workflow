@@ -38,6 +38,7 @@ export type {
   FilterSelectPerson,
 } from './filter-select/filter-select.component';
 export { HistoryComponent } from './history/history.component';
+export { ImageThumbComponent, inlineUrl, isThumbImage } from './image-thumb/image-thumb.component';
 export type { HistoryChange, HistoryEntry } from './history/history.component';
 export {
   LIST_DETAIL_SPLIT_MIN,

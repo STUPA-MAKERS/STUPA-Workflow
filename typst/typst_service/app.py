@@ -46,9 +46,11 @@ __all__ = ["app"]
 # 4 MiB default answered 413 for real protocols with their logos.
 _MAX_BODY_BYTES = int(os.environ.get("TYPST_MAX_BODY_BYTES", str(32 * 1024 * 1024)))
 # Caps on the asset channel of a multipart request. They sit under the total
-# cap, so one huge logo cannot eat the whole budget of a document.
-_MAX_ASSETS = int(os.environ.get("TYPST_MAX_ASSETS", "16"))
-_MAX_ASSET_BYTES = int(os.environ.get("TYPST_MAX_ASSET_BYTES", str(2 * 1024 * 1024)))
+# cap, so one huge image cannot eat the whole budget of a document. The backend
+# sends the logos plus at most 48 images of the text (24 MiB together), so 64
+# assets of 8 MiB each leave room for both.
+_MAX_ASSETS = int(os.environ.get("TYPST_MAX_ASSETS", "64"))
+_MAX_ASSET_BYTES = int(os.environ.get("TYPST_MAX_ASSET_BYTES", str(8 * 1024 * 1024)))
 # Compiles in parallel. A compile is CPU-bound, so more than the cores only
 # queues work inside the kernel instead of here.
 _MAX_CONCURRENCY = int(os.environ.get("TYPST_MAX_CONCURRENCY", "2"))

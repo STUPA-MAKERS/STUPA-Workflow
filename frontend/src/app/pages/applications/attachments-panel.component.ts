@@ -13,6 +13,7 @@ import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
+import { API_BASE_URL } from '@core/api/api.config';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -26,6 +27,12 @@ import {
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import {
+  ImageThumbComponent,
+  inlineUrl,
+  isThumbImage,
+} from '@shared/ui/image-thumb/image-thumb.component';
+import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { formatBytes } from './applications.util';
 
 /**
@@ -57,6 +64,7 @@ import { formatBytes } from './applications.util';
     CheckboxComponent,
     DialogComponent,
     IconComponent,
+    ImageThumbComponent,
     StatusTextComponent,
   ],
   templateUrl: './attachments-panel.component.html',
@@ -66,6 +74,7 @@ export class AttachmentsPanelComponent {
   private readonly api = inject(ApiClient);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly apiBase = inject(API_BASE_URL);
 
   readonly applicationId = input.required<Uuid>();
   readonly canUpload = input(false);
@@ -290,6 +299,17 @@ export class AttachmentsPanelComponent {
       default:
         return 'applications.attachments.error.upload';
     }
+  }
+
+  /** A clean raster image shows a small thumbnail in its row. */
+  isImage(att: Attachment): boolean {
+    return isThumbImage(att);
+  }
+
+  /** The thumbnail streams through the session-gated download route as an inline
+   *  preview. It needs no signed URL. */
+  thumbUrl(att: Attachment): string {
+    return inlineUrl(chatFileUrl(this.apiBase, att.id));
   }
 
   /** Preview only a clean image or PDF. The browser can render those two inline. */

@@ -112,6 +112,36 @@
                 <app-icon [name]="tool.icon" [size]="20" />
               </button>
             }
+            <button
+              type="button"
+              class="ts__tool"
+              [attr.aria-label]="'meetings.editor.table' | t"
+              [title]="'meetings.editor.table' | t"
+              (mousedown)="$event.preventDefault()"
+              (click)="insertTable()"
+            >
+              <app-icon name="table" [size]="20" />
+            </button>
+            <button
+              type="button"
+              class="ts__tool"
+              [attr.aria-label]="'meetings.editor.image' | t"
+              [title]="'meetings.editor.image' | t"
+              (mousedown)="$event.preventDefault()"
+              (click)="insertImage()"
+            >
+              <app-icon name="image" [size]="20" />
+            </button>
+            @if (inTable()) {
+              <app-row-menu
+                class="ts__tableMenu"
+                icon="table"
+                align="start"
+                [label]="'meetings.editor.tableMenu' | t"
+                [sections]="tableMenu()"
+                (selected)="onTableMenu($event)"
+              />
+            }
           </div>
         }
         <span class="ts__spacer"></span>
@@ -146,13 +176,14 @@
         <div class="ts__editor ts__editor--raw">
           <textarea
             #raw
+            appMarkdownImageUpload
             class="ts__raw"
             [attr.aria-label]="'meetings.editor.modeRaw' | t"
             [value]="t.body ?? ''"
             [readOnly]="!editable()"
             [placeholder]="'meetings.protocol.placeholder' | t"
             spellcheck="true"
-            (input)="bodyChange.emit({ itemId: t.id, body: raw.value })"
+            (input)="onRawInput(t, raw.value)"
           ></textarea>
         </div>
       } @else {
@@ -164,6 +195,7 @@
             [voteInfo]="voteInfo()"
             [value]="t.body ?? ''"
             [disabled]="!editable()"
+            [imageUpload]="editable() ? imageUpload : null"
             [placeholder]="'meetings.protocol.placeholder' | t"
             (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
           />

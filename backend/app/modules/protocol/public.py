@@ -34,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.admin.models import Gremium
 from app.modules.files.storage import ObjectStorage, StorageError
 from app.modules.livevote.models import Meeting
+from app.modules.media.refs import image_ids_in
 from app.modules.protocol.models import Protocol
 from app.shared.config_schemas import ElectionConfig
 from app.shared.errors import NotFoundError, ServiceUnavailableError
@@ -481,6 +482,21 @@ class PublicProtocolService:
             hasPdf=self._has_pdf(protocol),
             pdfSize=protocol.public_pdf_size,
         )
+
+    async def public_image_ids(self, protocol_id: UUID) -> set[UUID]:
+        """Return the ids of the images that the public version shows.
+
+        The ids come from the public Markdown only: the free text of a meeting
+        without TOPs and the text of each public TOP. An image of a non-public TOP
+        stays out.
+
+        Raises:
+            NotFoundError: The protocol is not visible.
+        """
+        protocol, _, _ = await self._visible(protocol_id)
+        snap = self._snapshot(protocol)
+        texts = [snap.markdown, *(t.markdown for t in snap.tops if not t.non_public)]
+        return set(image_ids_in(*texts))
 
     async def get_pdf(self, protocol_id: UUID) -> tuple[bytes, str]:
         """Return the public PDF bytes and the download file name, else 404.

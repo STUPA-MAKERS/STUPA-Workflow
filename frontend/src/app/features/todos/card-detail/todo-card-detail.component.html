@@ -383,14 +383,26 @@
             data-focus="desc-input"
             rows="6"
             maxlength="20000"
+            appMarkdownImageUpload
+            #descImages="mdImageUpload"
             [ngModel]="descDraft()"
             (ngModelChange)="descDraft.set($event)"
             (keydown.escape)="$event.preventDefault(); $event.stopPropagation(); cancelDesc()"
           ></textarea>
         </label>
         <div class="cd__formFoot">
+          <app-button
+            class="cd__formStart"
+            variant="text"
+            [iconOnly]="true"
+            [ariaLabel]="'markdown.image.insert' | t"
+            [loading]="descImages.uploading() > 0"
+            (click)="descImages.pick()"
+          >
+            <app-icon name="image" [size]="18" />
+          </app-button>
           <app-button variant="text" (click)="cancelDesc()">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="fill" [loading]="busy()" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
+          <app-button variant="fill" [loading]="busy()" [disabled]="descImages.uploading() > 0" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
         </div>
       } @else if (card.descriptionMd) {
         <app-markdown-view class="cd__desc" [src]="card.descriptionMd" />

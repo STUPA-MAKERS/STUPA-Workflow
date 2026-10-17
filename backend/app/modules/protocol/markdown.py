@@ -17,7 +17,8 @@ all the same, and `sanitize_user_markdown` stays as defense in depth. It
 strips the `[//]: # "EXPR"` eval escape of the former pytex renderer in EVERY
 CommonMark form: one line, several lines, nested in a container, and with
 whitespace in the label. It also neutralizes an image with an absolute path or
-a `..` path. Normal Markdown survives. A stored body thus stays free of the
+a `..` path, except the canonical path of an uploaded image
+(`/api/media/images/<id>`). Normal Markdown survives. A stored body thus stays free of the
 known escape forms, whatever renderer reads it later.
 
 Variant per gremium: the render service knows the protocol variants
@@ -33,6 +34,8 @@ import re
 from dataclasses import dataclass, field
 from datetime import date as _date
 from datetime import time as _time
+
+from app.modules.media.refs import is_image_path
 
 try:  # marko is optional here. The primary regex protection works without it.
     import marko as _marko  # pyright: ignore[reportMissingImports]
@@ -122,7 +125,8 @@ _PYTEX_IFFALSE_RE = re.compile(
 # (`/...`) or a `../` path could reach a container file through
 # `\includegraphics` and leak a readable image from outside the render
 # directory. The code replaces such a path with a plain-text placeholder. A
-# relative in-repo path stays untouched.
+# relative in-repo path and the canonical path of an uploaded image
+# (`/api/media/images/<id>`) stay untouched.
 _UNSAFE_IMAGE_RE = re.compile(
     r"!\[(?P<alt>[^\]]*)\]\(\s*(?P<path>[^)\s]+)[^)]*\)",
 )
@@ -139,7 +143,9 @@ def _is_unsafe_image_path(path: str) -> bool:
 
 def _neutralize_unsafe_image(match: re.Match[str]) -> str:
     path = match.group("path")
-    if not _is_unsafe_image_path(path):
+    if is_image_path(path) or not _is_unsafe_image_path(path):
+        # The canonical path of an uploaded image is absolute but no file path: the
+        # render service maps it to an uploaded asset and never reads a file for it.
         return match.group(0)  # a harmless relative path stays unchanged
     alt = match.group("alt").strip() or "Bild"
     # Do NOT pass the path through. Replace it with a plain-text placeholder.
@@ -152,9 +158,9 @@ def sanitize_user_markdown(markdown: str) -> str:
     The function removes the RCE vectors: the `[//]: # "…"` comment eval in
     every CommonMark form, and `\iffalse{pytex(…)}\fi`. It also neutralizes
     an image with an absolute path or a `..` path. Normal Markdown survives in
-    full: headings, lists, emphasis, real links and images with relative
-    paths, and vote callouts. The marko parse verifies the eval trigger
-    structurally. While an eval-capable `LinkRefDef` survives, the strip
+    full: headings, lists, emphasis, real links, images with relative paths or
+    the canonical path of an uploaded image, and vote callouts. The marko parse
+    verifies the eval trigger structurally. While an eval-capable `LinkRefDef` survives, the strip
     repeats. The body therefore leaves without an eval vector.
     """
     cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)

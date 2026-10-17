@@ -55,6 +55,7 @@ from app.modules.livevote.keepers import agenda_positions, keeper_periods, princ
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.livevote.roster import meeting_roster_filter, roster_filter
 from app.modules.livevote.service import MeetingService
+from app.modules.media.service import MediaService
 from app.modules.notifications.layout import (
     append_link_text,
     reason_text,
@@ -1150,7 +1151,12 @@ class ProtocolService:
             # the vote boxes and the signature page.
             variant = protocol_variant_for(protocol.cd_variant)
             config = cd_render_config(cd) if cd else None
-            assets = cd.assets if cd else None
+            # The uploaded images of the text go next to the logos. An image that is
+            # missing or passes the budget stays out; the PDF then shows its alt text.
+            images = await MediaService(self.session, storage=self.storage).render_assets(
+                markdown
+            )
+            assets = {**(cd.assets if cd else {}), **images} or None
             # The body is user-written. The render service converts it into data
             # before Typst sees it, so no part of it runs as code there.
             pdf = await self.typst.render_pdf(
