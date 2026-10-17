@@ -1,6 +1,12 @@
 @if (cards().length) {
-  <section class="tl" [attr.aria-labelledby]="headingId()">
-    <h3 class="sec tl__title" [id]="headingId()">{{ 'todos.linked.title' | t }}</h3>
+  <section
+    class="tl"
+    [attr.aria-labelledby]="showTitle() ? headingId() : null"
+    [attr.aria-label]="showTitle() ? null : ('todos.linked.title' | t)"
+  >
+    @if (showTitle()) {
+      <h3 class="sec tl__title" [id]="headingId()">{{ 'todos.linked.title' | t }}</h3>
+    }
     <ul class="rowgroup tl__list">
       @for (card of cards(); track card.id) {
         <li class="tl__row" [class.tl__row--done]="card.isDone">

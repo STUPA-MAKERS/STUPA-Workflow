@@ -20,10 +20,10 @@ function card(over: Partial<TodoLinkedCard> = {}): TodoLinkedCard {
   };
 }
 
-async function setup(answer: () => Observable<TodoLinkedCard[]>) {
+async function setup(answer: () => Observable<TodoLinkedCard[]>, extra: Record<string, unknown> = {}) {
   const api = { linked: jest.fn(answer) };
   const view = await render(TodoLinkedListComponent, {
-    inputs: { kind: 'application', targetId: 'a-1', headingId: 'ad-todos' },
+    inputs: { kind: 'application', targetId: 'a-1', headingId: 'ad-todos', ...extra },
     providers: [provideRouter([]), { provide: TodosApiService, useValue: api }],
   });
   return { ...view, api, cmp: view.fixture.componentInstance };
@@ -43,6 +43,12 @@ describe('TodoLinkedListComponent', () => {
     expect(cmp.names(card())).toEqual(['Mara Keller', 'Gelöschte Person']);
     expect(cmp.ids(card())).toEqual(['p-1', null]);
     expect(document.querySelectorAll('app-avatar-stack')).toHaveLength(1);
+  });
+
+  it('leaves out the heading on request and keeps the name of the section', async () => {
+    await setup(() => of([card()]), { showTitle: false });
+    expect(screen.queryByRole('heading', { name: 'To-Dos' })).toBeNull();
+    expect(screen.getByRole('region', { name: 'To-Dos' })).not.toHaveAttribute('aria-labelledby');
   });
 
   it('shows nothing without linked cards', async () => {
