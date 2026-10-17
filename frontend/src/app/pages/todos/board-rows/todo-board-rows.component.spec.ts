@@ -18,8 +18,9 @@ import { NO_FILTER } from '../../../features/todos/todos.util';
 import { TODAY, board, detail, tile } from '../../../../testing/todo-fixtures';
 import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
+import { LONG_PRESS_MS } from '@shared/long-press.directive';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
-import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows, rowDropId } from './todo-board-rows.component';
+import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows, rowDropId, type RowLead } from './todo-board-rows.component';
 
 const ME = { principalId: 'me', displayName: 'Mara Keller' };
 
@@ -76,7 +77,7 @@ async function setup(opts: Opts = {}) {
     ),
   };
   const toast = { success: jest.fn(), error: jest.fn() };
-  const on = { openCard: jest.fn(), matches: jest.fn(), dropIn: jest.fn(), transferred: jest.fn() };
+  const on = { openCard: jest.fn(), matches: jest.fn(), dropIn: jest.fn(), transferred: jest.fn(), menu: jest.fn() };
   const view = await render(TodoBoardRowsComponent, {
     inputs: { filter: NO_FILTER, today: TODAY, phone: opts.phone ?? false, ...opts.inputs },
     on,
@@ -783,6 +784,104 @@ describe('TodoBoardRowsComponent', () => {
       expect(cards(cmp).some((c) => c.includes('/k-1/'))).toBe(false);
       await wait(settle);
       expect(api.cardTile).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('on a phone', () => {
+    function lead(over: Partial<TodoAssignedBoard> = {}): RowLead {
+      const b = row({ id: 'p-1', name: 'Meine To-Dos', kind: 'personal', gremiumId: null, ...over });
+      const cards = new Map(b.columns.map((c) => [c.id, b.cards.filter((k) => k.columnId === c.id)] as const));
+      return { board: b, cards };
+    }
+
+    it('shows each row as one list in column order with the column tags, and no drag', async () => {
+      const shuffled = row({ columns: [...row().columns].reverse() });
+      const { container, fixture } = await setup({ phone: true, boards: [shuffled, team()] });
+      expect(container.querySelector('.br__cols')).toBeNull();
+      expect(fixture.debugElement.queryAll(By.directive(CdkDrag))).toHaveLength(0);
+      expect(fixture.debugElement.queryAll(By.directive(CdkDropList))).toHaveLength(0);
+      const list = screen.getByRole('list', { name: 'Studierendenparlament' });
+      const items = within(list).getAllByRole('listitem');
+      expect(items.map((i) => i.querySelector('.tt__open')?.textContent?.trim())).toEqual([
+        'Raum buchen',
+        'Haushalt Kapitel 3',
+        'Bus anfragen',
+      ]);
+      expect(items.map((i) => i.querySelector('.tt__col')?.textContent?.trim())).toEqual(['Offen', 'Offen', 'Erledigt']);
+      expect(items[2]).toHaveClass('tt--done');
+    });
+
+    it('keeps the done preview and its "more" item in the list', async () => {
+      const done = Array.from({ length: DONE_PREVIEW + 2 }, (_, i) =>
+        tile({ id: `d-${i}`, columnId: 'c-4', title: `Fertig ${i}`, assignees: [ME] }),
+      );
+      const { settle } = await setup({ phone: true, boards: [row({ cards: done })] });
+      const list = screen.getByRole('list', { name: 'Studierendenparlament' });
+      expect(list.querySelectorAll('app-todo-card-tile')).toHaveLength(DONE_PREVIEW);
+      fireEvent.click(within(list).getByRole('button', { name: /2 weitere/ }));
+      await settle();
+      expect(list.querySelectorAll('app-todo-card-tile')).toHaveLength(DONE_PREVIEW + 2);
+    });
+
+    it('puts the personal board first, with one muted line when it has no card', async () => {
+      const { fixture, settle, on, container } = await setup({ phone: true, inputs: { lead: lead() } });
+      const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
+      expect(heads[0]).toMatch(/^Meine To-Dos\s*3/);
+      expect(heads).toHaveLength(3);
+      // The page counts the cards of its board: the matches are the rows' only.
+      expect(on.matches).toHaveBeenLastCalledWith(4);
+      const empty = lead();
+      fixture.componentRef.setInput('lead', { ...empty, cards: new Map() });
+      await settle();
+      const section = container.querySelector('[data-board-id="p-1"]') as HTMLElement;
+      expect(within(section).getByText('Keine Karten')).toHaveClass('br__empty');
+      expect(within(section).queryByRole('list')).toBeNull();
+      // A row of the same board as the lead is not shown twice.
+      fixture.componentRef.setInput('lead', lead({ id: 'b-1' }));
+      await settle();
+      expect(container.querySelectorAll('[data-board-id="b-1"]')).toHaveLength(1);
+    });
+
+    it('collapses a section of the list', async () => {
+      const { settle } = await setup({ phone: true });
+      fireEvent.click(screen.getByRole('button', { name: /Studierendenparlament/ }));
+      await settle();
+      expect(screen.queryByRole('list', { name: 'Studierendenparlament' })).toBeNull();
+    });
+
+    it('asks for the menu on a long press of a writable tile, not of a read-only one', async () => {
+      const { on } = await setup({ phone: true });
+      jest.useFakeTimers();
+      try {
+        const press = (title: string) => {
+          const button = screen.getByRole('button', { name: title });
+          button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+          jest.advanceTimersByTime(LONG_PRESS_MS);
+          button.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+          button.click();
+        };
+        press('Raum buchen');
+        expect(on.menu).toHaveBeenCalledTimes(1);
+        const req = on.menu.mock.calls[0][0];
+        expect(req).toMatchObject({ boardId: 'b-1', boardKind: 'gremium', card: { id: 'k-1' } });
+        expect(req.columns.map((c: { name: string }) => c.name)).toEqual(['Offen', 'In Arbeit', 'Wartet', 'Erledigt']);
+        // The release after the press does not open the card.
+        expect(on.openCard).not.toHaveBeenCalled();
+        press('Ticket prüfen');
+        expect(on.menu).toHaveBeenCalledTimes(1);
+        expect(on.openCard).toHaveBeenCalledWith('k-9');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('moves a card to the end of a column for the sheet', async () => {
+      const { cmp, api } = await setup({ phone: true });
+      cmp.moveTo('k-1', 'c-2');
+      expect(api.moveCard).toHaveBeenCalledWith('k-1', { columnId: 'c-2' });
+      expect(cmp.boards()[0].cards.find((c) => c.id === 'k-1')?.columnId).toBe('c-2');
+      cmp.moveTo('nope', 'c-2');
+      expect(api.moveCard).toHaveBeenCalledTimes(1);
     });
   });
 });

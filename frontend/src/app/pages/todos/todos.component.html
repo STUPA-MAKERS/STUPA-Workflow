@@ -150,13 +150,14 @@
   <div
     class="td__body"
     cdkScrollable
+    appScrollFade="y"
     [class.td__body--fab]="canAdd()"
-    [class.td__body--rows]="all() || (loading() ? skeleton().natural : rowsBelow())">
+    [class.td__body--rows]="all() || phoneList() || (loading() ? skeleton().natural : rowsBelow())">
     @if (all()) {
       <!-- "Alle": the rows of every board; they read themselves. Until they answer, the
            skeleton of a board stands in their place. -->
       @if (rowMatches() === null) {
-        <app-todo-board-skeleton view="board" [phone]="phone()" [natural]="true" />
+        <app-todo-board-skeleton [view]="phone() ? 'rows' : 'board'" [phone]="phone()" [natural]="true" />
         <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
       } @else if (allEmpty()) {
         <div class="td__state">
@@ -177,12 +178,13 @@
         [today]="today()"
         [phone]="phone()"
         (openCard)="openCard($event)"
+        (menu)="onTileMenu($event)"
         (matches)="onRowMatches($event)"
         (transferred)="onRowTransferred()"
       />
     } @else if (loading()) {
       <app-todo-board-skeleton
-        [view]="view()"
+        [view]="phoneList() ? 'rows' : view()"
         [phone]="phone()"
         [canWrite]="summary()?.canWrite ?? false"
         [columnCount]="skeleton().columns"
@@ -213,7 +215,7 @@
           (openCard)="openCard($event)"
           (toggleDone)="toggleDone($event)"
         />
-      } @else {
+      } @else if (!phoneList()) {
         <app-todo-board-view
           [board]="b"
           [cards]="visible()"
@@ -223,6 +225,7 @@
           [fill]="!rowsBelow()"
           [connectTo]="withRows() ? rowDrops() : []"
           (openCard)="openCard($event)"
+          (menu)="onTileMenu($event)"
           (moveCard)="moveCard($event)"
           (dropIn)="onDropFromRow($event)"
           (quickAdd)="quickAdd($event)"
@@ -241,7 +244,9 @@
           [me]="me()"
           [liveIds]="liveRowIds()"
           [hold]="hold()"
+          [lead]="lead()"
           (openCard)="openCard($event)"
+          (menu)="onTileMenu($event)"
           (matches)="onRowMatches($event)"
           (dropIn)="onDropIntoRow($event)"
           (drops)="rowDrops.set($event)"
@@ -281,6 +286,27 @@
       (transferred)="onTransferred($event)"
     />
   </aside>
+}
+
+@if (phone()) {
+  <p class="sr-only" aria-live="assertive">{{ tileSaid() }}</p>
+  <app-todo-tile-menu
+    [(open)]="tileMenuOpen"
+    [request]="tileMenu()"
+    (column)="onTileColumn($event)"
+    (transfer)="tileTransferOpen.set(true)"
+    (dismissed)="tileMenu.set(null)"
+  />
+  @if (tileMenu(); as m) {
+    <app-todo-transfer-dialog
+      [open]="tileTransferOpen()"
+      (openChange)="onTileTransferOpen($event)"
+      [boardId]="m.boardId"
+      [boardKind]="m.boardKind"
+      [busy]="tileTransferring()"
+      (transferred)="transferTile($event)"
+    />
+  }
 }
 
 @if (all()) {

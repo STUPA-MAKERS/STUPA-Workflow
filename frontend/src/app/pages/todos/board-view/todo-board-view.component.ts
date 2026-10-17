@@ -21,7 +21,10 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { ButtonComponent, IconComponent, TabsComponent, type TabItem } from '@stupa-makers/ui-kit';
+import { LongPressDirective } from '@shared/long-press.directive';
+import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
+import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
 import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
 
 /** The done column shows this many cards until "n weitere" opens the rest. */
@@ -67,8 +70,9 @@ interface KeyDrag {
  * the dots follow the page where the scroll ends, and a tab scrolls to its page. The
  * pager fills the free height and each page scrolls down by itself; an empty column
  * shows "Keine Karten" in the middle. The dots sit at the bottom, on the line of the
- * "+ To-Do" button of the page. No drag (the card moves with "Verschieben" in its
- * detail).
+ * "+ To-Do" button of the page. No drag: a long press on a tile of a writable board
+ * emits `menu`, and the page moves the card through its "Verschieben" sheet. The swipe
+ * stays a swipe, because a drift of the finger stops the press.
  */
 @Component({
   selector: 'app-todo-board-view',
@@ -83,7 +87,9 @@ interface KeyDrag {
     TranslatePipe,
     ButtonComponent,
     IconComponent,
+    LongPressDirective,
     RowMenuComponent,
+    ScrollFadeDirective,
     TabsComponent,
     TodoCardTileComponent,
   ],
@@ -120,6 +126,8 @@ export class TodoBoardViewComponent {
   readonly connectTo = input<string[]>([]);
 
   readonly openCard = output<Uuid>();
+  /** Phone: a long press on a tile of a writable board asks for the "Verschieben" sheet. */
+  readonly menu = output<TileMenuRequest>();
   readonly moveCard = output<BoardMove>();
   /** A card of another board landed in a column of this board (`connectTo`). */
   readonly dropIn = output<BoardMove>();
@@ -130,6 +138,12 @@ export class TodoBoardViewComponent {
 
   readonly columns = computed(() => sortedColumns(this.board().columns));
   readonly canWrite = computed(() => this.board().canWrite);
+
+  /** Ask the page for the "Verschieben" sheet of a tile (a long press on the phone). */
+  askMenu(card: TodoCardTile): void {
+    const b = this.board();
+    this.menu.emit({ card, boardId: b.id, boardKind: b.kind, columns: this.columns() });
+  }
   /** A card of a shared board does not enter the personal board (`canTransfer`). */
   readonly enter = computed(() => DROP_ENTER[this.board().kind]);
   readonly dropId = boardDropId;

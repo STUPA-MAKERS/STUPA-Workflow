@@ -15,7 +15,23 @@
   </div>
 </ng-template>
 
-@if (view() === 'list') {
+@if (view() === 'rows') {
+  <div class="bsk__rows">
+    @for (s of sections; track $index) {
+      <div class="bsk__section">
+        <p class="bsk__head skel-in">
+          <span class="skel-box bsk__chev"></span>
+          <span class="skel-text" [style.width]="s.name"></span>
+        </p>
+        <div class="bsk__list skel-in">
+          @for (t of s.tiles; track $index) {
+            <ng-container *ngTemplateOutlet="tile; context: { $implicit: t }" />
+          }
+        </div>
+      </div>
+    }
+  </div>
+} @else if (view() === 'list') {
   <div class="lv">
     <div class="lv__row lv__row--head">
       <span class="lv__c lv__c--check"></span>

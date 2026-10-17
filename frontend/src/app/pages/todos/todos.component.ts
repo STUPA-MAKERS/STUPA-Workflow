@@ -55,6 +55,11 @@ import {
 } from '@stupa-makers/ui-kit';
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
+import { TodoTileMenuComponent, type TileMenuRequest } from '../../features/todos/tile-menu/todo-tile-menu.component';
+import {
+  TodoTransferDialogComponent,
+  type TodoTransferTarget,
+} from '../../features/todos/transfer-dialog/todo-transfer-dialog.component';
 import {
   NO_FILTER,
   applyMove,
@@ -74,7 +79,7 @@ import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
-import { TodoBoardRowsComponent, type RowDrop } from './board-rows/todo-board-rows.component';
+import { TodoBoardRowsComponent, type RowDrop, type RowLead } from './board-rows/todo-board-rows.component';
 import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings.component';
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
@@ -114,6 +119,13 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * boards (`transferCard`); the page carries the drags between the personal board and the
  * rows below it.
  *
+ * Phone: "Meine To-Dos" (board view) and "Alle" are one list of board sections
+ * (`app-todo-board-rows`); the personal board is the first section (`lead`), not the tab
+ * board. Nothing drags there. A long press on a tile of a writable board, on these lists
+ * and on the tab board, opens the "Verschieben" sheet (`app-todo-tile-menu`): a column
+ * moves the card to its end as a drag does, "In anderes Board verschieben" opens the
+ * transfer dialog.
+ *
  * `?card=<id>` opens the card in a drawer over the board (a deep link works the same).
  * `?view=list` shows the table. The board reads itself again every 30 seconds while the
  * tab is visible and when the window gets the focus; the ETag makes an unchanged board
@@ -152,6 +164,8 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoCardDetailComponent,
     TodoListViewComponent,
     TodoNewDialogComponent,
+    TodoTileMenuComponent,
+    TodoTransferDialogComponent,
   ],
   // On a phone the board fills the free height too, so its column pages scroll inside;
   // the list scrolls as a page.
@@ -256,6 +270,27 @@ export class TodosComponent implements OnDestroy {
   /** The cards the rows show after the filters; null until the rows of this board answered. */
   readonly rowMatches = signal<number | null>(null);
   readonly withRows = computed(() => this.board()?.kind === 'personal' && this.view() === 'board');
+  /**
+   * Phone, "Alle" or "Meine To-Dos" in the board view (known from the board list while
+   * the board loads): every board is one section of a list, the personal board too.
+   */
+  readonly phoneList = computed(() => {
+    if (!this.phone()) return false;
+    if (this.all()) return true;
+    return this.view() === 'board' && (this.board() ?? this.summary())?.kind === 'personal';
+  });
+  /** The personal board as the first section of the phone list. */
+  readonly lead = computed<RowLead | null>(() => {
+    const b = this.board();
+    return b && this.phoneList() && !this.noMatch() ? { board: b, cards: this.visible() } : null;
+  });
+  /** The "Verschieben" sheet of the phone: the tile it is for. */
+  readonly tileMenu = signal<TileMenuRequest | null>(null);
+  readonly tileMenuOpen = signal(false);
+  readonly tileTransferOpen = signal(false);
+  readonly tileTransferring = signal(false);
+  /** The live region of the sheet: the move of a column pick, as the keyboard drag says it. */
+  readonly tileSaid = signal('');
   /**
    * The rows held cards at their last answer. Until the rows answer, the board and its
    * skeleton keep that shape, so the board does not resize when the rows land.
@@ -457,6 +492,17 @@ export class TodosComponent implements OnDestroy {
         this.focusedFor = id;
         el.nativeElement.focus();
       }
+    });
+
+    // The sheet and its transfer dialog live on the phone only: a wider window closes
+    // them and forgets the tile, so they do not open again on the way back.
+    effect(() => {
+      if (this.phone()) return;
+      untracked(() => {
+        this.tileMenuOpen.set(false);
+        this.tileTransferOpen.set(false);
+        this.tileMenu.set(null);
+      });
     });
 
     // Side by side the page fills the viewport and only the columns scroll.
@@ -945,6 +991,70 @@ export class TodosComponent implements OnDestroy {
     if (!board || card.boardId !== board.id) return;
     this.wrote();
     this.board.set({ ...placeTile(board, card), archivedCount: Math.max(0, board.archivedCount - 1) });
+  }
+
+  // ------------------------------------------------------------------ sheet
+
+  /** A long press on a tile (phone): the "Verschieben" sheet for it. */
+  onTileMenu(request: TileMenuRequest): void {
+    this.tileMenu.set(request);
+    this.tileMenuOpen.set(true);
+  }
+
+  /**
+   * The sheet picked a column: the card goes to its end, as with a drag. The live region
+   * says so, the sheet forgets the tile, and the focus goes back to the moved tile.
+   */
+  onTileColumn(columnId: Uuid): void {
+    const req = this.tileMenu();
+    if (!req) return;
+    const cardId = req.card.id;
+    if (this.board()?.cards.some((c) => c.id === cardId)) this.moveCard({ cardId, move: { columnId } });
+    else this.rowsView()?.moveTo(cardId, columnId);
+    const column = req.columns.find((c) => c.id === columnId)?.name ?? '';
+    this.tileSaid.set(this.i18n.translate('todos.drag.dropped', { title: req.card.title, column }));
+    this.tileMenu.set(null);
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>(`[data-card-id="${cardId}"]`)?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  /** The transfer dialog of the sheet opened or closed; closed, it forgets the tile. */
+  onTileTransferOpen(open: boolean): void {
+    this.tileTransferOpen.set(open);
+    if (!open) this.tileMenu.set(null);
+  }
+
+  /**
+   * The transfer dialog of the sheet picked a board: the card goes there. The page takes
+   * the answer as the drawer's transfer, then as its change, so the board and the rows
+   * follow; a refusal reads both again.
+   */
+  transferTile(target: TodoTransferTarget): void {
+    const req = this.tileMenu();
+    if (!req) return;
+    this.tileTransferring.set(true);
+    this.track(this.api.transferCard(req.card.id, { boardId: target.boardId, columnId: target.columnId })).subscribe({
+      next: (card) => {
+        this.tileTransferring.set(false);
+        this.tileTransferOpen.set(false);
+        this.onTransferred({ card, fromBoardId: req.boardId });
+        this.onCardChanged(card);
+        if (!this.board()) this.refreshBoards();
+        this.toast.success(this.i18n.translate('todos.card.transferred', { board: target.boardName }));
+        this.tileMenu.set(null);
+      },
+      error: (err: unknown) => {
+        this.tileTransferring.set(false);
+        this.tileTransferOpen.set(false);
+        this.toast.error(this.i18n.translate(moveErrorText(err, 'todos.error.transfer')));
+        const board = this.board();
+        if (board) this.resync(board.id);
+        this.rowsView()?.refresh();
+        this.tileMenu.set(null);
+      },
+    });
   }
 
   /** A drag in the rows moved a card between two of their boards: the open counts change. */

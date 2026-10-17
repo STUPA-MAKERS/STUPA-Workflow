@@ -12,7 +12,8 @@ const TILE_LABELS = 2;
 
 /**
  * One card on the board (frames 0, 1, 11, 34): the labels, the title, the first link,
- * the due date, the checklist, the comments and the people. A card in the done column
+ * the due date, the checklist, the comments and the people, and in a list of the phone
+ * the column tag. A card in the done column
  * shows the done mark and the day it was done instead of the due date.
  *
  * The whole tile is the target: its title is a button that opens the card. The board
@@ -44,6 +45,11 @@ export class TodoCardTileComponent {
   readonly today = input.required<string>();
   /** The keyboard drag holds this card. */
   readonly lifted = input(false);
+  /**
+   * The name of the column of the card, as a tag in the fact bar: a list of the phone
+   * shows the cards of every column of a board in one list.
+   */
+  readonly column = input<string | null>(null);
 
   /** The title was activated: open the card. */
   readonly open = output<void>();

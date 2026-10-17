@@ -1,0 +1,65 @@
+:host {
+  display: contents;
+}
+.tm {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: var(--space-2);
+}
+.tm__sub {
+  margin: calc(-1 * var(--space-2)) 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.tm__list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+/* The rows of the sheet: the menu rows of the chat sheet. */
+.tm__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  width: 100%;
+  height: 52px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  text-align: start;
+  cursor: pointer;
+}
+.tm__item:hover:not(:disabled) {
+  background: var(--color-surface-3);
+}
+.tm__item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+/* The column of the card: marked, not a choice. */
+.tm__item--on {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+  cursor: default;
+}
+.tm__mark {
+  display: inline-flex;
+  flex: none;
+  width: 20px;
+}
+.tm__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tm__sep {
+  height: 0;
+  margin: var(--space-2) 0;
+  border: 0;
+  border-top: var(--border-width) solid var(--color-border);
+}

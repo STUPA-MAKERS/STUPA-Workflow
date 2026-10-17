@@ -1,4 +1,3 @@
-@use 'breakpoints' as bp;
 
 :host {
   display: flex;
@@ -214,15 +213,27 @@
   text-decoration: underline;
 }
 
-/* Phone: the rows stack, the columns of a row scroll sideways and snap. */
-@include bp.phone {
-  .br__cols {
-    grid-auto-columns: min(80vw, 17rem);
-    gap: var(--space-3);
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 0;
-  }
-  .br__col {
-    scroll-snap-align: start;
-  }
+/* Phone: each row is one list of its cards at the full width; nothing scrolls sideways. */
+.br__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+:host-context([data-theme='dark']) .br__list {
+  background: var(--color-surface-1);
+}
+.br__moreItem {
+  display: flex;
+}
+/* A row without a card: one muted line, no frame. */
+.br__empty {
+  margin: 0;
+  padding: 0 var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  line-height: 1.5rem;
 }

@@ -34,6 +34,8 @@ import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
+import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
+import { LongPressDirective } from '@shared/long-press.directive';
 import {
   DROP_ENTER,
   applyMove,
@@ -90,6 +92,15 @@ export interface BoardRow {
   cards: ReadonlyMap<Uuid, readonly TodoCardTile[]>;
   labels: ReadonlyMap<Uuid, TodoLabel>;
   count: number;
+}
+
+/**
+ * The first section of the phone list of "Meine To-Dos": the personal board of the page
+ * with the cards that pass the filters of the page, by column.
+ */
+export interface RowLead {
+  board: TodoAssignedBoard;
+  cards: ReadonlyMap<Uuid, readonly TodoCardTile[]>;
 }
 
 /** The keyboard drag: the held card, its row and its place now. */
@@ -177,8 +188,13 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
  * refuses. A card from `extraDrops` comes out as `dropIn` for the page. The keyboard drag
  * stays in its row: Space lifts, the arrows move, Space or Enter put down, Escape puts
  * back. A row without `canWrite` is read only: no drag source and no drop target. A card
- * of a shared board does not enter the row of the personal board (`DROP_ENTER`). On a
- * phone the columns of a row scroll sideways and there is no drag.
+ * of a shared board does not enter the row of the personal board (`DROP_ENTER`).
+ *
+ * Phone: every row is one list of its cards, in column order and then in rank order, each
+ * tile with the tag of its column; a row without a card shows one muted line. Nothing
+ * scrolls sideways and nothing drags: a long press on a tile of a writable row emits
+ * `menu`, and the page moves the card through its sheet (`moveTo`). `lead` (the personal
+ * board of the page) is the first section there.
  *
  * The page calls `poll()` with its own poll (ETag, 304 keeps the rows), and the
  * `card…` methods after a change in the card drawer.
@@ -195,7 +211,16 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
   selector: 'app-todo-board-rows',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CdkDrag, CdkDropList, CdkScrollable, RouterLink, TranslatePipe, IconComponent, TodoCardTileComponent],
+  imports: [
+    CdkDrag,
+    CdkDropList,
+    CdkScrollable,
+    RouterLink,
+    TranslatePipe,
+    IconComponent,
+    LongPressDirective,
+    TodoCardTileComponent,
+  ],
   host: {
     class: 'br-host',
     '(document:focusin)': 'leaveDrag($event)',
@@ -230,8 +255,17 @@ export class TodoBoardRowsComponent implements OnInit {
   readonly liveIds = input<readonly Uuid[]>([]);
   /** The page holds a card or waits for a write: the pings wait too. */
   readonly hold = input(false);
+  /**
+   * Phone, "Meine To-Dos": the personal board as the first section of the list. Its head
+   * has no link to the board, because the page shows that board.
+   */
+  readonly lead = input<RowLead | null>(null);
+  /** The id of the board of `lead`: its section head has no link to the board. */
+  readonly leadId = computed(() => this.lead()?.board.id ?? null);
 
   readonly openCard = output<Uuid>();
+  /** Phone: a long press on a tile of a writable row asks for the "Verschieben" sheet. */
+  readonly menu = output<TileMenuRequest>();
   /** A card of `extraDrops` landed in a row: the page transfers it. */
   readonly dropIn = output<RowDrop>();
   /** A drag moved a card to another row: the server answer. */
@@ -291,6 +325,20 @@ export class TodoBoardRowsComponent implements OnInit {
       filterLabels: this.filterLabels(),
     }),
   );
+  /**
+   * The sections as shown: the rows, and on the phone of "Meine To-Dos" the personal board
+   * (`lead`) before them. The lead counts no match, because the page counts its cards.
+   */
+  readonly sections = computed<BoardRow[]>(() => {
+    const rows = this.rows();
+    const lead = this.lead();
+    if (!lead) return rows;
+    const columns = sortedColumns(lead.board.columns);
+    const count = columns.reduce((n, c) => n + (lead.cards.get(c.id)?.length ?? 0), 0);
+    const labels = new Map(lead.board.labels.map((l) => [l.id, l]));
+    const first: BoardRow = { board: lead.board, columns, cards: lead.cards, labels, count };
+    return [first, ...rows.filter((r) => r.board.id !== lead.board.id)];
+  });
   /** The open cards of every board (the search placeholder of "Alle"). */
   readonly openCount = computed(() =>
     this.boards().reduce((n, b) => {
@@ -428,6 +476,17 @@ export class TodoBoardRowsComponent implements OnInit {
     }
     this.update(card.boardId, (b) => replaceTile(b, card));
     return true;
+  }
+
+  /** Move a card of a row to the end of a column of its board (the sheet of the phone). */
+  moveTo(cardId: Uuid, columnId: Uuid): void {
+    const board = this.boards().find((b) => b.cards.some((c) => c.id === cardId));
+    if (board) this.move(board.id, cardId, { columnId });
+  }
+
+  /** Ask the page for the "Verschieben" sheet of a tile (a long press on the phone). */
+  askMenu(row: BoardRow, card: TodoCardTile): void {
+    this.menu.emit({ card, boardId: row.board.id, boardKind: row.board.kind, columns: row.columns });
   }
 
   /** Take a card out of its row (it went onto the personal board); null when no row holds it. */

@@ -1,6 +1,6 @@
 <p class="sr-only" aria-live="assertive">{{ announce() }}</p>
 
-@for (row of rows(); track row.board.id) {
+@for (row of sections(); track row.board.id) {
   <section class="br" [class.br--closed]="!isOpen(row)" [class.br--readonly]="!canDrag(row)" [attr.aria-labelledby]="'br-h-' + row.board.id" [attr.data-board-id]="row.board.id">
     <header class="br__head">
       <h2 class="br__title" [id]="'br-h-' + row.board.id">
@@ -23,6 +23,7 @@
           {{ 'todos.rows.readOnly' | t }}
         </span>
       }
+      @if (row.board.id !== leadId()) {
       <a
         class="br__open"
         [routerLink]="['/todos', row.board.id]"
@@ -31,9 +32,42 @@
       >
         <app-icon name="chevron-right" [size]="18" />
       </a>
+      }
     </header>
 
-    @if (isOpen(row)) {
+    @if (isOpen(row) && phone()) {
+      <!-- Phone: one list of the cards of every column, no drag; a long press opens the
+           "Verschieben" sheet of the page. -->
+      @if (row.count) {
+        <div class="br__list" role="list" [id]="'br-c-' + row.board.id" [attr.aria-label]="row.board.name">
+          @for (col of row.columns; track col.id) {
+            @for (card of list(row, col); track card.id) {
+              <app-todo-card-tile
+                role="listitem"
+                appLongPress
+                [appLongPressOff]="!row.board.canWrite"
+                [card]="card"
+                [labels]="row.labels"
+                [done]="col.isDone"
+                [today]="today()"
+                [column]="col.name"
+                (open)="openCard.emit(card.id)"
+                (appLongPress)="askMenu(row, card)"
+              />
+            }
+            @if (more(row, col) > 0) {
+              <div class="br__moreItem" role="listitem">
+                <button type="button" class="br__more" (click)="expand(col)">
+                  {{ 'todos.board.more' | t: { n: more(row, col) } }}
+                </button>
+              </div>
+            }
+          }
+        </div>
+      } @else {
+        <p class="br__empty" [id]="'br-c-' + row.board.id">{{ 'todos.board.columnEmpty' | t }}</p>
+      }
+    } @else if (isOpen(row)) {
       <!-- cdkScrollable: a drag in the row scrolls it sideways and measures its drop lists anew.
            The lists of all writable rows connect by id (cdkDropListConnectedTo). -->
       <div class="br__cols" cdkScrollable [id]="'br-c-' + row.board.id">

@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use '../../../features/meetings/scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -55,6 +56,12 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+}
+/* The cards of a column and of a phone page fade at an end only while more cards lie past
+   it (`appScrollFade="y"`). */
+.bv__scroll,
+.bv__page {
+  @include fade.fade-y(var(--space-5));
 }
 .bv__head {
   display: flex;
@@ -254,6 +261,7 @@
    phone too). The pager scrolls sideways, one page per column; each page scrolls down by
    itself, so a vertical swipe moves the cards and a horizontal one the column. */
 .bv--phone {
+  position: relative;
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -281,6 +289,9 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+  /* The page reaches down to the bottom bar; its last card scrolls clear of the dots and
+     of the floating "+ To-Do" (56px, --space-4 above the bar). */
+  padding-bottom: calc(56px + 2 * var(--space-4));
   overflow-y: auto;
   overscroll-behavior-y: contain;
   scroll-snap-align: start;
@@ -303,9 +314,14 @@
   color: var(--color-text-muted);
   text-align: center;
 }
-/* The dots end the board: a row as high as the floating "+ To-Do" button (56px), so they
-   sit on its line, in the middle and clear of it. */
+/* The dots lie over the foot of the pages, on the line of the floating "+ To-Do" button
+   (56px high, --space-4 above the bar), in the middle and clear of it. */
 .bv__dots {
+  position: absolute;
+  right: 0;
+  bottom: var(--space-4);
+  left: 0;
+  pointer-events: none;
   display: flex;
   flex: none;
   align-items: center;

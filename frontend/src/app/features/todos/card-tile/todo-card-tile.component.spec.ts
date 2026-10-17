@@ -8,7 +8,7 @@ const LABELS = new Map([
   ['l-3', { id: 'l-3', name: 'Dritte', color: 'red' as const }],
 ]);
 
-async function setup(card: TodoCardTile, extra: { done?: boolean; lifted?: boolean } = {}) {
+async function setup(card: TodoCardTile, extra: { done?: boolean; lifted?: boolean; column?: string | null } = {}) {
   const open = jest.fn();
   const view = await render(TodoCardTileComponent, {
     inputs: { card, labels: LABELS, today: TODAY, ...extra },
@@ -43,6 +43,14 @@ describe('TodoCardTileComponent', () => {
     title.click();
     expect(open).toHaveBeenCalled();
     expect(fixture.nativeElement).not.toHaveClass('tt--lifted');
+  });
+
+  it('shows the column tag only when a list asks for it', async () => {
+    const view = await setup(tile(), { column: 'In Arbeit' });
+    expect(screen.getByText('In Arbeit', { selector: '.tt__col' })).toHaveAttribute('title', 'In Arbeit');
+    view.fixture.componentRef.setInput('column', null);
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.tt__col')).toBeNull();
   });
 
   it('marks a date of tomorrow as soon and a later date plainly', async () => {

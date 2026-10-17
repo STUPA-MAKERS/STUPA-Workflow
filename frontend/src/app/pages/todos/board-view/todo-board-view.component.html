@@ -15,16 +15,19 @@
            snap), and the tab follows the page that the scroll ends on. -->
       <div #pager class="bv__pager" (scroll)="onPagerScroll()" (scrollend)="syncPage()">
         @for (col of columns(); track col.id) {
-          <div class="bv__page" [class.bv__page--empty]="!list(col).length">
+          <div class="bv__page" appScrollFade="y" [class.bv__page--empty]="!list(col).length">
             <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
               @for (card of list(col); track card.id) {
                 <app-todo-card-tile
                   role="listitem"
+                  appLongPress
+                  [appLongPressOff]="!canWrite()"
                   [card]="card"
                   [labels]="labels()"
                   [done]="col.isDone"
                   [today]="today()"
                   (open)="openCard.emit(card.id)"
+                  (appLongPress)="askMenu(card)"
                 />
               } @empty {
                 <p class="bv__empty">{{ 'todos.board.columnEmpty' | t }}</p>
@@ -72,7 +75,7 @@
           }
         </header>
 
-        <div class="bv__scroll" cdkScrollable>
+        <div class="bv__scroll" cdkScrollable appScrollFade="y">
         <div
           class="bv__cards"
           cdkDropList

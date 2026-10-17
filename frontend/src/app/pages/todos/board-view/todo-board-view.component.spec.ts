@@ -4,9 +4,10 @@ import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
 import { DROP_ENTER, cardsOf } from '../../../features/todos/todos.util';
 import { TODAY, board, tile } from '../../../../testing/todo-fixtures';
+import { LONG_PRESS_MS } from '@shared/long-press.directive';
 import { DONE_PREVIEW, TodoBoardViewComponent } from './todo-board-view.component';
 
-const OUTPUTS = ['openCard', 'moveCard', 'dropIn', 'quickAdd', 'addIn', 'settings', 'archive'] as const;
+const OUTPUTS = ['openCard', 'menu', 'moveCard', 'dropIn', 'quickAdd', 'addIn', 'settings', 'archive'] as const;
 
 function mapOf(b: TodoBoard) {
   return new Map(b.columns.map((c) => [c.id, cardsOf(b, c.id)]));
@@ -385,6 +386,48 @@ describe('TodoBoardViewComponent', () => {
   });
 
   describe('phone', () => {
+    function press(title: string): void {
+      const button = screen.getByRole('button', { name: title });
+      button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+      jest.advanceTimersByTime(LONG_PRESS_MS);
+      button.dispatchEvent(new MouseEvent('pointerup', { bubbles: true }));
+      button.click();
+    }
+
+    it('asks for the "Verschieben" sheet on a long press and does not open the card', async () => {
+      const { on, container } = await setup(board(), { phone: true });
+      expect(container.querySelector('.bv__page')).toHaveAttribute('appScrollFade', 'y');
+      jest.useFakeTimers();
+      try {
+        press('Raum buchen');
+        expect(on.menu).toHaveBeenCalledWith(
+          expect.objectContaining({ boardId: 'b-1', boardKind: 'gremium', card: expect.objectContaining({ id: 'k-1' }) }),
+        );
+        expect(on.menu.mock.calls[0][0].columns.map((c: { id: string }) => c.id)).toEqual(['c-1', 'c-2', 'c-3', 'c-4']);
+        expect(on.openCard).not.toHaveBeenCalled();
+        // A swipe over the tile is no long press.
+        const button = screen.getByRole('button', { name: 'Raum buchen' });
+        button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 0 }));
+        button.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40 }));
+        jest.advanceTimersByTime(LONG_PRESS_MS);
+        expect(on.menu).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('has no long press on a read-only board', async () => {
+      const { on } = await setup(board({ canWrite: false }), { phone: true });
+      jest.useFakeTimers();
+      try {
+        press('Raum buchen');
+        expect(on.menu).not.toHaveBeenCalled();
+        expect(on.openCard).toHaveBeenCalledWith('k-1');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
     it('shows one column behind tabs, its cards and the dots', async () => {
       const { cmp, on, fixture, container } = await setup(board(), { phone: true });
       expect(screen.getAllByRole('tab').map((t) => t.textContent?.replace(/\s+/g, '').trim())).toEqual([
