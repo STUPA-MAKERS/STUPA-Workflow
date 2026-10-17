@@ -1658,3 +1658,110 @@ def test_public_meeting_guests(alembic_cfg: Config, engine: Engine) -> None:
         assert conn.execute(
             text("SELECT count(*) FROM pg_indexes WHERE indexname = 'uq_meeting_join_code_open'")
         ).scalar_one() == 1
+
+
+def test_todo_link_budget_vote_gremium(alembic_cfg: Config, engine: Engine) -> None:
+    """Migration 527854b79d68.
+
+    The upgrade adds ``vote_id``, ``gremium_id``, ``invoice_id`` and ``expense_id`` with
+    their indexes and widens ``ck_todo_link_one_target``. The downgrade deletes the links
+    of the new kinds, drops the columns and keeps the other links.
+    """
+    new = ("vote_id", "gremium_id", "invoice_id", "expense_id")
+
+    def columns(conn: Connection) -> set[str]:
+        return set(
+            conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'todo_link'"
+                )
+            ).scalars()
+        )
+
+    with engine.begin() as conn:
+        assert set(new) <= columns(conn)
+        indexes = set(
+            conn.execute(
+                text("SELECT indexname FROM pg_indexes WHERE tablename = 'todo_link'")
+            ).scalars()
+        )
+        assert {f"{p}_todo_link_{c}" for c in new for p in ("uq", "ix")} <= indexes
+        check = conn.execute(
+            text(
+                "SELECT pg_get_constraintdef(oid) FROM pg_constraint "
+                "WHERE conname = 'ck_todo_link_one_target'"
+            )
+        ).scalar_one()
+        assert "expense_id" in check and "vote_id" in check
+
+    command.downgrade(alembic_cfg, "066ff25554e2")
+    with engine.begin() as conn:
+        assert not set(new) & columns(conn)
+    command.upgrade(alembic_cfg, "head")
+    # Idempotent: a second run of the upgrade on the new schema changes nothing.
+    command.downgrade(alembic_cfg, "066ff25554e2")
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        assert set(new) <= columns(conn)
+        gremium = conn.execute(
+            text("INSERT INTO gremium (name, slug) VALUES ('M', :s) RETURNING id"),
+            {"s": "mig-" + uuid.uuid4().hex[:8]},
+        ).scalar_one()
+        who = conn.execute(
+            text("INSERT INTO principal (sub) VALUES (:s) RETURNING id"),
+            {"s": "mig-" + uuid.uuid4().hex[:8]},
+        ).scalar_one()
+        board = conn.execute(
+            text(
+                "INSERT INTO todo_board (name, kind, gremium_id) VALUES ('M', 'gremium', :g) "
+                "RETURNING id"
+            ),
+            {"g": gremium},
+        ).scalar_one()
+        col = conn.execute(
+            text(
+                "INSERT INTO todo_column (board_id, name, position, is_done) "
+                "VALUES (:b, 'Offen', 0, true) RETURNING id"
+            ),
+            {"b": board},
+        ).scalar_one()
+        card = conn.execute(
+            text(
+                "INSERT INTO todo_card (board_id, column_id, title, rank, created_by) "
+                "VALUES (:b, :c, 'K', 'm', :w) RETURNING id"
+            ),
+            {"b": board, "c": col, "w": who},
+        ).scalar_one()
+        other = conn.execute(
+            text(
+                "INSERT INTO todo_card (board_id, column_id, title, rank, created_by) "
+                "VALUES (:b, :c, 'L', 'n', :w) RETURNING id"
+            ),
+            {"b": board, "c": col, "w": who},
+        ).scalar_one()
+        conn.execute(
+            text("INSERT INTO todo_link (card_id, gremium_id, created_by) VALUES (:c, :g, :w)"),
+            {"c": card, "g": gremium, "w": who},
+        )
+        conn.execute(
+            text("INSERT INTO todo_link (card_id, todo_id, created_by) VALUES (:c, :t, :w)"),
+            {"c": card, "t": other, "w": who},
+        )
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO todo_link (card_id, gremium_id, todo_id, created_by) "
+                "VALUES (:c, :g, :t, :w)"
+            ),
+            {"c": card, "g": gremium, "t": other, "w": who},
+        )
+
+    command.downgrade(alembic_cfg, "066ff25554e2")
+    with engine.begin() as conn:
+        kinds = conn.execute(text("SELECT todo_id FROM todo_link WHERE card_id = :c"), {"c": card})
+        assert list(kinds.scalars()) == [other]
+    command.upgrade(alembic_cfg, "head")
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM gremium WHERE id = :g"), {"g": gremium})
+        conn.execute(text("DELETE FROM principal WHERE id = :w"), {"w": who})

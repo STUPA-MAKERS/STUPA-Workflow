@@ -291,3 +291,105 @@ async def test_a_card_becomes_an_agenda_item(
     async with maker() as session:
         row = await session.get(TodoCard, uuid.UUID(card["id"]))
         assert row is not None
+
+
+async def test_votes_gremien_invoices_and_bookings_as_link_targets(
+    api: Api, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    from datetime import date
+    from decimal import Decimal
+
+    from app.modules.budget.tree_models import Budget, BudgetExpense, FiscalYear, Invoice
+    from app.modules.voting.models import Vote
+
+    gid, bid = await add_gremium(maker, "Finanzer")
+    lead, lead_id = await add_person(maker, "Lena")
+    await add_member(maker, gid, lead_id, "todo.write", "vote.manage")
+    async with maker() as session:
+        node = Budget(key=f"T{uuid.uuid4().hex[:6]}", path_key="", name="Kultur")
+        node.path_key = node.key
+        session.add(node)
+        await session.flush()
+        fy = FiscalYear(
+            budget_id=node.id, year=2026, start_date=date(2026, 1, 1), end_date=date(2026, 12, 31)
+        )
+        invoice = Invoice(number="RE-77", supplier="Druckhaus", gross_amount=Decimal("119.00"))
+        session.add_all([fy, invoice])
+        await session.flush()
+        booking = BudgetExpense(
+            budget_id=node.id,
+            fiscal_year_id=fy.id,
+            amount=Decimal("42.50"),
+            description="Plakate Sommerfest",
+            invoice_id=invoice.id,
+        )
+        vote = Vote(
+            eligible_group=str(gid),
+            question="Sommerfest Plakate?",
+            config={"options": ["yes", "no", "abstain"], "majorityRule": "simple"},
+            status="closed",
+            result="passed",
+        )
+        session.add_all([booking, vote])
+        await session.commit()
+        ids = {"vote": vote.id, "gremium": gid, "invoice": invoice.id, "expense": booking.id}
+
+    booker = Principal(sub=lead.sub, permissions={"budget.view"})
+    api.login(booker)
+    with TestClient(api.app) as client:
+        links = [{"kind": k, "targetId": str(v)} for k, v in ids.items()]
+        card = _card(client, str(bid), "Plakate", links=links)
+        detail = _ok(client.get(f"/api/todos/cards/{card['id']}"))
+        by_kind = {link["kind"]: link for link in detail["links"]}
+        assert by_kind["vote"]["title"] == "Sommerfest Plakate?"
+        assert by_kind["vote"]["url"] == f"/voting/{ids['vote']}"
+        assert by_kind["vote"]["detail"]["voteResult"] == "passed"
+        assert by_kind["gremium"]["title"] == "Finanzer"
+        assert by_kind["gremium"]["url"] == f"/gremien/{gid}"
+        assert by_kind["invoice"]["title"] == "RE-77"
+        assert by_kind["invoice"]["detail"]["amount"] == "119.00"
+        assert by_kind["expense"]["detail"]["costCentre"] == node.path_key
+        assert by_kind["expense"]["url"] == f"/expenses?id={ids['expense']}"
+        for kind, target in ids.items():
+            linked = _ok(client.get(f"/api/todos/linked?kind={kind}&targetId={target}"))
+            assert [c["id"] for c in linked] == [card["id"]]
+        found = _ok(client.get("/api/todos/link-targets?q=Plakate"))
+        assert {(h["kind"], h["targetId"]) for h in found} >= {
+            ("vote", str(ids["vote"])),
+            ("expense", str(ids["expense"])),
+        }
+        assert {h["kind"] for h in _ok(client.get("/api/todos/link-targets?q=RE-77"))} >= {
+            "invoice"
+        }
+        assert ("gremium", str(gid)) in {
+            (h["kind"], h["targetId"])
+            for h in _ok(client.get("/api/todos/link-targets?q=Finanzer&kind=gremium"))
+        }
+
+        # Without a budget permission the invoice and the booking redact, and the picker
+        # offers neither.
+        api.login(lead)
+        by_kind = {
+            link["kind"]: link
+            for link in _ok(client.get(f"/api/todos/cards/{card['id']}"))["links"]
+        }
+        assert by_kind["invoice"]["accessible"] is False and by_kind["invoice"]["title"] is None
+        assert by_kind["expense"]["accessible"] is False and by_kind["expense"]["url"] is None
+        assert by_kind["vote"]["accessible"] is True and by_kind["gremium"]["accessible"] is True
+        assert _ok(client.get("/api/todos/link-targets?q=RE-77&kind=invoice")) == []
+        bad = client.post(
+            f"/api/todos/cards/{card['id']}/links",
+            json={"kind": "invoice", "targetId": str(uuid.uuid4())},
+        )
+        assert bad.status_code == 422
+
+    # A delete of the target removes the link (ON DELETE CASCADE).
+    async with maker() as session:
+        await session.delete(await session.get(Vote, ids["vote"]))
+        await session.commit()
+    api.login(booker)
+    with TestClient(api.app) as client:
+        kinds = {
+            link["kind"] for link in _ok(client.get(f"/api/todos/cards/{card['id']}"))["links"]
+        }
+        assert kinds == {"gremium", "invoice", "expense"}

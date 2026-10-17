@@ -167,11 +167,26 @@ async def can_view_gremium(
     Gremium. A read route that refuses answers 404, not 403, so the answer does
     not tell that the Gremium exists.
     """
+    visible = await gremium_view_scope(session, principal, now)
+    return visible is None or gremium_id in visible
+
+
+async def gremium_view_scope(
+    session: AsyncSession,
+    principal: AuthPrincipal,
+    now: datetime | None = None,
+) -> set[UUID] | None:
+    """Return the Gremien that ``principal`` may see: ``None`` for every Gremium.
+
+    The set form of ``can_view_gremium``, for a reader that checks many Gremien at
+    once (the to-do links): ``gremium.view_all`` gives ``None``, a token without the
+    ``read`` scope the empty set, anyone else the active memberships now.
+    """
     if principal.has(GREMIUM_VIEW_ALL):
-        return True
+        return None
     if not principal.scope_allows(GREMIUM_VIEW_ALL):
-        return False
-    return gremium_id in await gremium_member_ids(session, principal.sub, now)
+        return set()
+    return await gremium_member_ids(session, principal.sub, now)
 
 
 def _sanitize_perms(perms: list[str] | None) -> list[str]:

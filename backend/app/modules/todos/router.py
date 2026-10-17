@@ -62,6 +62,7 @@ from app.modules.todos.schemas import (
     TodoCommentOut,
     TodoLabelOut,
     TodoLinkedCard,
+    TodoLinkedKind,
     TodoLinkKind,
     TodoLinkTarget,
     TodoMember,
@@ -400,7 +401,7 @@ async def link_targets(
     service: ServiceDep,
     principal: Member,
     q: Annotated[str, Query(min_length=2, max_length=200)],
-    kind: Literal["all", "application", "meeting", "agenda_item", "ticket", "todo"] = "all",
+    kind: TodoLinkKind | Literal["all"] = "all",
     exclude_card_id: Annotated[UUID | None, Query(alias="excludeCardId")] = None,
 ) -> list[TodoLinkTarget]:
     """Search the link targets that the caller may read (at most 5 per kind)."""
@@ -413,7 +414,7 @@ async def link_targets(
 async def linked(
     service: ServiceDep,
     principal: Member,
-    kind: Literal["application", "meeting", "agenda_item", "ticket"],
+    kind: TodoLinkedKind,
     target_id: Annotated[UUID, Query(alias="targetId")],
 ) -> list[TodoLinkedCard]:
     """The readable live cards that link to the target (back-references)."""

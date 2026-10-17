@@ -1,11 +1,18 @@
 """Link targets of a card: resolve them per viewer, and search them for the picker.
 
-A card links to an application, a meeting, an agenda item, a ticket or another
-card. Each kind has the read rule of its own module:
+A card links to an application, a meeting, an agenda item, a vote, a gremium, an
+invoice, a booking, a ticket or another card. Each kind has the read rule of its own
+module:
 
 * application — the application read access (``resolve_app_read``), confirmed only;
 * meeting — the meeting read scope (``meeting_read_scope``);
 * agenda_item — the read scope of its meeting;
+* vote — the read scope of the vote list (``voting.listing.read_scope``, the SQL form
+  of ``VotingService.assert_can_read``);
+* gremium — the gate of the tab "Gremien" (``gremium_view_scope``, the set form of
+  ``can_view_gremium``: ``gremium.view_all`` or an active membership);
+* invoice, expense — the gate of ``GET /api/invoices`` and ``GET /api/expenses``
+  (``budget.access.has_budget_read``);
 * ticket — ``ticket.manage``;
 * todo — the board read rule (``BoardAccess``).
 
@@ -24,6 +31,8 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.modules.admin.gremium_roles import gremium_view_scope
+from app.modules.admin.models import Gremium
 from app.modules.applications.access import (
     READ_ALL_PERMISSION,
     READ_PERMISSION,
@@ -32,6 +41,8 @@ from app.modules.applications.access import (
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
 from app.modules.auth.principal import Principal
+from app.modules.budget.access import has_budget_read
+from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice
 from app.modules.flow.models import State
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.tickets.access import TICKET_MANAGE
@@ -40,11 +51,15 @@ from app.modules.tickets.service import format_number
 from app.modules.todos.access import BoardAccess
 from app.modules.todos.models import LINK_KINDS, TodoBoard, TodoCard, TodoColumn
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkTarget
-from app.search import escape_like
+from app.modules.voting.listing import read_scope as vote_read_scope
+from app.modules.voting.models import Vote
+from app.search import dialect_of, escape_like, trigram_rank
 from app.shared.errors import ForbiddenError
 
 #: The most hits of one kind in the link picker.
 PER_KIND = 5
+#: Every status of a vote: the picker also offers a draft, which a card often prepares.
+VOTE_STATUSES = ("open", "draft", "closed", "cancelled")
 
 LinkRef = tuple[str, uuid.UUID]
 
@@ -66,6 +81,10 @@ def _iso(value: object) -> str | None:
     return value.isoformat() if value is not None else None  # type: ignore[attr-defined]
 
 
+def _money(value: object) -> str | None:
+    return str(value) if value is not None else None
+
+
 def card_url(board_id: uuid.UUID, card_id: uuid.UUID) -> str:
     """The app route of a card: the board with the drawer open."""
     return f"/todos/{board_id}?card={card_id}"
@@ -78,6 +97,7 @@ class LinkResolver:
         self.session = session
         self.access = access
         self._meeting_scope: tuple[set[uuid.UUID] | None, set[uuid.UUID]] | None = None
+        self._gremium_scope: tuple[set[uuid.UUID] | None] | None = None
 
     # -- rights -----------------------------------------------------------------
 
@@ -94,6 +114,12 @@ class LinkResolver:
     async def _meeting_visible(self, meeting: Meeting, principal: Principal) -> bool:
         gremien, delegated = await self._meetings_scope(principal)
         return gremien is None or meeting.gremium_id in gremien or meeting.id in delegated
+
+    async def _gremien_scope(self, principal: Principal) -> set[uuid.UUID] | None:
+        """The gremien of the tab "Gremien" for the principal (None = all), cached."""
+        if self._gremium_scope is None:
+            self._gremium_scope = (await gremium_view_scope(self.session, principal),)
+        return self._gremium_scope[0]
 
     async def _application_readable(self, app: Application, principal: Principal) -> bool:
         if app.email_confirmed_at is None:
@@ -120,6 +146,10 @@ class LinkResolver:
             "application": self._applications,
             "meeting": self._meetings,
             "agenda_item": self._agenda_items,
+            "vote": self._votes,
+            "gremium": self._gremien,
+            "invoice": self._invoices,
+            "expense": self._expenses,
             "ticket": self._tickets,
             "todo": self._todos,
         }
@@ -249,6 +279,111 @@ class LinkResolver:
         ).all()
         return {aid: _title_of(data) or "" for aid, data in rows}
 
+    async def _votes(self, ids: set[uuid.UUID], principal: Principal) -> dict[uuid.UUID, Resolved]:
+        rows = (
+            await self.session.execute(
+                select(Vote, Meeting.title, Meeting.date)
+                .outerjoin(Meeting, Meeting.id == Vote.meeting_id)
+                .where(Vote.id.in_(ids), await vote_read_scope(self.session, principal))
+            )
+        ).all()
+        if not rows:
+            return {}
+        titles = await self._application_titles(
+            {v.application_id for v, _t, _d in rows if not v.question and v.application_id}
+        )
+        out: dict[uuid.UUID, Resolved] = {}
+        for vote, meeting_title, meeting_date in rows:
+            title = vote.question or (
+                titles.get(vote.application_id) if vote.application_id is not None else None
+            )
+            out[vote.id] = Resolved(
+                accessible=True,
+                title=title or "",
+                url=f"/voting/{vote.id}",
+                detail=TodoLinkDetail(
+                    meeting_title=meeting_title,
+                    date=_iso(meeting_date),
+                    vote_status=vote.status,  # type: ignore[arg-type]
+                    vote_result=vote.result,  # type: ignore[arg-type]
+                ),
+            )
+        return out
+
+    async def _gremien(
+        self, ids: set[uuid.UUID], principal: Principal
+    ) -> dict[uuid.UUID, Resolved]:
+        visible = await self._gremien_scope(principal)
+        wanted = ids if visible is None else ids & visible
+        if not wanted:
+            return {}
+        rows = (
+            await self.session.execute(
+                select(Gremium.id, Gremium.name).where(Gremium.id.in_(wanted))
+            )
+        ).all()
+        return {
+            gid: Resolved(
+                accessible=True, title=name, url=f"/gremien/{gid}", detail=TodoLinkDetail()
+            )
+            for gid, name in rows
+        }
+
+    async def _invoices(
+        self, ids: set[uuid.UUID], principal: Principal
+    ) -> dict[uuid.UUID, Resolved]:
+        if not has_budget_read(principal):
+            return {}
+        invoices = list(
+            (await self.session.scalars(select(Invoice).where(Invoice.id.in_(ids)))).all()
+        )
+        return {
+            inv.id: Resolved(
+                accessible=True,
+                title=inv.number or inv.supplier or "",
+                url=f"/invoices?id={inv.id}",
+                detail=TodoLinkDetail(
+                    number=inv.number,
+                    counterparty=inv.supplier,
+                    amount=_money(inv.gross_amount),
+                    date=_iso(inv.issue_date),
+                    invoice_status=inv.status,  # type: ignore[arg-type]
+                ),
+            )
+            for inv in invoices
+        }
+
+    async def _expenses(
+        self, ids: set[uuid.UUID], principal: Principal
+    ) -> dict[uuid.UUID, Resolved]:
+        if not has_budget_read(principal):
+            return {}
+        rows = (
+            await self.session.execute(
+                select(BudgetExpense, Budget.path_key)
+                .join(Budget, Budget.id == BudgetExpense.budget_id)
+                .where(BudgetExpense.id.in_(ids))
+            )
+        ).all()
+        out: dict[uuid.UUID, Resolved] = {}
+        for exp, path_key in rows:
+            # The list shows a sub-booking under its parent only, so the deep link
+            # selects the parent.
+            row_id = exp.parent_expense_id or exp.id
+            out[exp.id] = Resolved(
+                accessible=True,
+                title=exp.description,
+                url=f"/expenses?id={row_id}",
+                detail=TodoLinkDetail(
+                    amount=_money(exp.amount),
+                    booking_kind=exp.kind,  # type: ignore[arg-type]
+                    cost_centre=path_key,
+                    counterparty=exp.correspondent,
+                    date=_iso(exp.payment_date or exp.invoice_date),
+                ),
+            )
+        return out
+
     async def _tickets(
         self, ids: set[uuid.UUID], principal: Principal
     ) -> dict[uuid.UUID, Resolved]:
@@ -330,6 +465,14 @@ class LinkResolver:
             return await self._meeting_candidates(pattern, principal)
         if kind == "agenda_item":
             return await self._agenda_candidates(pattern, principal)
+        if kind == "vote":
+            return await self._vote_candidates(term, principal)
+        if kind == "gremium":
+            return await self._gremium_candidates(term, principal)
+        if kind == "invoice":
+            return await self._invoice_candidates(term, principal)
+        if kind == "expense":
+            return await self._expense_candidates(term, principal)
         if kind == "ticket":
             return await self._ticket_candidates(term, principal)
         return await self._todo_candidates(pattern, principal, exclude_card_id)
@@ -387,6 +530,51 @@ class LinkResolver:
             MeetingAgendaItem.id,
         ).limit(PER_KIND)
         return list((await self.session.scalars(stmt)).all())
+
+    async def _vote_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
+        """Reuses ``voting.listing.list_votes`` (``GET /votes``), with every status."""
+        from app.modules.voting.listing import list_votes
+
+        page = await list_votes(
+            self.session, principal, statuses=VOTE_STATUSES, q=term, limit=PER_KIND, offset=0
+        )
+        return [v.id for v in page.items]
+
+    async def _gremium_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
+        """The trigram match of the search source on name and slug, in the Gremien scope."""
+        visible = await self._gremien_scope(principal)
+        if visible is not None and not visible:
+            return []
+        where, rank = trigram_rank(
+            term, [Gremium.name, Gremium.slug], dialect=dialect_of(self.session)
+        )
+        stmt = select(Gremium.id).where(where)
+        if visible is not None:
+            stmt = stmt.where(Gremium.id.in_(visible))
+        stmt = stmt.order_by(rank.desc(), Gremium.name, Gremium.id).limit(PER_KIND)
+        return list((await self.session.scalars(stmt)).all())
+
+    async def _invoice_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
+        """Reuses ``list_invoices_paged`` behind the gate of ``GET /invoices``."""
+        if not has_budget_read(principal):
+            return []
+        from app.modules.budget.tree.service import BudgetTreeService
+
+        page = await BudgetTreeService(self.session).list_invoices_paged(
+            q=term, limit=PER_KIND, offset=0
+        )
+        return [inv.id for inv in page.items]
+
+    async def _expense_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
+        """Reuses ``list_expenses_paged`` behind the gate of ``GET /expenses``."""
+        if not has_budget_read(principal):
+            return []
+        from app.modules.budget.tree.service import BudgetTreeService
+
+        page = await BudgetTreeService(self.session).list_expenses_paged(
+            q=term, limit=PER_KIND, offset=0
+        )
+        return [e.id for e in page.items]
 
     async def _ticket_candidates(self, term: str, principal: Principal) -> list[uuid.UUID]:
         """Reuses ``TicketService.list``, behind ``ticket.manage`` like ``GET /tickets``."""

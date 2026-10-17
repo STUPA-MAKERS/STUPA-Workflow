@@ -15,7 +15,8 @@ a move writes one row only (``lexorank.py``). ``version`` guards the content edi
 (title, description, due date) against a lost update.
 
 ``todo_link`` points a card at exactly one target: an application, a meeting, an
-agenda item, a ticket or another card. ``todo_event`` is the timeline of a card;
+agenda item, a vote, a gremium, an invoice, a booking (``budget_expense``), a ticket
+or another card. ``todo_event`` is the timeline of a card;
 there is no audit entry for to-dos.
 
 ``due_reminded_on`` is the due date that the ``todo_due`` reminder went out for. A
@@ -64,12 +65,26 @@ EVENT_KINDS: tuple[str, ...] = (
     "restored",
 )
 #: The target kinds of a link, in the order of the link picker.
-LINK_KINDS: tuple[str, ...] = ("application", "meeting", "agenda_item", "ticket", "todo")
+LINK_KINDS: tuple[str, ...] = (
+    "application",
+    "meeting",
+    "agenda_item",
+    "vote",
+    "gremium",
+    "invoice",
+    "expense",
+    "ticket",
+    "todo",
+)
 #: The target column of each link kind.
 LINK_COLUMNS: dict[str, str] = {
     "application": "application_id",
     "meeting": "meeting_id",
     "agenda_item": "agenda_item_id",
+    "vote": "vote_id",
+    "gremium": "gremium_id",
+    "invoice": "invoice_id",
+    "expense": "expense_id",
     "ticket": "ticket_id",
     "todo": "todo_id",
 }
@@ -283,6 +298,18 @@ class TodoLink(UUIDPkMixin, Base):
     agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting_agenda_item.id", ondelete="CASCADE"), nullable=True
     )
+    vote_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("vote.id", ondelete="CASCADE"), nullable=True
+    )
+    gremium_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
+    )
+    invoice_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("invoice.id", ondelete="CASCADE"), nullable=True
+    )
+    expense_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("budget_expense.id", ondelete="CASCADE"), nullable=True
+    )
     ticket_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("ticket.id", ondelete="CASCADE"), nullable=True
     )
@@ -294,7 +321,7 @@ class TodoLink(UUIDPkMixin, Base):
 
     __table_args__ = (
         CheckConstraint(
-            "num_nonnulls(application_id, meeting_id, agenda_item_id, ticket_id, todo_id) = 1",
+            f"num_nonnulls({', '.join(LINK_COLUMNS.values())}) = 1",
             name="one_target",
         ),
         Index("ix_todo_link_card_id", "card_id"),

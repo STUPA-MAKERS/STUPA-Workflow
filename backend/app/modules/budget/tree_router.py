@@ -30,6 +30,7 @@ from app.deps import (
 )
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
+from app.modules.budget.access import BUDGET_READ_PERMISSIONS, has_budget_read
 from app.modules.budget.invoice_import import (
     NotZugferdError,
     UnsupportedInvoiceCurrencyError,
@@ -101,13 +102,9 @@ def get_budget_tree_service(
 ServiceDep = Annotated[BudgetTreeService, Depends(get_budget_tree_service)]
 
 
-# Global full view of the budget tab. Each of these permissions shows ALL nodes.
-# Without one of them the gremium scope (view_gremium_id) applies.
-_FULL_VIEW_PERMS = ("budget.view", "budget.structure", "budget.book")
-
-
-def _has_full_view(principal: Principal) -> bool:
-    return any(principal.has(p) for p in _FULL_VIEW_PERMS)
+# Global full view of the budget tab: `access.BUDGET_READ_PERMISSIONS`. Each of them
+# shows ALL nodes. Without one of them the gremium scope (view_gremium_id) applies.
+_has_full_view = has_budget_read
 
 
 async def _member_gremium_ids(service: BudgetTreeService, sub: str) -> set[UUID]:
@@ -327,7 +324,7 @@ async def delete_budget_expense(expense_id: UUID, service: ServiceDep) -> None:
     "/budget-expenses/{expense_id}/sub-bookings",
     response_model=list[ExpenseOut],
     dependencies=[
-        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+        Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
     ],
     responses=_errors(401, 403, 404),
 )
@@ -382,7 +379,7 @@ async def book_expense(
     response_model=Page[ExpenseOut],
     # Every budget role reads this: view, structure and book see the bookings.
     dependencies=[
-        Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+        Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
     ],
     responses=_errors(401, 403, 404),
 )
@@ -603,7 +600,7 @@ async def delete_transfer(transfer_id: UUID, service: ServiceDep) -> None:
 
 
 # Every budget role may read an invoice. A write needs budget.book.
-_INVOICE_READ = Depends(require_any_permission("budget.view", "budget.structure", "budget.book"))
+_INVOICE_READ = Depends(require_any_permission(*BUDGET_READ_PERMISSIONS))
 
 
 @router.get(
