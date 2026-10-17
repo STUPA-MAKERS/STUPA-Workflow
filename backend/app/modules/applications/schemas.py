@@ -19,6 +19,8 @@ from app.modules.applications.diff import DataDiff
 from app.modules.files.schemas import MessageAttachmentOut, MessageFilesIn
 from app.shared.altcha import AltchaSolutionStr
 from app.shared.i18n import DEFAULT_LANG, I18nMap, Lang
+from app.shared.mentions import MAX_MENTIONS
+from app.shared.people import PersonRef
 
 
 class _CamelModel(BaseModel):
@@ -390,6 +392,11 @@ class CommentCreate(MessageFilesIn, _CamelModel):
     # database and in the mail render. A longer body answers 422.
     body: str = Field(max_length=10_000)
     visibility: Literal["internal", "public"] = "public"
+    # The principal ids of the mentioned members (at most 50, duplicates drop). Each
+    # one must be in ``GET /applications/{id}/mentionable``, else 422
+    # ``mention_not_member``. A caller who does not read the internal comments (the
+    # applicant view) may not mention anybody.
+    mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
 
 
 class CommentPatch(_CamelModel):
@@ -398,9 +405,13 @@ class CommentPatch(_CamelModel):
     The visibility is not patchable. A public comment is already out, so
     switching it to internal hides it only from the applicant who read it. The
     delete is the path for that case.
+
+    ``mentions`` null keeps the stored mentions; a list replaces them, with the same
+    rules as the create. Only a mention that the list adds gets a mail.
     """
 
     body: str = Field(min_length=1, max_length=10_000)
+    mentions: list[UUID] | None = Field(default=None, max_length=MAX_MENTIONS)
 
 
 class CommentOut(_CamelModel):
@@ -416,6 +427,10 @@ class CommentOut(_CamelModel):
     is_own: bool = Field(default=False, alias="isOwn")
     # The files of the comment, oldest first. They are fixed at the send.
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
+    # The mentioned members, in the stored order. The applicant view gets an empty
+    # list, because the applicant never sees a member name (A12, O16). An erased
+    # account shows as the deleted person (``principalId`` and ``displayName`` null).
+    mentions: list[PersonRef] = Field(default_factory=list)
 
 
 # ``ApplicationOut`` names ``CaptureOut``, which this module defines later, after

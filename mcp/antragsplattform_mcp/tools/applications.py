@@ -188,8 +188,9 @@ async def comment_application(
     body: str = "",
     visibility: Literal["public", "internal"] = "public",
     file_paths: list[str] | None = None,
+    mentions: list[str] | None = None,
 ) -> dict:
-    """Add a comment to an application, optionally with files.
+    """Add a comment to an application, optionally with files and mentions.
 
     An `internal` comment and its files stay hidden from the applicant. Each file in
     `file_paths` (a local path on the machine of the MCP server, at most 5 per comment)
@@ -202,13 +203,16 @@ async def comment_application(
 
     Args:
         body: Markdown, up to 10000 characters; empty only with at least one file.
+            Write a mention as "@Display Name".
         file_paths: Local files to attach.
+        mentions: Principal ids of the mentioned members (`GET
+            /applications/{id}/mentionable`: the persons who read the internal
+            comments); they get a mail. Another id gives 422 `mention_not_member`.
     """
-    return await post_message(
-        f"/applications/{application_id}/comments",
-        {"body": body, "visibility": visibility},
-        file_paths,
-    )
+    payload: dict[str, object] = {"body": body, "visibility": visibility}
+    if mentions:
+        payload["mentions"] = mentions
+    return await post_message(f"/applications/{application_id}/comments", payload, file_paths)
 
 
 @group.tool

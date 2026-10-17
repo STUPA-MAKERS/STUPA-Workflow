@@ -17,8 +17,9 @@ What the merge does with each reference:
   comments, ballots and the voted markers of secret votes, delegations, the substitute
   pool, attendance, meetings (creator, minute-taker, keeper periods), protocols, budget
   bookings and invoices, config versions, role assignments, privacy requests, backups,
-  the stored audit checks, tickets and to-dos (cards, comments with their mentions,
-  events, links).
+  the stored audit checks, tickets (with the mentions of the notes) and to-dos (cards,
+  comments with their mentions, events, links). The mentions of the application
+  comments move too.
 - It moves the personal to-do board of the source to the target. When the target has
   one already, the cards of the source board move into it (``todos/merge.py``).
 - It combines harmless duplicates: a notification preference, a pool entry, an
@@ -803,6 +804,23 @@ class PrincipalMergeService:
             apply=apply,
         )
 
+    async def _chat_mentions(
+        self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
+    ) -> None:
+        """Replace the source by the target in the mentions of the comments and notes.
+
+        The application comments count in the area ``comments``, the ticket notes in
+        ``tickets``. The to-do comments are part of `_todos`.
+        """
+        comments = await rewrite_mentions(
+            self.session, source.id, target.id, apply=apply, table="comment"
+        )
+        tally.add("comments", rewritten=comments)
+        notes = await rewrite_mentions(
+            self.session, source.id, target.id, apply=apply, table="ticket_note"
+        )
+        tally.add("tickets", rewritten=notes)
+
     async def _todos(
         self, source: PrincipalRow, target: PrincipalRow, tally: _Tally, *, apply: bool
     ) -> None:
@@ -893,6 +911,7 @@ class PrincipalMergeService:
         await self._plain_columns(source, target, tally, apply=False)
         await self._combined_tables(source, target, tally, apply=False)
         await self._todos(source, target, tally, apply=False)
+        await self._chat_mentions(source, target, tally, apply=False)
         await self._source_row(source, target, tally, apply=False)
         return MergePreviewOut(
             source=_principal_out(source),
@@ -943,6 +962,7 @@ class PrincipalMergeService:
             await self._combined_tables(source, target, tally, apply=True)
             await self._plain_columns(source, target, tally, apply=True)
             await self._todos(source, target, tally, apply=True)
+            await self._chat_mentions(source, target, tally, apply=True)
             merged_at = await self._source_row(source, target, tally, apply=True)
             assert merged_at is not None
             await AuditService(self.session).record(

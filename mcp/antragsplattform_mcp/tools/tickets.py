@@ -61,8 +61,9 @@ async def tickets_note(
     body: str = "",
     file_paths: list[str] | None = None,
     public: bool = False,
+    mentions: list[str] | None = None,
 ) -> dict:
-    """Add a note to a ticket, optionally with files.
+    """Add a note to a ticket, optionally with files and mentions.
 
     A note is internal: the reporter never sees it. With `public` the reporter account
     reads it (and its files) in its own view of the ticket; a report without an account
@@ -80,10 +81,15 @@ async def tickets_note(
         body: Markdown, up to 10000 characters; empty only with at least one file.
         file_paths: Local files to attach.
         public: Show the note to the reporter account.
+        mentions: Principal ids of the mentioned holders of `ticket.manage` (`GET
+            /tickets/assignees`); they get a mail. Another id gives 422
+            `mention_not_member`. Write a mention as "@Display Name" in `body`.
     """
     payload: dict[str, object] = {"body": body}
     if public:
         payload["visibility"] = "public"
+    if mentions:
+        payload["mentions"] = mentions
     return await post_message(f"/tickets/{ticket_id}/notes", payload, file_paths)
 
 

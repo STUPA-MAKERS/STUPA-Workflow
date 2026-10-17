@@ -104,6 +104,10 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a to-do that you are responsible "
         "for is due tomorrow.",
     },
+    "mention": {
+        "de": "Sie erhalten diese E-Mail, weil Sie erwähnt wurden.",
+        "en": "You are receiving this email because you were mentioned.",
+    },
     "generic": {
         "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
         "en": "You are receiving this email from the application platform.",
