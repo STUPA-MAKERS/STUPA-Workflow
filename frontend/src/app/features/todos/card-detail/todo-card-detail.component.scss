@@ -124,6 +124,12 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
+/* A part of the line ("Angelegt von …", the day) wraps as a whole: a narrow sheet breaks
+   the line between the parts, and inside a part only when it alone is wider than the
+   line. */
+.cd__seg {
+  display: inline-block;
+}
 .cd__note {
   margin-top: var(--space-2);
 }
@@ -564,6 +570,19 @@ a.cd__linkTitle:hover {
 :host(.cd--phone) .cd__head app-sheet-bar {
   min-height: 40px;
 }
+/* The kicker wraps on a phone, so the board name stays whole; ⋮ stays at its first line. */
+:host(.cd--phone) .cd__head app-sheet-bar {
+  align-items: flex-start;
+}
+:host(.cd--phone) .cd__kicker {
+  padding-block: 10px;
+}
+/* The labels take only their own width, so the values get the room: at 360px a person
+   chip with a first and a last name and the "+" fit on one line. */
+:host(.cd--phone) .cd__fields {
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: var(--space-4);
+}
 /* The tab "Aktivität" fills the drawer down to the bottom navigation: the log takes the
    height between the tabs and the composer and scrolls inside, so it opens at the newest
    message, and the composer bar sits on the navigation. */
@@ -594,6 +613,10 @@ a.cd__linkTitle:hover {
   margin-top: var(--space-4);
   padding: var(--space-3) 0;
   background: var(--color-surface);
+}
+/* In the pane of "Aufgaben" a phone shows the detail on the page, not on a sheet. */
+:host(.cd--pane) .cd__bar {
+  background: var(--color-bg);
 }
 
 /* ------------------------------------------------------------------ loading */

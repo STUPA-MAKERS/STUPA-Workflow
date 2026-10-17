@@ -2,6 +2,7 @@
   <app-todo-card-detail
     class="tt-pane"
     mode="pane"
+    [split]="split()"
     [cardId]="id"
     (closed)="close()"
     (changed)="refresh()"
