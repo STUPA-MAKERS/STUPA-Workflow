@@ -81,6 +81,7 @@
             (castFailed)="onCastFailed($event)"
             (changed)="onElectionChanged()"
           />
+          <app-todo-linked-list kind="vote" headingId="vc-todos" [targetId]="v.id" />
         </div>
       </article>
     } @else {

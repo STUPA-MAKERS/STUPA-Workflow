@@ -8,7 +8,7 @@ description: To-do boards (Kanban) — gremium boards, the personal board "Meine
 **Does:** Kanban boards for the work of a gremium, of one person and of a team. A card has
 a title, a Markdown description, a due date, assignees, labels, a checklist, comments
 with @-mentions, a timeline of events and links to an application, a meeting, an agenda
-item, a ticket or another card. Every board has exactly one done column; a card in it is
+item, a vote, a gremium, an invoice, a booking, a ticket or another card. Every board has exactly one done column; a card in it is
 done (`completed_at`).
 
 **Key files:**
@@ -18,7 +18,12 @@ done (`completed_at`).
   (`uq_todo_column_done`), `TodoCard` (`rank` collation `C`, `version`,
   `due_reminded_on`), `TodoAssignee`, `TodoLabel` (unique `lower(name)` per board),
   `TodoCardLabel`, `TodoCheckItem`, `TodoComment` (`mentions` JSONB of id strings, soft
-  delete), `TodoEvent`, `TodoLink` (exactly one target column, `LINK_COLUMNS`). Constants
+  delete), `TodoEvent`, `TodoLink` (exactly one target column, `LINK_COLUMNS`; every
+  target FK is `ON DELETE CASCADE`; `ck_todo_link_one_target` counts the columns of
+  `LINK_COLUMNS`, partial indexes `uq_todo_link_<column>` and `ix_todo_link_<column>`).
+  `LINK_KINDS` is also the picker order: application, meeting, agenda_item, vote,
+  gremium, invoice, expense (`budget_expense`), ticket, todo. Migration `527854b79d68`
+  adds `vote_id`, `gremium_id`, `invoice_id`, `expense_id`. Constants
   `DEFAULT_COLUMNS`, `PERSONAL_BOARD_NAME`, `TEAM_BOARD_NAME`/`TEAM_BOARD_PERMISSION`.
 - `access.py` — `BoardAccess` (per-request cache): `can_read` (write or `todo.read_all`),
   `can_write`, `can_configure`, `scope()` → `ReadScope.condition()` for the cross-board
@@ -30,7 +35,23 @@ done (`completed_at`).
   under "Meine To-Dos"; `all_boards`: the meta-board "Alle"; both through
   `_board_rows(mine=...)`.
 - `links.py` — `LinkResolver`: `resolve` (one query per kind), `readable`, `search` (the
-  link picker, `PER_KIND` 5), `card_url`.
+  link picker, `PER_KIND` 5), `card_url`. The read rule of each kind is the gate of its
+  own module, so a link never shows more than that module's page:
+  application `resolve_app_read` (confirmed only); meeting and agenda item
+  `meeting_read_scope`; vote `voting.listing.read_scope` (the SQL form of
+  `assert_can_read`); gremium `admin.gremium_roles.gremium_view_scope` (the tab
+  "Gremien": `gremium.view_all` or an active membership, cached per resolver); invoice and
+  expense `budget.access.has_budget_read` (`budget.view`/`.structure`/`.book`, the gate
+  of `GET /invoices` and `/expenses`); ticket `ticket.manage`; todo the board rule.
+  Titles and urls: vote = question, else the application title (`/voting/{id}`, detail
+  `meetingTitle`, `date`, `voteStatus`, `voteResult`); gremium = name (`/gremien/{id}`);
+  invoice = number, else supplier (`/invoices?id={id}`, detail `number`,
+  `counterparty`, `amount`, `date` = issue date, `invoiceStatus`); expense = description
+  (`/expenses?id={id}`, a sub-booking links its parent row; detail `amount`,
+  `bookingKind`, `costCentre` = path key, `counterparty`, `date`). Picker candidates
+  reuse the module lists: `list_votes` (every status, drafts too), the trigram match of
+  the search source on gremium name/slug inside the Gremien scope,
+  `list_invoices_paged`, `list_expenses_paged` (top-level bookings only).
 - `lexorank.py` — `between(low, high)` (a loop, no recursion), `spread(n)`; `RankError`, `MAX_LENGTH`.
 - `boards.py` — `add_default_columns`, `ensure_gremium_board` (no commit),
   `ensure_personal_board` (insert … on conflict do nothing, commits).
@@ -110,7 +131,8 @@ boards with `canWrite: false`; the personal board first (the call creates it, li
 and every live card, done ones too; `cardCount` = the live cards of the column; the same
 token gate (403), the same weak ETag and 304, and a constant number of queries: one for
 the boards, one for the cards, one each for columns and labels, and the tile facts),
-`GET /link-targets`, `GET /linked?kind&targetId`, `POST /cards`, `GET|PATCH
+`GET /link-targets` (`kind` = `all` or a `TodoLinkKind`), `GET /linked?kind&targetId`
+(`TodoLinkedKind`: every kind but `todo`), `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
 /cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `POST
 /cards/{id}/transfer` (`CardTransfer`: `boardId`, `columnId?` = default the first column,

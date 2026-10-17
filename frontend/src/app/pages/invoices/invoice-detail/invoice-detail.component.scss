@@ -87,3 +87,8 @@
 .id__secData {
   --fd-phone-order: 4;
 }
+/* The linked to-dos come last; the list is not a `.fd__sec`, so it sets the order itself. */
+.id__todos {
+  --fd-phone-order: 5;
+  order: var(--fd-phone-order);
+}

@@ -37,6 +37,7 @@ import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote
 import { VotingPageService } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -74,6 +75,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   without a meeting), and the button bar of the ballot pinned at the bottom.
  * - The route reuses the component from one vote to the next, so the pane loads again
  *   on each change of `:id`.
+ * - Under the vote: the to-do cards that link it (`app-todo-linked-list`).
  */
 @Component({
   selector: 'app-vote-cast',
@@ -90,6 +92,7 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     IconComponent,
     RowMenuComponent,
     ScrollFadeDirective,
+    TodoLinkedListComponent,
     TranslatePipe,
     VotePanelComponent,
     VotePhoneHeaderComponent,

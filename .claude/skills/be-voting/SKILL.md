@@ -12,7 +12,7 @@ description: Standalone vote lifecycle (Vote/Ballot/SecretBallot/VotedMarker) wi
 - `tally.py` — pure, side-effect-free counting + outcome logic (`tally`, `leading`, `result`, `failed_reason`, `Outcome`) and the majority/quorum math. Fully unit-testable, no DB, no time.
 - `service.py` — `VotingService`: lifecycle methods, race-safe casting via DB constraints, reveal/scope rules, flow-branch firing on close.
 - `schemas.py` — Pydantic IO (`VoteCreate` = API body, `extra=forbid`, no `eligibleCount`; `VoteCreateInternal` = server-side payload with the roster count; `BallotIn`, `TallyOut`, `VoteOut` with `canManage`/`canCast`, `BallotAccepted`, `VoteClosed`) with camelCase aliases.
-- `listing.py` — the vote list (`GET /votes`): the read scope in SQL, the filters and the page decoration.
+- `listing.py` — the vote list (`GET /votes`): the read scope in SQL, the filters and the page decoration. `read_scope` and `list_votes` also gate the to-do links to a vote (be-todos), so a link shows a vote only to a reader of `GET /votes/{id}`.
 - `router.py` — FastAPI routes (session gate only; the service runs the gremium-scoped checks), problem+json error responses.
 - `VoteConfig`/`Quorum` live in `app/shared/config_schemas.py`, stored as JSONB in `vote.config`.
 

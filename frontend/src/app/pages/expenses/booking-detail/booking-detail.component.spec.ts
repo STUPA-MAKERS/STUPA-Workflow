@@ -5,6 +5,9 @@ import type { Application } from '@core/api/models';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
 import { costCentreIndex } from '../../budget/expense-display.util';
 import { BookingDetailComponent } from './booking-detail.component';
+import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { TodosApiService } from '@core/api/todos.service';
+import { of } from 'rxjs';
 
 const NODE = (over: Partial<BudgetTreeNode>): BudgetTreeNode => ({
   id: 'n',
@@ -140,7 +143,7 @@ async function setup(inputs: Record<string, unknown> = {}) {
       ...inputs,
     },
     on: { edit, remove, addSub, openFile },
-    providers: [provideRouter([])],
+    providers: [provideRouter([]), NO_LINKED_TODOS],
   });
   return { view, edit, remove, addSub, openFile, user: userEvent.setup() };
 }
@@ -162,6 +165,18 @@ describe('BookingDetailComponent', () => {
     const link = screen.getByRole('link', { name: 'Im Budget ansehen' });
     expect(link.getAttribute('href')).toBe('/budget?budget=top&ks=mb&fy=fy');
     expect(view.container.querySelector('.fd--split')).not.toBeNull();
+  });
+
+  it('lists the to-dos that link the booking', async () => {
+    const linked = jest.fn(() =>
+      of([{ id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Beleg nachreichen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] }]),
+    );
+    await render(BookingDetailComponent, {
+      inputs: { expense: EXPENSE },
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked } }],
+    });
+    expect(linked).toHaveBeenCalledWith('expense', EXPENSE.id);
+    expect(screen.getByRole('link', { name: 'Beleg nachreichen' })).toBeInTheDocument();
   });
 
   it('leaves out what it does not know', async () => {

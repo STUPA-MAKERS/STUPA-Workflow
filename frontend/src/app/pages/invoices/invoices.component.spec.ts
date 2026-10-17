@@ -17,6 +17,7 @@ import type {
   InvoicePage,
   InvoiceParseResult,
 } from '../budget/budget-tree.api';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 function inv(over: Partial<Invoice> = {}): Invoice {
   return {
@@ -94,6 +95,7 @@ async function setup(opts: SetupOpts = {}) {
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
+      NO_LINKED_TODOS,
       { provide: AuthService, useValue: auth },
       {
         provide: ActivatedRoute,
@@ -175,6 +177,7 @@ describe('InvoicesComponent', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        NO_LINKED_TODOS,
         { provide: AuthService, useValue: new FakeAuth() },
         {
           provide: ActivatedRoute,
@@ -1262,6 +1265,7 @@ describe('InvoicesComponent infinite-scroll effect', () => {
         provideHttpClient(),
         provideHttpClientTesting(),
         { provide: USE_MOCK_API, useValue: false },
+        NO_LINKED_TODOS,
         { provide: AuthService, useValue: new FakeAuth2() },
       ],
     });
