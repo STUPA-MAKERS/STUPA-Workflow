@@ -59,6 +59,7 @@ function makeApi(card: TodoCardDetail) {
 interface Opts {
   card?: TodoCardDetail;
   mode?: 'drawer' | 'pane';
+  split?: boolean;
   board?: TodoBoard | null;
 }
 
@@ -69,7 +70,7 @@ async function setup(opts: Opts = {}) {
   const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
   const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
   const view = await render(TodoCardDetailComponent, {
-    inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null },
+    inputs: { cardId: card.id, mode: opts.mode ?? 'drawer', board: opts.board ?? null, split: opts.split ?? false },
     on: out,
     providers: [
       provideRouter([]),
@@ -124,11 +125,26 @@ describe('TodoCardDetailComponent', () => {
   });
 
   it('shows the board link in the pane and no close or copy button', async () => {
-    const { container } = await setup({ mode: 'pane' });
+    const { container, cmp } = await setup({ mode: 'pane', split: true });
     expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toHaveAttribute('href', '/todos/b-1?card=k-1');
     expect(screen.queryByRole('button', { name: 'Schließen' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
-    expect(container.querySelector('app-sheet-bar')).not.toBeNull();
+    // Beside the list the pane is a sheet: the bar bleeds into its padding.
+    expect(container.querySelector('app-sheet-bar')).toHaveClass('sheet-bar--bleed');
+    // The link sits in the bar, so the menu does not repeat it.
+    expect(cmp.menuSections()[0].items[0].id).toBe('rename');
+  });
+
+  it('does not bleed the bar of the pane one pane at a time (tablet)', async () => {
+    const { container, cmp } = await setup({ mode: 'pane' });
+    expect(container.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
+    expect(screen.getByRole('link', { name: /Im Board öffnen/ })).toBeInTheDocument();
+    expect(cmp.menuSections()[0].items[0].id).toBe('rename');
+  });
+
+  it('does not bleed the bar of the drawer', async () => {
+    const { container } = await setup({ split: true });
+    expect(container.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
   });
 
   it('reads a card without write right and an archived one', async () => {
@@ -1214,11 +1230,16 @@ describe('TodoCardDetailComponent', () => {
       expect(nav).toHaveBeenCalledWith(['/todos', 'b-1'], { queryParams: { card: 'k-1' } });
     });
 
-    it('offers "Im Board öffnen" in the pane without the write right, and keeps "Wiederherstellen"', async () => {
-      const readOnly = await setup({ mode: 'pane', card: detail({ canWrite: false }) });
-      expect(readOnly.cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['openInBoard']]);
-      readOnly.cmp.card.set(detail({ archivedAt: '2026-10-15T08:00:00Z' }));
-      expect(readOnly.cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['openInBoard'], ['restore']]);
+    it('offers "Im Board öffnen" in the pane without the write right and on an archived card', async () => {
+      const { cmp } = await setup({ mode: 'pane', card: detail({ canWrite: false }) });
+      const ids = () => cmp.menuSections().map((s) => s.items.map((i) => i.id));
+      expect(ids()).toEqual([['openInBoard']]);
+      // Read-only and archived: no "Wiederherstellen", only the link.
+      cmp.card.set(detail({ canWrite: false, archivedAt: '2026-10-15T08:00:00Z' }));
+      expect(ids()).toEqual([['openInBoard']]);
+      // Writable and archived: the link, then "Wiederherstellen".
+      cmp.card.set(detail({ archivedAt: '2026-10-15T08:00:00Z' }));
+      expect(ids()).toEqual([['openInBoard'], ['restore']]);
     });
 
     it('has no "Im Board öffnen" in the menu of the drawer', async () => {

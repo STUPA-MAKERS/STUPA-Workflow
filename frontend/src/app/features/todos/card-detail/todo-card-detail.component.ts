@@ -171,6 +171,11 @@ export class TodoCardDetailComponent {
   readonly cardId = input.required<Uuid>();
   /** `drawer`: over the board, with a close button. `pane`: the detail of "Aufgaben". */
   readonly mode = input<'drawer' | 'pane'>('drawer');
+  /**
+   * The pane is a sheet beside the list (wide). Only then the sheet bar bleeds into the
+   * padding of the sheet; one pane at a time the detail lies on the page with its gutter.
+   */
+  readonly split = input(false);
   /** The board around the card, when the page has it: counts and the first card of a column. */
   readonly board = input<TodoBoard | null>(null);
 
