@@ -167,6 +167,7 @@ export function mapComment(wire: CommentOutWire): ApplicationComment {
     at: wire.at,
     editedAt: wire.editedAt ?? null,
     attachments: wire.attachments ?? [],
+    mentions: wire.mentions ?? [],
   };
 }
 

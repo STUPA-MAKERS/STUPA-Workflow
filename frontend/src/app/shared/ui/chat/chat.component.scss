@@ -1,3 +1,5 @@
+@use '../option-menu' as menu;
+
 /* The host is a flex column: the log takes the space, the composer stays below it.
    A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole),
    gives the host a height (a sheet), or lets it fill a column that grows with the page:
@@ -583,4 +585,50 @@
 }
 .chat__menuItem--danger {
   color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------ mentions */
+/* The "@" list: the option menu of the app, above the composer (below an edit), as wide
+   as its text box. The text box keeps the focus, so the list needs no focus ring. */
+.chat__box,
+.chat__mentionAnchor {
+  position: relative;
+}
+.chat__mentionAnchor {
+  display: flex;
+  flex-direction: column;
+}
+.chat__mentions {
+  @include menu.menu;
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  left: 0;
+  max-height: min(18rem, 50vh);
+  list-style: none;
+}
+.chat__mentions--below {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+.chat__mentionOpt {
+  @include menu.option;
+}
+.chat__mentionOpt--active {
+  @include menu.option-hover;
+}
+.chat__mentionName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* A mentioned person in a message: the name in bold, in the accent of the thread. */
+.chat__text ::ng-deep .chat__mention {
+  color: var(--color-accent-text);
+  font-weight: var(--fw-semibold);
+}
+.chat__row--own .chat__text ::ng-deep .chat__mention {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
 }

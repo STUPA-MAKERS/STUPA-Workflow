@@ -824,6 +824,8 @@ export const de = {
     'Dieses Feld erlaubt keine Position ohne Vergleichsangebote. Gib die Vergleichsangebote an.',
   'forms.errors.server': 'Der Server hat diesen Wert abgelehnt.',
   'chat.log': 'Verlauf',
+  'chat.mentions': 'Personen erwähnen',
+  'chat.error.mention': 'Diese Person kann den Verlauf nicht lesen.',
   'chat.placeholder': 'Nachricht schreiben …',
   'chat.today': 'Heute',
   'chat.yesterday': 'Gestern',

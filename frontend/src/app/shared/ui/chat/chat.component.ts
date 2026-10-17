@@ -29,6 +29,7 @@ import {
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
+import type { PersonRef } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -47,6 +48,7 @@ import {
   type DraftFile,
 } from '../../../features/apply/draft-attachments.service';
 import { ChatDrafts } from './chat-drafts';
+import { type ChatPerson, MentionPicker, highlightMentions, mentionIds } from './chat-mentions';
 import type {
   ChatAttachment,
   ChatEdit,
@@ -64,6 +66,8 @@ const DRAFT_PREFIX = 'ap.chat.draft.';
 /** The longest body the server takes for a comment, a note or a card comment. */
 export const CHAT_MAX_LENGTH = 10_000;
 const SEEN_PREFIX = 'ap.chat.seen.';
+/** Numbers the "@" lists of the chats on a page, for their element ids. */
+let mentionListSeq = 0;
 /**
  * The waits between two reads of a thread while a file of a message is in the scan, in
  * ms: about 30 s in all. The ClamAV scan runs in the worker after the send.
@@ -99,14 +103,17 @@ function isFileDrag(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files');
 }
 
-/** The body of a message as safe HTML: escaped Markdown, bare URLs as links. */
+/** The body of a message as safe HTML: escaped Markdown, bare URLs as links, marked mentions. */
 @Pipe({ name: 'chatBody', standalone: true })
 export class ChatBodyPipe implements PipeTransform {
   private readonly sanitizer = inject(DomSanitizer);
-  transform(body: string): SafeHtml {
+  transform(body: string, mentions?: readonly PersonRef[] | null): SafeHtml {
     // `markdownToSafeHtml` escapes the whole input before it writes any tag, and
-    // `linkify` only wraps escaped text, so the result holds no markup of the author.
-    return this.sanitizer.bypassSecurityTrustHtml(linkify(markdownToSafeHtml(body)));
+    // `linkify` and `highlightMentions` only wrap escaped text, so the result holds no
+    // markup of the author.
+    const html = linkify(markdownToSafeHtml(body));
+    const names = (mentions ?? []).flatMap((p) => (p.displayName ? [p.displayName] : []));
+    return this.sanitizer.bypassSecurityTrustHtml(highlightMentions(html, names));
   }
 }
 
@@ -216,6 +223,11 @@ export class ChatComponent {
   readonly placeholder = input<TranslationKey>('chat.placeholder');
   /** Show the paperclip: the composer takes files. */
   readonly canAttach = input(false);
+  /**
+   * The people who can read the thread. "@" in the composer or an edit lists them, and
+   * `send` and `edit` carry the ids of the people the text names. Empty: no list.
+   */
+  readonly mentionables = input<readonly ChatPerson[]>([]);
 
   readonly send = output<ChatSend>();
   readonly edit = output<ChatEdit>();
@@ -247,6 +259,10 @@ export class ChatComponent {
   protected readonly full = computed(() => this.files().length + this.uploads().length >= CHAT_MAX_FILES);
 
   protected readonly maxLength = CHAT_MAX_LENGTH;
+  private readonly mentionSeq = ++mentionListSeq;
+  /** The "@" list of the composer and the one of the open edit. */
+  protected readonly composerMentions = new MentionPicker(`chat-mentions-${this.mentionSeq}`);
+  protected readonly editMentions = new MentionPicker(`chat-mentions-${this.mentionSeq}-edit`);
   protected readonly draft = signal('');
   protected readonly visibility = signal<ChatVisibility | null>(null);
   protected readonly editingId = signal<string | null>(null);
@@ -327,6 +343,13 @@ export class ChatComponent {
         this.thread.key = key;
         // A new thread starts on the default visibility (public first), never on the last one.
         this.visibility.set(this.visibilityOptions()[0] ?? null);
+      });
+    });
+    effect(() => {
+      const people = this.mentionables();
+      untracked(() => {
+        this.composerMentions.setPeople(people);
+        this.editMentions.setPeople(people);
       });
     });
     effect(() => {
@@ -510,8 +533,12 @@ export class ChatComponent {
     this.visibility.set(value === 'internal' || value === 'public' ? value : null);
   }
 
-  /** Desktop: Enter sends, Shift+Enter is a new line. Phone: Enter is a new line. */
+  /**
+   * Desktop: Enter sends, Shift+Enter is a new line. Phone: Enter is a new line. While the
+   * "@" list is open, the arrows move in it and Enter or Tab takes the person.
+   */
   protected onComposerKey(event: KeyboardEvent): void {
+    if (this.mentionKey(event, this.composerMentions)) return;
     if (event.key !== 'Enter' || event.shiftKey || event.isComposing || this.phone()) return;
     event.preventDefault();
     this.submit();
@@ -525,6 +552,9 @@ export class ChatComponent {
     if (!body && !files.length) return;
     const vis = this.visibility();
     const req: ChatSend = vis ? { body, visibility: vis } : { body };
+    const mentions = mentionIds(body, this.mentionables());
+    if (mentions.length) req.mentions = mentions;
+    this.composerMentions.close();
     if (files.length) {
       req.attachmentIds = files.map((f) => f.id);
       req.draftToken = this.drafts.token();
@@ -669,6 +699,39 @@ export class ChatComponent {
     return (msg.attachments ?? []).every((f) => f.lost);
   }
 
+  // --- mentions --------------------------------------------------------------------
+
+  /** Read the "@" search of a text box after an input, a click or a caret move. */
+  protected readMention(picker: MentionPicker, event: Event): void {
+    const box = event.target as HTMLTextAreaElement;
+    picker.update(box.value, box.selectionStart ?? box.value.length);
+  }
+
+  /** A key for the open "@" list. True: the list took it. */
+  private mentionKey(event: KeyboardEvent, picker: MentionPicker): boolean {
+    const hit = picker.key(event);
+    if (hit === null) return false;
+    event.preventDefault();
+    if (hit !== 'handled') this.pickMention(picker, hit);
+    return true;
+  }
+
+  /** Put the chosen person into the text box of the list, the caret after the name. */
+  protected pickMention(picker: MentionPicker, person: ChatPerson): void {
+    const box =
+      picker === this.composerMentions
+        ? this.composerInput()?.nativeElement
+        : this.log().nativeElement.querySelector<HTMLTextAreaElement>('.chat__editInput');
+    if (!box) return;
+    const next = picker.apply(box.value, person);
+    if (!next) return;
+    box.value = next.text;
+    if (picker === this.composerMentions) this.onDraft(next.text);
+    else this.editDraft.set(next.text);
+    box.focus();
+    box.setSelectionRange(next.caret, next.caret);
+  }
+
   // --- failed messages -------------------------------------------------------------
 
   /**
@@ -728,6 +791,7 @@ export class ChatComponent {
    * message, or to the log where the message has no buttons (a phone).
    */
   private endEdit(): void {
+    this.editMentions.close();
     const id = this.editingId();
     const log = this.log().nativeElement;
     const inside = log.contains(document.activeElement);
@@ -743,6 +807,7 @@ export class ChatComponent {
   }
 
   protected onEditKey(event: KeyboardEvent): void {
+    if (this.mentionKey(event, this.editMentions)) return;
     if (event.key === 'Escape') {
       event.preventDefault();
       this.cancelEdit();
@@ -760,7 +825,16 @@ export class ChatComponent {
     if (id === null || !body) return;
     const msg = this.messages().find((m) => m.id === id);
     this.endEdit();
-    if (msg && msg.body !== body) this.edit.emit({ id, body, restore: () => this.restoreEdit(id, body) });
+    if (msg && msg.body !== body) {
+      // Without a list the chat knows no names, so the mentions of the message stay.
+      const people = this.mentionables();
+      this.edit.emit({
+        id,
+        body,
+        ...(people.length ? { mentions: mentionIds(body, people) } : {}),
+        restore: () => this.restoreEdit(id, body),
+      });
+    }
   }
 
   /**

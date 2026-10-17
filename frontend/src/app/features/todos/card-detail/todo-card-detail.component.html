@@ -196,6 +196,7 @@
     [events]="events()"
     [canPost]="canWrite()"
     [canAttach]="canWrite()"
+    [mentionables]="mentionables()"
     placeholder="todos.card.commentPlaceholder"
     (send)="sendComment($event)"
     (retry)="retryComment($event)"

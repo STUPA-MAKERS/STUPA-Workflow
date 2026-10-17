@@ -306,6 +306,7 @@
           [messages]="chatMessages()"
           [visibilityOptions]="chatVisibilities()"
           [canAttach]="canAttach()"
+          [mentionables]="mentionables()"
           placeholder="applications.comments.placeholder"
           (send)="sendComment($event)"
           (retry)="retryComment($event)"

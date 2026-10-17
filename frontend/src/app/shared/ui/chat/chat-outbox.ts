@@ -53,16 +53,23 @@ function bodyTooLong(err: unknown): boolean {
   );
 }
 
+/** A 422 `mention_not_member`: the text names someone who cannot read the thread. */
+export function mentionRefused(err: unknown): boolean {
+  const e = err as { status?: unknown; error?: { code?: unknown } } | null;
+  return e?.status === 422 && e.error?.code === 'mention_not_member';
+}
+
 /**
  * The toast of a failed send: a lost file names itself, a body over the limit of the
- * server and a missing right (403) name their reason, every other error (another 422
- * too) the `fallback` of the thread.
+ * server, a mention of someone outside the thread and a missing right (403) name their
+ * reason, every other error (another 422 too) the `fallback` of the thread.
  */
 export function sendErrorKey(err: unknown, fallback: TranslationKey): TranslationKey {
   const status = (err as { status?: unknown } | null)?.status;
   if (missingFiles(err)) return 'chat.error.filesMissing';
   if (filesRefused(err)) return 'chat.error.filesRefused';
   if (bodyTooLong(err)) return 'chat.error.tooLong';
+  if (mentionRefused(err)) return 'chat.error.mention';
   if (status === 403) return 'chat.error.forbidden';
   return fallback;
 }

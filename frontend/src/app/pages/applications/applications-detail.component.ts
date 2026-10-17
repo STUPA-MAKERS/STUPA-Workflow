@@ -8,6 +8,7 @@ import {
   effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
@@ -64,7 +65,9 @@ import {
   RowMenuComponent,
   StatusTextComponent,
   flowColorKind,
+  chatPeople,
   type ChatEdit,
+  type ChatPerson,
   type ChatMessage,
   type ChatRef,
   type ChatSend,
@@ -252,7 +255,7 @@ export class ApplicationsDetailComponent {
   );
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
-    (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req),
+    (req) => this.api.addComment(this.id, req.body, req.visibility ?? 'public', req, req.mentions),
     (created) => this.comments.update((list) => appendOnce(list, created)),
     (err) => {
       if (filesRefused(err)) {
@@ -269,6 +272,10 @@ export class ApplicationsDetailComponent {
   readonly canAttach = computed(
     () => !this.app()?.applicant?.anonymized && !this.filesRefusedHere(),
   );
+  /** The "@" list of the composer: the people who read the internal comments. */
+  readonly mentionables = signal<ChatPerson[]>([]);
+  /** The application whose "@" list is loaded or on its way. */
+  private mentionsFor: string | null = null;
   /** The comments as chat messages, the pending ones last. */
   readonly chatMessages = computed<ChatMessage[]>(() => [
     ...this.comments().map((c) => this.toChatMessage(c)),
@@ -807,6 +814,11 @@ export class ApplicationsDetailComponent {
         { injector: this.injector },
       );
     });
+    // The "@" list loads with the open comments, not with every application.
+    effect(() => {
+      if (this.commentsOpen() && !this.loading() && this.app() !== null)
+        untracked(() => this.loadMentionables());
+    });
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),
@@ -899,6 +911,8 @@ export class ApplicationsDetailComponent {
     this.id = id;
     const seq = ++this.loadSeq;
     this.commentsLoaded = false;
+    this.mentionsFor = null;
+    this.mentionables.set([]);
     // The dialogs and the edit belong to the shown application: they close at once.
     this.editing.set(false);
     this.confirmDelete.set(false);
@@ -1251,7 +1265,26 @@ export class ApplicationsDetailComponent {
       canEdit: comment.isOwn || this.canManage(),
       visibility: comment.visibility,
       attachments: toChatAttachments(this.apiBase, comment.attachments),
+      mentions: comment.mentions,
     };
+  }
+
+  /**
+   * Load the "@" list once the comments open, once per application. Only a member reads
+   * it; the creator who reads as the applicant gets 403 and no list.
+   */
+  private loadMentionables(): void {
+    const id = this.id;
+    if (this.mentionsFor === id) return;
+    this.mentionsFor = id;
+    this.api.mentionable(id).subscribe({
+      next: (people) => {
+        if (this.id === id) this.mentionables.set(chatPeople(people));
+      },
+      error: () => {
+        if (this.id === id) this.mentionables.set([]);
+      },
+    });
   }
 
   protected sendComment(req: ChatSend): void {
@@ -1278,7 +1311,7 @@ export class ApplicationsDetailComponent {
 
   /** PATCH the body of the comment. The visibility is not patchable. */
   protected editComment(change: ChatEdit): void {
-    this.api.updateComment(this.id, change.id, change.body).subscribe({
+    this.api.updateComment(this.id, change.id, change.body, change.mentions).subscribe({
       next: (updated) => {
         this.comments.update((list) => list.map((c) => (c.id === updated.id ? updated : c)));
       },

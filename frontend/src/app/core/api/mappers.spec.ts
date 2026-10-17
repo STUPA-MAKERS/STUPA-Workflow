@@ -294,6 +294,7 @@ describe('mapComment', () => {
       at: '2026-06-05T13:00:00Z',
       editedAt: null,
       attachments: [],
+      mentions: [],
     });
   });
 

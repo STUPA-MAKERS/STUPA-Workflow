@@ -133,7 +133,9 @@ function flushForm(http: HttpTestingController, id = 'app-1') {
 /** The attachments panel loads on render. An empty answer is fine. */
 function flushAttachments(http: HttpTestingController) {
   flushTypes(http);
-  for (const req of http.match((r) => r.method === 'GET' && /\/(attachments|timeline)$/.test(r.url))) {
+  for (const req of http.match(
+    (r) => r.method === 'GET' && /\/(attachments|timeline|mentionable)$/.test(r.url),
+  )) {
     req.flush([]);
   }
   for (const req of http.match((r) => r.method === 'GET' && r.url === '/api/budgets')) {
@@ -162,7 +164,11 @@ function flushTypes(http: HttpTestingController) {
 }
 
 /** Load the page with the given comments and answer every request of the load. */
-async function loaded(permissions?: string[], comments: CommentOutWire[] = COMMENTS) {
+async function loaded(
+  permissions?: string[],
+  comments: CommentOutWire[] = COMMENTS,
+  people: { principalId: string; displayName: string }[] = [],
+) {
   const ctx = await setup(permissions);
   flushTypes(ctx.http);
   ctx.http.expectOne(url('')).flush(appWire());
@@ -173,6 +179,9 @@ async function loaded(permissions?: string[], comments: CommentOutWire[] = COMME
   ctx.detectChanges();
   flushAttachments(ctx.http);
   openComments(ctx.detectChanges);
+  // The open comments load the "@" list once.
+  ctx.http.expectOne(url('/mentionable')).flush(people);
+  ctx.detectChanges();
   const input = () => screen.getByRole('textbox', { name: 'Kommentar schreiben …' });
   const type = (text: string) => {
     fireEvent.input(input(), { target: { value: text } });
@@ -329,6 +338,69 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(screen.queryByText('wird gesendet …')).not.toBeInTheDocument();
     expect(success).not.toHaveBeenCalled();
     http.verify();
+  });
+
+  it('offers the readers after "@", sends their ids and marks them in the thread', async () => {
+    const people = [
+      { principalId: 'p-1', displayName: 'Jonas Weber' },
+      { principalId: 'p-2', displayName: 'Selin Yıldız' },
+    ];
+    const { http, input, detectChanges } = await loaded(['application.read'], COMMENTS, people);
+    const box = input() as HTMLTextAreaElement;
+    fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
+    detectChanges();
+    const list = screen.getByRole('listbox', { name: 'Personen erwähnen' });
+    expect(within(list).getAllByRole('option')).toHaveLength(1);
+    expect(within(list).getByRole('option', { name: 'Selin Yıldız' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    fireEvent.keyDown(box, { key: 'Enter' });
+    detectChanges();
+    expect(box.value).toBe('Hallo @Selin Yıldız ');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    fireEvent.keyDown(box, { key: 'Enter' });
+    detectChanges();
+    const post = http.expectOne(url('/comments'));
+    expect(post.request.body).toEqual({
+      body: 'Hallo @Selin Yıldız',
+      visibility: 'public',
+      mentions: ['p-2'],
+    });
+    post.flush({
+      ...OWN,
+      id: 'c3',
+      body: 'Hallo @Selin Yıldız',
+      visibility: 'public',
+      mentions: [{ principalId: 'p-2', displayName: 'Selin Yıldız' }],
+    });
+    detectChanges();
+    expect(document.querySelector('.chat__mention')).toHaveTextContent('@Selin Yıldız');
+    http.verify();
+  });
+
+  it('offers no "@" list when the server refuses it', async () => {
+    const ctx = await setup(['application.read']);
+    flushTypes(ctx.http);
+    ctx.http.expectOne(url('')).flush(appWire());
+    ctx.http.expectOne(url('/versions')).flush(VERSIONS);
+    ctx.http.expectOne(url('/comments')).flush(COMMENTS);
+    flushForm(ctx.http);
+    ctx.detectChanges();
+    flushAttachments(ctx.http);
+    openComments(ctx.detectChanges);
+    ctx.http.expectOne(url('/mentionable')).flush(null, { status: 403, statusText: 'Forbidden' });
+    ctx.detectChanges();
+    const box = screen.getByRole('textbox', { name: 'Kommentar schreiben …' });
+    fireEvent.input(box, { target: { value: '@J', selectionStart: 2 } });
+    ctx.detectChanges();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    // Closing and opening again reads the list no second time.
+    ctx.cmp.commentsOpen.set(false);
+    ctx.detectChanges();
+    ctx.cmp.commentsOpen.set(true);
+    ctx.detectChanges();
+    ctx.http.expectNone(url('/mentionable'));
   });
 
   it('posts an internal comment when the toggle says so and keeps the choice', async () => {

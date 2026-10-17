@@ -73,16 +73,35 @@
                 }
                 @if (editingId() === m.id) {
                   <form class="chat__edit" (submit)="saveEdit($event)">
-                    <textarea
-                      class="chat__editInput"
-                      rows="1"
-                      name="chatEdit"
-                      [attr.maxlength]="maxLength"
-                      [value]="editDraft()"
-                      (input)="editDraft.set($any($event.target).value)"
-                      (keydown)="onEditKey($event)"
-                      [attr.aria-label]="'chat.edit' | t"
-                    ></textarea>
+                    <div class="chat__mentionAnchor">
+                      <textarea
+                        class="chat__editInput"
+                        rows="1"
+                        name="chatEdit"
+                        [attr.maxlength]="maxLength"
+                        [value]="editDraft()"
+                        (input)="
+                          editDraft.set($any($event.target).value);
+                          readMention(editMentions, $event)
+                        "
+                        (keydown)="onEditKey($event)"
+                        (click)="readMention(editMentions, $event)"
+                        (keyup)="readMention(editMentions, $event)"
+                        (blur)="editMentions.close()"
+                        [attr.aria-label]="'chat.edit' | t"
+                        aria-autocomplete="list"
+                        [attr.aria-controls]="editMentions.open() ? editMentions.listId : null"
+                        [attr.aria-activedescendant]="
+                          editMentions.open() ? editMentions.optionId(editMentions.active()) : null
+                        "
+                      ></textarea>
+                      <ng-container
+                        *ngTemplateOutlet="
+                          mentionList;
+                          context: { $implicit: editMentions, below: true }
+                        "
+                      />
+                    </div>
                     <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
                     <span class="chat__editActions">
                       <app-button variant="text" size="sm" (click)="cancelEdit()">{{ 'chat.cancel' | t }}</app-button>
@@ -109,7 +128,7 @@
                         <app-icon name="globe" [size]="13" />{{ 'chat.public' | t }}
                       </span>
                     }
-                    <div class="chat__text" [innerHTML]="m.body | chatBody"></div>
+                    <div class="chat__text" [innerHTML]="m.body | chatBody: m.mentions"></div>
                     <ng-container *ngTemplateOutlet="msgFiles; context: { $implicit: m }" />
                   </div>
                 }
@@ -208,6 +227,9 @@
       </ul>
     }
     <div class="chat__box">
+      <ng-container
+        *ngTemplateOutlet="mentionList; context: { $implicit: composerMentions, below: false }"
+      />
       <textarea
         #composerInput
         class="chat__input"
@@ -217,9 +239,17 @@
         [value]="draft()"
         [placeholder]="placeholder() | t"
         [attr.aria-label]="placeholder() | t"
-        (input)="onDraft($any($event.target).value)"
+        (input)="onDraft($any($event.target).value); readMention(composerMentions, $event)"
         (keydown)="onComposerKey($event)"
+        (click)="readMention(composerMentions, $event)"
+        (keyup)="readMention(composerMentions, $event)"
+        (blur)="composerMentions.close()"
         (paste)="onPaste($event)"
+        aria-autocomplete="list"
+        [attr.aria-controls]="composerMentions.open() ? composerMentions.listId : null"
+        [attr.aria-activedescendant]="
+          composerMentions.open() ? composerMentions.optionId(composerMentions.active()) : null
+        "
       ></textarea>
       @if (canAttach()) {
         <app-button
@@ -319,6 +349,41 @@
               </span>
             </span>
           }
+        </li>
+      }
+    </ul>
+  }
+</ng-template>
+
+<!-- The "@" list of a text box: above the composer, below an edit. The text box keeps the
+     focus; the arrows, Enter and Tab work through it, a click takes a person. -->
+<ng-template #mentionList let-p let-below="below">
+  @if (p.open()) {
+    <ul
+      class="chat__mentions"
+      role="listbox"
+      [class.chat__mentions--below]="below"
+      [id]="p.listId"
+      [attr.aria-label]="'chat.mentions' | t"
+    >
+      @for (o of p.options(); track o.principalId; let i = $index) {
+        <li
+          class="chat__mentionOpt"
+          role="option"
+          [id]="p.optionId(i)"
+          [class.chat__mentionOpt--active]="i === p.active()"
+          [attr.aria-selected]="i === p.active()"
+          (mousedown)="$event.preventDefault()"
+          (mouseenter)="p.active.set(i)"
+          (click)="pickMention(p, o)"
+        >
+          <app-avatar
+            size="sm"
+            [decorative]="true"
+            [name]="o.displayName"
+            [principalId]="o.principalId"
+          />
+          <span class="chat__mentionName">{{ o.displayName }}</span>
         </li>
       }
     </ul>

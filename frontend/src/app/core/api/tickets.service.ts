@@ -127,6 +127,8 @@ export interface TicketNote {
   visibility?: TicketNoteVisibility;
   /** The reporter wrote it. */
   fromReporter?: boolean;
+  /** The people the note mentions; empty for the reporter. */
+  mentions?: PersonRef[];
 }
 
 export interface TicketDetail extends TicketListItem {
@@ -300,16 +302,22 @@ export class TicketsApiService {
     body: string,
     files: MessageFiles = {},
     visibility?: TicketNoteVisibility,
+    mentions?: Uuid[],
   ): Observable<TicketNote> {
     return this.http.post<TicketNote>(`${this.base}/tickets/${id}/notes`, {
       body,
+      ...(mentions?.length ? { mentions } : {}),
       ...messageFiles(files),
       ...(visibility ? { visibility } : {}),
     });
   }
 
-  editNote(id: Uuid, noteId: Uuid, body: string): Observable<TicketNote> {
-    return this.http.patch<TicketNote>(`${this.base}/tickets/${id}/notes/${noteId}`, { body });
+  /** Change a note; `mentions` replaces the people it mentions, without it they stay. */
+  editNote(id: Uuid, noteId: Uuid, body: string, mentions?: Uuid[]): Observable<TicketNote> {
+    return this.http.patch<TicketNote>(
+      `${this.base}/tickets/${id}/notes/${noteId}`,
+      mentions ? { body, mentions } : { body },
+    );
   }
 
   deleteNote(id: Uuid, noteId: Uuid): Observable<void> {

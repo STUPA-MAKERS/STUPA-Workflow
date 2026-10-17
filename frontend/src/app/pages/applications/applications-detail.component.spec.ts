@@ -177,7 +177,9 @@ function flushAll(http: HttpTestingController, id = 'app-1', form = true) {
 // The attachments panel loads the attachments on render. An empty answer is fine.
 function flushAttachments(http: HttpTestingController) {
   flushTypes(http);
-  for (const req of http.match((r) => r.method === 'GET' && /\/(attachments|timeline)$/.test(r.url))) {
+  for (const req of http.match(
+    (r) => r.method === 'GET' && /\/(attachments|timeline|mentionable)$/.test(r.url),
+  )) {
     req.flush([]);
   }
   // A manager also loads the cost-centre tree. An empty answer is fine.

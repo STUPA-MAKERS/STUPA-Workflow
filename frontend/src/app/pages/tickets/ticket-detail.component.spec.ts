@@ -906,11 +906,20 @@ describe('TicketDetailComponent', () => {
       'Fix ist offen.',
       { body: 'Fix ist offen.' },
       undefined,
+      undefined,
+    );
+    cmp.sendNote({ body: '@Ada hilft', mentions: ['p-ada'] });
+    expect(api.addNote).toHaveBeenLastCalledWith(
+      't40',
+      '@Ada hilft',
+      { body: '@Ada hilft', mentions: ['p-ada'] },
+      undefined,
+      ['p-ada'],
     );
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
     cmp.editNote({ id: 'n1', body: 'Prüfe ich morgen.' });
-    expect(api.editNote).toHaveBeenCalledWith('t40', 'n1', 'Prüfe ich morgen.');
+    expect(api.editNote).toHaveBeenCalledWith('t40', 'n1', 'Prüfe ich morgen.', undefined);
     expect(cmp.notes()[0].body).toBe('Prüfe ich morgen.');
     cmp.deleteNote({ id: 'n9' });
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1']);
@@ -1115,6 +1124,7 @@ describe('TicketDetailComponent', () => {
       '',
       expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }),
       undefined,
+      undefined,
     );
     const failed = cmp.messages().at(-1)!;
     expect(failed.attachments).toEqual([file]);
@@ -1222,6 +1232,7 @@ describe('TicketDetailComponent', () => {
         'Antwort',
         { body: 'Antwort', visibility: 'public' },
         'public',
+        undefined,
       );
     });
 

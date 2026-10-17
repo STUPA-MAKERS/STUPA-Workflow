@@ -809,6 +809,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
     'This field does not allow a position without comparison offers. Give the comparison offers.',
   'forms.errors.server': 'The server refused this value.',
   'chat.log': 'Conversation',
+  'chat.mentions': 'Mention people',
+  'chat.error.mention': 'This person cannot read the conversation.',
   'chat.placeholder': 'Write a message …',
   'chat.today': 'Today',
   'chat.yesterday': 'Yesterday',
