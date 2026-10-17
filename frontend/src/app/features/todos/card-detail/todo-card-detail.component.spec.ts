@@ -90,7 +90,10 @@ describe('TodoCardDetailComponent', () => {
   afterEach(() => jest.restoreAllMocks());
 
   it('shows the card side by side: activity, fields, links, description and checklist', async () => {
-    const { api, container, closed } = await setup();
+    const { api, container, closed, cmp, detect } = await setup();
+    // The due line counts from today; pin today to the day the fixture dates were written for.
+    cmp.today.set('2026-10-16');
+    detect();
     expect(api.card).toHaveBeenCalledWith('k-1');
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
