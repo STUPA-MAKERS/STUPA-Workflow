@@ -531,12 +531,6 @@
 .chat__attach {
   flex: none;
 }
-/* The plane of the "send" icon fills its 24-unit box evenly, but its area centroid is at
-   (13.83, 10.17): 1.83 units right of and above the middle. The icon moves back by that
-   much at its 17px size, so the plane looks centered in the round button. */
-.chat__sendIcon {
-  translate: calc(-1.83 * 17px / 24) calc(1.83 * 17px / 24);
-}
 .chat__attach {
   color: var(--color-text-muted);
 }
