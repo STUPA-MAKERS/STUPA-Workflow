@@ -83,9 +83,15 @@ export function insertMention(
   return { text: next, caret: start + insert.length + (after.startsWith(' ') ? 1 : 0) };
 }
 
-/** The names longest first, so "@Anna Maria" wins over "@Anna" at the same place. */
-function byLength(people: readonly ChatPerson[]): ChatPerson[] {
-  return [...people].sort((a, b) => b.displayName.length - a.displayName.length);
+/**
+ * The names longest first, so "@Anna Maria" wins over "@Anna" at the same place. Of two
+ * people with the same name, a person in `picked` comes first.
+ */
+function byLength(people: readonly ChatPerson[], picked: readonly string[]): ChatPerson[] {
+  const rank = (p: ChatPerson): number => (picked.includes(p.principalId) ? 0 : 1);
+  return [...people].sort(
+    (a, b) => b.displayName.length - a.displayName.length || rank(a) - rank(b),
+  );
 }
 
 /** A name ends at the end of the text or before a character that is no letter or digit. */
@@ -95,12 +101,17 @@ function endsName(text: string, at: number): boolean {
 
 /**
  * The ids of the people that a text names as "@Display Name", in the order of the text.
- * The longer name wins where two names start alike; each person counts once.
+ * The longer name wins where two names start alike; each person counts once. Where two
+ * people have the same name, the one in `picked` (chosen in the list) wins.
  */
-export function mentionIds(body: string, people: readonly ChatPerson[]): string[] {
+export function mentionIds(
+  body: string,
+  people: readonly ChatPerson[],
+  picked: readonly string[] = [],
+): string[] {
   const found: { at: number; id: string }[] = [];
   const taken: [number, number][] = [];
-  for (const p of byLength(people)) {
+  for (const p of byLength(people, picked)) {
     const token = `@${p.displayName}`;
     let at = body.indexOf(token);
     while (at >= 0) {
@@ -169,6 +180,8 @@ export class MentionPicker {
   private readonly search = signal<{ start: number; query: string } | null>(null);
   /** Escape closed the list for this "@": it opens again at the next "@". */
   private dismissedAt: number | null = null;
+  /** The ids of the people chosen in the list since the last `reset`. */
+  private chosen: string[] = [];
   readonly active = signal(0);
 
   readonly options = computed(() => {
@@ -208,6 +221,20 @@ export class MentionPicker {
     this.search.set(null);
   }
 
+  /** The ids of the people chosen in the list, for `mentionIds`. */
+  picked(): readonly string[] {
+    return this.chosen;
+  }
+
+  /**
+   * Close the list and forget the chosen people: the text box starts a new message. An
+   * edit keeps the people that the message mentions, so their names stay with them.
+   */
+  reset(keep: readonly string[] = []): void {
+    this.close();
+    this.chosen = [...keep];
+  }
+
   /**
    * A key while the list is open. Returns the person that Enter or Tab chose, 'handled'
    * for a key the list took, or null for a key that goes on to the text box.
@@ -240,6 +267,7 @@ export class MentionPicker {
     const s = this.search();
     if (!s) return null;
     this.close();
+    if (!this.chosen.includes(person.principalId)) this.chosen.push(person.principalId);
     return insertMention(text, s.start, s.start + 1 + s.query.length, person.displayName);
   }
 }

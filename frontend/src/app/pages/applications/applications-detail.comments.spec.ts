@@ -345,8 +345,18 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
       { principalId: 'p-1', displayName: 'Jonas Weber' },
       { principalId: 'p-2', displayName: 'Selin Yıldız' },
     ];
-    const { http, input, detectChanges } = await loaded(['application.read'], COMMENTS, people);
+    const { http, input, detectChanges } = await loaded(
+      ['application.read', 'application.manage'],
+      COMMENTS,
+      people,
+    );
     const box = input() as HTMLTextAreaElement;
+    // The applicant reads a public comment, so it lists nobody.
+    fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
+    detectChanges();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    const group = screen.getByRole('radiogroup', { name: 'Sichtbarkeit' });
+    await userEvent.click(within(group).getByRole('radio', { name: 'Intern' }));
     fireEvent.input(box, { target: { value: 'Hallo @sel', selectionStart: 10 } });
     detectChanges();
     const list = screen.getByRole('listbox', { name: 'Personen erwähnen' });
@@ -364,14 +374,14 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     const post = http.expectOne(url('/comments'));
     expect(post.request.body).toEqual({
       body: 'Hallo @Selin Yıldız',
-      visibility: 'public',
+      visibility: 'internal',
       mentions: ['p-2'],
     });
     post.flush({
       ...OWN,
       id: 'c3',
       body: 'Hallo @Selin Yıldız',
-      visibility: 'public',
+      visibility: 'internal',
       mentions: [{ principalId: 'p-2', displayName: 'Selin Yıldız' }],
     });
     detectChanges();

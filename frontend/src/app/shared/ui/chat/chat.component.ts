@@ -228,6 +228,8 @@ export class ChatComponent {
    * `send` and `edit` carry the ids of the people the text names. Empty: no list.
    */
   readonly mentionables = input<readonly ChatPerson[]>([]);
+  /** False: only an internal message mentions, because the other side reads a public one. */
+  readonly publicMentions = input(true);
 
   readonly send = output<ChatSend>();
   readonly edit = output<ChatEdit>();
@@ -265,6 +267,16 @@ export class ChatComponent {
   protected readonly editMentions = new MentionPicker(`chat-mentions-${this.mentionSeq}-edit`);
   protected readonly draft = signal('');
   protected readonly visibility = signal<ChatVisibility | null>(null);
+  /** The people that "@" lists in the composer, for the chosen visibility. */
+  private readonly composerPeople = computed(() =>
+    this.mayMention(this.visibility()) ? this.mentionables() : [],
+  );
+  /** The people that "@" lists in the edit, for the visibility of the message. */
+  private readonly editPeople = computed(() => {
+    const id = this.editingId();
+    const msg = id === null ? undefined : this.messages().find((m) => m.id === id);
+    return this.mayMention(msg?.visibility ?? null) ? this.mentionables() : [];
+  });
   protected readonly editingId = signal<string | null>(null);
   protected readonly editDraft = signal('');
   protected readonly deleting = signal<ChatMessage | null>(null);
@@ -346,11 +358,16 @@ export class ChatComponent {
       });
     });
     effect(() => {
-      const people = this.mentionables();
+      const people = this.composerPeople();
       untracked(() => {
         this.composerMentions.setPeople(people);
-        this.editMentions.setPeople(people);
+        // A switch to public closes an open list.
+        if (!people.length) this.composerMentions.close();
       });
+    });
+    effect(() => {
+      const people = this.editPeople();
+      untracked(() => this.editMentions.setPeople(people));
     });
     effect(() => {
       const first = this.visibilityOptions()[0] ?? null;
@@ -552,9 +569,9 @@ export class ChatComponent {
     if (!body && !files.length) return;
     const vis = this.visibility();
     const req: ChatSend = vis ? { body, visibility: vis } : { body };
-    const mentions = mentionIds(body, this.mentionables());
+    const mentions = mentionIds(body, this.composerPeople(), this.composerMentions.picked());
     if (mentions.length) req.mentions = mentions;
-    this.composerMentions.close();
+    this.composerMentions.reset();
     if (files.length) {
       req.attachmentIds = files.map((f) => f.id);
       req.draftToken = this.drafts.token();
@@ -701,9 +718,14 @@ export class ChatComponent {
 
   // --- mentions --------------------------------------------------------------------
 
+  private mayMention(visibility: ChatVisibility | null | undefined): boolean {
+    return this.publicMentions() || visibility === 'internal';
+  }
+
   /** Read the "@" search of a text box after an input, a click or a caret move. */
   protected readMention(picker: MentionPicker, event: Event): void {
     const box = event.target as HTMLTextAreaElement;
+    picker.setPeople(picker === this.composerMentions ? this.composerPeople() : this.editPeople());
     picker.update(box.value, box.selectionStart ?? box.value.length);
   }
 
@@ -769,6 +791,8 @@ export class ChatComponent {
   }
 
   private openEdit(id: string, body: string): void {
+    const msg = this.messages().find((m) => m.id === id);
+    this.editMentions.reset((msg?.mentions ?? []).flatMap((p) => p.principalId ?? []));
     this.editDraft.set(body);
     this.editingId.set(id);
     afterNextRender(
@@ -824,14 +848,15 @@ export class ChatComponent {
     const body = this.editDraft().trim();
     if (id === null || !body) return;
     const msg = this.messages().find((m) => m.id === id);
+    // Without a list the chat knows no names, so the mentions of the message stay.
+    const people = this.editPeople();
+    const picked = this.editMentions.picked();
     this.endEdit();
     if (msg && msg.body !== body) {
-      // Without a list the chat knows no names, so the mentions of the message stay.
-      const people = this.mentionables();
       this.edit.emit({
         id,
         body,
-        ...(people.length ? { mentions: mentionIds(body, people) } : {}),
+        ...(people.length ? { mentions: mentionIds(body, people, picked) } : {}),
         restore: () => this.restoreEdit(id, body),
       });
     }

@@ -106,6 +106,15 @@ describe('chat mentions', () => {
       expect(mentionIds('mail@Anna', PEOPLE)).toEqual([]);
       expect(mentionIds('(@Anna)', PEOPLE)).toEqual(['p-3']);
     });
+
+    it('takes the chosen person of two with the same name, else the first', () => {
+      const twins = [
+        { principalId: 'k-1', displayName: 'Kim' },
+        { principalId: 'k-2', displayName: 'Kim' },
+      ];
+      expect(mentionIds('@Kim', twins)).toEqual(['k-1']);
+      expect(mentionIds('@Kim', twins, ['k-2'])).toEqual(['k-2']);
+    });
   });
 
   describe('highlightMentions', () => {
@@ -200,6 +209,14 @@ describe('chat mentions', () => {
       expect(p.apply('Hi @jo', PEOPLE[0])).toEqual({ text: 'Hi @Jonas Weber ', caret: 16 });
       expect(p.open()).toBe(false);
       expect(p.apply('Hi', PEOPLE[0])).toBeNull();
+      expect(p.picked()).toEqual(['p-1']);
+      p.update('Hi @Jonas Weber @jo', 19);
+      p.apply('Hi @Jonas Weber @jo', PEOPLE[0]);
+      expect(p.picked()).toEqual(['p-1']);
+      p.reset(['p-2']);
+      expect(p.picked()).toEqual(['p-2']);
+      p.reset();
+      expect(p.picked()).toEqual([]);
     });
 
     it('treats "@Name " after a whole name as done, and "@Anna " as a search for more', () => {

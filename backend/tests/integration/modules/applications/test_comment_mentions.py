@@ -298,7 +298,13 @@ async def test_the_comment_checks_stores_and_hides_the_mentions(session: AsyncSe
 
     member_view = await svc.list_comments(w.app, include_internal=True)
     assert [m.display_name for m in member_view[0].mentions] == ["Mona Meet", "Vera Vote"]
-    public = await _add(svc, w, [w.ids["vote"]], visibility="public")
+    # The applicant reads a public body, so a public comment names no member.
+    with pytest.raises(ValidationProblem) as err:
+        await _add(svc, w, [w.ids["vote"]], visibility="public")
+    assert err.value.code == "mention_not_member"
+    public = await _add(svc, w, [], visibility="public")
+    with pytest.raises(ValidationProblem):
+        await _edit(svc, w, public.id, [w.ids["vote"]])
     applicant_view = await svc.list_comments(
         w.app, include_internal=False, applicant_view=True
     )
@@ -504,3 +510,27 @@ async def test_a_guest_application_and_a_lost_creator_add_no_creator(
     app.created_by = "sub-without-a-row"
     await session.commit()
     assert {p.principal_id for p in await mentionable_people(session, w.plain_app)} == base
+
+
+async def test_an_edit_keeps_a_mention_of_a_person_who_lost_the_access(
+    session: AsyncSession,
+) -> None:
+    w = await _seed(session)
+    svc = ApplicationsService(session)
+    old = Comment(
+        application_id=w.app,
+        author=w.subs["reader"],
+        author_kind="principal",
+        body="@Otto",
+        visibility="internal",
+        mentions=[str(w.ids["other"])],
+    )
+    session.add(old)
+    await session.commit()
+
+    kept = await _edit(svc, w, old.id, [w.ids["other"], w.ids["vote"]])
+    assert [m.principal_id for m in kept.mentions] == [w.ids["other"], w.ids["vote"]]
+    assert list(svc.added_mentions) == [w.ids["vote"]]
+    # Only a new mention must be mentionable now.
+    with pytest.raises(ValidationProblem):
+        await _edit(svc, w, old.id, [w.ids["other"], w.ids["plain"]])

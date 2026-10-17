@@ -240,6 +240,8 @@ export class TicketDetailComponent {
 
   private id: Uuid = '';
   private seq = 0;
+  /** The note of the `#note-` link that the log already showed for this ticket. */
+  private linkedNote: string | null = null;
   readonly ticket = signal<TicketDetail | null>(null);
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -488,6 +490,7 @@ export class TicketDetailComponent {
       this.todos.set([]);
       this.loading.set(true);
       this.tab.set('log');
+      this.linkedNote = null;
     }
     this.notFound.set(false);
     this.error.set(false);
@@ -561,10 +564,12 @@ export class TicketDetailComponent {
   /**
    * A link to a note (`#note-<id>`, the mention mail) opens the log and scrolls the note
    * into view once the thread rendered. A note that is gone leaves the log at its end.
+   * This happens once per ticket: a reload after a change leaves the tab and the scroll.
    */
   private showLinkedNote(): void {
     const id = NOTE_FRAGMENT.exec(this.route.snapshot.fragment ?? '')?.[1];
-    if (!id || !this.notes().some((n) => n.id === id)) return;
+    if (!id || this.linkedNote === id || !this.notes().some((n) => n.id === id)) return;
+    this.linkedNote = id;
     this.tab.set('log');
     afterNextRender(
       () => {

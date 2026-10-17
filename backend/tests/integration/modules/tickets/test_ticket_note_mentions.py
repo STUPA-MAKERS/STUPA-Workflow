@@ -100,6 +100,24 @@ async def test_a_team_note_mentions_managers_and_mails_the_new_ones(
         assert refused.status_code == 422
         assert refused.json()["code"] == "mention_not_member"
 
+        # A stored mention of a person who lost ticket.manage stays on an edit.
+        async with maker() as session:
+            row = await session.get(TicketNote, note_id)
+            assert row is not None
+            row.mentions = [str(plain), str(ada)]
+            await session.commit()
+        kept_old = client.patch(
+            f"/api/tickets/{ticket_id}/notes/{note_id}",
+            json={"body": "neu", "mentions": [str(plain), str(bob), str(ada)]},
+        )
+        assert kept_old.status_code == 200, kept_old.text
+        assert mails.calls[-1] == (note_id, [bob])
+        restored = client.patch(
+            f"/api/tickets/{ticket_id}/notes/{note_id}",
+            json={"body": "neu", "mentions": [str(bob), str(ada)]},
+        )
+        assert restored.status_code == 200, restored.text
+
         detail = client.get(f"/api/tickets/{ticket_id}").json()
         assert [m["displayName"] for m in detail["notes"][0]["mentions"]] == ["Bob", "Ada"]
 

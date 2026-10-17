@@ -608,17 +608,23 @@ class TicketService:
         named = [p for p in people if p.principal_id is not None]
         return sorted(named, key=lambda p: ((p.display_name or "").casefold(), str(p.principal_id)))
 
-    async def _checked_mentions(self, mentions: Sequence[uuid.UUID]) -> list[uuid.UUID]:
+    async def _checked_mentions(
+        self, mentions: Sequence[uuid.UUID], before: Sequence[uuid.UUID] = ()
+    ) -> list[uuid.UUID]:
         """Return the mentions without duplicates, after the check against ``assignees``.
 
+        Only the mentions that are not in ``before`` are checked, so an edit keeps a
+        mention of a person who lost ``ticket.manage`` since the create.
+
         Raises:
-            ValidationProblem: A mention of a person who does not hold ``ticket.manage``
-                (HTTP 422, ``mention_not_member``).
+            ValidationProblem: A new mention of a person who does not hold
+                ``ticket.manage`` (HTTP 422, ``mention_not_member``).
         """
         wanted = unique_mentions(mentions)
-        if wanted:
+        added = new_mentions(wanted, before)
+        if added:
             allowed = {p.principal_id for p in await self.assignees()}
-            check_mentions(wanted, {pid for pid in allowed if pid is not None})
+            check_mentions(added, {pid for pid in allowed if pid is not None})
         return wanted
 
     async def detail(self, ticket_id: uuid.UUID, principal: Principal) -> TicketDetail:
@@ -924,8 +930,9 @@ class TicketService:
         note, me = await self._own_note(ticket_id, note_id, principal)
         self.added_mentions = []
         if mentions is not None:
-            wanted = await self._checked_mentions(mentions)
-            self.added_mentions = new_mentions(wanted, mention_ids(note.mentions))
+            before = mention_ids(note.mentions)
+            wanted = await self._checked_mentions(mentions, before)
+            self.added_mentions = new_mentions(wanted, before)
             note.mentions = stored_mentions(wanted)
         note.body = body
         note.edited_at = _now()

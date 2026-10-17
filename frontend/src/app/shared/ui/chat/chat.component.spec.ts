@@ -62,6 +62,7 @@ interface SetupOpts {
   canAttach?: boolean;
   loading?: boolean;
   mentionables?: ChatPerson[];
+  publicMentions?: boolean;
   /** The answer of an upload; default: a draft with the file's name. */
   upload?: (file: File, opts: { token?: string | null }) => Observable<DraftUpload>;
 }
@@ -108,6 +109,7 @@ async function setup(opts: SetupOpts = {}) {
       canAttach: opts.canAttach ?? false,
       loading: opts.loading ?? false,
       mentionables: opts.mentionables ?? [],
+      publicMentions: opts.publicMentions ?? true,
     },
     on: { send, edit, delete: del, retry, discard, refresh },
     providers: [
@@ -589,6 +591,94 @@ describe('ChatComponent', () => {
       expect(edit).toHaveBeenLastCalledWith({
         id: 'm',
         body: 'Neu',
+        restore: expect.any(Function),
+      });
+    });
+
+    it('mentions only in an internal message where the other side reads the public ones', async () => {
+      const own = [
+        msg('pub', today(9), { own: true, body: 'Alt', visibility: 'public' }),
+        msg('int', today(9, 1), { own: true, body: 'Intern', visibility: 'internal' }),
+      ];
+      const { cmp, input, send, edit, view } = await setup({
+        messages: own,
+        mentionables: people,
+        publicMentions: false,
+        visibilityOptions: ['public', 'internal'],
+      });
+      type(input(), '@jo');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      cmp.setVisibility('internal');
+      type(input(), '@jo');
+      view.fixture.detectChanges();
+      expect(list()).not.toBeNull();
+      // The switch back to public closes the open list.
+      cmp.setVisibility('public');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      type(input(), '@Jonas Weber');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({ body: '@Jonas Weber', visibility: 'public' });
+
+      const editButton = (i: number) =>
+        screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[i];
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      fireEvent.click(editButton(0));
+      type(box(), 'Alt @jo');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'pub',
+        body: 'Alt @jo',
+        restore: expect.any(Function),
+      });
+      view.fixture.detectChanges();
+      fireEvent.click(editButton(1));
+      type(box(), 'Intern @Jonas Weber!');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'int',
+        body: 'Intern @Jonas Weber!',
+        mentions: ['p-1'],
+        restore: expect.any(Function),
+      });
+    });
+
+    it('keeps the chosen person where two people have the same name', async () => {
+      const twins: ChatPerson[] = [
+        { principalId: 'k-1', displayName: 'Kim' },
+        { principalId: 'k-2', displayName: 'Kim' },
+      ];
+      const own = [
+        msg('m', today(9), {
+          own: true,
+          body: '@Kim',
+          mentions: [{ principalId: 'k-2', displayName: 'Kim' }],
+        }),
+      ];
+      const { input, send, edit, view } = await setup({ messages: own, mentionables: twins });
+      type(input(), '@ki');
+      view.fixture.detectChanges();
+      fireEvent.keyDown(input(), { key: 'ArrowDown' });
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({ body: '@Kim', mentions: ['k-2'] });
+      // The next message starts without the earlier choice.
+      type(input(), '@Kim ');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({ body: '@Kim', mentions: ['k-1'] });
+      // An edit keeps the person that the message mentions.
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
+      type(box as HTMLTextAreaElement, '@Kim, bitte');
+      fireEvent.keyDown(box, { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: '@Kim, bitte',
+        mentions: ['k-2'],
         restore: expect.any(Function),
       });
     });

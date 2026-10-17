@@ -8,10 +8,10 @@ application takes no comment files, because the retention ran once and would not
 see them again.
 
 A comment can mention members (``mentions``, principal ids). Only a caller who reads
-the internal comments mentions, and only a person of `mentionable_people`; else the
-write is 422 ``mention_not_member``. The create and the edit put the mentions that
-they added into ``added_mentions``, and the router mails exactly those after the
-commit. The applicant view never sees the list (A12, O16).
+the internal comments mentions, only in an internal comment, and only a person of
+`mentionable_people`; else the write is 422 ``mention_not_member``. The create and
+the edit put the mentions that they added into ``added_mentions``, and the router
+mails exactly those after the commit. The applicant view never sees the list (A12, O16).
 """
 
 from __future__ import annotations
@@ -71,21 +71,33 @@ class CommentOps(ApplicationsServiceBase):
     added_mentions: Sequence[UUID] = ()
 
     async def _checked_mentions(
-        self, application_id: UUID, mentions: Sequence[UUID], *, may_mention: bool
+        self,
+        application_id: UUID,
+        mentions: Sequence[UUID],
+        *,
+        may_mention: bool,
+        visibility: str,
+        before: Sequence[UUID] = (),
     ) -> list[UUID]:
         """Return the mentions without duplicates, after the check.
 
+        A public comment takes no mention, because the applicant reads its body and
+        the body names the person (A12). Only the mentions that are not in ``before``
+        must be in `mentionable_people`: an edit keeps a mention of a person who
+        lost the access since the create.
+
         Raises:
             ValidationProblem: A mention by a caller who does not read the internal
-                comments, or a mention outside `mentionable_people` (HTTP 422,
-                ``mention_not_member``).
+                comments, a mention in a public comment, or a new mention outside
+                `mentionable_people` (HTTP 422, ``mention_not_member``).
         """
         wanted = unique_mentions(mentions)
         if not wanted:
             return wanted
-        if not may_mention:
+        if not may_mention or visibility == "public":
             raise mention_error()
-        check_mentions(wanted, await mentionable_ids(self.session, application_id))
+        added = new_mentions(wanted, before)
+        check_mentions(added, await mentionable_ids(self.session, application_id))
         return wanted
 
     async def mentionable(self, application_id: UUID) -> list[PersonRef]:
@@ -152,7 +164,7 @@ class CommentOps(ApplicationsServiceBase):
                 errors=[{"field": "attachmentIds", "msg": "application is anonymized"}],
             )
         wanted = await self._checked_mentions(
-            application_id, mentions, may_mention=may_mention
+            application_id, mentions, may_mention=may_mention, visibility=visibility
         )
         token = await check_message_drafts(
             self.session, attachment_ids=attachment_ids, token=draft_token, pepper=pepper
@@ -392,10 +404,15 @@ class CommentOps(ApplicationsServiceBase):
         )
         self.added_mentions = []
         if mentions is not None:
+            before = mention_ids(comment.mentions)
             wanted = await self._checked_mentions(
-                application_id, mentions, may_mention=may_mention
+                application_id,
+                mentions,
+                may_mention=may_mention,
+                visibility=comment.visibility,
+                before=before,
             )
-            self.added_mentions = new_mentions(wanted, mention_ids(comment.mentions))
+            self.added_mentions = new_mentions(wanted, before)
             comment.mentions = stored_mentions(wanted)
         comment.body = body
         await self._audit_comment(comment, AuditAction.COMMENT_UPDATE, actor=actor)

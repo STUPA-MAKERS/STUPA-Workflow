@@ -909,6 +909,14 @@ describe('TicketDetailComponent', () => {
       await harness.fixture.whenStable();
       expect(cmp.tab()).toBe('log');
       expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+      // A reload of the same ticket (after a change) leaves the tab and the scroll.
+      cmp.tab.set('details');
+      scroll.mockClear();
+      (cmp as unknown as { show(t: unknown): void }).show(cmp.ticket());
+      harness.detectChanges();
+      await harness.fixture.whenStable();
+      expect(cmp.tab()).toBe('details');
+      expect(scroll).not.toHaveBeenCalled();
     } finally {
       proto.scrollIntoView = before;
     }
