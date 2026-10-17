@@ -26,7 +26,7 @@
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.error' | t }}</app-note>
   } @else if (!loading() && !tree().length) {
-    <app-empty-state [heading]="'budget.tree.empty' | t" />
+    <app-empty-state shape="table" [heading]="'budget.tree.empty' | t" />
   } @else {
     @if (tops().length) {
       <div class="bt__pickers">
@@ -175,7 +175,7 @@
         </ng-template>
       </app-data-table>
     } @else {
-      <app-empty-state [heading]="'budget.tree.pickHint' | t" />
+      <app-empty-state shape="table" [heading]="'budget.tree.pickHint' | t" />
     }
   }
 </section>
@@ -410,7 +410,7 @@
         </ng-template>
       </app-data-table>
     } @else {
-      <app-empty-state rows="3" [heading]="'budget.tree.fyEmpty' | t" />
+      <app-empty-state shape="table" rows="3" [heading]="'budget.tree.fyEmpty' | t" />
     }
   </section>
 

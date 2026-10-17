@@ -1,18 +1,76 @@
-<div class="es">
-  <div class="es__ghosts" aria-hidden="true">
-    @for (g of ghosts(); track $index) {
-      <div class="es__ghost">
-        <span class="es__ghostMark"></span>
-        <span class="es__ghostText">
-          <span class="es__ghostBar" [style.width.%]="g.title"></span>
-          <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub"></span>
-        </span>
-      </div>
-    }
-  </div>
+<div class="es" [class.es--plain]="plain()">
+  @if (!plain()) {
+    <div class="es__ghosts" [class]="'es__ghosts es__ghosts--' + shape()" aria-hidden="true">
+      @for (g of ghosts(); track $index; let odd = $odd) {
+        @switch (shape()) {
+          @case ('card') {
+            <div class="es__ghost es__ghost--card">
+              <span class="es__ghostBar" [style.width.%]="g.title"></span>
+              <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub"></span>
+              <span class="es__ghostFoot">
+                <span class="es__ghostChip"></span>
+                <span class="es__ghostChip es__ghostChip--short"></span>
+                <span class="es__ghostDot"></span>
+              </span>
+            </div>
+          }
+          @case ('chat') {
+            <div class="es__ghost es__ghost--chat" [class.es__ghost--mine]="odd" [style.width.%]="g.title + 10">
+              <span class="es__ghostBar" [style.width.%]="85"></span>
+              <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub + 20"></span>
+            </div>
+          }
+          @case ('text') {
+            <div class="es__ghost es__ghost--text">
+              <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="100"></span>
+              <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.title + 25"></span>
+            </div>
+          }
+          @case ('table') {
+            <div class="es__ghost es__ghost--table">
+              <span class="es__ghostBar" [style.width.%]="g.title + 20"></span>
+              <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub + 30"></span>
+              <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub + 20"></span>
+              <span class="es__ghostBar es__ghostBar--sub es__ghostBar--end" [style.width.%]="60"></span>
+            </div>
+          }
+          @default {
+            <div class="es__ghost" [class]="'es__ghost es__ghost--' + shape()">
+              @switch (shape()) {
+                @case ('choice') {
+                  <span class="es__ghostLead es__ghostLead--ring"></span>
+                }
+                @case ('person') {
+                  <span class="es__ghostLead es__ghostLead--avatar"></span>
+                }
+                @case ('date') {
+                  <span class="es__ghostLead es__ghostLead--date"></span>
+                }
+                @case ('agenda') {
+                  <span class="es__ghostLead es__ghostLead--number"></span>
+                }
+                @case ('file') {
+                  <span class="es__ghostLead es__ghostLead--file"></span>
+                }
+              }
+              <span class="es__ghostText">
+                <span class="es__ghostBar" [style.width.%]="g.title"></span>
+                <span class="es__ghostBar es__ghostBar--sub" [style.width.%]="g.sub"></span>
+              </span>
+              @if (shape() === 'row') {
+                <span class="es__ghostChip"></span>
+              }
+            </div>
+          }
+        }
+      }
+    </div>
+  }
   <div class="es__msg">
     @if (code(); as c) {
       <p class="es__code">{{ c }}</p>
+    } @else if (plain()) {
+      <app-icon class="es__icon" [name]="icon()" [size]="32" />
     }
     @switch (headingLevel()) {
       @case (1) {

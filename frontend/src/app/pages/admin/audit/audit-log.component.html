@@ -142,7 +142,7 @@
       }
     </ul>
   } @else if (!loading() && !loadError()) {
-    <app-empty-state [heading]="'admin.audit.empty' | t">
+    <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
       @if (activeFilterCount()) {
         <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
       }

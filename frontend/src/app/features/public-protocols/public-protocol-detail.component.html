@@ -2,7 +2,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="5" [label]="'publicProtocols.loading' | t" />
   } @else if (notFound()) {
-    <app-empty-state
+    <app-empty-state plain icon="archive"
       fill
       code="404"
       [heading]="'publicProtocols.detail.notFound' | t"
@@ -51,7 +51,7 @@
             @if (p.markdown) {
               <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" />
             } @else {
-              <app-empty-state rows="3" [heading]="'publicProtocols.detail.noText' | t" />
+              <app-empty-state shape="text" rows="3" [heading]="'publicProtocols.detail.noText' | t" />
             }
           </div>
         } @else {

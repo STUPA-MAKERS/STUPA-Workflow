@@ -86,8 +86,8 @@
               <app-button variant="tonal" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
             </app-empty-state>
           } @else if (split()) {
-            <!-- Side by side the detail pane shows the empty state; one is enough. -->
-            <p class="vl__status">{{ 'voting.list.empty' | t }}</p>
+            <!-- Side by side the detail pane carries the text; the list keeps its ghost rows. -->
+            <app-empty-state rows="3" [heading]="'voting.list.empty' | t" />
           } @else {
             <app-empty-state
               fill

@@ -209,9 +209,8 @@
       }
     }
   } @else {
-    <app-empty-state
+    <app-empty-state plain icon="list"
       class="ts__empty"
-      rows="3"
       fill
       [heading]="'meetings.dock.noTop' | t"
       [body]="proto ? ('meetings.protocol.selectTop' | t) : null"
