@@ -1,8 +1,17 @@
 @use 'breakpoints' as bp;
+@use '../../features/meetings/scroll-fade' as fade;
 :host {
   display: flex;
   flex-direction: column;
   min-width: 0;
+}
+/* Phone: the pane page ends on the top edge of the bottom bar, not a gutter above it, so
+   the cards scroll right down to the bar. The room at the end (the floating button) is
+   padding inside the scroll areas. */
+@include bp.phone {
+  :host(.pane-page) {
+    margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
+  }
 }
 
 .td {
@@ -129,6 +138,12 @@
   min-width: 0;
   min-height: 0;
 }
+/* The shared top and bottom fade: an end fades only while more content lies past it
+   (`appScrollFade="y"` sets the classes), so the cards do not end at a hard cut under the
+   bar. */
+.td__body {
+  @include fade.fade-y(var(--space-5));
+}
 /* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the
    board keeps its natural height. */
 .td__body--rows {
@@ -149,7 +164,7 @@
 }
 @include bp.phone {
   .td__body--rows.td__body--fab {
-    padding-bottom: calc(56px + var(--space-4));
+    padding-bottom: calc(56px + 2 * var(--space-4));
   }
 }
 /* An empty, filtered or failed body stands in the middle of the free height. */

@@ -50,4 +50,13 @@ describe('TodoBoardSkeletonComponent', () => {
     expect(groups[0].querySelectorAll('.lv__row')).toHaveLength(5);
     expect(groups[1].querySelectorAll('.lv__row')).toHaveLength(3);
   });
+
+  it('draws board sections of full-width tiles for the phone list', async () => {
+    const { container } = await render(TodoBoardSkeletonComponent, { inputs: { view: 'rows', phone: true } });
+    const sections = container.querySelectorAll('.bsk__section');
+    expect(sections).toHaveLength(3);
+    expect(sections[1].querySelectorAll('.bsk__list .bsk__tile')).toHaveLength(3);
+    expect(container.querySelector('.bsk__tab')).toBeNull();
+    expect(container.querySelector('.bv__dot')).toBeNull();
+  });
 });

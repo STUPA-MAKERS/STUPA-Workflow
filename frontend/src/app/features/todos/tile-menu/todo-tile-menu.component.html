@@ -1,0 +1,36 @@
+<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open">
+  @if (request(); as r) {
+    <div class="tm">
+      <p class="tm__sub">{{ r.card.title }}</p>
+      @if (r.columns.length) {
+        <ul class="tm__list" [attr.aria-label]="'todos.move.column' | t">
+          @for (col of r.columns; track col.id) {
+            @let here = col.id === r.card.columnId;
+            <li>
+              <button
+                type="button"
+                class="tm__item"
+                [class.tm__item--on]="here"
+                [disabled]="here"
+                [attr.aria-current]="here ? 'true' : null"
+                (click)="pick(col)"
+              >
+                <span class="tm__mark" aria-hidden="true">
+                  @if (here) {
+                    <app-icon name="check" [size]="20" />
+                  }
+                </span>
+                <span class="tm__name">{{ col.name }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+        <hr class="tm__sep" />
+      }
+      <button type="button" class="tm__item" (click)="moveOn()">
+        <span class="tm__mark" aria-hidden="true"><app-icon name="arrow" [size]="20" /></span>
+        <span class="tm__name">{{ 'todos.card.transfer' | t }}</span>
+      </button>
+    </div>
+  }
+</app-side-sheet>

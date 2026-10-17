@@ -28,6 +28,11 @@
 :host(:hover) {
   --tile-bg: var(--tile-hover);
 }
+/* A tile with a long press (`appLongPress`): no text callout and no selection on touch. */
+:host(.long-press) {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
 :host(.tt--lifted) {
   outline: 2px solid var(--color-accent);
   outline-offset: 0;
@@ -116,6 +121,20 @@
   min-height: 22px;
   font-size: 0.8125rem;
   color: var(--color-text-muted);
+}
+/* The column of the card in a list of the phone: the muted tag of the board rows. */
+.tt__col {
+  flex: none;
+  max-width: 10rem;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+:host-context([data-theme='dark']) .tt__col {
+  background: var(--color-surface-4);
 }
 .tt__fact {
   display: inline-flex;

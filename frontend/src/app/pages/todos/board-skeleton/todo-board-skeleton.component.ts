@@ -52,6 +52,29 @@ const PHONE_TILES: readonly SkelTile[] = [
   { label: '3.5rem', title: ['74%'], fact: '2.5rem' },
 ];
 
+/** The phone list of "Meine To-Dos" and "Alle": three board sections of full-width tiles. */
+const SECTIONS: readonly { name: string; tiles: readonly SkelTile[] }[] = [
+  {
+    name: '7rem',
+    tiles: [
+      { label: '5.5rem', title: ['84%'], fact: '6.5rem' },
+      { label: null, title: ['78%'], fact: '3rem' },
+    ],
+  },
+  {
+    name: '9rem',
+    tiles: [
+      { label: '3.5rem', title: ['88%', '40%'], fact: '4.5rem' },
+      { label: '4rem', title: ['70%'], fact: '3rem' },
+      { label: null, title: ['74%'], fact: '2.5rem' },
+    ],
+  },
+  {
+    name: '6rem',
+    tiles: [{ label: '4rem', title: ['80%'], fact: '5rem' }],
+  },
+];
+
 /** The list shows two groups of rows; the widths are fixed per place. */
 const LIST_GROUPS: readonly { name: string; rows: readonly { title: string; link: string; label: string; due: string }[] }[] = [
   {
@@ -79,7 +102,9 @@ const LIST_GROUPS: readonly { name: string; rows: readonly { title: string; link
  * `app-todo-list-view`: it shares their stylesheets, so the column frames, heads,
  * scroll areas and the column foot, or the table head and the rows, are the real ones.
  * The placeholder tiles have the box of `app-todo-card-tile`. The phone shows the tab
- * row, one column of tiles and the dots.
+ * row, one column of tiles and the dots. `rows` is the phone list of "Meine To-Dos" and
+ * "Alle": a few board sections, each a head and full-width tiles, in the geometry of
+ * `app-todo-board-rows`.
  *
  * The frames show at once; the bars inside show after 300ms (`skel-in`), so a fast
  * answer shows no bars at all. The blocks are hidden from the accessibility tree; the
@@ -99,7 +124,7 @@ const LIST_GROUPS: readonly { name: string; rows: readonly { title: string; link
   host: { 'aria-hidden': 'true', '[class.bv-host--natural]': 'natural()' },
 })
 export class TodoBoardSkeletonComponent {
-  readonly view = input<'board' | 'list'>('board');
+  readonly view = input<'board' | 'list' | 'rows'>('board');
   readonly phone = input(false);
   /** The person may add cards: each open column ends with the place of "+ To-Do". */
   readonly canWrite = input(false);
@@ -118,4 +143,5 @@ export class TodoBoardSkeletonComponent {
   });
   protected readonly phoneTiles = PHONE_TILES;
   protected readonly groups = LIST_GROUPS;
+  protected readonly sections = SECTIONS;
 }

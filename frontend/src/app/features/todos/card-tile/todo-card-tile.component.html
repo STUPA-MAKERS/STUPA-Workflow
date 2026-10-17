@@ -20,6 +20,9 @@
   </p>
 }
 <div class="tt__facts">
+  @if (column(); as column) {
+    <span class="tt__col ell" [title]="column">{{ column }}</span>
+  }
   @if (doneOn(); as day) {
     <span class="tt__fact tt__fact--muted">
       <app-icon name="check" [size]="14" />
