@@ -130,7 +130,7 @@
         } @else if (loading() && !dayCards().length) {
           <span class="skel skel--panel"></span>
         } @else if (!dayCards().length) {
-          <app-empty-state rows="3" [heading]="'meetings.overview.dayEmpty' | t" />
+          <app-empty-state shape="date" rows="3" [heading]="'meetings.overview.dayEmpty' | t" />
         }
         @for (c of dayCards(); track c.meeting.id) {
           <article class="cal__card" [attr.aria-labelledby]="'cal-m-' + c.meeting.id">

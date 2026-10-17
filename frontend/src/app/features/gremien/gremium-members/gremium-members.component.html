@@ -53,9 +53,9 @@
   </div>
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <app-empty-state rows="3" [heading]="'gremien.members.noMatch' | t" />
+    <app-empty-state shape="person" rows="3" [heading]="'gremien.members.noMatch' | t" />
   } @else {
-    <app-empty-state
+    <app-empty-state shape="person"
       rows="3"
       [heading]="(former() ? 'gremien.members.emptyFormer' : 'gremien.members.empty') | t"
     />

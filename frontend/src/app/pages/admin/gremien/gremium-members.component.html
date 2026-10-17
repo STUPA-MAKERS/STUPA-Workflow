@@ -32,7 +32,7 @@
     } @else if (failed()) {
       <p class="gmm__error" role="alert">{{ 'admin.gremien.membersLoadFailed' | t }}</p>
     } @else if (!visible().length) {
-      <app-empty-state [heading]="'admin.gremien.membersEmpty' | t" />
+      <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
     } @else {
       <ul class="rowgroup gmm__list" [attr.aria-label]="'admin.gremien.members' | t">
         @for (m of visible(); track m.id) {

@@ -58,7 +58,7 @@
     }
   </div>
 } @else if (!rows().length) {
-  <app-empty-state rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
+  <app-empty-state shape="table" rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
 } @else if (phone()) {
   <div class="gat__phoneHead" aria-hidden="true">
     @for (h of heads(); track h.month) {

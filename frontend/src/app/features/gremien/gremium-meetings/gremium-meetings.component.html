@@ -37,9 +37,9 @@
   </div>
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <app-empty-state rows="3" [heading]="'gremien.meetings.noMatch' | t" />
+    <app-empty-state shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />
   } @else {
-    <app-empty-state rows="3" [heading]="'gremien.meetings.empty' | t" />
+    <app-empty-state shape="date" rows="3" [heading]="'gremien.meetings.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {

@@ -11,7 +11,7 @@
 
   @case ('error') {
     <div class="vc vc--empty" [class.vc--sheet]="split()">
-      <app-empty-state
+      <app-empty-state plain icon="vote"
         fill
         [heading]="'voting.cast.error.heading' | t"
         [body]="'voting.cast.error.body' | t"
@@ -86,7 +86,7 @@
       </article>
     } @else {
       <div class="vc vc--empty" [class.vc--sheet]="split()">
-        <app-empty-state fill [heading]="'voting.cast.notEligible' | t">
+        <app-empty-state plain icon="vote" fill [heading]="'voting.cast.notEligible' | t">
           <a routerLink="/voting" queryParamsHandling="preserve" class="vc__link">{{ 'voting.cast.toOverview' | t }}</a>
         </app-empty-state>
       </div>

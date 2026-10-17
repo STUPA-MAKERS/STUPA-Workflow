@@ -16,7 +16,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [TranslatePipe, EmptyStateComponent],
   template: `
-    <app-empty-state fill [heading]="'admin.home.none' | t" [body]="'admin.home.noneBody' | t" />
+    <app-empty-state plain icon="shield" fill [heading]="'admin.home.none' | t" [body]="'admin.home.noneBody' | t" />
   `,
   styles: [
     `
