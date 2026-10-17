@@ -157,3 +157,22 @@ def test_pillow_bomb_error_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 10)
     with pytest.raises(ImageRejected, match="cannot be decoded"):
         clean_image(encode("PNG", size=(40, 20)))
+
+
+def _gif(width: int, height: int) -> bytes:
+    img = Image.new("P", (width, height), 0)
+    img.putpalette([0, 0, 0, 255, 255, 255] + [0] * 762)
+    buffer = io.BytesIO()
+    img.save(buffer, "GIF")
+    return buffer.getvalue()
+
+
+def test_frame_larger_than_its_canvas_is_rejected() -> None:
+    """A second GIF frame that reaches past the canvas never decodes."""
+    small, big = _gif(10, 10), _gif(60, 60)
+    flags = big[10]
+    start = 13 + (3 * 2 ** ((flags & 7) + 1) if flags & 0x80 else 0)
+    assert big[start] == 0x2C
+    data = small[:-1] + big[start:-1] + b";"
+    with pytest.raises(ImageRejected, match="larger than its canvas"):
+        clean_image(data)

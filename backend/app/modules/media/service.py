@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import uuid
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.media.images import ImageRejected, clean_image
+from app.modules.media.images import CleanImage, ImageRejected, clean_image
 from app.modules.media.models import MarkdownImage, image_storage_key
 from app.modules.media.refs import image_ids_in, image_path
 from app.modules.media.schemas import MarkdownImageOut
@@ -53,6 +54,17 @@ CLEAN_CONCURRENCY: Final[int] = 2
 # parallel cleans in one process at ``CLEAN_CONCURRENCY``, so parallel uploads cannot
 # take all the CPU or the memory of the API.
 _clean_slots: Final[asyncio.Semaphore] = asyncio.Semaphore(CLEAN_CONCURRENCY)
+# A cancelled request releases ``_clean_slots`` while its thread still works. The
+# thread semaphore holds the limit in that case too.
+_clean_threads: Final[threading.BoundedSemaphore] = threading.BoundedSemaphore(
+    CLEAN_CONCURRENCY
+)
+
+
+def _clean_bounded(data: bytes) -> CleanImage:
+    """Run ``clean_image`` in one of the ``CLEAN_CONCURRENCY`` thread slots."""
+    with _clean_threads:
+        return clean_image(data)
 
 # Stored type -> the extension of the typst asset name.
 _ASSET_EXT: Final[dict[str, str]] = {
@@ -103,7 +115,7 @@ class MediaService:
             raise ServiceUnavailableError("Object storage unavailable.")
         try:
             async with _clean_slots:
-                image = await asyncio.to_thread(clean_image, data)
+                image = await asyncio.to_thread(_clean_bounded, data)
         except ImageRejected as exc:
             raise UnsupportedMediaTypeError(str(exc)) from exc
         if len(image.data) > self.max_bytes:

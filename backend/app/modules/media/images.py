@@ -115,14 +115,24 @@ def _frames(img: Image) -> tuple[list[Image], list[int]]:
 
     Each frame is converted and scaled before the next one decodes, so only one frame
     is in memory at full size.
+
+    Raises:
+        ImageRejected: A frame is not the size of the canvas. Every frame then has
+            the pixels that ``_check_dimensions`` counted.
     """
     from PIL import Image as PILImage
     from PIL import ImageSequence
 
     frames: list[Image] = []
     durations: list[int] = []
+    canvas = (img.width, img.height)
     size = _target_size(img.width, img.height, MAX_ANIMATION_SIDE)
     for frame in ImageSequence.Iterator(img):
+        # A later GIF frame can reach past the canvas. Pillow then grows the image at
+        # the seek, before the frame decodes, so the check of the first frame does not
+        # see it. Check every frame before it decodes.
+        if frame.size != canvas:
+            raise ImageRejected("A frame of the animation is larger than its canvas.")
         durations.append(int(frame.info.get("duration") or 100))
         rgba = frame.convert("RGBA")
         if size != rgba.size:
