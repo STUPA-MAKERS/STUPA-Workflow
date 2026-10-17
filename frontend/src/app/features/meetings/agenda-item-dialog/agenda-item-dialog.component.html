@@ -5,7 +5,8 @@
   (closed)="cancel()"
 >
   <form class="aid" (submit)="$event.preventDefault(); submit()">
-    <app-segmented width="equal"
+    <app-segmented
+      width="fill"
       class="aid__kind"
       [ariaLabel]="'meetings.agenda.kind' | t"
       [options]="kindOptions()"
@@ -13,102 +14,151 @@
       (valueChange)="setKind($event)"
     />
 
-    @if (kind() === 'application') {
-      <app-search-pill
-        size="md"
-        [placeholder]="'meetings.agenda.searchApplication' | t"
-        [value]="query()"
-        (valueChange)="query.set($event)"
-      />
-      <div class="aid__group">
-        <span class="aid__cap cap" id="aid-apps">
-          {{ 'meetings.agenda.assignableCount' | t: { n: shown().length } }}
-        </span>
-        @if (loading()) {
-          <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
-        } @else if (shown().length) {
-          <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-apps">
-            @for (a of shown(); track a.applicationId) {
-              <label class="aid__row" [class.aid__row--on]="pick() === a.applicationId">
-                <input
-                  class="aid__radio"
-                  type="radio"
-                  name="aid-pick"
-                  [value]="a.applicationId"
-                  [checked]="pick() === a.applicationId"
-                  (change)="pick.set(a.applicationId)"
-                />
-                <span class="aid__title ell" [appTruncated]="a.title ?? ''" #cut="appTruncated" [attr.title]="cut.truncated() ? a.title ?? '' : null">{{ a.title }}</span>
-                @if (stateOf(a); as state) {
-                  <app-status-text kind="neutral">{{ state }}</app-status-text>
-                }
-              </label>
+    <!-- One area of one height for every kind, so the dialog does not change its height. -->
+    <div class="aid__area" [attr.data-kind]="kind()">
+      @if (kind() === 'application') {
+        <app-search-pill
+          size="md"
+          [placeholder]="'meetings.agenda.searchApplication' | t"
+          [value]="query()"
+          (valueChange)="query.set($event)"
+        />
+        @if (loading() || shown().length) {
+          <span class="aid__cap" id="aid-apps">
+            @if (loading()) {
+              {{ 'meetings.agenda.assignableLabel' | t }}
+            } @else {
+              {{ 'meetings.agenda.assignableCount' | t: { n: shown().length } }}
             }
-          </div>
-        } @else {
-          <p class="aid__hint">
-            {{ (query().trim() ? 'meetings.agenda.noMatch' : 'meetings.agenda.noAssignable') | t }}
-          </p>
+          </span>
         }
-      </div>
-    } @else if (kind() === 'todo') {
-      <app-search-pill
-        size="md"
-        [placeholder]="'meetings.agenda.searchTodo' | t"
-        [value]="todoQuery()"
-        (valueChange)="todoQuery.set($event)"
-      />
-      <div class="aid__group">
-        <span class="aid__cap aid__cap--todo" id="aid-todos">
-          {{ 'meetings.agenda.openTodos' | t: { n: shownTodos().length } }}
-        </span>
-        @if (todosLoading()) {
-          <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
-        } @else if (shownTodos().length) {
-          <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-todos">
-            @for (c of shownTodos(); track c.id) {
-              @let on = todoPick() === c.id;
-              <label class="aid__row aid__row--todo" [class.aid__row--on]="on">
-                <input
-                  class="aid__radio aid__radio--hidden"
-                  type="radio"
-                  name="aid-todo"
-                  [value]="c.id"
-                  [checked]="on"
-                  (change)="todoPick.set(c.id)"
-                />
-                <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
-                <span class="aid__text">
-                  <span class="aid__title ell" [appTruncated]="c.title" #cut2="appTruncated" [attr.title]="cut2.truncated() ? c.title : null">{{ c.title }}</span>
-                  <span class="aid__sub ell">{{ c.sub }}</span>
-                </span>
-              </label>
+        <div class="aid__slot">
+          @if (loading()) {
+            <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
+          } @else if (shown().length) {
+            <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-apps">
+              @for (a of shown(); track a.applicationId) {
+                @let on = pick() === a.applicationId;
+                <label class="aid__row" [class.aid__row--on]="on">
+                  <input
+                    class="aid__radio"
+                    type="radio"
+                    name="aid-pick"
+                    [value]="a.applicationId"
+                    [checked]="on"
+                    (change)="pick.set(a.applicationId)"
+                  />
+                  <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
+                  <span class="aid__text">
+                    <span class="aid__title ell" [appTruncated]="a.title ?? ''" #cut="appTruncated" [attr.title]="cut.truncated() ? a.title ?? '' : null">{{ a.title }}</span>
+                    @if (stateOf(a); as state) {
+                      <span class="aid__sub ell">{{ state }}</span>
+                    }
+                  </span>
+                </label>
+              }
+            </div>
+          } @else {
+            <ng-container [ngTemplateOutlet]="empty" />
+          }
+        </div>
+      } @else if (kind() === 'todo') {
+        <app-search-pill
+          size="md"
+          [placeholder]="'meetings.agenda.searchTodo' | t"
+          [value]="todoQuery()"
+          (valueChange)="todoQuery.set($event)"
+        />
+        @if (todosLoading() || shownTodos().length) {
+          <span class="aid__cap" id="aid-todos">
+            @if (todosLoading()) {
+              {{ 'meetings.agenda.openTodosLabel' | t }}
+            } @else {
+              {{ 'meetings.agenda.openTodos' | t: { n: shownTodos().length } }}
             }
-          </div>
-        } @else {
-          <p class="aid__hint">
-            {{ (todoQuery().trim() ? 'meetings.agenda.noTodoMatch' : 'meetings.agenda.noTodos') | t }}
-          </p>
+          </span>
         }
-      </div>
-    } @else {
-      <app-input
-        name="freetext"
-        [id]="'aid-title'"
-        [label]="'meetings.agenda.freetextTitle' | t"
-        [required]="true"
-        [ngModel]="freetext()"
-        (ngModelChange)="freetext.set($event)"
-      />
-    }
+        <div class="aid__slot">
+          @if (todosLoading()) {
+            <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
+          } @else if (shownTodos().length) {
+            <div class="aid__list" appScrollFade="y" role="radiogroup" aria-labelledby="aid-todos">
+              @for (c of shownTodos(); track c.id) {
+                @let on = todoPick() === c.id;
+                <label class="aid__row" [class.aid__row--on]="on">
+                  <input
+                    class="aid__radio"
+                    type="radio"
+                    name="aid-todo"
+                    [value]="c.id"
+                    [checked]="on"
+                    (change)="todoPick.set(c.id)"
+                  />
+                  <app-icon class="aid__mark" [name]="on ? 'circleok' : 'circle'" [size]="20" />
+                  <span class="aid__text">
+                    <span class="aid__title ell" [appTruncated]="c.title" #cut2="appTruncated" [attr.title]="cut2.truncated() ? c.title : null">{{ c.title }}</span>
+                    <span class="aid__sub ell">{{ c.sub }}</span>
+                  </span>
+                </label>
+              }
+            </div>
+          } @else {
+            <ng-container [ngTemplateOutlet]="empty" />
+          }
+        </div>
+      } @else {
+        <app-input
+          name="freetext"
+          [id]="'aid-title'"
+          [label]="'meetings.agenda.freetextTitle' | t"
+          [required]="true"
+          [ngModel]="freetext()"
+          (ngModelChange)="freetext.set($event)"
+        />
+      }
+    </div>
+
     <app-switch
+      class="aid__np"
       [id]="'aid-np'"
       [checked]="nonPublic()"
       (checkedChange)="nonPublic.set($event)"
+      (click)="toggleFromRow($event)"
       ><span class="aid__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch
     >
     <button type="submit" hidden></button>
   </form>
+
+  <!-- An empty list: ghost rows in the shape of the list rows, and over them the message
+       with one way on. -->
+  <ng-template #empty>
+    <div class="aid__empty">
+      <div class="aid__ghosts" aria-hidden="true">
+        @for (g of ghostRows; track $index) {
+          <div class="aid__ghost">
+            <span class="aid__ghostMark"></span>
+            <span class="aid__ghostText">
+              <span class="aid__ghostBar" [style.width.%]="g.title"></span>
+              <span class="aid__ghostBar aid__ghostBar--sub" [style.width.%]="g.sub"></span>
+            </span>
+          </div>
+        }
+      </div>
+      <div class="aid__emptyMsg">
+        @if (emptyCase() === 'noMatch') {
+          <p class="aid__emptyText">
+            {{ (kind() === 'todo' ? 'meetings.agenda.noTodoMatch' : 'meetings.agenda.noMatch') | t: { q: activeQuery() } }}
+          </p>
+          <app-button variant="tonal" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
+        } @else {
+          <p class="aid__emptyText">
+            {{ (kind() === 'todo' ? 'meetings.agenda.noTodos' : 'meetings.agenda.noAssignable') | t }}
+          </p>
+          <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>
+        }
+      </div>
+    </div>
+  </ng-template>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
   <app-button
     dialog-footer

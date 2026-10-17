@@ -108,16 +108,24 @@
 //   safe area in the installed app). Work pages have no footer (route data `footer`).
 // - A large sheet with round corners in a pane page must clip what scrolls in it: the
 //   rounded element is the scroll container, or an `overflow: hidden` parent of it.
-// - A dialog or a side sheet of the page is an overlay. Closed, it is empty, but as a
-//   flex item it would still take the gap of the host. `display: contents` gives it no
-//   box of its own.
+// - A side sheet of the page is an overlay. Closed, it is empty, but as a flex item it
+//   would still take the gap of the host. `display: contents` gives it no box of its own.
+//   A dialog has no box anywhere (see `app-dialog` below).
 .pane-page {
   flex: 1 1 0;
   min-height: 0;
   margin-bottom: calc(var(--pane-foot-gap, 0px) - var(--main-pad-bottom, 0px));
 }
-.pane-page > app-dialog,
 .pane-page > app-side-sheet {
+  display: contents;
+}
+
+// A dialog is an overlay: its backdrop is fixed. Open or closed, the `app-dialog` host adds
+// no box, so it takes no gap and no track in the flex column or grid of the page that holds
+// it. With a box, an open dialog in a flex column moves everything after it by one gap (the
+// meeting dock rose by 24px while "TOP hinzufügen" was open). Global, because the dialog of
+// the UI kit sets no display on its host.
+app-dialog {
   display: contents;
 }
 

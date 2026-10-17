@@ -94,7 +94,7 @@ describe('AgendaItemDialogComponent', () => {
     expect(screen.getByText('Zuweisbare Anträge · 1')).toBeInTheDocument();
     cmp.query.set('zzz');
     fixture.detectChanges();
-    expect(screen.getByText('Kein Antrag passt zur Suche.')).toBeInTheDocument();
+    expect(screen.getByText('Kein Antrag passt zu „zzz“')).toBeInTheDocument();
   });
 
   it('does not send a pick that the search hides', async () => {
@@ -116,7 +116,7 @@ describe('AgendaItemDialogComponent', () => {
     const { http, fixture } = await setup();
     http.expectOne('/api/meetings/m-1/agenda/assignable').flush(null, { status: 403, statusText: 'x' });
     fixture.detectChanges();
-    expect(screen.getByText('Keine zuweisbaren Anträge.')).toBeInTheDocument();
+    expect(screen.getByText('Keine zuweisbaren Anträge')).toBeInTheDocument();
   });
 
   it('has no axe violations', async () => {
@@ -190,6 +190,113 @@ describe('AgendaItemDialogComponent', () => {
     const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
+  });
+  it('fills the body with the kind control, its segments in equal parts', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture);
+    const seg = document.querySelector('app-segmented.aid__kind');
+    expect(seg).toHaveClass('seg-host--fill');
+  });
+
+  it('keeps one area for every kind, so the dialog keeps its height', async () => {
+    const { http, fixture, cmp } = await setup();
+    const area = () => document.querySelector('.aid__area') as HTMLElement;
+    expect(area()).toHaveAttribute('data-kind', 'application');
+    // Loading: the rows of the skeleton sit in the area.
+    expect(area().querySelector('app-skeleton')).not.toBeNull();
+    flushApps(http, fixture);
+    expect(area().querySelector('.aid__list')).not.toBeNull();
+    cmp.query.set('zzz');
+    fixture.detectChanges();
+    expect(area().querySelector('.aid__empty')).not.toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: 'Freitext' }));
+    expect(area()).toHaveAttribute('data-kind', 'freetext');
+    expect(area().querySelector('#aid-title')).not.toBeNull();
+    expect(document.querySelectorAll('.aid__area')).toHaveLength(1);
+  });
+
+  it('shows the caption without a count while loading and none for an empty list', async () => {
+    const { http, fixture } = await setup();
+    const cap = () => document.querySelector('#aid-apps');
+    expect(cap()).toHaveTextContent(/^\s*Zuweisbare Anträge\s*$/);
+    flushApps(http, fixture, []);
+    expect(cap()).toBeNull();
+    expect(screen.queryByText(/· 0/)).toBeNull();
+  });
+
+  it('shows ghost rows behind the message of an empty list, hidden from the screen reader', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture, []);
+    const ghosts = document.querySelector('.aid__ghosts') as HTMLElement;
+    expect(ghosts).toHaveAttribute('aria-hidden', 'true');
+    expect(ghosts.querySelectorAll('.aid__ghost')).toHaveLength(5);
+    expect(screen.queryByRole('radiogroup', { name: /Zuweisbare Anträge/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Als Freitext anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
+    expect(await runAxe(document.body)).toHaveNoViolations();
+  });
+
+  it('switches an empty list to a free-text item, with the search text as its title', async () => {
+    const { http, fixture, cmp } = await setup();
+    flushApps(http, fixture, []);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), ' Mensa ');
+    // Nothing to find at all: the way on is a free-text item, not a reset.
+    expect(screen.getByText('Keine zuweisbaren Anträge')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Als Freitext anlegen' }));
+    expect(cmp.kind()).toBe('freetext');
+    expect(cmp.freetext()).toBe('Mensa');
+    // ngModel writes the field after a microtask.
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByLabelText(/Titel/)).toHaveValue('Mensa');
+    expect(screen.getByLabelText(/Titel/)).toHaveFocus();
+    expect(submitButton()).toBeEnabled();
+  });
+
+  it('switches to a free text without a search text and keeps the title empty', async () => {
+    const { http, fixture, cmp } = await setup();
+    flushApps(http, fixture, []);
+    await userEvent.click(screen.getByRole('button', { name: 'Als Freitext anlegen' }));
+    expect(cmp.kind()).toBe('freetext');
+    expect(cmp.freetext()).toBe('');
+  });
+
+  it('resets the search when nothing matches it', async () => {
+    const { http, fixture, cmp } = await setup();
+    flushApps(http, fixture);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Antrag suchen' }), 'Kühlschrank');
+    expect(screen.getByText('Kein Antrag passt zu „Kühlschrank“')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Als Freitext anlegen' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+    expect(cmp.query()).toBe('');
+    expect(cmp.kind()).toBe('application');
+    expect(within(screen.getByRole('radiogroup', { name: /Zuweisbare Anträge/ })).getAllByRole('radio')).toHaveLength(3);
+    expect(screen.getByRole('searchbox', { name: 'Antrag suchen' })).toHaveFocus();
+  });
+
+  it('toggles "Nicht öffentlich" from anywhere on its row, once per click', async () => {
+    const { http, fixture, cmp } = await setup();
+    flushApps(http, fixture);
+    const row = document.querySelector('app-switch.aid__np') as HTMLElement;
+    const sw = screen.getByRole('switch', { name: 'Nicht öffentlich (NÖ)' });
+    await userEvent.click(row);
+    expect(cmp.nonPublic()).toBe(true);
+    expect(sw).toHaveAttribute('aria-checked', 'true');
+    await userEvent.click(screen.getByText('Nicht öffentlich (NÖ)'));
+    expect(cmp.nonPublic()).toBe(false);
+    await userEvent.click(sw);
+    expect(cmp.nonPublic()).toBe(true);
+  });
+
+  it('shows the state of an application as the second line of its row', async () => {
+    const { http, fixture } = await setup();
+    flushApps(http, fixture);
+    const row = screen.getByRole('radio', { name: /Sommerkino/ }).closest('label') as HTMLElement;
+    expect(row.querySelector('.aid__sub')).toHaveTextContent('Auf Tagesordnung');
+    const bare = screen.getByRole('radio', { name: /Erste-Hilfe/ }).closest('label') as HTMLElement;
+    expect(bare.querySelector('.aid__sub')).toBeNull();
+    await userEvent.click(screen.getByRole('radio', { name: /Erste-Hilfe/ }));
+    expect(bare).toHaveClass('aid__row--on');
   });
   describe('kind To-Do', () => {
     const AGENDA_TODO = [{ id: 't-1', applicationId: null, todoId: 'k-5', title: 'Schon da', position: 0 }] as AgendaItem[];
@@ -289,14 +396,14 @@ describe('AgendaItemDialogComponent', () => {
       http.expectNone('/api/meetings/m-1/agenda');
       cmp.todoQuery.set('zzz');
       fixture.detectChanges();
-      expect(screen.getByText('Kein To-Do passt zur Suche.')).toBeInTheDocument();
+      expect(screen.getByText('Kein To-Do passt zu „zzz“')).toBeInTheDocument();
     });
 
     it('says there are no open to-dos without a gremium board', async () => {
       const { http, fixture, cmp } = await todoSetup();
       http.expectOne((r) => r.url === '/api/todos/boards').flush([BOARDS[0], BOARDS[2]]);
       fixture.detectChanges();
-      expect(screen.getByText('Keine offenen To-Dos.')).toBeInTheDocument();
+      expect(screen.getByText('Keine offenen To-Dos')).toBeInTheDocument();
       expect(cmp.todosLoading()).toBe(false);
     });
 
@@ -305,7 +412,32 @@ describe('AgendaItemDialogComponent', () => {
       http.expectOne((r) => r.url === '/api/todos/boards').flush(BOARDS);
       http.expectOne('/api/todos/boards/b-1').flush(null, { status: 404, statusText: 'x' });
       fixture.detectChanges();
-      expect(screen.getByText('Keine offenen To-Dos.')).toBeInTheDocument();
+      expect(screen.getByText('Keine offenen To-Dos')).toBeInTheDocument();
+    });
+
+    it('offers a free-text item when the board has no open card', async () => {
+      const { http, fixture, cmp } = await todoSetup();
+      http.expectOne((r) => r.url === '/api/todos/boards').flush([BOARDS[0], BOARDS[2]]);
+      fixture.detectChanges();
+      expect(document.querySelector('#aid-todos')).toBeNull();
+      expect(document.querySelector('.aid__ghosts')).toHaveAttribute('aria-hidden', 'true');
+      await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Grillfest');
+      expect(screen.getByText('Keine offenen To-Dos')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Als Freitext anlegen' }));
+      expect(cmp.kind()).toBe('freetext');
+      expect(cmp.freetext()).toBe('Grillfest');
+    });
+
+    it('resets the to-do search when nothing matches it', async () => {
+      const { http, fixture, cmp } = await todoSetup();
+      expect(document.querySelector('#aid-todos')).toHaveTextContent(/^\s*Offene To-Dos\s*$/);
+      flushBoard(http, fixture);
+      await userEvent.type(screen.getByRole('searchbox', { name: 'To-Do suchen' }), 'Mensa');
+      expect(screen.getByText('Kein To-Do passt zu „Mensa“')).toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: 'Filter zurücksetzen' }));
+      expect(cmp.todoQuery()).toBe('');
+      expect(cmp.kind()).toBe('todo');
+      expect(screen.getByText('Offene To-Dos · 3')).toBeInTheDocument();
     });
 
     it('starts again on every opening', async () => {
