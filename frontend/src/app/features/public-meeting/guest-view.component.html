@@ -119,7 +119,7 @@
         </p>
         @for (item of excerpts(); track item.id) {
           <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
-          <app-markdown-view [src]="item.body ?? ''" />
+          <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" />
         } @empty {
           <app-empty-state rows="3" [heading]="'guests.view.protocolEmpty' | t" />
         }

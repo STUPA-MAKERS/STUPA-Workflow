@@ -1,4 +1,10 @@
+import type { Provider } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { of, throwError } from 'rxjs';
+import { ToastService } from '@stupa-makers/ui-kit';
+import { MediaApiService } from '@shared/markdown/media-api.service';
+import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { renderDeferred } from '../../../../testing/defer';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
@@ -22,7 +28,7 @@ interface Inputs {
   renamingTopId: string | null;
 }
 
-async function setup(over: Partial<Inputs> = {}) {
+async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []) {
   const bodyChange = jest.fn();
   const finalize = jest.fn();
   const startRename = jest.fn();
@@ -41,7 +47,7 @@ async function setup(over: Partial<Inputs> = {}) {
       ...over,
     },
     on: { bodyChange, finalize, startRename, cancelRename, renameTop },
-    providers: [provideRouter([]), NO_LINKED_TODOS],
+    providers: [provideRouter([]), NO_LINKED_TODOS, ...extraProviders],
   });
   await renderDeferred(view.fixture);
   return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop };
@@ -51,6 +57,8 @@ function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorCompon
   return view.fixture.debugElement.query((d) => d.componentInstance instanceof MarkdownEditorComponent)
     .componentInstance as MarkdownEditorComponent;
 }
+
+const ID = '0f8fad5b-d9cb-469f-a165-70867728950e';
 
 describe('TopSheetComponent', () => {
   it('lists the to-dos linked to the item, and leaves them out of the participant view', async () => {
@@ -109,6 +117,47 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('button', { name: 'Fett' })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('inserts a table and an image from the bar and edits the table from its menu', async () => {
+    const view = await setup();
+    const editor = editorOf(view);
+    const table = jest.spyOn(editor, 'insertTable');
+    const pick = jest.spyOn(editor, 'pickImage').mockImplementation(() => undefined);
+    const command = jest.spyOn(editor, 'tableCommand');
+    await userEvent.click(screen.getByRole('button', { name: 'Tabelle einfügen' }));
+    expect(table).toHaveBeenCalled();
+    await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
+    expect(pick).toHaveBeenCalled();
+    editor.inTable.set(true);
+    view.fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Tabelle bearbeiten' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Zeile einfügen' }));
+    expect(command).toHaveBeenCalledWith('addRowAfter');
+    editor.inTable.set(false);
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Tabelle bearbeiten' })).toBeNull();
+  });
+
+  it('uploads an image of the editor through the media service and reports an error', async () => {
+    const upload = jest
+      .fn()
+      .mockReturnValueOnce(of({ id: ID, url: `/api/media/images/${ID}`, mime: 'image/png', width: 1, height: 1, size: 1 }))
+      .mockReturnValueOnce(throwError(() => ({ status: 413 })));
+    const view = await setup({}, [{ provide: MediaApiService, useValue: { uploadImage: upload } }]);
+    const uploader = editorOf(view).imageUpload();
+    expect(uploader).not.toBeNull();
+    const png = new File(['x'], 'Foto.der.Sitzung.png', { type: 'image/png' });
+    await expect(uploader!(png)).resolves.toEqual({ src: `/api/media/images/${ID}`, alt: 'Foto.der.Sitzung' });
+    const toast = TestBed.inject(ToastService);
+    const error = jest.spyOn(toast, 'error');
+    await expect(uploader!(png)).rejects.toEqual({ status: 413 });
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('gives a reader no image upload', async () => {
+    const view = await setup({ editable: false });
+    expect(editorOf(view).imageUpload()).toBeNull();
+  });
+
   it('passes the edits of the text on', async () => {
     const view = await setup();
     editorOf(view).valueChange.emit('Neu.');
@@ -142,6 +191,23 @@ describe('TopSheetComponent', () => {
       expect(screen.getByRole('button', { name: 'Fett' })).toHaveAttribute('aria-pressed', 'false');
     });
 
+    it('inserts a table and opens the file dialog in the Markdown source', async () => {
+      const view = await setup({ top: { ...AGENDA[0], body: 'Text' } });
+      await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
+      const area = screen.getByRole<HTMLTextAreaElement>('textbox', { name: 'Markdown' });
+      area.setSelectionRange(4, 4);
+      await userEvent.click(screen.getByRole('button', { name: 'Tabelle einfügen' }));
+      expect(area.value).toBe('Text\n\n|  |  |  |\n| --- | --- | --- |\n|  |  |  |\n|  |  |  |\n');
+      expect(view.bodyChange).toHaveBeenLastCalledWith({ itemId: 't-1', body: area.value });
+      const directive = view.fixture.debugElement
+        .query((d) => d.injector.get(MarkdownImageUploadDirective, null) !== null)
+        .injector.get(MarkdownImageUploadDirective);
+      const pick = jest.spyOn(directive, 'pick').mockImplementation(() => undefined);
+      await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
+      expect(pick).toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: 'Tabelle bearbeiten' })).toBeNull();
+    });
+
     it('keeps the Markdown source of a reader read only', async () => {
       const view = await setup({ editable: false, top: { ...AGENDA[0], body: 'Text' } });
       await userEvent.click(screen.getByRole('radio', { name: 'Markdown' }));
@@ -151,6 +217,8 @@ describe('TopSheetComponent', () => {
         toggleFormat(f: string): void;
       };
       cmp.toggleFormat('bold');
+      (cmp as unknown as { insertTable(): void }).insertTable();
+      area.dispatchEvent(new Event('input'));
       expect(area.value).toBe('Text');
       expect(view.bodyChange).not.toHaveBeenCalled();
     });

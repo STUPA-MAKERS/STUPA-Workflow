@@ -42,5 +42,6 @@ description: DSGVO/GDPR backend — erasure-request queue (Art. 17), application
 - `ErasureRequestService.create` validates the subject↔id pairing (`ValidationProblem`), checks the application up-front (404 not 500), and copies the applicant email before the erasure sets it to NULL.
 - If a migration seed is missing, `PrivacySettingsService.get` seeds the id=1 row itself.
 - The Auskunft export resolves the i18n type and state labels via `_i18n` (locale → `de` → `en` fallback).
+- **Markdown images are not covered (follow-up needed).** An image of a Markdown text (`markdown_image`, be-media) is not deleted with its text, and the erasure, the anonymization and the Auskunft export do not touch it. The table has no uploader column, so nothing links an image to a person. A deletion of unreferenced images and an erasure path are open work.
 
 **Related:** be-applications, be-audit, be-files, be-notifications, be-auth, be-tickets

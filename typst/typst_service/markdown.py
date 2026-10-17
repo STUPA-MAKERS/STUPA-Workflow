@@ -22,6 +22,12 @@ builder (`backend/app/modules/protocol/markdown.py`):
   package converts it inside math mode.
 * The editor block `:::antrag{#<id>}` ... `:::` only marks an application
   reference. The converter drops the two fence lines and keeps the content.
+* Images: only the canonical path of an uploaded image,
+  `![alt](/api/media/images/<uuid>)`, shows an image, and only when the
+  caller uploaded its bytes as the asset `img-<uuid>.<ext>`. Every other image
+  (a URL, a relative path, a missing asset) keeps its alt text. The node names
+  the asset only; the template loads it from `/assets/`. A paragraph that holds
+  only an image becomes a block image (`figure`).
 """
 
 from __future__ import annotations
@@ -33,11 +39,11 @@ from typing import TYPE_CHECKING, Final, cast
 import marko
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator, Mapping
+    from collections.abc import Collection, Iterator, Mapping
 
     from .frontmatter import Meta
 
-__all__ = ["ConversionError", "Node", "convert_body", "strip_antrag_fences"]
+__all__ = ["ConversionError", "Node", "convert_body", "image_assets", "strip_antrag_fences"]
 
 type Node = dict[str, object]
 
@@ -165,6 +171,25 @@ def _election(lines: list[str]) -> Node | None:
         "lot": lot,
         "notes": notes,
     }
+
+
+# -- images -----------------------------------------------------------------
+
+_UUID: Final = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+# The canonical path of an uploaded image (the backend media module).
+IMAGE_PATH_RE: Final[re.Pattern[str]] = re.compile(rf"^/api/media/images/({_UUID})$")
+# The asset name of an uploaded image: `img-<uuid>.<ext>`.
+IMAGE_ASSET_RE: Final[re.Pattern[str]] = re.compile(rf"^img-({_UUID})\.(?:png|jpg|gif|webp)$")
+
+
+def image_assets(assets: Collection[str]) -> dict[str, str]:
+    """Map the uuid of each uploaded image asset to its asset name."""
+    out: dict[str, str] = {}
+    for name in assets:
+        match = IMAGE_ASSET_RE.fullmatch(name)
+        if match is not None:
+            out[match.group(1)] = name
+    return out
 
 
 # -- inline text: shortcodes, math, arrows ----------------------------------
@@ -369,6 +394,8 @@ def strip_antrag_fences(markdown: str) -> str:
 @dataclass(slots=True)
 class _Converter:
     meta: Meta
+    # uuid -> asset name of the uploaded images.
+    images: Mapping[str, str]
     _depth: int = 0
     _ul: int = 0
     _ol: int = 0
@@ -409,13 +436,24 @@ class _Converter:
                     return [{"t": "link", "url": dest, "c": self.inlines(node)}]
                 return self.inlines(node)
             if kind == "Image":
-                # The render has no network and no file of the author, so an
-                # image cannot load. Its alt text stands in for it.
-                alt = "".join(_plain(c) for c in _children(node)).strip() or "Bild"
-                return [{"t": "image", "alt": alt}]
+                return [self._image(node)]
             return self.inlines(node)
         finally:
             self._leave()
+
+    def _image(self, node: object) -> Node:
+        """Build an image node: the uploaded asset, else the alt text only.
+
+        The render has no network and reads no file of the author. Only the
+        canonical path of an uploaded image whose bytes came with the request
+        names an asset; every other image keeps its alt text.
+        """
+        alt = "".join(_plain(c) for c in _children(node)).strip() or "Bild"
+        match = IMAGE_PATH_RE.fullmatch(str(getattr(node, "dest", "")))
+        asset = self.images.get(match.group(1)) if match is not None else None
+        if asset is None:
+            return {"t": "image", "alt": alt}
+        return {"t": "image", "asset": asset, "alt": alt}
 
     def inlines(self, node: object) -> list[Node]:
         return self._inline_nodes(_children(node))
@@ -485,7 +523,11 @@ class _Converter:
             display = self._display_math(node)
             if display is not None:
                 return [display]
-            return [{"t": "par", "c": _trim(self.inlines(node))}]
+            content = _trim(self.inlines(node))
+            if len(content) == 1 and content[0].get("t") == "image" and "asset" in content[0]:
+                # A paragraph of one image is a block image, centered and scaled.
+                return [{"t": "figure", "asset": content[0]["asset"], "alt": content[0]["alt"]}]
+            return [{"t": "par", "c": content}]
         if kind == "List":
             # LaTeX counts the itemize and the enumerate depth apart: a bullet
             # list inside a numbered list still takes the first bullet.
@@ -691,14 +733,17 @@ def _trim(nodes: list[Node]) -> list[Node]:
     return [n for n in out if not (n.get("t") == "text" and n.get("v") == "")]
 
 
-def convert_body(markdown: str, meta: Meta) -> list[Node]:
+def convert_body(markdown: str, meta: Meta, assets: Collection[str] = ()) -> list[Node]:
     """Convert the Markdown body of a protocol into block nodes.
+
+    `assets` holds the names of the uploaded assets. An `img-<uuid>.<ext>` among
+    them lets the image `/api/media/images/<uuid>` show.
 
     Raises:
         ConversionError: The Markdown nests too deep.
     """
     tree = _PARSER.parse(strip_antrag_fences(markdown))
-    converter = _Converter(meta=meta)
+    converter = _Converter(meta=meta, images=image_assets(assets))
     try:
         blocks = converter.blocks(_children(tree))
     except RecursionError:

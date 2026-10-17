@@ -170,9 +170,10 @@ describe('renderMarkdown', () => {
 
   it('rejects a link whose URL contains a double-quote (no attribute break-out, AUD-064)', () => {
     const out = renderMarkdown('[x](https://e"x=)');
-    // A URL that carries a quote must never become an href attribute …
-    expect(out).not.toContain('<a ');
-    expect(out).not.toContain('href');
+    // A URL that carries a quote must never become an href attribute. The Markdown link
+    // stays text; the autolink stops before the escaped quote.
+    expect(out).toContain('[x](');
+    expect(out).not.toMatch(/href="[^"]*&quot;/);
     // … and no raw double-quote may leak into the rendered HTML.
     expect(out).not.toContain('"x=');
     expect(out).toContain('&quot;');
@@ -231,8 +232,9 @@ describe('renderMarkdown', () => {
   it('renders an aligned pipe-table separator (:--:)', () => {
     const out = renderMarkdown('| a | b |\n| :--: | --- |\n| 1 | 2 |');
     expect(out).toContain('<table>');
-    expect(out).toContain('<th>a</th>');
-    expect(out).toContain('<td>1</td>');
+    expect(out).toContain('<th class="mdv__al--center">a</th>');
+    expect(out).toContain('<td class="mdv__al--center">1</td>');
+    expect(out).toContain('<th>b</th>');
   });
 
   it('renders a table with no body rows', () => {
@@ -253,6 +255,11 @@ describe('renderMarkdown', () => {
     const out = renderMarkdown('- eins\n# Titel');
     expect(out).toContain('</ul>');
     expect(out).toContain('<h1>Titel</h1>');
+  });
+
+  it('renders an image as its alt text only (anonymous contexts)', () => {
+    const out = renderMarkdown('![Foto](/api/media/images/0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40)');
+    expect(out).toBe('<p>Foto</p>');
   });
 
   it('switches from an unordered to an ordered list', () => {

@@ -11,6 +11,7 @@ async function setup(reply: Observable<PublicProtocolDetail> = of(detailFixture(
   const api = {
     detail: jest.fn(() => reply),
     pdfUrl: (id: string) => `/api/public/protocols/${id}/pdf`,
+    imageUrl: (id: string, image: string) => `/api/public/protocols/${id}/images/${image}`,
   };
   const view = await render(PublicProtocolDetailComponent, {
     providers: [
@@ -113,6 +114,16 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.getByText('Freitext').tagName).toBe('STRONG');
     expect(screen.queryByRole('link', { name: /PDF/ })).toBeNull();
     expect(screen.queryByText(/finalisiert am/)).toBeNull();
+  });
+
+  it('loads the images of the text through the public protocol route', async () => {
+    const img = '0b8f3c3e-4d6a-4f43-9a1e-2f0c1d2e3f40';
+    const fixture = detailFixture();
+    await setup(of(detailFixture({ tops: [], markdown: `![Plan](/api/media/images/${img})` })));
+    expect(screen.getByRole('img', { name: 'Plan' })).toHaveAttribute(
+      'src',
+      `/api/public/protocols/${fixture.id}/images/${img}`,
+    );
   });
 
   it('says when a protocol has no public text at all', async () => {

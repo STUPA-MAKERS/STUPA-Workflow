@@ -49,7 +49,7 @@
         @if (p.tops.length === 0) {
           <div class="pd__free">
             @if (p.markdown) {
-              <app-markdown-view [src]="p.markdown" />
+              <app-markdown-view [src]="p.markdown" [imageSrc]="imageSrc()" />
             } @else {
               <app-empty-state rows="3" [heading]="'publicProtocols.detail.noText' | t" />
             }
@@ -80,7 +80,7 @@
                       {{ top.title }}
                     </h3>
                     @if (top.markdown) {
-                      <app-markdown-view class="pd__md" [src]="top.markdown" />
+                      <app-markdown-view class="pd__md" [src]="top.markdown" [imageSrc]="imageSrc()" />
                     }
                     @for (d of top.decisions; track $index) {
                       @if (!d.inText) {

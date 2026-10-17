@@ -9,6 +9,7 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
@@ -33,6 +34,7 @@ import {
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL, sortedColumns } from '../todos.util';
@@ -67,6 +69,7 @@ export interface NewTodoLink {
     DialogComponent,
     IconComponent,
     InputComponent,
+    MarkdownImageUploadDirective,
     SelectFieldComponent,
     TodoLinkPickerComponent,
   ],
@@ -123,8 +126,16 @@ export class TodoNewDialogComponent {
   readonly titleError = computed(() =>
     this.title().trim().length > MAX_TITLE ? this.i18n.translate('todos.new.titleTooLong', { max: MAX_TITLE }) : '',
   );
+  /** The image upload of the description. A card must not be created while an image
+   *  uploads, because its placeholder would go into the description. */
+  private readonly images = viewChild(MarkdownImageUploadDirective);
   readonly canSave = computed(
-    () => !!this.title().trim() && !this.titleError() && !!this.selectedBoard() && !this.saving(),
+    () =>
+      !!this.title().trim() &&
+      !this.titleError() &&
+      !!this.selectedBoard() &&
+      !this.saving() &&
+      !this.images()?.uploading(),
   );
 
   constructor() {

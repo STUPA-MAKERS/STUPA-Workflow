@@ -59,6 +59,7 @@ from app.modules.livevote.models import (
     MeetingSettings,
     ProtocolKeeperPeriod,
 )
+from app.modules.media.models import MarkdownImage
 from app.modules.notifications.models import (
     MailTemplate,
     NotificationPreference,
@@ -113,6 +114,7 @@ __all__ = [
     "MagicLink",
     "MailList",
     "MailTemplate",
+    "MarkdownImage",
     "NotificationPreference",
     "NotificationSettings",
     "TaskReminderLog",

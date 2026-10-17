@@ -5,6 +5,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { BOARDS, MEMBERS, board, detail } from '../../../../testing/todo-fixtures';
 import { TodoNewDialogComponent, type NewTodoLink } from './todo-new-dialog.component';
 import { LINK_ICON } from '../todos.util';
+import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 
 interface Opts {
   boards?: TodoBoardSummary[];
@@ -199,6 +200,24 @@ describe('TodoNewDialogComponent', () => {
     api.createCard.mockReturnValueOnce(throwError(() => null) as never);
     cmp.save();
     expect(toast.error).toHaveBeenLastCalledWith('Das To-Do konnte nicht angelegt werden.');
+  });
+
+  it('does not create the card while an image uploads', async () => {
+    const { cmp, open, api, fixture, debugElement } = await setup();
+    open();
+    cmp.title.set('Bus');
+    fixture.detectChanges();
+    const images = debugElement
+      .query((d) => d.nativeElement instanceof HTMLTextAreaElement)
+      .injector.get(MarkdownImageUploadDirective);
+    images.uploading.set(1);
+    fixture.detectChanges();
+    expect(cmp.canSave()).toBe(false);
+    expect(screen.getByRole('button', { name: 'Anlegen' })).toBeDisabled();
+    cmp.save();
+    expect(api.createCard).not.toHaveBeenCalled();
+    images.uploading.set(0);
+    expect(cmp.canSave()).toBe(true);
   });
 
   it('cancels', async () => {

@@ -60,4 +60,6 @@ description: Backend attachment storage for applications: multipart upload, libm
 - The edge nginx gives both upload routes (`/api/applications/{id}/attachments`, `/api/apply/attachments`) the 11m body limit. `enforce_attachment_body_cap` (Content-Length, `attachment_max_bytes` + 64 KiB) and the capped read stay as defense in depth.
 - Tunables in settings: `attachment_max_bytes`, `attachment_url_ttl_seconds`, `attachment_draft_ttl_days`, `attachment_draft_max_files`, `attachment_draft_max_bytes`, `storage_enabled`/`minio_*`, `clamav_*`, `scan_max_tries`, `scan_retry_backoff_seconds`.
 
-**Related:** be-applications, be-audit, be-privacy, be-notifications, be-tickets, be-todos
+- **Markdown images are not attachments.** An image pasted into a Markdown text goes to `POST /api/media/images` (`be-media`): no `attachment` row, no scan, re-encoded by Pillow, object key `media/images/<id>` in the same bucket. The chat and the attachment panel of the SPA show a clean raster attachment as a thumbnail through `/download?inline=1`.
+
+**Related:** be-applications, be-audit, be-privacy, be-notifications, be-tickets, be-todos, be-media

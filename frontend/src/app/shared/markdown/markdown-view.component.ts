@@ -7,7 +7,9 @@ import {
   input,
 } from '@angular/core';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
-import { markdownToSafeHtml } from './markdown.util';
+import { Router } from '@angular/router';
+import { routeInternalLink } from './internal-link';
+import { defaultImageSrc, markdownToSafeHtml } from './markdown.util';
 
 /**
  * Show rendered Markdown for long text that a user typed. Detail views use it.
@@ -22,13 +24,29 @@ import { markdownToSafeHtml } from './markdown.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
+  host: { '(click)': 'onClick($event)' },
   template: `<div class="mdv" [innerHTML]="html()"></div>`,
   styleUrl: './markdown-view.component.scss',
 })
 export class MarkdownViewComponent {
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly router = inject(Router, { optional: true });
   readonly src = input('');
+  /** The number of levels that a heading moves down (3: `#` renders as h4). */
+  readonly headingOffset = input(3);
+  /** The URL of an image from its uuid. `null` shows the alt text (anonymous views). */
+  readonly imageSrc = input<((id: string) => string) | null>(defaultImageSrc);
   protected readonly html = computed<SafeHtml>(() =>
-    this.sanitizer.bypassSecurityTrustHtml(markdownToSafeHtml(this.src())),
+    this.sanitizer.bypassSecurityTrustHtml(
+      markdownToSafeHtml(this.src(), {
+        headingOffset: this.headingOffset(),
+        imageSrc: this.imageSrc(),
+      }),
+    ),
   );
+
+  /** An internal link navigates through the router, without a reload. */
+  protected onClick(event: MouseEvent): void {
+    routeInternalLink(event, this.router);
+  }
 }

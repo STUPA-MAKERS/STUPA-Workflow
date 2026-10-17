@@ -163,7 +163,12 @@
       strong[Abstimmung: ]
       text(fill: vote-color(n.yes, n.no))[Ja #n.yes #dot Nein #n.no #dot Enthaltung #n.abstain]
     } else if t == "image" {
-      emph[\[#n.alt\]]
+      if "asset" in n {
+        // An uploaded image inside a line: two lines high, aspect kept.
+        box(baseline: 20%, image("/assets/" + n.asset, height: 2em, alt: n.alt))
+      } else {
+        emph[\[#n.alt\]]
+      }
     }
   }
 }
@@ -340,6 +345,7 @@
   quote: 8.78pt,
   box: 24.35pt,
   table: 14.85pt,
+  figure: 14.85pt,
   code: 4.6pt,
   rule: 16.04pt,
   math: 22.64pt,
@@ -354,6 +360,7 @@
   list: (par: 8.78pt, runin: 8.78pt, box: 27.52pt),
   quote: (par: 8.78pt, runin: 8.78pt, box: 27.58pt),
   table: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
+  figure: (par: 14.3pt, runin: 14.3pt, list: 8.98pt, quote: 8.98pt, box: 25.41pt, h1: 31.4pt, h2: 23.89pt, h3: 15.5pt),
   code: (par: 10.95pt, runin: 10.95pt, box: 29.75pt, h1: 39.26pt, h2: 31.7pt, h3: 23.3pt),
   rule: (par: 8.25pt, runin: 8.25pt, box: 26.48pt),
   math: (par: 14.37pt, runin: 14.37pt, box: 33.03pt),
@@ -433,6 +440,17 @@
     rule(0.876pt)
   })
 }
+
+// A paragraph of one uploaded image: centered, at most the text width and
+// 12cm high, never larger than its natural size, aspect kept. Like a box it
+// does not break across pages.
+#let figure-block(n) = layout(region => {
+  let path = "/assets/" + n.asset
+  let natural = measure(image(path))
+  let ratio = if natural.height > 0pt { natural.width / natural.height } else { 1 }
+  let width = calc.min(region.width, natural.width, 12cm * ratio)
+  align(center, block(breakable: false, image(path, width: width, alt: n.alt)))
+})
 
 #let code-block(n) = {
   // lstlisting with `frame=single`, `numbers=left` and \footnotesize
@@ -515,6 +533,8 @@
       rect(width: 100%, height: 0.4pt, fill: black, stroke: none)
     } else if n.t == "table" {
       table-block(n)
+    } else if n.t == "figure" {
+      figure-block(n)
     } else if n.t == "mathblock" {
       mitex(n.tex)
     } else if n.t == "signatures" {

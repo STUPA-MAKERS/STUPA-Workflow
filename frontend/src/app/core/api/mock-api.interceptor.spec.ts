@@ -132,6 +132,23 @@ describe('mockApiInterceptor', () => {
     http.verify();
   });
 
+  it('answers a Markdown image upload with a canonical path', async () => {
+    const { http } = setup(true);
+    const client = TestBed.inject(HttpClient);
+    const form = new FormData();
+    form.append('file', new File(['xy'], 'a.webp', { type: 'image/webp' }));
+    const res = await firstValueFrom(client.post<Record<string, unknown>>('/api/media/images', form));
+    expect(res).toMatchObject({ mime: 'image/webp', size: 2 });
+    expect(String(res['url'])).toMatch(/^\/api\/media\/images\/[0-9a-f-]{36}$/);
+    const bare = await firstValueFrom(client.post<Record<string, unknown>>('/api/media/images', {}));
+    expect(bare).toMatchObject({ mime: 'image/png', size: 1024 });
+    const typeless = new FormData();
+    typeless.append('file', new File(['x'], 'ohne'));
+    const t = await firstValueFrom(client.post<Record<string, unknown>>('/api/media/images', typeless));
+    expect(t['mime']).toBe('image/png');
+    http.verify();
+  });
+
   it('answers a draft upload with the file and a token, and a draft delete', async () => {
     const { api } = setup(true);
     const file = new File(['x'.repeat(10)], 'Angebot.pdf', { type: 'application/pdf' });

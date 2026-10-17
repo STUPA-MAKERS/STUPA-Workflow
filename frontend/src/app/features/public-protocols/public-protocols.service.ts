@@ -67,4 +67,9 @@ export class PublicProtocolsService {
   pdfUrl(id: string): string {
     return `${this.base}/public/protocols/${encodeURIComponent(id)}/pdf`;
   }
+
+  /** The URL of an image in the public Markdown of a protocol (no login). */
+  imageUrl(protocolId: string, imageId: string): string {
+    return `${this.base}/public/protocols/${encodeURIComponent(protocolId)}/images/${imageId}`;
+  }
 }

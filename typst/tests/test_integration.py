@@ -151,6 +151,22 @@ def test_uploaded_logos_render(tmp_path: Path) -> None:
     assert pdf.startswith(b"%PDF")
 
 
+def test_uploaded_images_render_inline_and_as_block() -> None:
+    image_id = "0b7c6f0e-3a51-4c3e-9b8e-6f1d2a3b4c5d"
+    name = f"img-{image_id}.png"
+    path = f"/api/media/images/{image_id}"
+    source = (
+        "---\ngremium: StuPa\n---\n\n# Bericht\n\n"
+        f"![Foto]({path})\n\nText ![klein]({path}) im Satz.\n\n"
+        f"| Bild | Text |\n|---|---|\n| ![z]({path}) | x |\n\n"
+        "![fehlt](/api/media/images/11111111-2222-4333-8444-555555555555)\n"
+    )
+    doc = build_document(source, variant="protocol-stupa", assets=[name])
+    pdf = asyncio.run(default_compiler().compile(doc, {name: _png()}))
+    assert pdf.startswith(b"%PDF")
+    assert b"/Subtype /Image" in pdf or b"/Subtype/Image" in pdf
+
+
 def test_invalid_math_is_a_compile_error() -> None:
     from typst_service.compiler import CompileError
 

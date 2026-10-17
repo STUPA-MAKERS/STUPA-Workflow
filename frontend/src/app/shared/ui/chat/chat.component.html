@@ -325,7 +325,11 @@
     <ul class="chat__files">
       @for (f of m.attachments; track f.id) {
         <li>
-          @if (isLink(f)) {
+          @if (isLink(f) && isImage(f)) {
+            <a class="chat__thumb" [href]="inline(f.url)" target="_blank" rel="noopener">
+              <app-image-thumb [src]="inline(f.url)" [alt]="f.filename" />
+            </a>
+          } @else if (isLink(f)) {
             <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
               <span class="chat__fileIcon" aria-hidden="true">
                 <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
