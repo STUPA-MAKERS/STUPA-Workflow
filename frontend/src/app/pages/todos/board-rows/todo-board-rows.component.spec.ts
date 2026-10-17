@@ -823,7 +823,7 @@ describe('TodoBoardRowsComponent', () => {
       expect(list.querySelectorAll('app-todo-card-tile')).toHaveLength(DONE_PREVIEW + 2);
     });
 
-    it('puts the personal board first, with one muted line when it has no card', async () => {
+    it('puts the personal board first, with the empty state when it has no card', async () => {
       const { fixture, settle, on, container } = await setup({ phone: true, inputs: { lead: lead() } });
       const heads = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
       expect(heads[0]).toMatch(/^Meine To-Dos\s*3/);
@@ -834,7 +834,7 @@ describe('TodoBoardRowsComponent', () => {
       fixture.componentRef.setInput('lead', { ...empty, cards: new Map() });
       await settle();
       const section = container.querySelector('[data-board-id="p-1"]') as HTMLElement;
-      expect(within(section).getByText('Keine Karten')).toHaveClass('br__empty');
+      expect(within(section).getByText('Keine Karten').closest('app-empty-state')).toHaveClass('br__empty');
       expect(within(section).queryByRole('list')).toBeNull();
       // A row of the same board as the lead is not shown twice.
       fixture.componentRef.setInput('lead', lead({ id: 'b-1' }));

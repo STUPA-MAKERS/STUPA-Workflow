@@ -21,6 +21,6 @@
       }
     </ul>
   } @else if (!error()) {
-    <p class="nt__empty">{{ 'account.notifications.empty' | t }}</p>
+    <app-empty-state [heading]="'account.notifications.empty' | t" />
   }
 </section>

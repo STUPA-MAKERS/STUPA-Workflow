@@ -38,6 +38,7 @@ import { errorDetail, resolveI18n } from '../meetings-display.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { cardsOf, isoDay, shortDay, sortedColumns } from '../../todos/todos.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** What the new agenda item is: an application of the Gremium, a to-do, or a free text. */
 export type AgendaItemKind = 'application' | 'todo' | 'freetext';
@@ -47,15 +48,6 @@ export type AgendaItemKind = 'application' | 'todo' | 'freetext';
  * when the search hides every row.
  */
 export type AgendaEmptyCase = 'none' | 'noMatch';
-
-/** The widths of the title and the sub bar of the ghost rows of the empty state, in %. */
-const GHOST_ROWS: readonly { title: number; sub: number }[] = [
-  { title: 62, sub: 34 },
-  { title: 48, sub: 28 },
-  { title: 70, sub: 40 },
-  { title: 52, sub: 30 },
-  { title: 44, sub: 26 },
-];
 
 /** An open card of the gremium board, as a row of the to-do list. */
 export interface AgendaTodoOption {
@@ -96,6 +88,7 @@ export interface AgendaTodoOption {
     SwitchComponent,
     SearchPillComponent,
     SkeletonComponent,
+    EmptyStateComponent,
   ],
   templateUrl: './agenda-item-dialog.component.html',
   styleUrl: './agenda-item-dialog.component.scss',
@@ -108,9 +101,6 @@ export class AgendaItemDialogComponent {
   private readonly auth = inject(AuthService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
-
-  /** The ghost rows behind the message of an empty list. */
-  readonly ghostRows = GHOST_ROWS;
 
   readonly open = input(false);
   readonly meeting = input.required<Meeting>();

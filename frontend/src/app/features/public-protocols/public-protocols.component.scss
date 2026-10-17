@@ -55,6 +55,7 @@
 .pp__none {
   display: flex;
   flex-direction: column;
+  padding: var(--space-4);
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }

@@ -54,6 +54,7 @@ import { AttachmentsPanelComponent } from '../../pages/applications/attachments-
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -91,6 +92,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     ReactiveFormsModule,
     RouterLink,
     FormlyForm,

@@ -22,6 +22,10 @@
   gap: var(--space-3);
   padding: var(--space-8) var(--space-4);
 }
+/* The centred state column would shrink the empty state to its text; it spans the box. */
+.cd__none {
+  align-self: stretch;
+}
 .cd__error {
   margin: 0;
   color: var(--color-danger);

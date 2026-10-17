@@ -35,9 +35,9 @@
   width: 60%;
   height: 2rem;
 }
-.vc--center {
-  align-items: center;
-  justify-content: center;
+/* The empty sheet: the empty state fills it and centres itself. */
+.vc--empty.vc--sheet {
+  padding-top: var(--space-6);
 }
 
 

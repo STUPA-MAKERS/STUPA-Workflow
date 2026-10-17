@@ -58,7 +58,7 @@
     }
   </div>
 } @else if (!rows().length) {
-  <p class="gat__status">{{ (role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t }}</p>
+  <app-empty-state rows="3" [heading]="(role() ? 'gremien.attendance.noMatch' : 'gremien.attendance.empty') | t" />
 } @else if (phone()) {
   <div class="gat__phoneHead" aria-hidden="true">
     @for (h of heads(); track h.month) {

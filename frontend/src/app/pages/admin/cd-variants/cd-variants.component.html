@@ -10,111 +10,113 @@
   } @else if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.cdVariants.error' | t }}</app-note>
   } @else {
-    <ul class="rowgroup cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
-      @for (v of variants(); track v.id) {
-        <li class="cdv__variant">
-          <div class="cdv__head">
-            @if (squareLogo(v); as sq) {
-              <img class="cdv__square" [src]="squareUrl(sq)" alt="" width="40" height="40" (error)="thumbFailed(sq)" />
-            } @else {
-              <span class="cdv__square cdv__square--none" [attr.title]="'admin.cdVariants.noSquare' | t" aria-hidden="true">{{ initials(v.name) }}</span>
-            }
-            <span class="cdv__text">
-              <span class="cdv__titleLine">
-                <strong class="cdv__name">{{ v.name }}</strong>
-                <span class="cdv__key mono">{{ v.key }}</span>
-              </span>
-              <span class="cdv__usage">{{ usage(v) }}</span>
-            </span>
-            <span class="cdv__actions">
-              <button
-                type="button"
-                class="cdv__toggle"
-                [attr.aria-expanded]="isExpanded(v.id)"
-                [attr.aria-controls]="'cdv-logos-' + v.id"
-                (click)="toggle(v.id)"
-              >
-                {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
-                <span class="cdv__count">({{ v.logos.length }})</span>
-              </button>
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.edit' | t) + ': ' + v.name" [title]="'admin.common.edit' | t" (click)="openEdit(v)">
-                <app-icon name="edit" />
-              </app-button>
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + v.name" [title]="'admin.common.remove' | t" (click)="askDelete(v)">
-                <app-icon name="trash" />
-              </app-button>
-            </span>
-          </div>
-
-          @if (isExpanded(v.id)) {
-            <div class="cdv__body" [id]="'cdv-logos-' + v.id">
-              @if (v.logos.length) {
-                <ul class="rowgroup rowgroup--bg3 cdv__logos">
-                  @for (slot of listOrder; track slot) {
-                    @for (logo of logosOf(v, slot); track logo.id; let i = $index; let last = $last) {
-                      <li class="cdv__logo">
-                        @if (slot === 'square' && logo.fileName && !brokenThumbs().has(logo.id)) {
-                          <img class="cdv__thumb cdv__thumb--img" [src]="squareUrl(logo)" alt="" width="40" height="40" (error)="thumbFailed(logo)" />
-                        } @else {
-                          <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
-                        }
-                        <span class="cdv__logoText">
-                          <span class="cdv__logoHead">
-                            <strong>{{ slotLabel(slot) }}</strong>
-                            <span class="cdv__dot" aria-hidden="true">·</span>
-                            <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
-                          </span>
-                          <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
-                          @if (logo.vendoredName) {
-                            <!-- Why this row has no file and no download. -->
-                            <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>
-                          }
-                        </span>
-                        <span class="cdv__logoActions">
-                          @if (slot === 'square') {
-                            <!-- One square logo per variant: nothing to move. -->
-                            <span class="cdv__moveGap" aria-hidden="true"></span>
-                          } @else {
-                            <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
-                              <app-icon name="chevron-up" />
-                            </app-button>
-                            <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
-                              <app-icon name="chevron-down" />
-                            </app-button>
-                          }
-                          @if (logo.fileName) {
-                            <a
-                              class="cdv__iconLink"
-                              [href]="fileUrl(logo)"
-                              [attr.aria-label]="('admin.cdVariants.download' | t) + ': ' + logoLabel(logo)"
-                              [attr.title]="'admin.cdVariants.download' | t"
-                              download
-                              ><app-icon name="download" [size]="18"
-                            /></a>
-                          } @else {
-                            <span class="cdv__iconGap" aria-hidden="true"></span>
-                          }
-                          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.cdVariants.removeLogo' | t) + ': ' + logoLabel(logo)" (click)="removeLogo(v, logo)">
-                            <app-icon name="trash" />
-                          </app-button>
-                        </span>
-                      </li>
-                    }
-                  }
-                </ul>
+    @if (variants().length) {
+      <ul class="rowgroup cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
+        @for (v of variants(); track v.id) {
+          <li class="cdv__variant">
+            <div class="cdv__head">
+              @if (squareLogo(v); as sq) {
+                <img class="cdv__square" [src]="squareUrl(sq)" alt="" width="40" height="40" (error)="thumbFailed(sq)" />
               } @else {
-                <p class="cdv__empty">{{ 'admin.cdVariants.noLogos' | t }}</p>
+                <span class="cdv__square cdv__square--none" [attr.title]="'admin.cdVariants.noSquare' | t" aria-hidden="true">{{ initials(v.name) }}</span>
               }
-              <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
-                <app-icon name="plus" [size]="16" /> {{ 'admin.cdVariants.addLogo' | t }}
-              </app-button>
+              <span class="cdv__text">
+                <span class="cdv__titleLine">
+                  <strong class="cdv__name">{{ v.name }}</strong>
+                  <span class="cdv__key mono">{{ v.key }}</span>
+                </span>
+                <span class="cdv__usage">{{ usage(v) }}</span>
+              </span>
+              <span class="cdv__actions">
+                <button
+                  type="button"
+                  class="cdv__toggle"
+                  [attr.aria-expanded]="isExpanded(v.id)"
+                  [attr.aria-controls]="'cdv-logos-' + v.id"
+                  (click)="toggle(v.id)"
+                >
+                  {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
+                  <span class="cdv__count">({{ v.logos.length }})</span>
+                </button>
+                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.edit' | t) + ': ' + v.name" [title]="'admin.common.edit' | t" (click)="openEdit(v)">
+                  <app-icon name="edit" />
+                </app-button>
+                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + v.name" [title]="'admin.common.remove' | t" (click)="askDelete(v)">
+                  <app-icon name="trash" />
+                </app-button>
+              </span>
             </div>
-          }
-        </li>
-      } @empty {
-        <li class="cdv__empty">{{ 'admin.cdVariants.empty' | t }}</li>
-      }
-    </ul>
+
+            @if (isExpanded(v.id)) {
+              <div class="cdv__body" [id]="'cdv-logos-' + v.id">
+                @if (v.logos.length) {
+                  <ul class="rowgroup rowgroup--bg3 cdv__logos">
+                    @for (slot of listOrder; track slot) {
+                      @for (logo of logosOf(v, slot); track logo.id; let i = $index; let last = $last) {
+                        <li class="cdv__logo">
+                          @if (slot === 'square' && logo.fileName && !brokenThumbs().has(logo.id)) {
+                            <img class="cdv__thumb cdv__thumb--img" [src]="squareUrl(logo)" alt="" width="40" height="40" (error)="thumbFailed(logo)" />
+                          } @else {
+                            <span class="cdv__thumb" aria-hidden="true"><app-icon [name]="logo.vendoredName ? 'pin' : 'file'" [size]="18" /></span>
+                          }
+                          <span class="cdv__logoText">
+                            <span class="cdv__logoHead">
+                              <strong>{{ slotLabel(slot) }}</strong>
+                              <span class="cdv__dot" aria-hidden="true">·</span>
+                              <span class="cdv__muted">{{ (logo.vendoredName ? 'admin.cdVariants.sourceVendored' : 'admin.cdVariants.sourceUpload') | t }}</span>
+                            </span>
+                            <span class="cdv__logoName mono">{{ logoDetail(logo) }}</span>
+                            @if (logo.vendoredName) {
+                              <!-- Why this row has no file and no download. -->
+                              <span class="cdv__logoHint">{{ 'admin.cdVariants.vendoredHint' | t }}</span>
+                            }
+                          </span>
+                          <span class="cdv__logoActions">
+                            @if (slot === 'square') {
+                              <!-- One square logo per variant: nothing to move. -->
+                              <span class="cdv__moveGap" aria-hidden="true"></span>
+                            } @else {
+                              <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
+                                <app-icon name="chevron-up" />
+                              </app-button>
+                              <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
+                                <app-icon name="chevron-down" />
+                              </app-button>
+                            }
+                            @if (logo.fileName) {
+                              <a
+                                class="cdv__iconLink"
+                                [href]="fileUrl(logo)"
+                                [attr.aria-label]="('admin.cdVariants.download' | t) + ': ' + logoLabel(logo)"
+                                [attr.title]="'admin.cdVariants.download' | t"
+                                download
+                                ><app-icon name="download" [size]="18"
+                              /></a>
+                            } @else {
+                              <span class="cdv__iconGap" aria-hidden="true"></span>
+                            }
+                            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.cdVariants.removeLogo' | t) + ': ' + logoLabel(logo)" (click)="removeLogo(v, logo)">
+                              <app-icon name="trash" />
+                            </app-button>
+                          </span>
+                        </li>
+                      }
+                    }
+                  </ul>
+                } @else {
+                  <app-empty-state rows="2" [heading]="'admin.cdVariants.noLogos' | t" />
+                }
+                <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
+                  <app-icon name="plus" [size]="16" /> {{ 'admin.cdVariants.addLogo' | t }}
+                </app-button>
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    } @else {
+      <app-empty-state [heading]="'admin.cdVariants.empty' | t" />
+    }
   }
 </section>
 

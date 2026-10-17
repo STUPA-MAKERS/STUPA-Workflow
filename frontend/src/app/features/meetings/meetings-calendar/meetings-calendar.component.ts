@@ -62,6 +62,7 @@ import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-vi
 import { beamerUrl } from '../../voting/beamer-link.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -102,6 +103,7 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     SheetBarComponent,
     PageHeaderComponent,
     TranslatePipe,

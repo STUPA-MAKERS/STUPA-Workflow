@@ -18,47 +18,49 @@
       <p class="dl__error" role="alert">{{ 'admin.deleg.error' | t }}</p>
     } @else {
       <ng-template #rows let-list>
-        <ul class="rowgroup dl__list">
-          @for (d of list; track d.id) {
-            <li class="dl__row">
-              <span class="dl__meeting">
-                <a class="dl__title" [routerLink]="['/meetings', d.meetingId]">{{
-                  d.meetingTitle || ('admin.deleg.meeting' | t)
-                }}</a>
-                @if (d.meetingDate) {
-                  <span class="dl__date">{{ d.meetingDate | ldate: 'mediumDate' }}</span>
-                }
-              </span>
-              <span class="dl__who">
-                <span class="dl__person">{{ who(d, 'from') }}</span>
-                <app-icon class="dl__arrow" name="arrow" [size]="16" />
-                <span class="sr-only">{{ 'admin.deleg.to' | t }}</span>
-                <span class="dl__person">{{ who(d, 'to') }}</span>
-              </span>
-              <span class="dl__tags">
-                @if (d.delegateVoting) {
-                  <span class="dl__tag dl__tag--vote">{{ 'admin.deleg.votingTag' | t }}</span>
-                }
-                @if (d.viaPool) {
-                  <span class="dl__tag">{{ 'admin.deleg.poolTag' | t }}</span>
-                }
-              </span>
-              <span class="dl__act">
-                <app-button
-                  variant="danger"
-                  size="sm"
-                  [ariaLabel]="
-                    ('admin.deleg.revoke' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')
-                  "
-                  (click)="askRevoke(d)"
-                  >{{ 'admin.deleg.revoke' | t }}</app-button
-                >
-              </span>
-            </li>
-          } @empty {
-            <li class="dl__empty">{{ 'admin.deleg.none' | t }}</li>
-          }
-        </ul>
+        @if (list.length) {
+          <ul class="rowgroup dl__list">
+            @for (d of list; track d.id) {
+              <li class="dl__row">
+                <span class="dl__meeting">
+                  <a class="dl__title" [routerLink]="['/meetings', d.meetingId]">{{
+                    d.meetingTitle || ('admin.deleg.meeting' | t)
+                  }}</a>
+                  @if (d.meetingDate) {
+                    <span class="dl__date">{{ d.meetingDate | ldate: 'mediumDate' }}</span>
+                  }
+                </span>
+                <span class="dl__who">
+                  <span class="dl__person">{{ who(d, 'from') }}</span>
+                  <app-icon class="dl__arrow" name="arrow" [size]="16" />
+                  <span class="sr-only">{{ 'admin.deleg.to' | t }}</span>
+                  <span class="dl__person">{{ who(d, 'to') }}</span>
+                </span>
+                <span class="dl__tags">
+                  @if (d.delegateVoting) {
+                    <span class="dl__tag dl__tag--vote">{{ 'admin.deleg.votingTag' | t }}</span>
+                  }
+                  @if (d.viaPool) {
+                    <span class="dl__tag">{{ 'admin.deleg.poolTag' | t }}</span>
+                  }
+                </span>
+                <span class="dl__act">
+                  <app-button
+                    variant="danger"
+                    size="sm"
+                    [ariaLabel]="
+                      ('admin.deleg.revoke' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')
+                    "
+                    (click)="askRevoke(d)"
+                    >{{ 'admin.deleg.revoke' | t }}</app-button
+                  >
+                </span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <app-empty-state rows="3" [heading]="'admin.deleg.none' | t" />
+        }
       </ng-template>
 
       <ng-container *ngTemplateOutlet="rows; context: { $implicit: active() }" />

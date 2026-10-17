@@ -3,6 +3,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import type { TransitionListRow, TransitionLists } from './flow-editor.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Incoming and outgoing transitions of the selected state, under the state settings in
@@ -12,7 +13,7 @@ import type { TransitionListRow, TransitionLists } from './flow-editor.models';
   selector: 'app-transition-lists',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, IconComponent],
+  imports: [EmptyStateComponent, TranslatePipe, IconComponent],
   templateUrl: './transition-lists.component.html',
   styleUrl: './transition-lists.component.scss',
 })

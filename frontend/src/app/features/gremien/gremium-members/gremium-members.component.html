@@ -53,10 +53,10 @@
   </div>
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <p class="gmb__status">{{ 'gremien.members.noMatch' | t }}</p>
+    <app-empty-state rows="3" [heading]="'gremien.members.noMatch' | t" />
   } @else {
     <app-empty-state
-      icon="users"
+      rows="3"
       [heading]="(former() ? 'gremien.members.emptyFormer' : 'gremien.members.empty') | t"
     />
   }

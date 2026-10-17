@@ -109,7 +109,7 @@
             />
           </div>
         } @else if (!items().length) {
-          <app-empty-state icon="search" [heading]="'invoices.empty' | t">
+          <app-empty-state [heading]="'invoices.empty' | t">
             @if (activeFilterCount() > 0) {
               <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
             }
@@ -220,7 +220,6 @@
           <div class="inv__none">
             <app-empty-state
               [fill]="true"
-              icon="search"
               [heading]="'invoices.notFound' | t"
               [body]="'invoices.notFoundBody' | t"
             />
@@ -241,7 +240,7 @@
               </div>
             } @else {
               <div class="inv__none">
-                <app-empty-state [fill]="true" icon="receipt" [heading]="'invoices.none' | t" />
+                <app-empty-state [fill]="true" [heading]="'invoices.none' | t" />
               </div>
             }
           }

@@ -48,7 +48,7 @@
       }
 
       @if (empty()) {
-        <p class="ur__muted">{{ 'admin.users.revoke.nothing' | t }}</p>
+        <app-empty-state rows="3" [heading]="'admin.users.revoke.nothing' | t" />
       }
 
       @if (p.gremien.length) {

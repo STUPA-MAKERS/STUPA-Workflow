@@ -53,6 +53,7 @@ import {
   normalizeFormField,
   validateFormField,
 } from '../form-field.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -96,6 +97,7 @@ type QPos = QuestionPos;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

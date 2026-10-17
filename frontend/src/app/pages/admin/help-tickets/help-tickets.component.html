@@ -141,7 +141,7 @@
             }
           </ul>
         } @else {
-          <p class="ht__empty">{{ 'admin.helpTickets.blockedEmpty' | t }}</p>
+          <app-empty-state rows="3" [heading]="'admin.helpTickets.blockedEmpty' | t" />
         }
       } @else {
         <!-- One row of the list: the sender, the quiet line, "Entsperren". -->

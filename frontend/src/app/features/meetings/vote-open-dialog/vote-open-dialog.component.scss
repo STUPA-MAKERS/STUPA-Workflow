@@ -119,13 +119,9 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-.vod__empty,
 .vod__warn {
   margin: 0;
   font-size: var(--fs-small);
-  color: var(--color-text-muted);
-}
-.vod__warn {
   color: var(--color-warning);
 }
 .vod__free {

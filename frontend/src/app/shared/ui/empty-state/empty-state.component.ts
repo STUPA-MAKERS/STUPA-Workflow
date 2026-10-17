@@ -1,25 +1,31 @@
-import { booleanAttribute, ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { booleanAttribute, ChangeDetectionStrategy, Component, computed, input, numberAttribute } from '@angular/core';
+
+/** Bar widths in percent of the ghost rows, title and sub line. Uneven, so they read as text. */
+const GHOST_ROWS: readonly { title: number; sub: number }[] = [
+  { title: 62, sub: 34 },
+  { title: 48, sub: 28 },
+  { title: 70, sub: 40 },
+  { title: 52, sub: 30 },
+  { title: 44, sub: 26 },
+];
 
 /**
  * One shape for "there is nothing here".
  *
- * It covers both cases the platform has: a page that cannot show what was asked for
- * (a missing application, a 404) and a list that is legitimately empty. One component for
- * both, so the two do not drift into looking like different kinds of answer.
+ * Faint ghost rows in the shape of list rows stand for the list that is missing, and over
+ * them sit the message and, if the caller projects one, one way on (a tonal button). The
+ * same shape serves an empty list, a search without a match, a missing record (`code`) and
+ * a page the reader has no access to, so they do not drift into looking like different
+ * kinds of answer. It is the "Geister-Zeilen" state of the "TOP hinzufügen" dialog.
  *
- * The action is projected, so the caller decides whether there is a way forward and what
- * it is.
- *
- * Set `fill` when the empty state is the whole page. The host then takes the free height
- * of its flex-column parent and centres the content vertically in it. Do not set it in a
- * card or a list row: there the empty state stays at the top, where the reader looks.
+ * Set `fill` when the empty state is the whole page or pane. The host then takes the free
+ * height of its flex-column parent and centres the block in it vertically. Without it, the
+ * block keeps its own height, for a card, a tab or a dialog.
  */
 @Component({
   selector: 'app-empty-state',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent],
   templateUrl: './empty-state.component.html',
   styleUrl: './empty-state.component.scss',
   host: { '[class.es-host--fill]': 'fill()' },
@@ -27,17 +33,19 @@ import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 export class EmptyStateComponent {
   /** Short statement of what is missing. Never an error code on its own. */
   readonly heading = input.required<string>();
-  /** One sentence of context: why the reader is here and what to do next. */
+  /** One short line of context, only where the heading alone leaves the reader stuck. */
   readonly body = input<string | null>(null);
-  /** Large muted glyph above the heading. */
-  readonly icon = input<IconName>('document');
-  /** Glyph size in px. A block-level empty state (a card, a tab) passes a smaller one. */
-  readonly iconSize = input(32);
   /** Displayed above the heading, for a code such as 404. */
   readonly code = input<string | null>(null);
+  /** Number of ghost rows, 1 to 5. A small box (a dashboard tile) passes fewer. */
+  readonly rows = input(5, { transform: numberAttribute });
   /**
    * Fill the free height of the parent and centre in it. The parent must be a flex
    * column that has that height.
    */
   readonly fill = input(false, { transform: booleanAttribute });
+
+  protected readonly ghosts = computed(() =>
+    GHOST_ROWS.slice(0, Math.min(GHOST_ROWS.length, Math.max(1, this.rows() || 1))),
+  );
 }

@@ -262,38 +262,6 @@
 .dash__emptyGrid--two {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
 }
-.dash__emptyBox {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-2);
-}
-/* The empty state of a block, not of a page: a smaller heading and less air. */
-.dash__emptyBox ::ng-deep .es {
-  padding: var(--space-6) var(--space-5);
-}
-/* A 48px circle. The glyph (22px, set by `iconSize`) sits in its center. */
-.dash__emptyBox ::ng-deep .es__icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text-muted);
-}
-.dash__emptyBox ::ng-deep .es__heading {
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-}
-.dash__emptyBox ::ng-deep .es__body {
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-}
-
 .dash__apply {
   display: flex;
   flex-direction: column;
@@ -596,8 +564,4 @@
 :host(.dash--phone) .dash__all {
   align-self: flex-end;
   margin-inline-end: -4px;
-}
-/* Phone: the empty states are compact, so the next block stays in view. */
-:host(.dash--phone) .dash__emptyBox ::ng-deep .es {
-  padding: var(--space-5) var(--space-4);
 }

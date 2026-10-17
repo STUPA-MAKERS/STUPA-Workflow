@@ -53,6 +53,7 @@ import {
 } from '../../../features/todos/todos.util';
 import { BOARD_ICON } from '../board-picker/todo-board-picker.component';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The ids of the collapsed rows, per browser ("Meine To-Dos" and "Alle" share them). */
 export const COLLAPSED_KEY = 'ap.todos.rows.collapsed';
@@ -212,6 +213,7 @@ function writeCollapsed(ids: ReadonlySet<Uuid>): void {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     CdkDrag,
     CdkDropList,
     CdkScrollable,

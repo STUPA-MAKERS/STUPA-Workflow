@@ -436,7 +436,6 @@
           <div class="exp__none">
             <app-empty-state
               [fill]="true"
-              icon="search"
               [heading]="'expenses.notFound' | t"
               [body]="'expenses.notFoundBody' | t"
             />
@@ -459,7 +458,6 @@
               <div class="exp__none">
                 <app-empty-state
                   [fill]="true"
-                  [icon]="tab() === 'transfers' ? 'repeat' : 'swap'"
                   [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
                 />
               </div>
@@ -472,7 +470,7 @@
 </div>
 
 <ng-template #emptyList let-key>
-  <app-empty-state icon="search" [heading]="key | t">
+  <app-empty-state [heading]="key | t">
     @if (activeFilterCount() > 0) {
       <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
     }

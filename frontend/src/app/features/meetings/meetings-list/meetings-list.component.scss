@@ -129,14 +129,11 @@ app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
   color: var(--color-text-muted);
 }
 
-.mtl__status {
-  margin: 0;
-  padding: var(--space-2) var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 .mtl__empty {
   margin-block: var(--space-6);
+}
+.mtl__upcoming {
+  margin-block: var(--space-3);
 }
 .mtl__more {
   display: flex;
@@ -195,9 +192,10 @@ app-page-header app-button ::ng-deep .btn:not(.btn--icon) app-icon {
 }
 /* The empty sheet side by side: the same sheet as an open meeting, so nothing jumps. */
 .mtl__none {
-  display: grid;
+  display: flex;
   flex: 1 1 auto;
-  place-items: center;
+  flex-direction: column;
+  padding: var(--space-4);
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }

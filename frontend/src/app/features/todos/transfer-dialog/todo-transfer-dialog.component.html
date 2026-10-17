@@ -5,7 +5,7 @@
   (closed)="cancel()"
 >
   @if (none()) {
-    <p class="tt__empty">{{ 'todos.transfer.none' | t }}</p>
+    <app-empty-state rows="3" [heading]="'todos.transfer.none' | t" />
   } @else if (unloadable()) {
     <p class="tt__error" role="alert">{{ 'todos.error.transfer' | t }}</p>
   } @else {

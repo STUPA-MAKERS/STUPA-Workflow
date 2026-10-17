@@ -41,13 +41,15 @@
           [disabled]="!othersOpen()"
         />
       </label>
-      <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'participant.delegation.others' | t">
-        @for (r of others(); track r.principalId) {
-          <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: r, off: !othersOpen() }" />
-        } @empty {
-          <p class="dd__empty">{{ 'participant.delegation.noMember' | t }}</p>
-        }
-      </div>
+      @if (others().length) {
+        <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'participant.delegation.others' | t">
+          @for (r of others(); track r.principalId) {
+            <ng-container [ngTemplateOutlet]="row" [ngTemplateOutletContext]="{ $implicit: r, off: !othersOpen() }" />
+          }
+        </div>
+      } @else {
+        <app-empty-state rows="3" [heading]="'participant.delegation.noMember' | t" />
+      }
     </section>
 
     @if (c.votingDelegationEnabled) {

@@ -37,6 +37,7 @@ import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { AdminApiService } from '../admin/admin-api.service';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
@@ -107,6 +108,7 @@ const MAX_CUTOFF_DAY = 28;
     CurrencyInputComponent,
     DataTableComponent,
     DialogComponent,
+    EmptyStateComponent,
     FilterSelectComponent,
     IconComponent,
     InputComponent,
