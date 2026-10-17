@@ -24,7 +24,7 @@
        wrong cause here, so this branch names the fiscal year and links the page that
        creates one. -->
   <div class="bd__empty">
-    <app-empty-state
+    <app-empty-state plain icon="cal"
       fill
       [heading]="'budget.empty.noFiscalYear.title' | t"
       [body]="'budget.empty.noFiscalYear.body' | t"
@@ -39,7 +39,7 @@
 } @else if (emptyReason()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <div class="bd__empty">
-    <app-empty-state fill [heading]="'budget.empty.title' | t" [body]="'budget.empty.body' | t" />
+    <app-empty-state plain icon="pie" fill [heading]="'budget.empty.title' | t" [body]="'budget.empty.body' | t" />
   </div>
 } @else {
   <div class="bd" [class.bd--wide]="wide()">

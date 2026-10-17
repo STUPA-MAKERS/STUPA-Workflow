@@ -114,13 +114,13 @@
   <!-- An empty list: the shared empty state with one way on. -->
   <ng-template #empty>
     @if (emptyCase() === 'noMatch') {
-      <app-empty-state
+      <app-empty-state shape="choice"
         [heading]="(kind() === 'todo' ? 'meetings.agenda.noTodoMatch' : 'meetings.agenda.noMatch') | t: { q: activeQuery() }"
       >
         <app-button variant="tonal" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
       </app-empty-state>
     } @else {
-      <app-empty-state
+      <app-empty-state shape="choice"
         [heading]="(kind() === 'todo' ? 'meetings.agenda.noTodos' : 'meetings.agenda.noAssignable') | t"
       >
         <app-button variant="tonal" size="sm" (click)="asFreetext()">{{ 'meetings.agenda.asFreetext' | t }}</app-button>

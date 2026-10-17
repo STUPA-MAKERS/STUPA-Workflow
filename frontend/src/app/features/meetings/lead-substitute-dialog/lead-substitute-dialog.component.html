@@ -52,7 +52,7 @@
           }
         </div>
       } @else {
-        <app-empty-state
+        <app-empty-state shape="person"
           rows="3"
           [heading]="(query() ? 'participant.delegation.noMember' : 'meetings.leadSubstitute.empty') | t: { name: memberName() }"
         />

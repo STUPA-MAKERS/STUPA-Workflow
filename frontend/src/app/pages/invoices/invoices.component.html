@@ -218,7 +218,7 @@
         }
         @case ('missing') {
           <div class="inv__none">
-            <app-empty-state
+            <app-empty-state plain icon="search"
               [fill]="true"
               [heading]="'invoices.notFound' | t"
               [body]="'invoices.notFoundBody' | t"
@@ -240,7 +240,7 @@
               </div>
             } @else {
               <div class="inv__none">
-                <app-empty-state [fill]="true" [heading]="'invoices.none' | t" />
+                <app-empty-state plain icon="receipt" [fill]="true" [heading]="'invoices.none' | t" />
               </div>
             }
           }

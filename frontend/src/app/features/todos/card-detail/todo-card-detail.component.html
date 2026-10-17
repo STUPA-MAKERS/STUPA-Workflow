@@ -48,7 +48,7 @@
   </article>
 } @else if (notFound()) {
   <div class="cd cd--state">
-    <app-empty-state class="cd__none" [heading]="'todos.card.notFound' | t">
+    <app-empty-state plain icon="circleok" class="cd__none" [heading]="'todos.card.notFound' | t">
       @if (mode() === 'drawer') {
         <app-button variant="tonal" size="sm" (click)="closed.emit()">{{ 'todos.card.back' | t }}</app-button>
       }

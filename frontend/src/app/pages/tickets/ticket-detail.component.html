@@ -47,7 +47,7 @@
   </article>
 } @else if (notFound()) {
   <div class="td">
-    <app-empty-state fill [heading]="'tickets.detail.notFound' | t">
+    <app-empty-state plain icon="ticket" fill [heading]="'tickets.detail.notFound' | t">
       <a routerLink="/tickets" queryParamsHandling="preserve" class="td__backLink">{{ 'tickets.detail.backToList' | t }}</a>
     </app-empty-state>
   </div>

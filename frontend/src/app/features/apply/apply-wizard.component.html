@@ -46,7 +46,7 @@
             }
           </div>
         } @else {
-          <app-empty-state rows="3" [heading]="'apply.type.empty' | t" />
+          <app-empty-state shape="choice" rows="3" [heading]="'apply.type.empty' | t" />
         }
         @if (loadingForm()) {
           <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />

@@ -76,7 +76,7 @@
         @if (!data()?.agenda) {
           <p class="ms__note ms__note--error" role="alert">{{ 'meetings.overview.agendaError' | t }}</p>
         } @else if (!agendaRows().length) {
-          <app-empty-state rows="3" [heading]="'meetings.overview.agendaEmpty' | t" />
+          <app-empty-state shape="agenda" rows="3" [heading]="'meetings.overview.agendaEmpty' | t" />
         } @else {
           <ol class="ms__tops rowgroup">
             @for (row of agendaRows(); track row.item.id) {

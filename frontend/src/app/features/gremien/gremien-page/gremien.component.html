@@ -75,10 +75,9 @@
           </div>
         } @else if (!mine().length && !others().length) {
           @if (query().trim()) {
-            <app-empty-state class="grl__empty" [heading]="'gremien.list.noMatch' | t" />
+            <app-empty-state [heading]="'gremien.list.noMatch' | t" />
           } @else {
             <app-empty-state
-              class="grl__empty"
               [heading]="'gremien.list.empty' | t"
               [body]="'gremien.list.emptyBody' | t"
             />
