@@ -1,14 +1,18 @@
 import {
+  afterNextRender,
   ChangeDetectionStrategy,
   Component,
   computed,
   effect,
+  ElementRef,
   inject,
+  Injector,
   input,
   output,
   signal,
   untracked,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
@@ -20,7 +24,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
   ButtonComponent,
   DialogComponent,
@@ -38,6 +41,21 @@ import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** What the new agenda item is: an application of the Gremium, a to-do, or a free text. */
 export type AgendaItemKind = 'application' | 'todo' | 'freetext';
+
+/**
+ * The empty list of the area: `none` when the kind has nothing to offer at all, `noMatch`
+ * when the search hides every row.
+ */
+export type AgendaEmptyCase = 'none' | 'noMatch';
+
+/** The widths of the title and the sub bar of the ghost rows of the empty state, in %. */
+const GHOST_ROWS: readonly { title: number; sub: number }[] = [
+  { title: 62, sub: 34 },
+  { title: 48, sub: 28 },
+  { title: 70, sub: 40 },
+  { title: 52, sub: 30 },
+  { title: 44, sub: 26 },
+];
 
 /** An open card of the gremium board, as a row of the to-do list. */
 export interface AgendaTodoOption {
@@ -68,6 +86,7 @@ export interface AgendaTodoOption {
     TruncatedDirective,
     ScrollFadeDirective,
     FormsModule,
+    NgTemplateOutlet,
     TranslatePipe,
     DialogComponent,
     ButtonComponent,
@@ -77,7 +96,6 @@ export interface AgendaTodoOption {
     SwitchComponent,
     SearchPillComponent,
     SkeletonComponent,
-    StatusTextComponent,
   ],
   templateUrl: './agenda-item-dialog.component.html',
   styleUrl: './agenda-item-dialog.component.scss',
@@ -88,6 +106,11 @@ export class AgendaItemDialogComponent {
   private readonly toast = inject(ToastService);
   private readonly todosApi = inject(TodosApiService);
   private readonly auth = inject(AuthService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
+
+  /** The ghost rows behind the message of an empty list. */
+  readonly ghostRows = GHOST_ROWS;
 
   readonly open = input(false);
   readonly meeting = input.required<Meeting>();
@@ -156,6 +179,20 @@ export class AgendaItemDialogComponent {
   readonly visiblePick = computed<Uuid | null>(() => {
     const pick = this.pick();
     return pick !== null && this.shown().some((a) => a.applicationId === pick) ? pick : null;
+  });
+
+  /** The search text of the current kind, trimmed. */
+  readonly activeQuery = computed(() =>
+    (this.kind() === 'todo' ? this.todoQuery() : this.query()).trim(),
+  );
+
+  /**
+   * Why the list of the current kind is empty. A kind without any row is `none` also
+   * while a search text is set, because clearing the search would show nothing either.
+   */
+  readonly emptyCase = computed<AgendaEmptyCase>(() => {
+    const all = this.kind() === 'todo' ? (this.todos() ?? []).length : this.assignable().length;
+    return all && this.activeQuery() ? 'noMatch' : 'none';
   });
 
   readonly valid = computed(() => {
@@ -251,13 +288,49 @@ export class AgendaItemDialogComponent {
   }
 
   /**
-   * The flow state of an assignable application, as neutral status text. The board
-   * shows it in the accent, but the accent means "done" or "live" (see
+   * The flow state of an assignable application, as the muted second line of its row.
+   * The board shows it in the accent, but the accent means "done" or "live" (see
    * `status-kind.util.ts`), and an application that waits for its agenda item is
-   * neither. The list also has no state colour to map with `flowColorKind`.
+   * neither.
    */
   stateOf(a: AssignableApplication): string {
     return resolveI18n(a.stateLabel, this.i18n.locale());
+  }
+
+  /**
+   * A click on the "Nicht öffentlich" row outside its label and its switch toggles the
+   * switch, so the whole row is the target. The label and the switch toggle it
+   * themselves, so a click on them is left alone.
+   */
+  toggleFromRow(event: MouseEvent): void {
+    if ((event.target as HTMLElement).closest('label, button')) return;
+    this.nonPublic.update((on) => !on);
+  }
+
+  /** "Filter zurücksetzen": clears the search of the current kind. */
+  clearSearch(): void {
+    if (this.kind() === 'todo') this.todoQuery.set('');
+    else this.query.set('');
+    this.focusAfterRender('.aid__area input');
+  }
+
+  /**
+   * "Als Freitext anlegen": switches to a free-text item. A search text becomes the
+   * title, so nothing that was typed is lost.
+   */
+  asFreetext(): void {
+    const q = this.activeQuery();
+    this.kind.set('freetext');
+    if (q) this.freetext.set(q);
+    this.focusAfterRender('#aid-title');
+  }
+
+  /** The button that had the focus is gone after the change, so the focus moves on. */
+  private focusAfterRender(selector: string): void {
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>(selector)?.focus(),
+      { injector: this.injector },
+    );
   }
 
   cancel(): void {

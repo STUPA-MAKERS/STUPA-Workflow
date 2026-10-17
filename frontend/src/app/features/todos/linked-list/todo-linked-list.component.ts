@@ -35,6 +35,12 @@ export class TodoLinkedListComponent {
   /** The id of the heading, unique on the page. */
   readonly headingId = input('todo-linked');
 
+  /**
+   * Show the "To-Dos" heading. The TOP sheet leaves it out, because there the list stands
+   * under the TOP title; the section keeps the name for the screen reader.
+   */
+  readonly showTitle = input(true);
+
   readonly cards = signal<TodoLinkedCard[]>([]);
   private seq = 0;
 

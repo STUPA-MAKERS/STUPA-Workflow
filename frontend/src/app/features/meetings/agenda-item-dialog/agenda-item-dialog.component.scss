@@ -1,117 +1,107 @@
+@use 'breakpoints' as bp;
 @use '../dialog-form' as df;
 @use '../scroll-fade' as fade;
 
 @include df.host;
 
+/* Wider than the shared `md` size (35rem), so a long application title has room. */
+@include bp.not-phone {
+  :host ::ng-deep .dialog {
+    max-width: 40rem;
+  }
+}
+
+/* Every block of the body shares the same left and right edges: no block pads itself. */
 .aid {
   @include df.form;
 }
 .aid__switchLabel {
   @include df.switch-label;
 }
+
+/* The kind: the full width of the body, the segments share it in equal parts. */
 .aid__kind {
-  align-self: flex-start;
-  max-width: 100%;
+  width: 100%;
 }
 
-.aid__group {
+/* The area between the kind and the switch row: the search and the list
+   (or the empty state, the loading rows or the title field). On a desktop it has one
+   height for every kind and every state, so the dialog keeps its height from the opening
+   to the close: the list scrolls inside it. The height follows the viewport, so the
+   dialog is about three quarters of a 900px screen and still fits a 720px one. On a phone
+   the area takes the height of its content. */
+.aid__area {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+  height: clamp(14rem, calc(78dvh - 21rem), 26rem);
 }
-.aid__cap {
-  padding: 0 4px;
-}
-.aid__hint {
-  @include df.hint;
-  padding: 0 4px;
+@include bp.phone {
+  .aid__area {
+    height: auto;
+  }
+  .aid__list {
+    max-height: 22rem;
+  }
 }
 
-/* The applications: one row per application on surface 3, the chosen one selected. */
+
+/* The rest of the area below the search: the list, the loading rows or the empty state. */
+.aid__slot {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* The list scrolls inside the area, with the shared fade at an end with more content. */
 .aid__list {
   display: flex;
+  flex: 0 1 auto;
   flex-direction: column;
   gap: 2px;
-  max-height: 16rem;
+  min-height: 0;
   overflow-y: auto;
-}
-.aid__row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-width: 0;
-  padding: 12px 14px;
-  border-radius: 4px;
-  background: var(--color-surface-3);
-  cursor: pointer;
-}
-.aid__row:first-child {
-  border-top-left-radius: var(--radius-lg);
-  border-top-right-radius: var(--radius-lg);
-}
-.aid__row:last-child {
-  border-bottom-left-radius: var(--radius-lg);
-  border-bottom-right-radius: var(--radius-lg);
-}
-.aid__row--on {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.aid__row--on app-status-text {
-  color: inherit;
-}
-.aid__radio {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--color-accent);
-}
-.aid__radio:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.aid__title {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-weight: var(--fw-medium);
-}
-
-/* The shared top and bottom fade: an end fades only while more content lies past it. */
-.aid__list {
   @include fade.fade-y(var(--space-5));
 }
 
-/* A to-do: a ring that fills with a check when picked, the title over its column and due
-   date. The radio stays for the keyboard and the screen reader; the ring shows the pick. */
-.aid__row--todo {
+/* A row: a ring that fills with a check when picked, the title over a muted line (the
+   state of an application, the column and due date of a to-do). The radio stays for the
+   keyboard and the screen reader; the ring shows the pick. */
+.aid__row {
   position: relative;
-  padding-block: 6px;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  min-height: 52px;
+  padding: 6px 14px;
   border-radius: var(--radius-lg);
-  background: transparent;
+  cursor: pointer;
 }
-.aid__row--todo:hover {
+.aid__row:hover {
   background: var(--color-surface-2);
 }
-.aid__row--todo.aid__row--on {
+.aid__row--on,
+.aid__row--on:hover {
   background: var(--color-selected);
+  color: var(--color-on-selected);
 }
-.aid__list:has(.aid__row--todo) {
-  max-height: 22rem;
-}
-.aid__cap--todo {
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
-}
-.aid__radio--hidden {
-  position: absolute;
-  inset-inline-start: 14px;
-  opacity: 0;
-}
-.aid__row--todo:has(.aid__radio:focus-visible) {
+.aid__row:has(.aid__radio:focus-visible) {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
+}
+.aid__radio {
+  position: absolute;
+  inset-inline-start: 14px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  opacity: 0;
 }
 .aid__mark {
   flex: none;
@@ -126,10 +116,100 @@
   flex-direction: column;
   min-width: 0;
 }
+.aid__title {
+  min-width: 0;
+  font-weight: var(--fw-medium);
+}
 .aid__sub {
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
 .aid__row--on .aid__sub {
   color: inherit;
+}
+
+/* An empty list: five ghost rows in the geometry of the list rows, faint and hidden from
+   the screen reader, and over them the message with one button on a radial scrim of the
+   dialog surface. The scrim keeps the message legible over the rows. Nothing moves. */
+.aid__empty {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+.aid__ghosts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  opacity: 0.35;
+}
+.aid__ghost {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 6px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.aid__ghostMark {
+  flex: none;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+}
+.aid__ghostText {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.aid__ghostBar {
+  display: block;
+  height: 10px;
+  border-radius: 6px;
+  background: var(--color-surface-4);
+}
+.aid__ghostBar--sub {
+  height: 8px;
+  background: var(--color-surface-3);
+}
+.aid__emptyMsg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: var(--space-4);
+  text-align: center;
+  background: radial-gradient(
+    closest-side,
+    color-mix(in srgb, var(--color-bg-elevated) 96%, transparent),
+    color-mix(in srgb, var(--color-bg-elevated) 55%, transparent)
+  );
+}
+.aid__emptyText {
+  margin: 0;
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.5rem;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+
+/* "Nicht öffentlich": one settings row on surface 3, label left, switch right. The whole
+   row toggles the switch (`toggleFromRow`). */
+.aid__np {
+  justify-content: center;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3) var(--space-2) 14px;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-3);
+  cursor: pointer;
 }

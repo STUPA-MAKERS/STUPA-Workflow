@@ -2,14 +2,11 @@
 // delete). Emulated encapsulation scopes styles per component, so each dialog
 // component includes these mixins in its own stylesheet.
 
-// The host of a dialog component. It adds no box, and a closed dialog takes no gap in a
-// flex column of the page.
+// The host of a dialog component. It adds no box, so the dialog takes no gap in a flex
+// column of the page (`app-dialog` itself adds no box either).
 @mixin host {
   :host {
     display: contents;
-  }
-  app-dialog:empty {
-    display: none;
   }
 }
 
