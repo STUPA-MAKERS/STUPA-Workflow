@@ -898,6 +898,44 @@ describe('TicketDetailComponent', () => {
     }
   });
 
+  it('opens a link to a note in the log and scrolls the note into view', async () => {
+    const proto = Element.prototype as { scrollIntoView?: unknown };
+    const before = proto.scrollIntoView;
+    const scroll = jest.fn();
+    proto.scrollIntoView = scroll;
+    try {
+      const { cmp, harness } = await start('/tickets/t40#note-n1');
+      harness.detectChanges();
+      await harness.fixture.whenStable();
+      expect(cmp.tab()).toBe('log');
+      expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+    } finally {
+      proto.scrollIntoView = before;
+    }
+  });
+
+  it('leaves the log at its end for a link to a note that is gone', async () => {
+    const proto = Element.prototype as { scrollIntoView?: unknown };
+    const before = proto.scrollIntoView;
+    const scroll = jest.fn();
+    proto.scrollIntoView = scroll;
+    try {
+      const { harness } = await start('/tickets/t40#note-gone');
+      await harness.fixture.whenStable();
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      proto.scrollIntoView = before;
+    }
+  });
+
+  it('offers the staff the ticket team after "@", and the reporter nobody', async () => {
+    const { cmp } = await start();
+    expect(cmp.mentionables().map((p: { displayName: string }) => p.displayName)).toEqual(
+      expect.arrayContaining([MARA.displayName, JONAS.displayName]),
+    );
+    expect(cmp.mentionables()).toHaveLength(2);
+  });
+
   it('sends, edits and deletes notes, and never the report', async () => {
     const { cmp, api, toast } = await start();
     cmp.sendNote({ body: 'Fix ist offen.' });

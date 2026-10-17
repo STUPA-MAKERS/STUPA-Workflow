@@ -102,6 +102,8 @@ import {
 
 type DetailTab = 'log' | 'details';
 
+/** The fragment of a link to one note: `#note-<id>`. */
+const NOTE_FRAGMENT = /^note-(.+)$/;
 /**
  * The scan state of a report file: the three-state `scanState` of the server, so that
  * a file with a finding shows as quarantined and not as a link. `scanned` alone only
@@ -553,6 +555,24 @@ export class TicketDetailComponent {
   private show(t: TicketDetail): void {
     this.ticket.set(t);
     this.notes.set(t.notes);
+    this.showLinkedNote();
+  }
+
+  /**
+   * A link to a note (`#note-<id>`, the mention mail) opens the log and scrolls the note
+   * into view once the thread rendered. A note that is gone leaves the log at its end.
+   */
+  private showLinkedNote(): void {
+    const id = NOTE_FRAGMENT.exec(this.route.snapshot.fragment ?? '')?.[1];
+    if (!id || !this.notes().some((n) => n.id === id)) return;
+    this.tab.set('log');
+    afterNextRender(
+      () => {
+        const el = document.querySelector(`[data-msg-id="${CSS.escape(id)}"]`);
+        el?.scrollIntoView?.({ block: 'center' });
+      },
+      { injector: this.injector },
+    );
   }
 
   loadTodos(): void {
