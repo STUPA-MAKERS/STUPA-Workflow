@@ -523,8 +523,8 @@ class _GremiumRolesFake:
 
 
 class _SiteFake:
-    async def manifest(self) -> dict[str, Any]:
-        return {"name": "Antrag", "short_name": "A", "icons": []}
+    async def manifest(self, scheme: str = "light") -> dict[str, Any]:
+        return {"name": "Antrag", "short_name": "A", "icons": [], "scheme": scheme}
 
     async def get(self) -> SiteConfigOut:
         return SiteConfigOut(
@@ -623,6 +623,9 @@ def test_admin_manifest_webmanifest(
     assert r.headers["content-type"].startswith("application/manifest+json")
     assert r.headers["cache-control"] == "public, max-age=300"
     assert r.json()["name"] == "Antrag"
+    assert r.json()["scheme"] == "light"
+    assert client.get("/api/manifest.webmanifest?scheme=dark").json()["scheme"] == "dark"
+    assert client.get("/api/manifest.webmanifest?scheme=blue").status_code == 422
 
 
 # app.modules.applications.router: factory, senders, list_tasks, form and erasure
