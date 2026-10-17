@@ -388,8 +388,19 @@ async def test_votes_gremien_invoices_and_bookings_as_link_targets(
         await session.delete(await session.get(Vote, ids["vote"]))
         await session.commit()
     api.login(booker)
-    with TestClient(api.app) as client:
-        kinds = {
-            link["kind"] for link in _ok(client.get(f"/api/todos/cards/{card['id']}"))["links"]
-        }
-        assert kinds == {"gremium", "invoice", "expense"}
+    try:
+        with TestClient(api.app) as client:
+            kinds = {
+                link["kind"] for link in _ok(client.get(f"/api/todos/cards/{card['id']}"))["links"]
+            }
+            assert kinds == {"gremium", "invoice", "expense"}
+    finally:
+        # The budget rows are no part of the to-do cleanup; other tests count invoices.
+        async with maker() as session:
+            await session.delete(await session.get(BudgetExpense, ids["expense"]))
+            await session.delete(await session.get(Invoice, ids["invoice"]))
+            await session.flush()
+            await session.delete(await session.get(FiscalYear, fy.id))
+            await session.flush()
+            await session.delete(await session.get(Budget, node.id))
+            await session.commit()
