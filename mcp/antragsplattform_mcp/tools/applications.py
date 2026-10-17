@@ -186,13 +186,14 @@ async def delete_application(application_id: str) -> dict:
 async def comment_application(
     application_id: str,
     body: str = "",
-    visibility: Literal["public", "internal"] = "public",
+    visibility: Literal["public", "internal"] | None = None,
     file_paths: list[str] | None = None,
     mentions: list[str] | None = None,
 ) -> dict:
     """Add a comment to an application, optionally with files and mentions.
 
-    An `internal` comment and its files stay hidden from the applicant. Each file in
+    An `internal` comment and its files stay hidden from the applicant. Without a
+    `visibility`, a comment with `mentions` is `internal` and any other is `public`. Each file in
     `file_paths` (a local path on the machine of the MCP server, at most 5 per comment)
     goes up as a draft through `POST /apply/attachments`; the comment then binds the
     drafts. Allowed types and the 10 MB cap are those of `upload_attachment`. A comment
@@ -207,9 +208,11 @@ async def comment_application(
         file_paths: Local files to attach.
         mentions: Principal ids of the mentioned members (`GET
             /applications/{id}/mentionable`: the persons who read the internal
-            comments); they get a mail. Another id gives 422 `mention_not_member`.
+            comments); they get a mail. Another id, or a mention in a `public`
+            comment (the applicant reads its body), gives 422 `mention_not_member`.
     """
-    payload: dict[str, object] = {"body": body, "visibility": visibility}
+    chosen = visibility or ("internal" if mentions else "public")
+    payload: dict[str, object] = {"body": body, "visibility": chosen}
     if mentions:
         payload["mentions"] = mentions
     return await post_message(f"/applications/{application_id}/comments", payload, file_paths)

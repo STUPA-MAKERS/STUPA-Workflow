@@ -683,6 +683,37 @@ describe('ChatComponent', () => {
       });
     });
 
+    it('keeps a stored mention of a person who left the list while the text names them', async () => {
+      const own = [
+        msg('m', today(9), {
+          own: true,
+          body: '@Otto Alt bitte',
+          mentions: [{ principalId: 'p-9', displayName: 'Otto Alt' }],
+        }),
+      ];
+      const { edit } = await setup({ messages: own, mentionables: people });
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      type(box(), '@Otto Alt bitte prüfen, @Jonas Weber!');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: '@Otto Alt bitte prüfen, @Jonas Weber!',
+        mentions: ['p-9', 'p-1'],
+        restore: expect.any(Function),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      type(box(), 'Ohne Otto');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: 'Ohne Otto',
+        mentions: [],
+        restore: expect.any(Function),
+      });
+    });
+
     it('does nothing when the text box of a pick is gone', async () => {
       const { cmp } = await setup({ mentionables: people });
       cmp.editMentions.update('@jo', 3);

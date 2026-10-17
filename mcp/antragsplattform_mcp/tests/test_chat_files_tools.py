@@ -158,6 +158,12 @@ def test_application_comment_passes_the_mentions(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_application_comment_with_mentions_is_internal_by_default(fake_api: _FakeApi) -> None:
+    asyncio.run(applications.comment_application("app1", "@Anna", mentions=["p1"]))
+    asyncio.run(applications.comment_application("app1", "Hallo"))
+    assert [c[2]["json"]["visibility"] for c in fake_api.calls] == ["internal", "public"]
+
+
 def test_more_than_five_files_sends_nothing(
     fake_api: _FakeApi, pdfs: list[str]
 ) -> None:

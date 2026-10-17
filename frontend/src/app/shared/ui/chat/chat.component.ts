@@ -48,7 +48,13 @@ import {
   type DraftFile,
 } from '../../../features/apply/draft-attachments.service';
 import { ChatDrafts } from './chat-drafts';
-import { type ChatPerson, MentionPicker, highlightMentions, mentionIds } from './chat-mentions';
+import {
+  type ChatPerson,
+  MentionPicker,
+  chatPeople,
+  highlightMentions,
+  mentionIds,
+} from './chat-mentions';
 import type {
   ChatAttachment,
   ChatEdit,
@@ -850,8 +856,13 @@ export class ChatComponent {
     const body = this.editDraft().trim();
     if (id === null || !body) return;
     const msg = this.messages().find((m) => m.id === id);
-    // Without a list the chat knows no names, so the mentions of the message stay.
-    const people = this.editPeople();
+    // Without a list the chat knows no names, so the mentions of the message stay. A
+    // stored mention of a person who left the list stays while the text still names them.
+    const listed = this.editPeople();
+    const known = new Set(listed.map((p) => p.principalId));
+    const people = listed.length
+      ? [...listed, ...chatPeople(msg?.mentions).filter((p) => !known.has(p.principalId))]
+      : listed;
     const picked = this.editMentions.picked();
     this.endEdit();
     if (msg && msg.body !== body) {
