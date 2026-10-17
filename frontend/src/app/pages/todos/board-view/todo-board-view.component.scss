@@ -259,8 +259,11 @@
 /* ------------------------------------------------------------------ phone */
 /* The board fills the free height down to the bottom bar (the page is a pane page on a
    phone too). The pager scrolls sideways, one page per column; each page scrolls down by
-   itself, so a vertical swipe moves the cards and a horizontal one the column. */
+   itself, so a vertical swipe moves the cards and a horizontal one the column.
+   `--bv-gutter` is the side padding of the page (`.page-shell`), which the tab bar and the
+   pager run over. */
 .bv--phone {
+  --bv-gutter: var(--layout-gutter);
   position: relative;
   display: flex;
   flex: 1 1 auto;
@@ -269,12 +272,56 @@
   min-height: 0;
   overflow: visible;
 }
+@media (max-width: 768px) {
+  .bv--phone {
+    --bv-gutter: var(--space-4);
+  }
+}
+/* The tab bar runs over the page gutter to the screen edges too, so a long tab scrolls
+   out at the edge; its line stays inside the gutter. The tabs draw no mark of their own
+   (also not on hover): the ink below moves with the swipe. */
+.bv__tabBar {
+  position: relative;
+  flex: none;
+  min-width: 0;
+  margin-inline: calc(-1 * var(--bv-gutter));
+}
+.bv__tabBar::after {
+  content: '';
+  position: absolute;
+  right: var(--bv-gutter);
+  bottom: 0;
+  left: var(--bv-gutter);
+  height: var(--border-width);
+  background: var(--color-border);
+  pointer-events: none;
+}
+.bv__tabBar ::ng-deep .tabs {
+  padding-inline: var(--bv-gutter);
+  border-bottom-color: transparent;
+}
+.bv__tabBar ::ng-deep .tabs .tabs__tab.tabs__tab--on {
+  box-shadow: none;
+}
+.bv__ink {
+  position: absolute;
+  bottom: var(--border-width);
+  left: 0;
+  width: 0;
+  z-index: 1;
+  height: 3px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+/* The pager runs over the page gutter to the screen edges, so a card that moves away
+   leaves at the edge of the screen; each page gives the gutter back inside. */
 .bv__pager {
   display: grid;
   flex: 1 1 0;
   grid-auto-columns: 100%;
   grid-auto-flow: column;
   min-height: 0;
+  margin-inline: calc(-1 * var(--bv-gutter));
   overflow-x: auto;
   overflow-y: hidden;
   overscroll-behavior-x: contain;
@@ -289,8 +336,9 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  /* The page reaches down to the bottom bar; its last card scrolls clear of the dots and
-     of the floating "+ To-Do" (56px, --space-4 above the bar). */
+  /* The page reaches down to the bottom bar; its last card scrolls clear of the floating
+     "+ To-Do" (56px, --space-4 above the bar). */
+  padding-inline: var(--bv-gutter);
   padding-bottom: calc(56px + 2 * var(--space-4));
   overflow-y: auto;
   overscroll-behavior-y: contain;
@@ -313,29 +361,4 @@
   padding: var(--space-6) var(--space-2);
   color: var(--color-text-muted);
   text-align: center;
-}
-/* The dots lie over the foot of the pages, on the line of the floating "+ To-Do" button
-   (56px high, --space-4 above the bar), in the middle and clear of it. */
-.bv__dots {
-  position: absolute;
-  right: 0;
-  bottom: var(--space-4);
-  left: 0;
-  pointer-events: none;
-  display: flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 56px;
-}
-.bv__dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--color-surface-3);
-}
-.bv__dot--on {
-  width: 16px;
-  background: var(--color-accent);
 }
