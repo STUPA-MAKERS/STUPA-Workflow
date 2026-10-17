@@ -8,13 +8,16 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from sqlalchemy import true
 
 from app.modules.applications.service import ApplicationsService
 from app.modules.auth.principal import Principal
+from app.modules.budget.tree.service import BudgetTreeService
 from app.modules.livevote.service import MeetingService
 from app.modules.tickets.service import TicketService
 from app.modules.todos import links as links_mod
-from app.modules.todos.links import HIDDEN, PER_KIND, LinkResolver, card_url
+from app.modules.todos.links import HIDDEN, PER_KIND, VOTE_STATUSES, LinkResolver, card_url
+from app.modules.voting import listing as vote_listing
 from app.shared.errors import ForbiddenError
 from tests.unit.modules.todos.fakes import FakeAccess, ScriptedSession, board, card, column
 
@@ -25,8 +28,54 @@ MEETING = uuid.UUID(int=41)
 ITEM = uuid.UUID(int=51)
 TICKET = uuid.UUID(int=61)
 STATE = uuid.UUID(int=71)
+VOTE = uuid.UUID(int=81)
+INVOICE = uuid.UUID(int=91)
+EXPENSE = uuid.UUID(int=101)
+G2 = uuid.UUID(int=22)
 USER = Principal(sub="u")
 READER = Principal(sub="r", permissions={"application.read", "ticket.manage"})
+BOOKER = Principal(sub="b", permissions={"budget.view"})
+
+
+@pytest.fixture
+def vote_scope(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The read scope of the vote list: a constant clause, the calls counted."""
+    box: dict[str, Any] = {"calls": 0}
+
+    async def _scope(_session: Any, _principal: Principal) -> Any:
+        box["calls"] += 1
+        return true()
+
+    monkeypatch.setattr(links_mod, "vote_read_scope", _scope)
+    return box
+
+
+@pytest.fixture
+def gremium_scope(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The gremien of the tab "Gremien": ``scope`` (None = all), the calls counted."""
+    box: dict[str, Any] = {"scope": {G1}, "calls": 0}
+
+    async def _scope(_session: Any, _principal: Principal) -> Any:
+        box["calls"] += 1
+        return box["scope"]
+
+    monkeypatch.setattr(links_mod, "gremium_view_scope", _scope)
+    return box
+
+
+@pytest.fixture
+def empty_new_kinds(
+    monkeypatch: pytest.MonkeyPatch, vote_scope: dict[str, Any], gremium_scope: dict[str, Any]
+) -> None:
+    """No vote, gremium, invoice or booking matches: their candidates make no query."""
+
+    async def _none(*_a: Any, **_kw: Any) -> Any:
+        return SimpleNamespace(items=[])
+
+    monkeypatch.setattr(vote_listing, "list_votes", _none)
+    monkeypatch.setattr(BudgetTreeService, "list_invoices_paged", _none)
+    monkeypatch.setattr(BudgetTreeService, "list_expenses_paged", _none)
+    gremium_scope["scope"] = set()
 
 
 @pytest.fixture
@@ -184,7 +233,7 @@ async def test_todos_follow_the_board_rule() -> None:
 
 
 async def test_search_every_kind(
-    monkeypatch: pytest.MonkeyPatch, meeting_scope: dict[str, Any]
+    monkeypatch: pytest.MonkeyPatch, meeting_scope: dict[str, Any], empty_new_kinds: None
 ) -> None:
     seen: dict[str, Any] = {}
 
@@ -242,3 +291,219 @@ async def test_search_without_rights(
     assert await resolver.search("x", "agenda_item", USER) == []
     assert await resolver.search("x", "todo", USER) == []
     assert "!=" not in str(session.statements[-1])
+
+
+def _vote(vote_id: uuid.UUID = VOTE, **kw: Any) -> Any:
+    return SimpleNamespace(
+        id=vote_id,
+        question=kw.get("question", "Antrag annehmen?"),
+        application_id=kw.get("application_id"),
+        status=kw.get("status", "closed"),
+        result=kw.get("result", "passed"),
+    )
+
+
+async def test_votes_follow_the_read_scope_of_the_vote_list(vote_scope: dict[str, Any]) -> None:
+    by_app = _vote(uuid.uuid4(), question=None, application_id=APP, status="open", result=None)
+    bare = _vote(uuid.uuid4(), question=None)
+    session = ScriptedSession(
+        execute=[
+            [(_vote(), "33. Sitzung", date(2026, 5, 1)), (by_app, None, None), (bare, None, None)],
+        ],
+        scalars=[[_app(APP)]],
+    )
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve(
+        [("vote", VOTE), ("vote", by_app.id), ("vote", bare.id), ("vote", uuid.uuid4())], READER
+    )
+    seen = out[("vote", VOTE)]
+    assert (seen.title, seen.url) == ("Antrag annehmen?", f"/voting/{VOTE}")
+    assert seen.detail is not None
+    assert (seen.detail.meeting_title, seen.detail.date) == ("33. Sitzung", "2026-05-01")
+    assert (seen.detail.vote_status, seen.detail.vote_result) == ("closed", "passed")
+    assert out[("vote", by_app.id)].title == "Antrag"
+    assert out[("vote", bare.id)].title == ""
+    assert HIDDEN in out.values()
+    assert vote_scope["calls"] == 1
+    assert "LEFT OUTER JOIN meeting" in str(session.statements[0])
+
+
+async def test_vote_titles_need_a_readable_application(
+    vote_scope: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _deny(_db: Any, _app_id: uuid.UUID, _p: Any, _a: Any) -> None:
+        raise ForbiddenError("no")
+
+    monkeypatch.setattr(links_mod, "resolve_app_read", _deny)
+    by_app = _vote(question=None, application_id=APP)
+    session = ScriptedSession(execute=[[(by_app, None, None)]], scalars=[[_app(APP)]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve([("vote", VOTE)], USER)
+    assert out[("vote", VOTE)].accessible
+    assert out[("vote", VOTE)].title == ""
+
+
+async def test_votes_none_readable(vote_scope: dict[str, Any]) -> None:
+    session = ScriptedSession(execute=[[]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert not await resolver.readable("vote", VOTE, USER)
+    assert len(session.statements) == 1
+
+
+async def test_votes_with_a_question_need_no_title_lookup(vote_scope: dict[str, Any]) -> None:
+    session = ScriptedSession(execute=[[(_vote(application_id=APP), None, None)]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert await resolver.readable("vote", VOTE, USER)
+    assert len(session.statements) == 1
+
+
+async def test_gremien_follow_the_gremien_tab(gremium_scope: dict[str, Any]) -> None:
+    session = ScriptedSession(
+        execute=[[(G1, "StuPa")], [(G1, "StuPa")], [(G1, "StuPa"), (G2, "AStA")]]
+    )
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve([("gremium", G1), ("gremium", G2)], USER)
+    seen = out[("gremium", G1)]
+    assert (seen.title, seen.url) == ("StuPa", f"/gremien/{G1}")
+    assert out[("gremium", G2)] == HIDDEN
+    # The scope is read once per resolver.
+    await resolver.resolve([("gremium", G1)], USER)
+    assert gremium_scope["calls"] == 1
+
+    gremium_scope["scope"] = None
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve([("gremium", G1), ("gremium", G2)], USER)
+    assert out[("gremium", G2)].title == "AStA"
+
+
+async def test_gremien_outside_the_scope_make_no_query(gremium_scope: dict[str, Any]) -> None:
+    gremium_scope["scope"] = set()
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert not await resolver.readable("gremium", G1, USER)
+    assert session.statements == []
+
+
+def _invoice(invoice_id: uuid.UUID = INVOICE, **kw: Any) -> Any:
+    return SimpleNamespace(
+        id=invoice_id,
+        number=kw.get("number", "RE-2026-7"),
+        supplier=kw.get("supplier", "Druckerei"),
+        gross_amount=kw.get("gross", "119.00"),
+        issue_date=kw.get("issue", date(2026, 4, 2)),
+        status=kw.get("status", "open"),
+    )
+
+
+async def test_invoices_need_a_budget_read_permission() -> None:
+    by_supplier = _invoice(uuid.uuid4(), number=None, issue=None)
+    bare = _invoice(uuid.uuid4(), number=None, supplier=None)
+    session = ScriptedSession(scalars=[[_invoice(), by_supplier, bare]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve(
+        [("invoice", INVOICE), ("invoice", by_supplier.id), ("invoice", bare.id)], BOOKER
+    )
+    seen = out[("invoice", INVOICE)]
+    assert (seen.title, seen.url) == ("RE-2026-7", f"/invoices?id={INVOICE}")
+    assert seen.detail is not None
+    assert (seen.detail.counterparty, seen.detail.amount) == ("Druckerei", "119.00")
+    assert (seen.detail.date, seen.detail.invoice_status) == ("2026-04-02", "open")
+    assert out[("invoice", by_supplier.id)].title == "Druckerei"
+    assert out[("invoice", by_supplier.id)].detail.date is None  # type: ignore[union-attr]
+    assert out[("invoice", bare.id)].title == ""
+
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert not await resolver.readable("invoice", INVOICE, USER)
+    assert session.statements == []
+
+
+def _expense(expense_id: uuid.UUID = EXPENSE, **kw: Any) -> Any:
+    return SimpleNamespace(
+        id=expense_id,
+        description=kw.get("description", "Plakate"),
+        amount=kw.get("amount", "42.50"),
+        kind=kw.get("kind", "expense"),
+        correspondent=kw.get("correspondent", "Druckerei"),
+        payment_date=kw.get("payment"),
+        invoice_date=kw.get("invoice", date(2026, 4, 3)),
+        parent_expense_id=kw.get("parent"),
+    )
+
+
+async def test_expenses_need_a_budget_read_permission() -> None:
+    sub = _expense(uuid.uuid4(), parent=EXPENSE, payment=date(2026, 4, 9), kind="income")
+    session = ScriptedSession(execute=[[(_expense(), "VS-800"), (sub, "VS-800-04")]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve([("expense", EXPENSE), ("expense", sub.id)], BOOKER)
+    seen = out[("expense", EXPENSE)]
+    assert (seen.title, seen.url) == ("Plakate", f"/expenses?id={EXPENSE}")
+    assert seen.detail is not None
+    assert (seen.detail.amount, seen.detail.cost_centre) == ("42.50", "VS-800")
+    assert (seen.detail.booking_kind, seen.detail.counterparty) == ("expense", "Druckerei")
+    assert seen.detail.date == "2026-04-03"
+    # A sub-booking opens its parent row: the list shows it there.
+    child = out[("expense", sub.id)]
+    assert child.url == f"/expenses?id={EXPENSE}"
+    assert child.detail is not None and child.detail.date == "2026-04-09"
+
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert not await resolver.readable("expense", EXPENSE, USER)
+    assert session.statements == []
+
+
+async def test_search_votes_gremien_invoices_and_bookings(
+    monkeypatch: pytest.MonkeyPatch, vote_scope: dict[str, Any], gremium_scope: dict[str, Any]
+) -> None:
+    seen: dict[str, Any] = {}
+
+    async def _votes(_session: Any, principal: Principal, **kw: Any) -> Any:
+        seen["votes"] = kw
+        return SimpleNamespace(items=[SimpleNamespace(id=VOTE)])
+
+    async def _invoices(_self: Any, **kw: Any) -> Any:
+        seen["invoices"] = kw
+        return SimpleNamespace(items=[SimpleNamespace(id=INVOICE)])
+
+    async def _expenses(_self: Any, **kw: Any) -> Any:
+        seen["expenses"] = kw
+        return SimpleNamespace(items=[SimpleNamespace(id=EXPENSE)])
+
+    monkeypatch.setattr(vote_listing, "list_votes", _votes)
+    monkeypatch.setattr(BudgetTreeService, "list_invoices_paged", _invoices)
+    monkeypatch.setattr(BudgetTreeService, "list_expenses_paged", _expenses)
+    session = ScriptedSession(
+        scalars=[[G1], [_invoice()]],
+        execute=[[(_vote(), None, None)], [(G1, "StuPa")], [(_expense(), "VS-800")]],
+    )
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    hits = []
+    for kind in ("vote", "gremium", "invoice", "expense"):
+        hits.extend(await resolver.search(" stu ", kind, BOOKER))
+    assert [(h.kind, h.target_id) for h in hits] == [
+        ("vote", VOTE),
+        ("gremium", G1),
+        ("invoice", INVOICE),
+        ("expense", EXPENSE),
+    ]
+    assert seen["votes"] == {"statuses": VOTE_STATUSES, "q": "stu", "limit": PER_KIND, "offset": 0}
+    assert seen["invoices"] == {"q": "stu", "limit": PER_KIND, "offset": 0}
+    assert seen["expenses"] == {"q": "stu", "limit": PER_KIND, "offset": 0}
+    gremium_sql = str(session.statements[1])
+    assert "gremium.id IN" in gremium_sql and "LIMIT" in gremium_sql
+
+    gremium_scope["scope"] = None
+    session = ScriptedSession(scalars=[[]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    assert await resolver.search("stu", "gremium", USER) == []
+    assert "gremium.id IN" not in str(session.statements[0])
+
+
+async def test_search_new_kinds_without_rights(gremium_scope: dict[str, Any]) -> None:
+    gremium_scope["scope"] = set()
+    session = ScriptedSession()
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    for kind in ("gremium", "invoice", "expense"):
+        assert await resolver.search("stu", kind, USER) == []
+    assert session.statements == []

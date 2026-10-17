@@ -8,6 +8,7 @@ description: Hierarchical cost center budget tree with fiscal years, top-down al
 **Does:** Hierarchical cost center budgeting. The tree carries fiscal years per top-level node, top-down allocations, bookings (expenses/income) with sub-bookings, transfers, and invoices imported from ZUGFeRD/Factur-X PDFs. The append-only audit log records every money mutation. Most mutations are revertable.
 
 **Key files:**
+- `access.py` — the read gate of the invoice and booking lists: `BUDGET_READ_PERMISSIONS` (`budget.view`/`.structure`/`.book`) and `has_budget_read(principal)`. The router (`_has_full_view`, `require_any_permission(*BUDGET_READ_PERMISSIONS)`), the global search and the to-do links use it, so no copy of the trio drifts.
 - `tree_models.py` — SQLAlchemy models for the tree: `Budget`, `FiscalYear`, `BudgetAllocation`, `BudgetExpense`, `Invoice` (EUR-only, `Numeric(12,2)`).
 - `models.py` — legacy flat-pot models `BudgetPot`/`BudgetField`/`BudgetEntry` (per-application 1:1 binding, `STAGES = requested→reserved→approved→paid`). The tree supersedes most of this. `BudgetEntry.stage` still drives the roll-up.
 - `tree_rules.py` — pure, DB-free domain logic (100% branch-covered): path-key composition, descendant tests, fiscal year interval overlap, allocation invariants, `rollup_committed`, `node_available`, `build_forest`, `fiscal_year_bounds`, `scope_forest`.

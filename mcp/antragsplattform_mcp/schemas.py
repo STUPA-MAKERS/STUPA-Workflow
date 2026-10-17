@@ -703,7 +703,17 @@ class SubstituteCreate(WireModel):
     substituteId: str
 
 
-TodoLinkKind = Literal["application", "meeting", "agenda_item", "ticket", "todo"]
+TodoLinkKind = Literal[
+    "application",
+    "meeting",
+    "agenda_item",
+    "vote",
+    "gremium",
+    "invoice",
+    "expense",
+    "ticket",
+    "todo",
+]
 TicketKind = Literal["bug", "question", "idea"]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
 

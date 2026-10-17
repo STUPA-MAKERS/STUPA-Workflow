@@ -1,3 +1,4 @@
+import { formatMoney } from '@shared/decision/decision.util';
 import type { TodoEvent } from '@core/api/todos.service';
 import { de, type TranslationKey } from '@core/i18n/translations';
 import { TODAY, board, link, summary, tile } from '../../../testing/todo-fixtures';
@@ -156,6 +157,31 @@ describe('todos.util', () => {
       expect(sub({ kind: 'todo', targetId: 'k', title: 'x', detail: { boardName: 'B' } })).toBe('To-Do · B');
     });
 
+    it('lists the facts of a vote, a gremium, an invoice and a booking', () => {
+      const sub = (l: Parameters<typeof linkSub>[0]) => linkSub(l, 'de-DE', 'de', t);
+      const eur = (v: string) => formatMoney(v, 'de-DE');
+      expect(
+        sub(link({ kind: 'vote', detail: { meetingTitle: '33. Sitzung', voteStatus: 'closed', voteResult: 'passed' } })),
+      ).toBe('Abstimmung · 33. Sitzung · Angenommen');
+      expect(sub(link({ kind: 'vote', detail: { voteStatus: 'draft' } }))).toBe('Abstimmung · Entwurf');
+      expect(sub(link({ kind: 'vote', detail: {} }))).toBe('Abstimmung');
+      expect(sub(link({ kind: 'gremium', title: 'StuPa', detail: {} }))).toBe('Gremium');
+      expect(
+        sub(link({ kind: 'invoice', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus', amount: '119.00' } })),
+      ).toBe(`Rechnung · Druckhaus · ${eur('119.00')}`);
+      // A title that is the supplier names neither twice; without an amount the date.
+      expect(
+        sub(link({ kind: 'invoice', title: 'Druckhaus', detail: { number: 'RE-8', counterparty: 'Druckhaus', date: '2026-11-03' } })),
+      ).toBe('Rechnung · RE-8 · Di, 03.11.2026');
+      expect(sub(link({ kind: 'invoice', title: 'X', detail: {} }))).toBe('Rechnung');
+      expect(sub(link({ kind: 'expense', detail: { costCentre: 'VS-800', amount: '42.50' } }))).toBe(
+        `Buchung · VS-800 · ${eur('42.50')}`,
+      );
+      expect(sub(link({ kind: 'expense', detail: {} }))).toBe('Buchung');
+      expect(linkTitle(link({ kind: 'invoice', accessible: false, title: null }), t)).toBe('Rechnung (kein Zugriff)');
+      expect(linkTitle(link({ kind: 'gremium', accessible: false, title: null }), t)).toBe('Gremium (kein Zugriff)');
+    });
+
     it('writes the link line of a tile', () => {
       expect(linkLine(link(), TODAY, 'de-DE', t)).toBe('Antrag · Lerncafé');
       expect(linkLine(link({ accessible: false, title: null }), TODAY, 'de-DE', t)).toBe('Antrag (kein Zugriff)');
@@ -170,6 +196,15 @@ describe('todos.util', () => {
         linkLine(link({ kind: 'agenda_item', title: 'TOP Haushalt', detail: { date: 'bad' } }), TODAY, 'de-DE', t),
       ).toBe('TOP · TOP Haushalt');
       expect(linkLine(link({ kind: 'meeting', title: 'S', detail: null }), TODAY, 'de-DE', t)).toBe('Sitzung · S');
+      expect(linkLine(link({ kind: 'invoice', title: 'RE-7', detail: { amount: '119.00' } }), TODAY, 'de-DE', t)).toBe(
+        `Rechnung · RE-7 · ${formatMoney('119.00', 'de-DE')}`,
+      );
+      expect(linkLine(link({ kind: 'expense', title: 'Plakate', detail: {} }), TODAY, 'de-DE', t)).toBe(
+        'Buchung · Plakate',
+      );
+      expect(linkLine(link({ kind: 'vote', title: 'Annehmen?', detail: null }), TODAY, 'de-DE', t)).toBe(
+        'Abstimmung · Annehmen?',
+      );
     });
 
     it('splits an app url into path and query', () => {

@@ -128,6 +128,37 @@ describe('TodoLinkPickerComponent', () => {
     expect(screen.queryByText('Anträge', { selector: '.lp__group' })).toBeNull();
   });
 
+  it('groups votes, gremien, invoices and bookings with their icons', async () => {
+    const hits: TodoLinkTarget[] = [
+      { kind: 'vote', targetId: 'v-1', title: 'Plakate annehmen?', detail: { voteStatus: 'open' } },
+      { kind: 'gremium', targetId: 'g-1', title: 'StuPa', detail: {} },
+      { kind: 'invoice', targetId: 'i-1', title: 'RE-7', detail: { number: 'RE-7', counterparty: 'Druckhaus' } },
+      { kind: 'expense', targetId: 'e-1', title: 'Plakate', detail: { costCentre: 'VS-800' } },
+    ];
+    const { open, type, linkTargets, picked, fixture } = await setup();
+    linkTargets.mockReturnValue(of(hits));
+    await open();
+    type('Pla');
+    const groups = [...document.querySelectorAll('.lp__group')].map((g) => g.textContent?.trim());
+    expect(groups).toEqual(['Abstimmungen', 'Gremien', 'Rechnungen', 'Buchungen']);
+    expect(screen.getByText('Abstimmung · Offen')).toBeInTheDocument();
+    expect(screen.getByText('Rechnung · Druckhaus')).toBeInTheDocument();
+    expect(screen.getByText('Buchung · VS-800')).toBeInTheDocument();
+    // The icons of the navigation: Abstimmungen, Gremien, Rechnungen, Buchungen.
+    expect(hits.map((h) => fixture.componentInstance.icon(h))).toEqual(['vote', 'landmark', 'receipt', 'swap']);
+    fireEvent.click(screen.getByRole('button', { name: /StuPa/ }));
+    expect(picked).toHaveBeenCalledWith(hits[1]);
+    for (const [label, kind] of [
+      ['Abstimmungen', 'vote'],
+      ['Gremien', 'gremium'],
+      ['Rechnungen', 'invoice'],
+      ['Buchungen', 'expense'],
+    ] as const) {
+      fireEvent.click(screen.getByRole('button', { name: label }));
+      expect(linkTargets).toHaveBeenLastCalledWith('Pla', kind, 'k-1');
+    }
+  });
+
   it('narrows the kind and searches again; the same kind does nothing', async () => {
     const { open, type, linkTargets } = await setup();
     await open();

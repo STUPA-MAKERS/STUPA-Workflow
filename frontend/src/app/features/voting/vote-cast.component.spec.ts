@@ -14,6 +14,7 @@ import { matchMediaQueries } from '../../../testing/meeting-fixtures';
 import { VoteCastComponent } from './vote-cast.component';
 import { VotingPageService, type ShownVote } from './voting-page/voting-page.service';
 import { RailStatusService } from '../../layout/rail-status.service';
+import { NO_LINKED_TODOS } from '../../../testing/todo-fixtures';
 
 /** A live-vote channel as signals, driven by the test. */
 function fakeSession() {
@@ -161,6 +162,7 @@ async function setup(opts: {
       { provide: LiveVoteService, useValue: live },
       ...(page ? [{ provide: VotingPageService, useValue: page }] : []),
       { provide: ActivatedRoute, useValue: { paramMap: params } },
+      NO_LINKED_TODOS,
     ],
   });
   return {
@@ -204,6 +206,12 @@ describe('VoteCastComponent', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
     expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
     expect(getMeeting).toHaveBeenCalledWith('m1', { quiet: true });
+  });
+
+  it('lists the to-dos that link the vote under it', async () => {
+    const { fixture } = await setup();
+    const list = fixture.nativeElement.querySelector('.vc__body app-todo-linked-list');
+    expect(list).not.toBeNull();
   });
 
   it('casts in two steps over REST and reloads the vote', async () => {

@@ -43,6 +43,10 @@ const KIND_CHIPS: readonly { value: PickerKind; label: TranslationKey }[] = [
   { value: 'application', label: 'todos.picker.applications' },
   { value: 'meeting', label: 'todos.picker.meetings' },
   { value: 'agenda_item', label: 'todos.picker.tops' },
+  { value: 'vote', label: 'todos.picker.votes' },
+  { value: 'gremium', label: 'todos.picker.gremien' },
+  { value: 'invoice', label: 'todos.picker.invoices' },
+  { value: 'expense', label: 'todos.picker.expenses' },
   { value: 'ticket', label: 'todos.picker.tickets' },
   { value: 'todo', label: 'todos.picker.todos' },
 ];
@@ -55,8 +59,8 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
 /**
  * "Verknüpfen" (frame 3): search what a card can link. The server lists per kind only
  * what the person may read. The chips narrow the kind; the hits come in groups (Anträge,
- * Sitzungen und TOPs, Tickets, To-Dos), a linked target carries a check mark. A pick of
- * a linked target takes the link off again.
+ * Sitzungen und TOPs, Abstimmungen, Gremien, Rechnungen, Buchungen, Tickets, To-Dos), a
+ * linked target carries a check mark. A pick of a linked target takes the link off again.
  *
  * Desktop: a panel that floats over the whole page, like the search palette, with a
  * scrim; a click on the scrim, Escape or the × closes it, and the focus goes back to
@@ -119,6 +123,10 @@ export class TodoLinkPickerComponent {
     const all: PickerGroup[] = [
       { key: 'application', label: 'todos.picker.applications', hits: by(['application']) },
       { key: 'meeting', label: 'todos.picker.meetingsAndTops', hits: by(['meeting', 'agenda_item']) },
+      { key: 'vote', label: 'todos.picker.votes', hits: by(['vote']) },
+      { key: 'gremium', label: 'todos.picker.gremien', hits: by(['gremium']) },
+      { key: 'invoice', label: 'todos.picker.invoices', hits: by(['invoice']) },
+      { key: 'expense', label: 'todos.picker.expenses', hits: by(['expense']) },
       { key: 'ticket', label: 'todos.picker.tickets', hits: by(['ticket']) },
       { key: 'todo', label: 'todos.picker.todos', hits: by(['todo']) },
     ];

@@ -286,6 +286,10 @@ def test_cross_board_routes(env: _Env) -> None:
     linked = c.get(f"/api/todos/linked?kind=meeting&targetId={XID}")
     assert linked.json()[0]["boardName"] == "B"
     assert c.get(f"/api/todos/linked?kind=todo&targetId={XID}").status_code == 422
+    for kind in ("vote", "gremium", "invoice", "expense"):
+        assert c.get(f"/api/todos/linked?kind={kind}&targetId={XID}").status_code == 200
+        assert c.get(f"/api/todos/link-targets?q=ab&kind={kind}").status_code == 200
+    assert c.get("/api/todos/link-targets?q=ab&kind=budget").status_code == 422
 
 
 def test_the_link_picker_without_the_scope_is_empty(env: _Env) -> None:
