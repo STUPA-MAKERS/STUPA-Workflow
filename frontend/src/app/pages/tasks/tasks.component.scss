@@ -135,6 +135,13 @@
   flex-direction: column;
   min-width: 0;
 }
+/* Side by side a to-do sheet is as tall as the pane, like the card drawer of the board:
+   the thread fills its column with the composer at the foot of the pane, and the details
+   column scrolls inside itself. An application sheet keeps its height and the pane
+   scrolls. */
+.tasks--split .tasks__detail--todo {
+  min-height: 0;
+}
 
 @include bp.phone {
   .tasks__month {
@@ -144,4 +151,53 @@
   .tasks__chev {
     display: none;
   }
+}
+
+/* ------------------------------------------------------------------ groups and To-Dos */
+.tasks__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-3);
+}
+.tasks__kind {
+  margin: 0;
+  padding: 18px var(--space-4) 6px;
+  color: var(--color-accent-text);
+  font-size: 0.84375rem;
+  font-weight: var(--fw-semibold);
+  line-height: 1.25rem;
+}
+.tasks__scroll > .tasks__kind:first-child {
+  padding-top: var(--space-1);
+}
+/* A to-do row has a narrow circle in front, so its slots sit closer and the title keeps its width. */
+.tasks__row:has(.tasks__circle) {
+  --li-gap: var(--space-3);
+}
+.tasks__circle {
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+.tasks__board {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.tasks__due {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--color-text-muted);
+  font-size: 0.75rem; /* 12px */
+  white-space: nowrap;
+}
+.tasks__due[data-tone='overdue'] {
+  color: var(--color-danger);
+  font-weight: var(--fw-semibold);
+}
+.tasks__due[data-tone='soon'] {
+  color: var(--color-warning);
+  font-weight: var(--fw-semibold);
 }

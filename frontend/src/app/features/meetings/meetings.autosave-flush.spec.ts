@@ -113,7 +113,7 @@ async function loaded() {
       { provide: Router, useValue: routerStub() },
       {
         provide: ActivatedRoute,
-        useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })) },
+        useValue: { paramMap: of(convertToParamMap({ id: 'm-1' })), queryParamMap: of(convertToParamMap({})) },
       },
     ],
   });

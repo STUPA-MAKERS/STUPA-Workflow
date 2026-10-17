@@ -92,7 +92,6 @@
             [ngModel]="name()"
             (ngModelChange)="name.set($event)"
           />
-          <p class="pm__hint">{{ 'guests.join.nameHint' | t }}</p>
           @if (joinErrorKey(); as e) {
             <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
           }

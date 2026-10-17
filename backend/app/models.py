@@ -67,6 +67,19 @@ from app.modules.notifications.models import (
 )
 from app.modules.privacy.models import ErasureRequest, PrivacySettings
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
+from app.modules.tickets.models import Ticket, TicketEvent, TicketNote, TicketSenderBlock
+from app.modules.todos.models import (
+    TodoAssignee,
+    TodoBoard,
+    TodoCard,
+    TodoCardLabel,
+    TodoCheckItem,
+    TodoColumn,
+    TodoComment,
+    TodoEvent,
+    TodoLabel,
+    TodoLink,
+)
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 
 __all__ = [
@@ -125,6 +138,20 @@ __all__ = [
     "State",
     "StatusEvent",
     "SubmissionVersion",
+    "Ticket",
+    "TicketEvent",
+    "TicketNote",
+    "TicketSenderBlock",
+    "TodoAssignee",
+    "TodoBoard",
+    "TodoCard",
+    "TodoCardLabel",
+    "TodoCheckItem",
+    "TodoColumn",
+    "TodoComment",
+    "TodoEvent",
+    "TodoLabel",
+    "TodoLink",
     "Transition",
     "Vote",
     "VotedMarker",

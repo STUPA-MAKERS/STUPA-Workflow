@@ -47,7 +47,7 @@ import { PrepChecklistComponent } from '../prep-checklist/prep-checklist.compone
 import { type DockPanel, SessionDockComponent } from '../session-dock/session-dock.component';
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardComponent } from '../vote-card/vote-card.component';
-import { voteSnippet, voteSnippetHead } from '../meetings.util';
+import { voteSnippet, votesInText } from '../meetings.util';
 import { clockTime, voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
@@ -172,10 +172,6 @@ export class MeetingPageComponent {
   readonly renameTop = output<AgendaItem>();
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
   readonly moveTop = output<AgendaMove>();
-  readonly dragStart = output<number>();
-  readonly dragOver = output<DragEvent>();
-  /** Drop a dragged agenda item at this index. Not `drop`: see `AgendaPaneComponent.pick`. */
-  readonly dropAt = output<number>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
   /** A member was picked in the dock to take the minutes of a live meeting over (Z3). */
@@ -357,10 +353,16 @@ export class MeetingPageComponent {
   /** The newest closed vote whose result is not in the text yet. */
   protected readonly pendingResult = computed<MeetingVote | null>(() => {
     if (this.openVote()) return null;
-    const body = this.top()?.body ?? '';
-    return (
-      this.votes().find((v) => v.status === 'closed' && !body.includes(voteSnippetHead(v))) ?? null
-    );
+    const shown = this.inTextIds();
+    return this.votes().find((v) => v.status === 'closed' && !shown.has(v.id)) ?? null;
+  });
+
+  /** The closed votes of the open item whose callout is in its text. */
+  private readonly inTextIds = computed(() => {
+    const t = this.top();
+    if (!t) return new Set<string>();
+    const own = this.meeting().votes.filter((v) => v.agendaItemId === t.id);
+    return votesInText(t.body ?? '', own);
   });
 
   /**
@@ -404,7 +406,7 @@ export class MeetingPageComponent {
 
   /** The result of a closed vote is in the text of the open item. */
   protected inText(vote: MeetingVote): boolean {
-    return vote.status === 'closed' && (this.top()?.body ?? '').includes(voteSnippetHead(vote));
+    return this.inTextIds().has(vote.id);
   }
 
   protected myChoice(voteId: Uuid): string | null {

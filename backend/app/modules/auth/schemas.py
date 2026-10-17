@@ -80,3 +80,6 @@ class MeOut(BaseModel):
     # to show the meeting timeline to pool substitutes. The live channel still needs a
     # concrete delegation.
     in_substitute_pool: bool = False
+    # True if the principal reported at least one ticket that is not anonymized. The
+    # frontend uses this to show the tab "Tickets" without `ticket.manage`.
+    has_reported_tickets: bool = False

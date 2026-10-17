@@ -1,4 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
+import { renderDeferred } from '../../../../testing/defer';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -30,7 +31,7 @@ const OUTPUTS = [
   'voteDelete', 'voteDialog', 'startSession', 'closeSession', 'finalize', 'openSettings',
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
-  'dragStart', 'dragOver', 'dropAt', 'setProtokollant', 'pickHandover', 'cancelHandover',
+  'setProtokollant', 'pickHandover', 'cancelHandover',
   'attendanceConflictResolved',
 ] as const;
 
@@ -344,7 +345,6 @@ describe('MeetingPageComponent', () => {
 
     it('opens a picked item of the preparation pane to prepare it, and goes back', async () => {
       const { on } = await setup({ meeting: planned({ canManageVotes: true }), protocol: null }, [MEDIA.wide]);
-      expect(screen.getByText('Wähle einen TOP, um seinen Text und seine Abstimmungen vorzubereiten.')).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Bericht des Finanzreferats' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-2');
       expect(screen.queryByRole('heading', { name: 'Sitzung vorbereiten' })).toBeNull();
@@ -431,12 +431,6 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(within(rows[1]).getByRole('button', { name: /Aktionen für/ }));
       await userEvent.click(await screen.findByRole('menuitem', { name: 'TOP entfernen' }));
       expect(on.removeFromAgenda).toHaveBeenCalledWith('t-2');
-      rows[0].dispatchEvent(new Event('dragstart'));
-      rows[1].dispatchEvent(new Event('dragover'));
-      rows[1].dispatchEvent(new Event('drop'));
-      expect(on.dragStart).toHaveBeenCalledWith(0);
-      expect(on.dragOver).toHaveBeenCalled();
-      expect(on.dropAt).toHaveBeenCalledWith(1);
     });
 
     it('passes on no native event that bubbles out of the agenda as a value', async () => {
@@ -445,12 +439,6 @@ describe('MeetingPageComponent', () => {
       const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
       input.dispatchEvent(new Event('select', { bubbles: true }));
       expect(on.selectTop).not.toHaveBeenCalled();
-      // A native `drop` bubbles out of the row after the row gave its index.
-      const rows = screen.getAllByRole('listitem');
-      rows[1].dispatchEvent(new Event('dragstart', { bubbles: true }));
-      rows[2].dispatchEvent(new Event('drop', { bubbles: true }));
-      expect(on.dropAt).toHaveBeenCalledTimes(1);
-      expect(on.dropAt).toHaveBeenCalledWith(2);
     });
 
     it('passes the inline rename on', async () => {
@@ -485,6 +473,8 @@ describe('MeetingPageComponent', () => {
 
     it('passes the edits of the sheet on and makes the editor read-only for a reader', async () => {
       const { container, fixture } = await setup();
+      await renderDeferred(fixture);
+      expect(container.querySelector('.mde__host')).toBeTruthy();
       expect(container.querySelector('.mde__host--disabled')).toBeNull();
       fixture.componentRef.setInput('canEdit', false);
       fixture.detectChanges();

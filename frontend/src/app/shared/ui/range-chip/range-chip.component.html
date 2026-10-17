@@ -5,13 +5,19 @@
   [class.on]="active()"
   aria-haspopup="dialog"
   [attr.aria-expanded]="open()"
-  [title]="chipText()"
   (click)="toggle()"
 >
   @if (active()) {
     <app-icon name="check" [size]="15" />
   }
-  <span class="ell">{{ chipText() }}</span>
+  <!-- A tooltip only where the text is cut: a full text needs no second copy. -->
+  <span
+    class="ell"
+    [appTruncated]="chipText()"
+    #chipCut="appTruncated"
+    [attr.title]="chipCut.truncated() ? chipText() : null"
+    >{{ chipText() }}</span
+  >
   @if (!active()) {
     <app-icon class="rc__chev" name="down" [size]="15" />
   }

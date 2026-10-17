@@ -11,6 +11,7 @@ interface Inputs {
   vote: MeetingVote;
   meetingStatus: MeetingStatus;
   canManage: boolean;
+  canRun: boolean;
   canVote: boolean;
   myChoice: string | null;
   casting: string | null;
@@ -31,6 +32,7 @@ async function setup(over: Partial<Inputs> = {}) {
       vote: vote(),
       meetingStatus: 'live',
       canManage: true,
+      canRun: true,
       canVote: false,
       myChoice: null,
       casting: null,
@@ -116,6 +118,12 @@ describe('VoteCardComponent', () => {
       // An open vote is part of the record: no delete.
       expect(screen.queryByRole('button', { name: 'Beschlussfrage löschen' })).toBeNull();
       expect(container.querySelectorAll('.vc__actions app-button')).toHaveLength(2);
+    });
+
+    it('lets a lead who does not keep the minutes cancel, but not close', async () => {
+      await setup({ canRun: false });
+      expect(screen.queryByRole('button', { name: 'Abstimmung schließen' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Abstimmung abbrechen' })).toBeInTheDocument();
     });
 
     it('offers no vote control without the vote right', async () => {
@@ -243,11 +251,10 @@ describe('VoteCardComponent', () => {
   });
 
   describe('a vote with guests (#17)', () => {
-    it('shows the room while open and the hint about late guests', async () => {
+    it('shows the room while open', async () => {
       await setup({ vote: vote({ guestsVote: true, majorityRule: 'simple', presentMembers: 19, presentGuests: 7 }) });
       expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();
       expect(screen.getByText(/Einfache Mehrheit der abgegebenen Stimmen/)).toBeInTheDocument();
-      expect(screen.getByText(/Gäste, die du jetzt zulässt, stimmen noch mit/)).toBeInTheDocument();
     });
 
     it('sums the closed result up without a quorum', async () => {

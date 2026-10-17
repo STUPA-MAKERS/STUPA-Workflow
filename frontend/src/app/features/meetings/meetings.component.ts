@@ -175,6 +175,10 @@ export class MeetingsComponent {
         this.timeline.loadList();
       }
     });
+    // A link to an agenda item (`?item=`) opens that item, not the first one.
+    this.route.queryParamMap
+      .pipe(takeUntilDestroyed())
+      .subscribe((qp) => this.agendaSvc.requestTop(qp.get('item')));
   }
 
   /** Back from the meeting page to the list. */
@@ -348,19 +352,7 @@ export class MeetingsComponent {
     this.agendaSvc.flushPendingBody(this.meeting()?.id ?? null);
   }
 
-  onTopDragStart(index: number): void {
-    this.agendaSvc.onTopDragStart(index);
-  }
-
-  onTopDragOver(event: DragEvent): void {
-    this.agendaSvc.onTopDragOver(event);
-  }
-
-  onTopDrop(index: number): void {
-    this.agendaSvc.onTopDrop(this.meeting()?.id ?? null, index);
-  }
-
-  /** "Nach oben" / "Nach unten" in the row menu of an agenda item. */
+  /** "Nach oben" / "Nach unten" in the row menu, or a drop in the agenda. */
   moveTop(from: number, to: number): void {
     this.agendaSvc.moveTop(this.meeting()?.id ?? null, from, to);
   }

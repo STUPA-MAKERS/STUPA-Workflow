@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, time, timedelta
 from types import SimpleNamespace
 from typing import Any
+from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -335,12 +336,13 @@ def test_create_strips_and_checks_the_title() -> None:
 
 
 async def test_current_item_change_is_not_audited(
-    audit: list[dict[str, Any]], voting: SimpleNamespace
+    audit: list[dict[str, Any]], voting: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     m = _meeting("live")
     item = uuid4()
     # _get, then the owner lookup of the item.
     svc = MeetingService(_Session([m], scalars=[m.id]))  # type: ignore[arg-type]
+    monkeypatch.setattr(MeetingService, "can_set_current_item", AsyncMock(return_value=True))
     await svc.patch(m.id, MeetingPatch(currentAgendaItemId=item), _admin())
     assert m.current_agenda_item_id == item
     assert audit == []

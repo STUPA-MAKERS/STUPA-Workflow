@@ -6,6 +6,8 @@
     <header class="ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <span appSheetBarKicker class="skel-in"><span class="skel-text skel-text--muted ad__skelKicker"></span></span>
+        <!-- The action "Kommentare" and the menu. -->
+        <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
         <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
       </app-sheet-bar>
       <h2 class="ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
@@ -68,9 +70,6 @@
         }
         <p class="ad__editText ell">
           <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
-          <span class="ad__editHint">
-            · {{ 'applications.edit.versionHint' | t: { version: application.version + 1 } }}
-          </span>
         </p>
         @if (!phone()) {
           <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
@@ -102,6 +101,26 @@
       }
       <header class="ad__head">
         <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+          <!-- The comments open in a sheet over the page; the count waits for the thread. -->
+          <app-button
+            class="ad__commentsBtn"
+            variant="text"
+            [ariaLabel]="
+              commentsLoading()
+                ? ('applications.comments.title' | t)
+                : ('applications.comments.open' | t: { n: comments().length })
+            "
+            data-testid="ad-comments-open"
+            (click)="commentsOpen.set(true)"
+          >
+            <app-icon name="chat" [size]="19" />
+            @if (!phone()) {
+              {{ 'applications.comments.title' | t }}
+            }
+            @if (!commentsLoading()) {
+              <span class="ad__commentsN num" aria-hidden="true">{{ comments().length }}</span>
+            }
+          </app-button>
           @if (!phone()) {
             <!-- Outside the edit right: `application.share` decides who may read the
                  record, not who may edit it. -->
@@ -221,7 +240,6 @@
             <ng-container *ngTemplateOutlet="decision; context: { $implicit: application }" />
             <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
             <ng-container *ngTemplateOutlet="history" />
-            <ng-container *ngTemplateOutlet="chat" />
           </div>
         </div>
       } @else {
@@ -234,8 +252,8 @@
           [active]="tab()"
           (activeChange)="selectTab($event)"
         />
-        <!-- Every panel stays in the DOM, so the attachment count, a comment draft and the
-             scroll of a list survive a tab change. -->
+        <!-- Every panel stays in the DOM, so the attachment count and the scroll of a list
+             survive a tab change. -->
         <section
           class="ad__panel"
           role="tabpanel"
@@ -259,15 +277,6 @@
         <section
           class="ad__panel"
           role="tabpanel"
-          [id]="tabBar.panelId('comments')"
-          [attr.aria-labelledby]="tabBar.tabId('comments')"
-          [hidden]="tab() !== 'comments'"
-        >
-          <ng-container *ngTemplateOutlet="chat" />
-        </section>
-        <section
-          class="ad__panel"
-          role="tabpanel"
           [id]="tabBar.panelId('files')"
           [attr.aria-labelledby]="tabBar.tabId('files')"
           [hidden]="tab() !== 'files'"
@@ -276,6 +285,37 @@
         </section>
       }
     </article>
+
+    <!-- "Kommentare": the thread and the composer in a sheet over the page, from the end
+         on a wide screen and from the bottom on a phone. The chat fills the sheet: the
+         log scrolls inside and the composer stays at its foot. The chat exists only while
+         the sheet is open: projected content lives even where the sheet does not render
+         it, and a hidden chat would mark the thread as seen. -->
+    <app-side-sheet
+      [(open)]="commentsOpen"
+      [heading]="'applications.comments.title' | t"
+      [side]="phone() ? 'bottom' : 'end'"
+      [contentScrolls]="true"
+    >
+      @if (commentsOpen()) {
+        <app-chat
+          class="ad__chat"
+          [class.ad__chat--sheet]="phone()"
+          [loading]="commentsLoading()"
+          [draftKey]="'application.' + application.id"
+          [messages]="chatMessages()"
+          [visibilityOptions]="chatVisibilities()"
+          [canAttach]="canAttach()"
+          placeholder="applications.comments.placeholder"
+          (send)="sendComment($event)"
+          (retry)="retryComment($event)"
+          (discard)="discardComment($event)"
+          (edit)="editComment($event)"
+          (delete)="deleteComment($event)"
+          (refresh)="refreshComments()"
+        />
+      }
+    </app-side-sheet>
   }
 }
 
@@ -348,6 +388,7 @@
       </app-field-row>
     </app-field-group>
   </section>
+  <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" />
 </ng-template>
 
 <!-- The answers of the form by section (O19). -->
@@ -387,93 +428,6 @@
   </section>
 </ng-template>
 
-<!-- "Kommentare": the thread and the composer. -->
-<ng-template #chat>
-  <section class="ad__sec" [attr.aria-labelledby]="split() ? 'ad-comments' : null">
-    @if (split()) {
-      <div class="ad__secHead">
-        <h3 id="ad-comments" class="sec ad__secTitle">{{ 'applications.comments.title' | t }}</h3>
-        <span class="ad__count">{{ comments().length }}</span>
-      </div>
-    }
-    <div class="rowgroup ad__thread">
-      @for (comment of comments(); track comment.id) {
-        <article class="ad__msg" [class.ad__msg--own]="comment.isOwn">
-          <app-avatar [name]="authorName(comment)" [principalId]="comment.authorInfo?.principalId" size="sm" [decorative]="true" />
-          <div class="ad__msgBody">
-            <div class="ad__msgHead">
-              <span class="ad__msgAuthor ell">{{ authorName(comment) }}</span>
-              @if (canEditComment(comment)) {
-                <span class="ad__msgActions">
-                  <app-button
-                    variant="text"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="'applications.comments.edit' | t"
-                    (click)="openEditComment(comment)"
-                  ><app-icon name="edit" [size]="16" /></app-button>
-                  <app-button
-                    variant="text"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="'applications.comments.delete' | t"
-                    (click)="askDeleteComment(comment)"
-                  ><app-icon name="trash" [size]="16" /></app-button>
-                </span>
-              }
-            </div>
-            <span class="ad__msgMeta">
-              <time [attr.datetime]="comment.at">{{ comment.at | ldate: 'short' }}</time>
-              <span class="ad__msgDot" aria-hidden="true">·</span>
-              @if (comment.visibility === 'internal') {
-                <span>{{ 'applications.comments.internal' | t }}</span>
-              } @else {
-                <span class="ad__msgPublic">{{ 'applications.comments.public' | t }}</span>
-              }
-            </span>
-            <p class="ad__msgText">{{ comment.body }}</p>
-          </div>
-        </article>
-      } @empty {
-        <p class="ad__none ad__none--row">{{ 'applications.comments.empty' | t }}</p>
-      }
-      <form class="ad__composer" (submit)="submitComment($event)">
-        <textarea
-          class="ad__composerInput"
-          rows="1"
-          [placeholder]="'applications.comments.placeholder' | t"
-          [ngModel]="newComment()"
-          (ngModelChange)="newComment.set($event)"
-          (keydown.enter)="onComposerEnter($event)"
-          name="comment"
-          [attr.aria-label]="'applications.comments.add' | t"
-        ></textarea>
-        <!-- One group, so the toggle and the send button wrap together and the button
-             never sits alone on a second line. -->
-        <div class="ad__composerActions">
-          @if (canManage()) {
-            <app-segmented width="equal"
-              class="ad__composerVis"
-              [ariaLabel]="'applications.comments.visibility' | t"
-              [options]="visibilityOptions()"
-              [value]="visibility()"
-              (valueChange)="setVisibility($event)"
-            />
-          }
-          <app-button
-            type="submit"
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'applications.comments.send' | t"
-            [disabled]="!newComment().trim()"
-            [loading]="posting()"
-          ><app-icon name="send" [size]="19" /></app-button>
-        </div>
-      </form>
-    </div>
-  </section>
-</ng-template>
-
 <app-dialog
   [open]="confirmDelete()"
   [title]="'applications.detail.deleteTitle' | t"
@@ -506,7 +460,6 @@
   [closeLabel]="'applications.detail.cancel' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
-  <p class="ad__dlgLead">{{ 'applications.budget.lead' | t }}</p>
   <div class="ad__ccTree" appScrollFade="y">
     <app-cost-centre-tree
       [nodes]="budgetTree()"
@@ -543,52 +496,6 @@
   [(open)]="forceDialogOpen"
   (done)="onForced()"
 />
-
-<!-- Comment edit. Only the body changes. The visibility stays as written, so a public
-     comment cannot silently turn internal after the applicant read it. -->
-<app-dialog
-  [open]="editingComment() !== null"
-  [title]="'applications.comments.editTitle' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
-  (closed)="closeEditComment()"
->
-  <label class="ad__commentEdit">
-    <span>{{ 'applications.comments.body' | t }}</span>
-    <textarea
-      rows="5"
-      name="commentBody"
-      [ngModel]="commentDraft()"
-      (ngModelChange)="commentDraft.set($event)"
-      [attr.aria-label]="'applications.comments.body' | t"
-    ></textarea>
-  </label>
-  <p class="ad__dlgLead">{{ 'applications.comments.visibilityLocked' | t }}</p>
-  <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="closeEditComment()">{{ 'applications.detail.cancel' | t }}</app-button>
-    <app-button
-      variant="fill"
-      size="sm"
-      [loading]="savingComment()"
-      [disabled]="!commentDraft().trim()"
-      (click)="saveComment()"
-    >{{ 'applications.detail.save' | t }}</app-button>
-  </div>
-</app-dialog>
-
-<app-dialog
-  [open]="deletingComment() !== null"
-  [title]="'applications.comments.deleteTitle' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
-  (closed)="deletingComment.set(null)"
->
-  <p>{{ 'applications.comments.deleteConfirm' | t }}</p>
-  <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="deletingComment.set(null)">{{ 'applications.detail.cancel' | t }}</app-button>
-    <app-button variant="danger" size="sm" [loading]="removingComment()" (click)="doDeleteComment()">
-      {{ 'applications.comments.delete' | t }}
-    </app-button>
-  </div>
-</app-dialog>
 
 <app-share-links-dialog [applicationId]="app()?.id ?? null" [(open)]="shareDialogOpen" />
 

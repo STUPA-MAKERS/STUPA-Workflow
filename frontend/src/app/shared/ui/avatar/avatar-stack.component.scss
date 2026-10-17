@@ -1,14 +1,18 @@
-/* Each avatar overlaps the one before it, with a ring in the surface colour. */
+/* Each avatar overlaps the one before it, with a ring in the colour of the surface
+   below (`--stack-ring`). An extra small stack only touches, so no initials hide. */
 :host {
   display: inline-flex;
   flex: none;
   align-items: center;
 }
 .stack__av {
-  box-shadow: 0 0 0 2px var(--color-surface-2);
+  box-shadow: 0 0 0 2px var(--stack-ring, var(--color-surface-2));
 }
 .stack__av + .stack__av {
   margin-left: -8px;
+}
+.stack__av.av--xs + .stack__av {
+  margin-left: 2px;
 }
 /* "+N" has the shape of an avatar. */
 .stack__rest {
@@ -27,4 +31,9 @@
 .stack__rest.av--sm {
   width: 2rem;
   height: 2rem;
+}
+.stack__rest.av--xs {
+  width: 1.375rem;
+  height: 1.375rem;
+  font-size: 0.5625rem;
 }

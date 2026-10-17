@@ -42,3 +42,21 @@ class PrivacySettingsOut(_CamelModel):
 
 class PrivacySettingsUpdate(_CamelModel):
     default_retention_months: int = Field(alias="defaultRetentionMonths", ge=1)
+
+
+class EmailErasureBody(_CamelModel):
+    """The address whose applications and ticket reports go."""
+
+    email: str = Field(min_length=1)
+
+
+class EmailErasureOut(_CamelModel):
+    """What the erasure of an address anonymized.
+
+    ``principalId`` names an account under the address. Its erasure is a separate
+    step, because it deactivates the account.
+    """
+
+    applications: int
+    tickets: int
+    principal_id: UUID | None = Field(default=None, alias="principalId")

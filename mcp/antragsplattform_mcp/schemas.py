@@ -703,6 +703,53 @@ class SubstituteCreate(WireModel):
     substituteId: str
 
 
+TodoLinkKind = Literal["application", "meeting", "agenda_item", "ticket", "todo"]
+TicketKind = Literal["bug", "question", "idea"]
+TicketStatus = Literal["new", "in_progress", "done", "rejected"]
+
+
+class TodoLinkIn(WireModel):
+    kind: TodoLinkKind
+    targetId: str = Field(description="The id of the linked object; the caller must be able to read it")
+
+
+class TodoCardCreate(WireModel):
+    boardId: str
+    columnId: str | None = Field(default=None, description="Default: the first column")
+    title: str = Field(description="1 to 300 characters")
+    descriptionMd: str | None = Field(default=None, description="Markdown, up to 20000 characters")
+    dueDate: str | None = Field(default=None, description="ISO date YYYY-MM-DD")
+    assigneeIds: list[str] | None = Field(
+        default=None, description="Principal ids; each must be a member of the board (422 otherwise)"
+    )
+    labelIds: list[str] | None = Field(default=None, description="Label ids of the same board")
+    links: list[TodoLinkIn] | None = None
+
+
+class TodoCardPatch(WireModel):
+    version: int = Field(description="The `version` of the card as last read; 409 on a mismatch")
+    title: str | None = Field(default=None, description="1 to 300 characters")
+    descriptionMd: str | None = Field(default=None, description="Markdown; explicit null clears it")
+    dueDate: str | None = Field(default=None, description="ISO date; explicit null clears it")
+
+
+class TicketPatch(WireModel):
+    status: TicketStatus | None = None
+    assigneeId: str | None = Field(
+        default=None,
+        description="A holder of ticket.manage (see the ticket assignees); explicit null unassigns",
+    )
+    kind: TicketKind | None = None
+    duplicateOfId: str | None = Field(
+        default=None, description="Another ticket's id; only together with status `rejected`"
+    )
+    completeTodos: bool | None = Field(
+        default=None,
+        description="Only with status `done` or `rejected`: move every open linked to-do the "
+        "caller can write into its done column",
+    )
+
+
 def dump_create(model: BaseModel) -> dict[str, Any]:
     """Dump a create body: drop None values, keep defaults, use the wire aliases."""
     return model.model_dump(by_alias=True, exclude_none=True)

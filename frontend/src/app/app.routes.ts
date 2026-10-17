@@ -159,6 +159,13 @@ export const routes: Routes = [
               import('./pages/tasks/tasks-none.component').then((m) => m.TasksNoneComponent),
           },
           {
+            // A card of the group "To-Dos": the card detail in the right pane.
+            path: 'todo/:cardId',
+            data: { title: 'todos.card.kicker', parent: ['tasks'] },
+            loadComponent: () =>
+              import('./pages/tasks/task-todo.component').then((m) => m.TaskTodoComponent),
+          },
+          {
             path: ':id',
             // The detail of the applications page. The server authorizes the read.
             data: { title: 'applications.detail.crumb', parent: ['tasks'] },
@@ -333,6 +340,44 @@ export const routes: Routes = [
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/invoices/invoices.component').then((m) => m.InvoicesComponent),
+      },
+      {
+        path: 'tickets',
+        // The tickets of the help menu: the list beside the detail of the open ticket.
+        // `ticket.manage` works every ticket; a reporter reads and answers the own ones.
+        // The server answers 403/404 to anybody else.
+        data: { title: 'nav.tickets', permission: 'ticket.manage', allowReporter: true, wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
+        children: [
+          {
+            path: '',
+            loadComponent: () =>
+              import('./pages/tickets/tickets-none.component').then((m) => m.TicketsNoneComponent),
+          },
+          {
+            path: ':id',
+            data: { title: 'tickets.detail.crumb', parent: ['tickets'] },
+            loadComponent: () =>
+              import('./pages/tickets/ticket-detail.component').then((m) => m.TicketDetailComponent),
+          },
+        ],
+      },
+      {
+        // The To-Do boards: `/todos` opens the default board, `/todos/:boardId` one board,
+        // `/todos/alle` the meta-board "Alle" (every readable board, `ALL_BOARDS`).
+        // `?card=` opens a card in the drawer, `?view=list` the table. The server
+        // authorizes every board; any signed-in person has the personal one.
+        path: 'todos',
+        data: { title: 'nav.todos', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
+      },
+      {
+        path: 'todos/:boardId',
+        data: { title: 'nav.todos', wide: true },
+        canActivate: [authGuard],
+        loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
       },
       {
         // The admin frame (board Verwaltung): the admin navigation beside every admin
@@ -521,6 +566,16 @@ export const routes: Routes = [
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/config/webhooks.component').then((m) => m.WebhooksComponent),
+          },
+          {
+            path: 'help-tickets',
+            // `ticket.manage` alone sees the blocked senders, without the settings form.
+            data: { title: 'admin.helpTickets.title', permission: ['admin.site', 'ticket.manage'], parent: ['admin'] },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/help-tickets/help-tickets.component').then(
+                (m) => m.HelpTicketsComponent,
+              ),
           },
           {
             path: 'gremien/:id/roles',

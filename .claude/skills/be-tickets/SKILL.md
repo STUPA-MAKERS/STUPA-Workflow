@@ -1,0 +1,159 @@
+---
+name: be-tickets
+description: Tickets from the help menu — problem reports, questions and ideas (ticket/ticket_note/ticket_event, number T-0001 from ticket_number_seq). Covers the public one-way report POST /api/tickets (session, or ALTCHA + rate limit + body cap while tickets.publicEnabled), the ticket.manage work routes (list/counts/assignees/detail/patch/notes), draft attachments bound with ticket_id, note files, the sender block (ticket_sender_block, "Absender sperren"), the mails ticket_created/ticket_received/ticket_message/ticket_answer, the "Hilfe & Tickets" settings (help.wikiUrl, tickets.publicEnabled/notifyNew/retentionMonths, GET/PUT /api/admin/help-tickets), the retention cron anonymize_tickets, privacy export/erasure and the search source. Use when working on tickets, the help menu backend, TicketService, ticket mails, ticket retention or ticket attachments in backend/app/modules/tickets.
+---
+
+# Tickets — `backend/app/modules/tickets`
+
+**Does:** A person reports a bug, a question or an idea from the help menu. The answer is
+`{ number }` only, and the reporter gets a confirmation mail. A reporter **account** then
+reads its own tickets under `/tickets/mine` (the tab "Tickets" in the app): the report, the
+`public` notes and the status changes, and it writes its own messages. A report without
+an account stays one-way. Holders of `ticket.manage` work on the tickets: status,
+assignee, kind, notes (`internal` or `public`), a timeline of events and the technical
+context of the report.
+
+**Key files:**
+- `models.py` — `TicketSenderBlock` (see below), `Ticket` (number from `ticket_number_seq`, kind, status, reporter
+  `reporter_principal_id` XOR `reporter_email` until `anonymized_at`, `assignee_id`,
+  `duplicate_of_id`, `context` JSONB, `closed_at` = retention clock), `TicketNote` (soft
+  delete, `visibility` `internal|public`, `author_id` NULL only for a reporter note on an
+  anonymized ticket), `TicketEvent` (`created|status|assignee|kind|todo_done`).
+- `schemas.py` — wire models (camelCase). `TicketCreate` caps every string, because the
+  route is public. `TicketPatch.assigneeId: null` unassigns (`model_fields_set`).
+- `service.py` — `TicketService` (create, list with `q`, counts, assignees, detail with
+  `contextTarget`, patch, notes, anonymize), `ticket_managers` (role assignments plus OIDC
+  group mappings plus the admin role; active, not merged), `format_number`,
+  `TicketTodoHooks` (the to-do coupling: `openTodoCount`, `completeTodos`, and
+  `readable_cards`, so a `todo_done` event shows the card title only to a reader of its
+  board; the implementation is `todos/hooks.py`).
+- `router.py` — the routes; `get_ticket_service` is where the todos module wires its
+  hooks; `get_ticket_mail_sender` is the override point for tests.
+- `access.py` — `TICKET_MANAGE`.
+- Outside the module: `notifications/tickets.py` (both mails), `worker/tickets.py`
+  (retention cron), `shared/people.py` (`PersonRef`, `person_of`, `person_refs`),
+  `files/{drafts,service,router}.py` (ticket attachments), `admin/branding.py`
+  (`HelpSettings`, `TicketSettings`, `PublicBranding`), `admin/site_config_service.py`
+  (`active_branding`, `help_tickets`, `put_help_tickets`).
+
+**API surface:**
+- `POST /api/tickets` — dependencies in the order of `POST /applications`:
+  `enforce_ticket_payload_limit` (`MAX_TICKET_PAYLOAD_BYTES`, 64 KiB, 413),
+  `rate_limit_tickets` (`tickets:ip:<ip>`, `RL_TICKETS_IP_PER_HOUR` 10, OAuth exempt),
+  `require_public_or_session` (403 `tickets_public_disabled`),
+  `verify_altcha_unless_authenticated` (400 `altcha_failed`). Without a session `email`
+  is required (422). A session without an account row counts as no account.
+  201 `{ number: "T-0042" }`.
+- `GET /api/tickets` (`status`, `kind` repeatable; `assignee` = uuid | `me` | `none`; `q`
+  matches title, body, number `T-0040`/`0040`/`40`, reporter name and e-mail; paged,
+  newest first), `GET /api/tickets/counts`, `GET /api/tickets/assignees`,
+  `GET|PATCH /api/tickets/{id}`, `POST /api/tickets/{id}/notes`,
+  `PATCH|DELETE /api/tickets/{id}/notes/{noteId}` (403 `not_note_author`),
+  `POST|DELETE /api/tickets/{id}/block-sender` (returns `TicketDetail`),
+  `GET /api/tickets/blocked-senders`, `DELETE /api/tickets/blocked-senders/{blockId}` (204) — all
+  `ticket.manage`; an unknown ticket or note is 404. PATCH 422 codes:
+  `assignee_not_allowed` (not a holder), `duplicate_invalid` (`duplicateOfId` only with
+  `rejected`, never itself).
+- `GET /api/tickets/mine` (`status`, `kind`, `q`; paged), `GET /api/tickets/mine/{id}`
+  (`ReporterTicketDetail`: report, files, `public` notes, `status` events without actor and
+  without `duplicateOf`, `canReply`), `POST /api/tickets/mine/{id}/notes`
+  (`ReporterNoteCreate`, always `public`; 403 `sender_blocked` while a block matches),
+  `PATCH|DELETE /api/tickets/mine/{id}/notes/{noteId}` (own `public` messages; an
+  `internal` note gives 404 like a missing one, a team note 403 `not_note_author`, an edit
+  403 `sender_blocked` while a block matches, a delete stays allowed). The message and the
+  edit lock the ticket row, because an anonymization between the check and the commit would
+  miss the new note. Any session reads, no permission; a write needs a cookie session or a
+  token whose scope allows `ticket.manage` (`tickets:write`), else 403. A ticket of another
+  account, an anonymized ticket or a session without an account row gives 404 (list:
+  empty page). The routes stand before `/tickets/{ticket_id}` so `mine` never parses as an
+  id. The reporter sees no assignee, no context, no reporter block, no to-dos; a team author
+  shows by name only: no e-mail fallback of `PersonRef` and no `principalId`, because the id
+  opens the Gravatar of the e-mail. `updatedAt` also moves on internal activity.
+- `POST /api/tickets/{id}/notes` takes `visibility` (`internal` default, `public`);
+  `TicketNoteOut` carries `visibility` and `fromReporter`.
+- `GET /api/auth/me` carries `has_reported_tickets` (a ticket of the account that is not
+  anonymized); the frontend shows the tab and lets the route guard pass (`allowReporter`).
+- `GET|PUT /api/admin/help-tickets` (`admin.site`) — the direct save of the admin page.
+- Public `GET /api/site-config` carries `help.wikiUrl` and `tickets.publicEnabled` top
+  level; its `branding` omits `help` and `tickets` (`PublicBranding`).
+
+**Data rules:**
+- A status change writes a `status` event; entry into `done`/`rejected` sets `closed_at`,
+  `done`→`rejected` keeps it, a reopen clears it. `duplicateOf` in the payload is the
+  number. Assignee events store ids; the detail resolves them to `PersonRef`.
+- Events get `created_at` from the process clock, because one PATCH can write two events
+  and `now()` of the transaction would give them the same time.
+- Attachments: the dialog uploads with `POST /api/apply/attachments` (draft token), then
+  `POST /api/tickets` binds the drafts (`bind_drafts(..., ticket_id=...)`). The download
+  route `GET /api/attachments/{id}/download` and the URL route need `ticket.manage` for a
+  ticket attachment, or the reporter account (`reporter_reads_file`: a report file, or a
+  file of a live `public` note; never on an anonymized ticket), else 404. Application paths filter `application_id IS NOT NULL`
+  (`BOUND`), so a ticket file never shows there.
+- Note files: `POST /notes` takes `NoteCreate` (`body` may be empty with a file,
+  `attachmentIds` ≤ 5, `draftToken`) and binds with `ticket_note_id`; files on an
+  anonymized ticket give 422 `ticket_anonymized`. With files `add_note` reads the ticket
+  `FOR UPDATE`, and the cron `anonymize_tickets` and the erasure (`anonymize_reported_tickets`)
+  lock it too, so a note cannot bind files
+  between the check and the anonymization. `TicketNoteOut.attachments` lists them;
+  `delete_note` and `delete_for_ticket` (anonymization, retention) remove them.
+- **Sender block** (`ticket_sender_block`): exactly one of `principal_id` (the reporter
+  account, cascade) or `email` (lowercase), plus `source_ticket_id`, `created_by`,
+  `hit_count`, `last_hit_at`; a partial unique index per target, so a second block is a
+  no-op. Blocking yourself (account or own account e-mail) is 422 `sender_is_self`; an
+  anonymized or sender-less ticket is 409 `ticket_sender_unknown`. `TicketDetail.senderBlocked`
+  and the per-ticket unblock use the same cross-identity condition as `matching_block`
+  (`_sender_condition`): the flag shows every block that swallows the sender, and the
+  unblock lifts all of them (account and account e-mail, or e-mail and its accounts).
+  `create` checks `matching_block` after the draft check: an account matches by id or by
+  its e-mail, an address matches the address or an account with it, case-insensitive. A
+  match takes a number from the sequence, counts the hit, commits and answers the normal
+  201 `{ number }` (`SwallowedReport`) — no ticket row, no bound drafts, no mail. The log
+  names the block id, never the address. The merge combines blocks; the erasure deletes
+  them (be-privacy).
+- `PersonRef`: name, else e-mail, else the deleted person (`null/null`).
+
+**Mails:** `ticket_created` to the holders of `ticket.manage` (not the reporter), only while
+`tickets.notifyNew`, opt-out kind, link `/tickets/{id}`. `ticket_received` to the reporter
+(account e-mail or given e-mail) in `context.language`, else `de`, with `wikiUrl`; its kind
+is not in `NOTIFICATION_KINDS`, so nobody can switch it off; only a report of an account
+links `/tickets/{id}` (the tab), a report without a session stays one-way. A new `public`
+message (`notify_ticket_note`, background task of both note routes, idempotency key per note)
+goes to the other side (reporter messages capped by `rl_ticket_messages_per_hour`, 60/h per account): from the reporter as `ticket_message` to the assignee while they hold an address and
+`ticket.manage`, else to every holder (never the reporter's own address); from the team as
+`ticket_answer` to the live reporter account (active, not merged), with the author's name only; a message with neither text nor files sends nothing. Internal notes, edits,
+anonymized tickets and reports without an account send nothing; a message of files only
+names its files. Both kinds are opt-out. For a report
+without a session the context `title` is empty, because that address is unchecked and the
+platform must not mail the caller's text to it; the builtin texts drop the quoted title. Both run as
+a background task after the commit and never fail the report.
+
+**Retention and privacy:** `anonymize_tickets` (arq cron 03:45) anonymizes tickets whose
+`closed_at` is older than `tickets.retentionMonths` (null = off): reporter, context and
+attachments (row + object) go, title, body, notes and events stay, but the `created` event
+loses its actor and the public notes of the reporter lose their author (both are the reporter; an internal note of the same account is team work and keeps it), one commit and one `anonymization` audit entry
+per ticket. `PrincipalService.erase` gives the same anonymization to the tickets of the
+account and to the reports without a session under the account's e-mail; an applicant
+erasure does it for the tickets of the request's e-mail
+(`privacy.service.anonymize_reported_tickets`). The Art. 15 export has a sheet "Tickets" (with text and context) and lists the ticket attachments in "Anhänge", and "Ticket-Sperren" lists the sender blocks. The account merge moves
+reporter, assignee, note author and event actor (area `tickets`).
+
+**Search:** source `ticket` behind `ticket.manage`, reuses `TicketService.list`; title
+`T-0040 · <title>`, subtitle the status in the reader's language, url `/tickets/{id}`.
+
+**Conventions & gotchas:**
+- The migration `071d20ab0e10` adds `ticket_note.visibility` (existing notes stay
+  `internal`) and drops `NOT NULL` from `ticket_note.author_id`.
+- The migration `269d13cd80a8` adds the three message owners of `attachment` and
+  `ticket_sender_block` (idempotent, with a downgrade).
+- The migration `86718c748401_tickets` is idempotent (baseline `create_all` already builds
+  the tables) and widens `ck_attachment_draft_xor_application` to three owners.
+- `TicketContext.url` keeps a platform page only: an http(s) URL on the origin of
+  `PUBLIC_BASE_URL` or a path with one leading `/` (`platform_page_url`). Any other value is
+  dropped, not rejected, because the detail shows it as a link and the route is public.
+- `ticket.manage` is in `PERMISSION_CATALOGUE`, granted to the `admin` role by the
+  migration, and in the OAuth scope `tickets:write`.
+- The unit coverage gate counts unit tests only: `tests/unit/modules/tickets` uses a
+  scripted session (`fakes.py`); `tests/integration/modules/tickets` runs on Postgres.
+
+**Related:** be-todos, be-files, be-antiabuse, be-notifications, be-admin, be-privacy,
+be-search, be-auth, frontend

@@ -114,6 +114,14 @@ _DATA_TABLES = (
     "attachment_draft_token",
     # Stored audit-chain checks (Z6). No FK reaches this table either.
     "audit_verification",
+    # Tickets. CASCADE also clears the notes, the events and the ticket attachments.
+    "ticket",
+    # Sender blocks. A block of an e-mail address has no FK to a ticket or an account
+    # that a CASCADE follows.
+    "ticket_sender_block",
+    # To-do boards. CASCADE also clears the columns, the cards and their rows. A test
+    # creates the boards it needs (`ensure_gremium_board`, `GET /todos/boards`).
+    "todo_board",
 )
 
 

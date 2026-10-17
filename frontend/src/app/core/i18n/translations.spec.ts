@@ -1,4 +1,5 @@
-import { de, en } from './translations';
+import { de } from './translations';
+import { en } from './translations.en';
 
 /**
  * Catalog parity.

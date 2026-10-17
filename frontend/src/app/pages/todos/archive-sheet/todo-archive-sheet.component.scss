@@ -1,0 +1,81 @@
+:host {
+  display: contents;
+}
+.as {
+  /* The sheet has the surface-2 background of the search field. The field takes the
+     next surface, so that its edge shows. */
+  --sp-bg: var(--color-surface-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-4);
+}
+.as__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.as__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-3);
+}
+/* The row has the surface-3 fill of a tonal button. The restore button takes the next
+   surface, and its hover a step further, so that it shows on the row. */
+.as__row {
+  --as-restore: var(--color-surface-4);
+  --as-restore-hover: color-mix(in srgb, var(--color-text) 8%, var(--color-surface-4));
+}
+.as__restore {
+  --color-surface-3: var(--as-restore);
+  --color-surface-4: var(--as-restore-hover);
+  flex: none;
+}
+.as__open {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.as__open:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.as__title {
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.as__sub,
+.as__note {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.as__note {
+  margin: 0;
+}
+.as__note--error {
+  color: var(--color-danger);
+}
+
+/* The loading rows: the day line and the size of the small tonal button. */
+.as__skelSub {
+  width: 6rem;
+}
+.as__skelButton {
+  width: 7.5rem;
+  height: var(--control-height-sm);
+  border-radius: 999px;
+}

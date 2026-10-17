@@ -4,7 +4,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { AuthService } from './auth.service';
+import { AuthService, loginReturnTo } from './auth.service';
 import { USE_MOCK_API } from '../api/api.config';
 import { IS_INSTALLED_APP } from '../browser/installed-app.token';
 import type { Principal } from '../api/models';
@@ -80,6 +80,40 @@ describe('AuthService', () => {
   it('redirects to the OIDC login endpoint', () => {
     auth.login();
     expect(assign).toHaveBeenCalledWith('/api/auth/login');
+  });
+
+  it('returns to the current page after the login', () => {
+    location.pathname = '/applications/a1';
+    location.search = '?tab=x';
+    location.hash = '#comment-c1';
+    auth.login();
+    expect(assign).toHaveBeenCalledWith(
+      '/api/auth/login?returnTo=%2Fapplications%2Fa1%3Ftab%3Dx%23comment-c1',
+    );
+  });
+
+  it('marks a started login and clears the mark once a principal loads', () => {
+    auth.login();
+    expect(sessionStorage.getItem('auth.loginStartedAt')).not.toBeNull();
+    auth.ensureLoaded().subscribe();
+    http.expectOne('/api/auth/me').flush(PRINCIPAL);
+    expect(sessionStorage.getItem('auth.loginStartedAt')).toBeNull();
+  });
+
+  it('returns to the target it is given', () => {
+    auth.login('/todos/b1?view=list');
+    expect(assign).toHaveBeenCalledWith('/api/auth/login?returnTo=%2Ftodos%2Fb1%3Fview%3Dlist');
+  });
+
+  it('keeps only safe parts of the return target', () => {
+    expect(loginReturnTo('/')).toBeNull();
+    expect(loginReturnTo('/api/auth/me')).toBeNull();
+    expect(loginReturnTo('https://evil.example/x')).toBeNull();
+    expect(loginReturnTo('//evil.example/x')).toBeNull();
+    expect(loginReturnTo('/antrag/a1#t=secret')).toBe('/antrag/a1');
+    expect(loginReturnTo('/status?t=secret&app=a1')).toBe('/status?app=a1');
+    expect(loginReturnTo('/applications/a1#comments')).toBe('/applications/a1#comments');
+    expect(loginReturnTo('/applications/a1#comment-0d4c-11')).toBe('/applications/a1#comment-0d4c-11');
   });
 
   it('starts the login of the installed app with client=pwa', () => {
@@ -170,6 +204,10 @@ describe('AuthService', () => {
     expect(auth.gremiumPermissions()).toEqual({});
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
+    expect(auth.hasReportedTickets()).toBe(false);
+    // Without a principal a report marks nothing.
+    auth.markReportedTicket();
+    expect(auth.hasReportedTickets()).toBe(false);
 
     auth.ensureLoaded().subscribe();
     // Authenticated, but the optional fields are absent. The fallbacks still apply.
@@ -178,6 +216,13 @@ describe('AuthService', () => {
     expect(auth.sessionManageGremien()).toEqual([]);
     expect(auth.hasScopedBudgetView()).toBe(false);
     expect(auth.inSubstitutePool()).toBe(false);
+    expect(auth.hasReportedTickets()).toBe(false);
+    // A report of this session opens the tab at once; a second report changes nothing.
+    auth.markReportedTicket();
+    expect(auth.hasReportedTickets()).toBe(true);
+    const marked = auth.principal();
+    auth.markReportedTicket();
+    expect(auth.principal()).toBe(marked);
   });
 
   it('falls back to the placeholder display name when name and email are blank', () => {

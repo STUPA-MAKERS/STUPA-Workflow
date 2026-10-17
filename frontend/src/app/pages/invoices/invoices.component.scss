@@ -44,6 +44,10 @@
   font-size: var(--fs-small);
   white-space: nowrap;
 }
+/* "0 von 0" is not true before the first answer: the place stays, the text waits. */
+.inv__count--wait {
+  visibility: hidden;
+}
 .inv__selText {
   flex: 1 1 auto;
   min-width: 0;
@@ -104,8 +108,13 @@
 .inv__month {
   padding: 18px var(--space-4) 6px;
 }
-.inv__group:first-child .inv__month {
+.inv__group:first-child .inv__month,
+.inv__skel .inv__month {
   padding-top: var(--space-2);
+}
+/* The loading shape: a bar about as wide as "September 2026". */
+.inv__skelMonth {
+  width: 7rem;
 }
 .inv__rows {
   display: flex;
@@ -348,9 +357,6 @@
 .inv__dropTitle {
   font-size: var(--fs-xl);
   font-weight: var(--fw-semibold);
-}
-.inv__dropHint {
-  color: var(--color-text-muted);
 }
 
 @include bp.phone {

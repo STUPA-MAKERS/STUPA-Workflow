@@ -1,0 +1,341 @@
+@use 'breakpoints' as bp;
+@use '../../../features/meetings/scroll-fade' as fade;
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* Without `fill` the board is as tall as its cards: the scroll areas and the phone pager
+   take the height of their content instead of a share of the free height, which a board
+   of natural height does not have. */
+:host(.bv-host--natural) .bv__scroll,
+:host(.bv-host--natural) .bv__pager {
+  flex: 0 0 auto;
+}
+:host(.bv-host--natural) .bv__page {
+  overflow-y: visible;
+}
+
+/* The columns side by side; the board scrolls sideways, each column down. */
+.bv {
+  display: grid;
+  flex: 1 1 auto;
+  grid-auto-columns: minmax(17rem, 1fr);
+  grid-auto-flow: column;
+  gap: var(--space-4);
+  min-height: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+.bv__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-2);
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-2);
+}
+/* The dark column is surface 1, so its tiles (surface 3) stand out as the white tiles do
+   on the grey column of the light theme. */
+:host-context([data-theme='dark']) .bv__col {
+  background: var(--color-surface-1);
+}
+/* The cards scroll between the column head and the column foot. The scroll area takes
+   the free height of the column, so the foot ("+ To-Do", the quick field, the done
+   links) sits at the bottom edge of the column. */
+.bv__scroll {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+/* The cards of a column and of a phone page fade at an end only while more cards lie past
+   it (`appScrollFade="y"`). */
+.bv__scroll,
+.bv__page {
+  @include fade.fade-y(var(--space-5));
+}
+.bv__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 0 0 var(--space-2);
+}
+.bv__name {
+  display: flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+}
+.bv__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-regular);
+}
+.bv__doneTag {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+/* The name and the count start the head; the done tag and the menu end it. */
+.bv__doneTag,
+.bv__menu {
+  margin-inline-start: auto;
+}
+.bv__doneTag + .bv__menu {
+  margin-inline-start: 0;
+}
+
+/* The drop list fills the scroll area, so an empty column is a drop target down to its
+   foot. */
+.bv__cards {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 3rem;
+}
+.bv__item {
+  display: block;
+}
+.bv__item:focus-visible {
+  outline: none;
+}
+/* The tile in the hand: opaque, lifted with a shadow and tilted a little. The CDK opens
+   it as a popover, so the UA popover box (border, padding, canvas colour) is reset. */
+.bv__preview {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  box-shadow: 0 18px 40px -8px rgb(0 0 0 / 0.45), 0 4px 12px rgb(0 0 0 / 0.25);
+  /* `rotate`, not `transform`: the CDK sets the inline transform of the preview. */
+  rotate: 2deg;
+  opacity: 1;
+  /* The tilted preview is a composited layer. Where the edge of the tile is the edge of
+     the layer, a GPU compositor can draw that edge without antialiasing, so it shows
+     steps. The transparent outline makes the layer 1px larger than the tile, and the
+     hidden back face keeps the preview on one layer, so the edge is painted inside the
+     layer and gets smoothed. */
+  outline: 1px solid transparent;
+  backface-visibility: hidden;
+}
+/* An accent edge marks the tile in the hand, drawn on the tile itself so it follows
+   its corners. It is an inset shadow, not an outline: the shadow is painted as a
+   rounded shape with smoothed edges also when it is tilted. */
+.bv__preview app-todo-card-tile {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+/* Where it lands: the item itself, kept at the height of the tile, as a dashed box. */
+.bv__item.cdk-drag-placeholder {
+  border-radius: var(--radius-lg);
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+  background: transparent;
+}
+.bv__item.cdk-drag-placeholder > * {
+  visibility: hidden;
+}
+.bv__cards.cdk-drop-list-dragging .bv__item:not(.cdk-drag-placeholder) {
+  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+}
+.cdk-drag-animating {
+  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .bv__cards.cdk-drop-list-dragging .bv__item,
+  .cdk-drag-animating {
+    transition: none;
+  }
+}
+
+.bv__doneFoot {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text-muted);
+}
+.bv__link,
+.bv__more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.bv__link:hover,
+.bv__more:hover {
+  text-decoration: underline;
+}
+.bv__link:focus-visible,
+.bv__more:focus-visible,
+.bv__add:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.bv__add {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.bv__add:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.bv__quick {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-lg);
+  /* The fill of a tile (todo-card-tile): the new card sits among the cards. */
+  background: var(--color-surface-1);
+}
+:host-context([data-theme='dark']) .bv__quick {
+  background: var(--color-surface-3);
+}
+.bv__quickInput {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  resize: none;
+}
+.bv__quickFoot {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ------------------------------------------------------------------ phone */
+/* The board fills the free height down to the bottom bar (the page is a pane page on a
+   phone too). The pager scrolls sideways, one page per column; each page scrolls down by
+   itself, so a vertical swipe moves the cards and a horizontal one the column. */
+.bv--phone {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: visible;
+}
+.bv__pager {
+  display: grid;
+  flex: 1 1 0;
+  grid-auto-columns: 100%;
+  grid-auto-flow: column;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.bv__pager::-webkit-scrollbar {
+  display: none;
+}
+.bv__page {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  /* The page reaches down to the bottom bar; its last card scrolls clear of the dots and
+     of the floating "+ To-Do" (56px, --space-4 above the bar). */
+  padding-bottom: calc(56px + 2 * var(--space-4));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+.bv__phoneCards {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* An empty column: "Keine Karten" in the middle of the page. */
+.bv__page--empty .bv__phoneCards {
+  align-items: center;
+  justify-content: center;
+}
+.bv__empty {
+  margin: 0;
+  padding: var(--space-6) var(--space-2);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+/* The dots lie over the foot of the pages, on the line of the floating "+ To-Do" button
+   (56px high, --space-4 above the bar), in the middle and clear of it. */
+.bv__dots {
+  position: absolute;
+  right: 0;
+  bottom: var(--space-4);
+  left: 0;
+  pointer-events: none;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 56px;
+}
+.bv__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-surface-3);
+}
+.bv__dot--on {
+  width: 16px;
+  background: var(--color-accent);
+}

@@ -16,6 +16,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { DraftAttachmentsService, type DraftFile } from '../../../features/apply/draft-attachments.service';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { runAxe } from '../../../../testing/a11y';
+import { optionLabels } from '../../../../testing/select';
 import {
   APPLICANT_SEARCH_DELAY_MS,
   ApplicationCaptureComponent,
@@ -132,9 +133,9 @@ describe('ApplicationCaptureComponent', () => {
   it('shows the head, the sections and offers only the active types', async () => {
     const s = await setup();
     expect(screen.getByRole('heading', { name: 'Antrag erfassen' })).toBeTruthy();
-    expect(screen.getByText('Für eine andere Person · geht direkt in den Ablauf')).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Förderantrag' })).toBeTruthy();
-    expect(screen.queryByRole('option', { name: 'Alt' })).toBeNull();
+    expect(await optionLabels(screen.getByRole('combobox', { name: 'Antragsart' }))).toEqual([
+      'Förderantrag',
+    ]);
     expect(screen.getByText('Wähle eine Antragsart, dann erscheinen die Felder.')).toBeTruthy();
     expect(s.comp.receivedOn()).toBe(localToday());
     expect((screen.getByTestId('cap-submit').querySelector('button') as HTMLButtonElement).disabled).toBe(true);
@@ -165,7 +166,6 @@ describe('ApplicationCaptureComponent', () => {
     screen.getByRole('option', { name: /Anna Antrag/ }).click();
     s.flush();
     expect(screen.getByTestId('cap-picked').textContent).toContain('Anna Antrag · anna@example.org');
-    expect(screen.getByText('Für Anna Antrag · anna@example.org · geht direkt in den Ablauf')).toBeTruthy();
     s.comp.clearPick();
     s.flush();
     expect(s.comp.picked()).toBeNull();
@@ -219,7 +219,6 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.comp.guestName()).toBe('Gisela Gast');
     s.flush();
     expect(screen.getByLabelText(/^Name/)).toBeTruthy();
-    expect(screen.getByText(/persönlichen Link/)).toBeTruthy();
   });
 
   it('checks the e-mail of a new person', async () => {

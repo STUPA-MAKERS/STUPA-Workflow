@@ -148,16 +148,15 @@ async def seed(
         if existing is None:
             session.add(lead)
         await session.flush()
-        writer = PrincipalRow(sub=f"w-{tag}", display_name="W", email=f"w-{tag}@x.de")
-        session.add(writer)
-        await session.flush()
+        # The lead also keeps the minutes: only the protokollant opens and closes votes.
+        keeper = existing or lead
         meeting = Meeting(
             gremium_id=gremium.id,
             title="7. Sitzung",
             date=_date(2026, 10, 6),
             start_time=_time(18, 0),
             status=status,
-            protokollant_id=writer.id,
+            protokollant_id=keeper.id,
             public_join=public_join,
             guests_mode=guests_mode,
             join_code=("A" + tag[:5])

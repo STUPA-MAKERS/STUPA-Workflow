@@ -13,11 +13,18 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  MEDIA,
   type SelectOption,
-  SelectComponent,
   TimeInputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
@@ -116,11 +123,12 @@ function emptyDraft(): PolicyDraft {
     DialogComponent,
     IconComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TimeInputComponent,
     PageHeaderComponent,
     GuestSettingsComponent,
     MeetingWindowSettingsComponent,
+    RowMenuComponent,
   ],
   templateUrl: './deadlines.component.html',
   styleUrl: './deadlines.component.scss',
@@ -161,6 +169,21 @@ export class AdminDeadlinesComponent {
     },
   ]);
   protected readonly rowId = (r: unknown): string => (r as DeadlinePolicy).id;
+  /** A phone shows cards: the actions of a policy go into the ⋮ menu of its card. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly rowMenu = computed<RowMenuSection[]>(() => [
+    {
+      items: [
+        { id: 'edit', label: this.i18n.translate('admin.common.edit'), icon: 'edit' },
+        { id: 'remove', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true },
+      ],
+    },
+  ]);
+
+  protected onRowMenu(policy: DeadlinePolicy, index: number, item: RowMenuItem): void {
+    if (item.id === 'edit') this.openEdit(index);
+    else if (item.id === 'remove') this.askDelete(policy);
+  }
 
   constructor() {
     this.api.listDeadlinePolicies().subscribe({

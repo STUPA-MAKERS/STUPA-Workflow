@@ -88,8 +88,7 @@
 }
 :host(.km--sheet) .km__cap,
 :host(.km--sheet) .km__plan,
-:host(.km--sheet) .km__person,
-:host(.km--sheet) .km__hint {
+:host(.km--sheet) .km__person {
   padding-inline: var(--space-1);
 }
 :host(.km--sheet) .km__person {
@@ -119,11 +118,5 @@
 .km__empty {
   padding: var(--space-3) var(--space-4);
   font-size: var(--fs-body);
-  color: var(--color-text-muted);
-}
-.km__hint {
-  margin: 0;
-  padding: var(--space-2) var(--space-4) var(--space-1);
-  font-size: var(--fs-small);
   color: var(--color-text-muted);
 }

@@ -6,6 +6,7 @@ import { AdminApiService } from '../admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminDeadlinesComponent } from './deadlines.component';
+import { pickOption } from '../../../../testing/select';
 
 const POLICIES: DeadlinePolicy[] = [
   { id: 'dp-1', key: 'semester', label: { de: 'Semesterfrist', en: 'Semester' }, kind: 'absolute', absoluteAt: '2026-07-01T00:00:00Z' },
@@ -49,7 +50,7 @@ describe('AdminDeadlinesComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Frist hinzufügen' }));
     // A key, a relative kind and an offset enable the save.
     await userEvent.type(screen.getByLabelText('Schlüssel'), 'mahnung');
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Art' }), 'relative_submitted');
+    await pickOption(screen.getByRole('combobox', { name: 'Art' }), 'Einreichung + X Tage');
     await userEvent.type(screen.getByLabelText('Frist in Tagen'), '14');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.createDeadlinePolicy).toHaveBeenCalledWith(

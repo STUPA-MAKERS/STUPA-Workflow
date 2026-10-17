@@ -1,31 +1,27 @@
 <section class="bt">
-  <app-page-header [flush]="true" [title]="'budget.tree.title' | t" [subtitle]="'budget.tree.subtitle' | t">
-    @if (phone()) {
-      <ng-container ngProjectAs="[actions]">
+  <app-page-header [flush]="true" [title]="'budget.tree.title' | t">
+    <ng-container ngProjectAs="[actions]">
+      @if (phone()) {
         <app-button variant="fill" (click)="openTop()">
           <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTopShort' | t }}
         </app-button>
         <app-row-menu [label]="'budget.tree.moreActions' | t" [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
-      </ng-container>
-    }
+      } @else {
+        <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStateConfig()">
+          {{ 'budget.tree.stateConfig' | t }}
+        </app-button>
+        <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStichtag()">
+          {{ 'budget.tree.stichtagTitle' | t }}
+        </app-button>
+        <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
+          <app-icon name="cal" [size]="16" /> {{ 'budget.tree.fyTitle' | t }}
+        </app-button>
+        <app-button variant="fill" (click)="openTop()">
+          <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTop' | t }}
+        </app-button>
+      }
+    </ng-container>
   </app-page-header>
-
-  @if (!phone()) {
-    <div class="bt__toolbar" role="toolbar" [attr.aria-label]="'budget.tree.toolbar' | t">
-      <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStateConfig()">
-        {{ 'budget.tree.stateConfig' | t }}
-      </app-button>
-      <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStichtag()">
-        {{ 'budget.tree.stichtagTitle' | t }}
-      </app-button>
-      <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
-        <app-icon name="cal" [size]="16" /> {{ 'budget.tree.fyTitle' | t }}
-      </app-button>
-      <app-button variant="fill" (click)="openTop()">
-        <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTop' | t }}
-      </app-button>
-    </div>
-  }
 
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.error' | t }}</app-note>
@@ -225,7 +221,6 @@
         />
         <app-input [label]="'budget.tree.name' | t" [ngModel]="editName()" (ngModelChange)="editName.set($event)" name="editName" />
       </div>
-      <p class="bt__hint">{{ 'budget.tree.editNodeHint' | t }}</p>
 
       <fieldset class="bt__colors">
         <legend class="bt__legend">{{ 'budget.tree.col.color' | t }}</legend>
@@ -263,18 +258,16 @@
             <app-button variant="text" size="sm" (click)="clearColor()">{{ 'budget.tree.colorClear' | t }}</app-button>
           }
         </div>
-        <p class="bt__hint">{{ 'budget.tree.colorHint' | t }}</p>
       </fieldset>
 
       <div class="bt__rule" aria-hidden="true"></div>
 
-      <app-switch [checked]="editActive()" (checkedChange)="editActive.set($event)" [hint]="'budget.tree.activeHint' | t">
+      <app-switch [checked]="editActive()" (checkedChange)="editActive.set($event)">
         {{ 'budget.tree.active' | t }}
       </app-switch>
       <app-checkbox
         [ngModel]="editHidden()"
         (ngModelChange)="editHidden.set($event)"
-        [hint]="'budget.tree.hiddenInBudgetHint' | t"
         name="editHidden"
         >{{ 'budget.tree.hiddenInBudget' | t }}</app-checkbox
       >
@@ -284,7 +277,6 @@
         name="editViewGremium"
         [label]="'budget.tree.viewGremium' | t"
         [placeholder]="'budget.tree.viewGremiumNone' | t"
-        [hint]="'budget.tree.viewGremiumHint' | t"
         [options]="gremiumOptions()"
         [ngModel]="editViewGremium()"
         (ngModelChange)="editViewGremium.set($event)"
@@ -359,7 +351,6 @@
         name="topStMonth"
       />
     </div>
-    <p class="bt__hint">{{ 'budget.tree.stichtagHint' | t }}</p>
   </form>
   <div dialog-footer class="bt__foot">
     <app-button variant="text" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
@@ -381,7 +372,6 @@
     <app-input
       type="number"
       [label]="'budget.tree.fyYear' | t"
-      [hint]="'budget.tree.fyYearHint' | t"
       [ngModel]="newFy().year"
       (ngModelChange)="patchFyYear($event)"
       name="fyYear"
@@ -402,10 +392,18 @@
         <span [class.bt__muted]="!$any(fy).active">{{ ($any(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t }}</span>
       </ng-template>
       <ng-template appCell="actions" let-fy>
-        <span class="bt__actions">
-          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyEdit' | t) + ': ' + $any(fy).display" (click)="openFyEdit($any(fy))"><app-icon name="edit" /></app-button>
-          <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyDelete' | t) + ': ' + $any(fy).display" (click)="askFyDelete($any(fy))"><app-icon name="trash" /></app-button>
-        </span>
+        @if (phone()) {
+          <app-row-menu
+            [label]="('budget.tree.rowActions' | t) + ': ' + $any(fy).display"
+            [sections]="fyMenu()"
+            (selected)="onFyMenu($any(fy), $event)"
+          />
+        } @else {
+          <span class="bt__actions">
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyEdit' | t) + ': ' + $any(fy).display" (click)="openFyEdit($any(fy))"><app-icon name="edit" /></app-button>
+            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyDelete' | t) + ': ' + $any(fy).display" (click)="askFyDelete($any(fy))"><app-icon name="trash" /></app-button>
+          </span>
+        }
       </ng-template>
     </app-data-table>
   </section>
@@ -422,7 +420,7 @@
   @if (fyEdit()) {
     <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
       <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" />
-      <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)" [hint]="'budget.tree.fyEditHint' | t">
+      <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">
         {{ 'budget.tree.fyActive' | t }}
       </app-switch>
     </form>
@@ -483,7 +481,6 @@
         />
       </label>
     </div>
-    <p class="bt__hint">{{ 'budget.tree.stichtagHint' | t }}</p>
   </form>
   <div dialog-footer class="bt__foot">
     <app-button variant="fill" (click)="closeStichtag()">{{ 'budget.tree.done' | t }}</app-button>
@@ -498,7 +495,6 @@
   [closeLabel]="'budget.tree.cancel' | t"
   (closed)="closeStateConfig()"
 >
-  <p class="bt__hint">{{ 'budget.tree.stateConfigHint' | t }}</p>
   @if (stateOptions().length) {
     <table class="bt__states">
       <thead>

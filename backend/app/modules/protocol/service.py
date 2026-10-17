@@ -56,10 +56,12 @@ from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAtten
 from app.modules.livevote.roster import meeting_roster_filter, roster_filter
 from app.modules.livevote.service import MeetingService
 from app.modules.notifications.layout import (
+    append_link_text,
     reason_text,
     render_layout,
     text_to_html,
 )
+from app.modules.notifications.links import protocol_link, public_protocol_url
 from app.modules.notifications.mail import (
     MailAttachment,
     MailMessage,
@@ -80,8 +82,8 @@ from app.modules.protocol.markdown import (
     demote_headings,
     guest_vote_note,
     protocol_variant_for,
-    replace_vote_block,
-    vote_in_body,
+    replace_vote_blocks,
+    votes_in_body,
 )
 from app.modules.protocol.models import Protocol, ProtocolVoteRef
 from app.modules.protocol.public import (
@@ -1078,21 +1080,27 @@ class ProtocolService:
                 # F2: an election callout that the protokollant put into the text
                 # names every candidate with the votes. The public text carries the
                 # public form: the elected names only.
-                for view in views:
-                    if getattr(view, "kind", "motion") == "election":
-                        body = replace_vote_block(
-                            body, _snippet(view, "Beschlussfrage", public=True)
+                body = replace_vote_blocks(
+                    body,
+                    [
+                        (
+                            _snippet(view, "Beschlussfrage"),
+                            _snippet(view, "Beschlussfrage", public=True),
                         )
+                        for view in views
+                        if getattr(view, "kind", "motion") == "election"
+                    ],
+                )
             if body:
                 # Demote the body headings by one level. Only the item heading stays
                 # top-level. Otherwise every `#` counts as its own agenda item.
                 block.append(demote_headings(body))
             top = PublicTop(number=number, title=heading, markdown=body or None)
-            for view in views:
-                snippet = _snippet(view, "Beschlussfrage", public=public)
-                # The protokollant may have put the result into the text already,
-                # with the same snippet. One box per vote.
-                in_text = vote_in_body(body, snippet)
+            snippets = [_snippet(view, "Beschlussfrage", public=public) for view in views]
+            # The protokollant may have put the result into the text already, with
+            # the same snippet. One box per vote, also for two votes with one question.
+            found = votes_in_body(body, snippets)
+            for view, snippet, in_text in zip(views, snippets, found, strict=True):
                 if getattr(view, "status", None) == "closed":
                     # The public list shows the result also when the protokollant
                     # put the snippet into the text already. `inText` tells the
@@ -1198,10 +1206,14 @@ class ProtocolService:
         """Mail the protocol to MAIL_LIST(gremium) under an idempotency key.
 
         The mail carries the PDF as an attachment. The subject and the body name the
-        Gremium and the meeting. The HTML version uses the branded mail layout. The
-        mail holds no link, by design. The former `/api/protocols/{id}/pdf` link
-        needed a login and a meeting management right. It was broken for the members
-        and for the external list addresses.
+        Gremium and the meeting. The HTML version uses the branded mail layout.
+
+        The mail links the meeting page, which holds the protocol: a member opens it
+        after the login. An external list address cannot log in, so the PDF stays the
+        content of the mail. When the protocol is public, the mail also links its
+        public version, which everybody can open. The mail never links the API
+        (`/api/protocols/{id}/pdf`), because that read needs a meeting management
+        right.
         """
         if self.mail_queue is None:
             return
@@ -1211,9 +1223,8 @@ class ProtocolService:
         )
         if not recipients:
             return
-        gremium_name = await self.session.scalar(
-            select(Gremium.name).where(Gremium.id == protocol.gremium_id)
-        )
+        gremium = await self.session.get(Gremium, protocol.gremium_id)
+        gremium_name = gremium.name if gremium is not None else None
         meeting = await self.session.get(Meeting, protocol.meeting_id)
         subject = "Sitzungsprotokoll"
         if gremium_name:
@@ -1232,7 +1243,23 @@ class ProtocolService:
             intro = (
                 "Das Sitzungsprotokoll wurde finalisiert und liegt als PDF bei."
             )
+        settings = self.settings or get_settings()
+        link = protocol_link(settings, protocol.meeting_id)
+        # The rule of `public.visible_clause`, on the protocol in hand.
+        if (
+            gremium is not None
+            and bool(getattr(gremium, "protocols_public", False))
+            and protocol.status == "final"
+            and not protocol.public_withheld
+            and protocol.public_content is not None
+        ):
+            lines.append(
+                "Öffentliche Fassung: "
+                + public_protocol_url(settings, protocol.id)
+            )
         text = intro + ("\n\n" + "\n".join(lines) if lines else "") + "\n"
+        content = text_to_html(text)
+        text = append_link_text(text, link.url, link.label("de"))
         attachments: tuple[MailAttachment, ...] = ()
         if pdf is not None:
             attachments = (
@@ -1240,14 +1267,15 @@ class ProtocolService:
                     filename="protokoll.pdf", mime="application/pdf", content=pdf
                 ),
             )
-        settings = self.settings or get_settings()
         html = render_layout(
-            content_html=text_to_html(text),
+            content_html=content,
             title=subject,
             site_name=settings.mail_from_name,
             base_url=settings.public_base_url,
             reason=reason_text("protocol", "de"),
             lang="de",
+            action_url=link.url,
+            action_label=link.label("de"),
         )
         await self.mail_queue.enqueue(
             MailMessage(

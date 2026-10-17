@@ -537,9 +537,14 @@ def test_drop_global_vote_permissions(
         votes = set(conn.execute(text("SELECT id FROM vote")).scalars().all())
         perms = _gremium_perms(conn)
     assert dropped == []
-    assert perms["sitzungsleitung"] == ["session.manage", "protocol.write", "protocol.finalize"]
-    assert perms["schrift"] == ["protocol.write"]
-    assert perms["vorsitz"] == ["session.manage", "protocol.finalize"]
+    # `head` also runs the to-do migration, which grants `todo.write` to every gremium
+    # role. Compare without the to-do grants and check that grant on its own.
+    todo = {"todo.write", "todo.configure"}
+    stripped = {key: [p for p in ps if p not in todo] for key, ps in perms.items()}
+    assert stripped["sitzungsleitung"] == ["session.manage", "protocol.write", "protocol.finalize"]
+    assert stripped["schrift"] == ["protocol.write"]
+    assert stripped["vorsitz"] == ["session.manage", "protocol.finalize"]
+    assert all("todo.write" in perms[key] for key in ("sitzungsleitung", "schrift", "vorsitz"))
     assert kept == ["application.read"]
     # Report, delete nothing.
     assert {free_vote, foreign_vote, good_vote} <= votes

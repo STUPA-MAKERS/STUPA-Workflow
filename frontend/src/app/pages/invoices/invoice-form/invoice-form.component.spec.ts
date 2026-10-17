@@ -122,7 +122,6 @@ describe('InvoiceFormComponent', () => {
     h.importNotice.set('manual');
     const { view, user } = await setup('create', h);
     expect(screen.getByRole('heading', { name: 'Rechnung hinzufügen' })).toBeInTheDocument();
-    expect(screen.getByText('Pflichtfelder sind mit * markiert.')).toBeInTheDocument();
     expect(screen.getByText(/Kein ZUGFeRD erkannt/)).toBeInTheDocument();
     const input = view.container.querySelector('input[type=file]') as HTMLInputElement;
     const click = jest.spyOn(input, 'click').mockImplementation(() => undefined);

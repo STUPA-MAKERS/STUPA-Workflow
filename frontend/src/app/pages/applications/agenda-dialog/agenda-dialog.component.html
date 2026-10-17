@@ -47,14 +47,10 @@
         <p class="agd__refusal" role="alert">{{ key | t }}</p>
       }
     </div>
-    @if (choices().length) {
-      <p class="agd__hint">{{ 'applications.agenda.appends' | t }}</p>
-    }
 
     @if (!noMeeting()) {
       <app-switch
         [id]="'agd-np'"
-        [hint]="'meetings.agenda.nonPublicHint' | t"
         [checked]="nonPublic()"
         (checkedChange)="nonPublic.set($event)"
         ><span class="agd__switchLabel">{{ 'meetings.agenda.nonPublicLabel' | t }}</span></app-switch

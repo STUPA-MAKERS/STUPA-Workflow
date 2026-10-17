@@ -25,7 +25,8 @@ export type ScrollFadeAxis = 'x' | 'y';
  * * `is-fade-end` — content is hidden to the right (`x`) or below (`y`)
  *
  * A strip that fits carries neither and is not masked at all, so its first and last item
- * stay sharp.
+ * stay sharp. A host whose overflow on the axis is `visible` does not scroll and carries
+ * neither either, because a mask on it would cut off what overflows.
  *
  * The axis is the value of the attribute: `appScrollFade` or `appScrollFade="x"` for a
  * horizontal strip, `appScrollFade="y"` for a vertical list. The page styles the mask.
@@ -66,6 +67,13 @@ export class ScrollFadeDirective {
   /** Read the scroll position and write the two classes. Cheap enough to run on scroll. */
   protected measure(): void {
     const el = this.el.nativeElement;
+    // A box that does not scroll on this axis (`overflow: visible`, for example a layout
+    // that only scrolls at another width) hides nothing: a mask would only clip it.
+    const style = getComputedStyle(el);
+    if ((this.axis() === 'y' ? style.overflowY : style.overflowX) === 'visible') {
+      el.classList.remove('is-fade-start', 'is-fade-end');
+      return;
+    }
     // A sub-pixel layout leaves a fraction of a pixel over on a strip that visibly fits.
     const slack = 1;
     const y = this.axis() === 'y';

@@ -12,7 +12,9 @@
     <header class="ff__head">
       <div class="ff__titles">
         <h2 class="ff__title" [id]="'bf-title-' + mode()">{{ (mode() === 'create' ? 'expenses.add' : 'expenses.edit') | t }}</h2>
-        <p class="ff__subtitle">{{ subtitle() }}</p>
+        @if (subtitle()) {
+          <p class="ff__subtitle">{{ subtitle() }}</p>
+        }
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
         <app-icon name="x" [size]="20" />

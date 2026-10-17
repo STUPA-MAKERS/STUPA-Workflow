@@ -13,12 +13,15 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.deps import get_current_principal
 from app.modules.admin.models import ApplicationType
 from app.modules.applications.models import Application
+from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.principal import Principal
 from app.modules.flow.models import FlowVersion
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
-from tests.integration.modules.livevote.conftest import audit_actions, seed
+from tests.integration.modules.livevote.conftest import admin, audit_actions, seed
 
 pytestmark = pytest.mark.integration
 
@@ -75,6 +78,9 @@ async def test_meeting_out_carries_the_agenda_summary(
         meeting = await session.get(Meeting, s.meeting_id)
         assert meeting is not None
         meeting.current_agenda_item_id = s.item_ids[1]
+        keeper = await session.get(PrincipalRow, meeting.protokollant_id)
+        assert keeper is not None
+        keeper_sub = keeper.sub
         await session.commit()
 
     with TestClient(api) as client:
@@ -82,9 +88,12 @@ async def test_meeting_out_carries_the_agenda_summary(
         assert detail["agendaItemCount"] == 4
         assert detail["currentAgendaItem"] == {"position": 2, "title": "TOP 2"}
 
+        # Only the protokollant moves the current agenda item.
+        api.dependency_overrides[get_current_principal] = lambda: Principal(sub=keeper_sub)
         moved = client.patch(
             f"/api/meetings/{s.meeting_id}", json={"currentAgendaItemId": str(app_item.id)}
         )
+        api.dependency_overrides[get_current_principal] = admin
         assert moved.status_code == 200, moved.text
         assert moved.json()["currentAgendaItem"] == {"position": 4, "title": "Sommerfest"}
 

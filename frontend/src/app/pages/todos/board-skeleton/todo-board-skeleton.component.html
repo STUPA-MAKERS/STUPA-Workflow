@@ -1,0 +1,116 @@
+<ng-template #tile let-t>
+  <div class="bsk__tile">
+    @if (t.label) {
+      <p class="bsk__labels"><span class="skel-text skel-text--muted" [style.width]="t.label"></span></p>
+    }
+    @for (w of t.title; track $index) {
+      <p class="bsk__title"><span class="skel-text" [style.width]="w"></span></p>
+    }
+    <p class="bsk__facts">
+      @if (t.fact !== '0') {
+        <span class="skel-text skel-text--muted" [style.width]="t.fact"></span>
+      }
+      <span class="skel-box bsk__person"></span>
+    </p>
+  </div>
+</ng-template>
+
+@if (view() === 'rows') {
+  <div class="bsk__rows">
+    @for (s of sections; track $index) {
+      <div class="bsk__section">
+        <p class="bsk__head skel-in">
+          <span class="skel-box bsk__chev"></span>
+          <span class="skel-text" [style.width]="s.name"></span>
+        </p>
+        <div class="bsk__list skel-in">
+          @for (t of s.tiles; track $index) {
+            <ng-container *ngTemplateOutlet="tile; context: { $implicit: t }" />
+          }
+        </div>
+      </div>
+    }
+  </div>
+} @else if (view() === 'list') {
+  <div class="lv">
+    <div class="lv__row lv__row--head">
+      <span class="lv__c lv__c--check"></span>
+      <span class="lv__c lv__c--title cap">{{ 'todos.list.title' | t }}</span>
+      <span class="lv__c lv__c--link cap">{{ 'todos.list.linked' | t }}</span>
+      <span class="lv__c lv__c--label cap">{{ 'todos.list.label' | t }}</span>
+      <span class="lv__c lv__c--due cap">{{ 'todos.list.due' | t }}</span>
+      <span class="lv__c lv__c--who cap">{{ 'todos.list.who' | t }}</span>
+    </div>
+    @for (group of groups; track $index) {
+      <div class="lv__group">
+        <div class="lv__groupRow">
+          <span class="lv__groupHead skel-in"><span class="skel-text skel-text--accent" [style.width]="group.name"></span></span>
+        </div>
+        @for (row of group.rows; track $index) {
+          <div class="lv__row">
+            <span class="lv__c lv__c--check"><span class="skel-box bsk__circle"></span></span>
+            <span class="lv__c lv__c--title skel-in"><span class="skel-text" [style.width]="row.title"></span></span>
+            <span class="lv__c lv__c--link skel-in">
+              @if (row.link !== '0') {
+                <span class="skel-text skel-text--muted" [style.width]="row.link"></span>
+              }
+            </span>
+            <span class="lv__c lv__c--label skel-in">
+              @if (row.label !== '0') {
+                <span class="skel-text skel-text--muted" [style.width]="row.label"></span>
+              }
+            </span>
+            <span class="lv__c lv__c--due skel-in">
+              @if (row.due !== '0') {
+                <span class="skel-text skel-text--muted" [style.width]="row.due"></span>
+              }
+            </span>
+            <span class="lv__c lv__c--who"><span class="skel-box bsk__person skel-in"></span></span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+} @else if (phone()) {
+  <div class="bv bv--phone">
+    <div class="bsk__tabs">
+      @for (col of columns(); track $index) {
+        <span class="bsk__tab skel-in"><span class="skel-text" [style.width]="col.name"></span></span>
+      }
+    </div>
+    <div class="bv__pager">
+      <div class="bv__page">
+        <div class="bv__phoneCards skel-in">
+          @for (t of phoneTiles; track $index) {
+            <ng-container *ngTemplateOutlet="tile; context: { $implicit: t }" />
+          }
+        </div>
+      </div>
+    </div>
+    <div class="bv__dots">
+      @for (col of columns(); track $index) {
+        <span class="bv__dot"></span>
+      }
+    </div>
+  </div>
+} @else {
+  <div class="bv">
+    @for (col of columns(); track $index; let last = $last) {
+      <section class="bv__col">
+        <header class="bv__head">
+          <p class="bv__name skel-in"><span class="skel-text" [style.width]="col.name"></span></p>
+        </header>
+        <div class="bv__scroll">
+          <div class="bv__cards skel-in">
+            @for (t of col.tiles; track $index) {
+              <ng-container *ngTemplateOutlet="tile; context: { $implicit: t }" />
+            }
+          </div>
+        </div>
+        @if (canWrite() && !last) {
+          <p class="bv__add bsk__add skel-in"><span class="skel-text skel-text--muted"></span></p>
+        }
+      </section>
+    }
+  </div>
+}

@@ -85,6 +85,39 @@ class PermissionOps(MeetingServiceBase):
         """
         return await self.can_write(await self._get(meeting_id), principal)
 
+    async def can_set_current_item(self, meeting: Meeting, principal: Principal) -> bool:
+        """Check who sets the current agenda item: the protokollant of the meeting only.
+
+        The session lead, a gremium role and the admin role do not pass, because the
+        current item moves the beamer and every follower. The scope cap applies: a
+        token without `protocol.write` in its scope cannot set it.
+        """
+        return principal.scope_allows("protocol.write") and await self._is_protokollant(
+            meeting, principal
+        )
+
+    async def can_run_votes(self, meeting: Meeting, principal: Principal) -> bool:
+        """Check who opens and closes the votes of a meeting: the protokollant only.
+
+        The session lead, a gremium role with `vote.manage` and the admin role still
+        prepare, cancel and delete votes (`can_manage_votes`), but the open and the
+        close follow the minutes. The scope cap applies: a token without `vote.manage`
+        in its scope cannot open or close.
+        """
+        return principal.scope_allows("vote.manage") and await self._is_protokollant(
+            meeting, principal
+        )
+
+    async def assert_can_run_votes(self, meeting_id: UUID, principal: Principal) -> None:
+        """Load the meeting and refuse anybody but its protokollant (`can_run_votes`).
+
+        Raises:
+            NotFoundError: The meeting does not exist.
+            ForbiddenError: The principal is not the protokollant of the meeting.
+        """
+        if not await self.can_run_votes(await self._get(meeting_id), principal):
+            raise ForbiddenError("only the protokollant may open or close a vote")
+
     async def can_manage_votes(self, meeting: Meeting, principal: Principal) -> bool:
         """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
 

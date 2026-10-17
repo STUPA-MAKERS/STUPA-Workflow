@@ -21,6 +21,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -36,6 +37,7 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     SkeletonComponent,
     StatusTextComponent,
     TranslatePipe,

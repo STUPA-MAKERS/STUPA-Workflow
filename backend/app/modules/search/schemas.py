@@ -21,6 +21,8 @@ SearchKind = Literal[
     "budget",
     "gremium",
     "principal",
+    "ticket",
+    "todo",
 ]
 
 

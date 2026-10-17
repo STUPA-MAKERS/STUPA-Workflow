@@ -161,6 +161,12 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # The to-do card that this item handles (an item of kind to-do). The item then
+    # has no application and carries the card title as its own `title`. A deleted
+    # card leaves a free-text item.
+    todo_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("todo_card.id", ondelete="SET NULL"), nullable=True
+    )
     # Markdown body of this agenda item. It flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
@@ -171,6 +177,13 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     __table_args__ = (
         UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),
         Index("ix_agenda_meeting", "meeting_id"),
+        Index(
+            "uq_agenda_meeting_todo",
+            "meeting_id",
+            "todo_id",
+            unique=True,
+            postgresql_where=text("todo_id IS NOT NULL"),
+        ),
     )
 
 

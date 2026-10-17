@@ -21,10 +21,10 @@ import {
   InputComponent,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import { formatBytes } from '../admin-health/admin-health.util';
 import {
@@ -134,7 +134,7 @@ function errorCode(err: unknown): string {
     InputComponent,
     NoteComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SkeletonComponent,
     PageHeaderComponent,
   ],
@@ -172,7 +172,6 @@ export class AdminCdVariantsComponent {
   readonly logoError = signal<TranslationKey | null>(null);
 
   readonly listOrder = CD_LOGO_LIST_ORDER;
-  readonly maxMb = Math.round(MAX_CD_LOGO_BYTES / (1024 * 1024));
   readonly minPx = SQUARE_LOGO_MIN_PX;
 
   /** Ids of square logos whose image failed to load: they show the placeholder. */

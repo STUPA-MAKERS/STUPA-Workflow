@@ -6,6 +6,7 @@ from typing import Any, Literal
 
 from mcp.server.fastmcp import FastMCP
 
+from ._chat_files import post_message
 from ._common import ToolGroup, api, params
 
 group = ToolGroup()
@@ -183,21 +184,36 @@ async def delete_application(application_id: str) -> dict:
 
 @group.tool
 async def comment_application(
-    application_id: str, body: str, visibility: Literal["public", "internal"] = "public"
+    application_id: str,
+    body: str = "",
+    visibility: Literal["public", "internal"] = "public",
+    file_paths: list[str] | None = None,
 ) -> dict:
-    """Add a comment to an application.
+    """Add a comment to an application, optionally with files.
 
-    An `internal` comment stays hidden from the applicant.
+    An `internal` comment and its files stay hidden from the applicant. Each file in
+    `file_paths` (a local path on the machine of the MCP server, at most 5 per comment)
+    goes up as a draft through `POST /apply/attachments`; the comment then binds the
+    drafts. Allowed types and the 10 MB cap are those of `upload_attachment`. A comment
+    file is not an application attachment: it is not in `list_attachments`, only in the
+    `attachments` of the comment (`id`, `filename`, `mime`, `size`, `scanState`).
+    Download a clean one with `download_attachment`. Files on an anonymized application
+    give 422 `application_anonymized`. A failed upload or post deletes the drafts already uploaded.
+
+    Args:
+        body: Markdown, up to 10000 characters; empty only with at least one file.
+        file_paths: Local files to attach.
     """
-    return await api().post(
+    return await post_message(
         f"/applications/{application_id}/comments",
-        json={"body": body, "visibility": visibility},
+        {"body": body, "visibility": visibility},
+        file_paths,
     )
 
 
 @group.tool
 async def list_comments(application_id: str) -> dict:
-    """List the comments on an application."""
+    """List the comments on an application, each with its `attachments`."""
     return await api().get(f"/applications/{application_id}/comments")
 
 

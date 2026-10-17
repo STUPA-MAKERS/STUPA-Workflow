@@ -462,10 +462,6 @@
     left: var(--space-3);
     right: var(--space-3);
   }
-  /* The hint names the shift key, which a phone has not. */
-  .fe__legendHint {
-    display: none;
-  }
   .fe__panel {
     padding: var(--space-4);
   }

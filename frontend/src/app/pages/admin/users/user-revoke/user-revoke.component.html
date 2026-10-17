@@ -3,7 +3,6 @@
   size="lg"
   [open]="!!src"
   [title]="'admin.users.revoke.title' | t"
-  [subtitle]="'admin.users.revoke.subtitle' | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
@@ -163,7 +162,6 @@
         <app-switch
           class="ur__switch"
           [checked]="deactivate()"
-          [hint]="'admin.users.revoke.deactivateHint' | t"
           (checkedChange)="deactivate.set($event)"
           >{{ 'admin.users.revoke.deactivate' | t }}</app-switch
         >

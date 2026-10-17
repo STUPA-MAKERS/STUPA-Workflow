@@ -29,11 +29,11 @@ import {
   RowDetailDirective,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
   type SelectOption,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { AdminApiService } from '../admin/admin-api.service';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
@@ -115,7 +115,7 @@ const MAX_CUTOFF_DAY = 28;
     RowDetailDirective,
     RowMenuComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
   ],
   templateUrl: './budget-tree.component.html',
@@ -460,6 +460,21 @@ export class BudgetTreeComponent {
     ];
   });
 
+  /** The phone menu of a fiscal year: the same two actions as the icon buttons. */
+  readonly fyMenu = computed<RowMenuSection[]>(() => [
+    {
+      items: [
+        { id: 'edit', label: this.i18n.translate('budget.tree.fyEdit'), icon: 'edit' },
+        { id: 'delete', label: this.i18n.translate('budget.tree.fyDelete'), icon: 'trash', danger: true },
+      ],
+    },
+  ]);
+
+  onFyMenu(fy: FiscalYear, item: RowMenuItem): void {
+    if (item.id === 'edit') this.openFyEdit(fy);
+    else if (item.id === 'delete') this.askFyDelete(fy);
+  }
+
   onRowMenu(node: BudgetTreeNode, item: RowMenuItem): void {
     if (item.id === 'edit') this.openEditNode(node);
     else if (item.id === 'limit') this.openLimit(node);
@@ -730,12 +745,13 @@ export class BudgetTreeComponent {
    * The hint under the deciding-gremium select. Without an own value the node takes
    * the effective gremium of its parent (`effectiveDecisionGremiumId`, served by the
    * API), so the hint names the node that supplies it (`decisionGremiumSourceId`):
-   * "Geerbt von …". Without one it says that no gremium decides.
+   * "Geerbt von …". Without one it says that no gremium decides. An own value needs
+   * no line.
    */
   readonly decisionGremiumHint = computed<string>(() => {
     const node = this.editNode();
     if (!node) return '';
-    if (this.editDecisionGremium()) return this.i18n.translate('budget.tree.decisionGremiumHint');
+    if (this.editDecisionGremium()) return '';
     const parent = node.parentId ? this.findNode(node.parentId) : undefined;
     const gremiumId = parent?.effectiveDecisionGremiumId;
     const source = parent?.decisionGremiumSourceId

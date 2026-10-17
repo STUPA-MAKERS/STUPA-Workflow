@@ -21,7 +21,7 @@ const ADMIN: Principal = {
   groups: [],
 };
 
-async function setup(tasks: number | null = 120) {
+async function setup(tasks: number | null = 120, tickets: number | null = null) {
   localStorage.setItem('ap.locale', 'de');
   const view = await render(NavRailComponent, {
     providers: [
@@ -36,9 +36,14 @@ async function setup(tasks: number | null = 120) {
           appName: signal('Antragsplattform'),
           loaded: signal(false),
           gravatarEnabled: signal(true),
+          wikiUrl: signal('https://wiki.example.org/handbook'),
+          ticketsPublic: signal(false),
         },
       },
-      { provide: RailStatusService, useValue: { taskCount: signal(tasks), live: signal(false) } },
+      {
+        provide: RailStatusService,
+        useValue: { taskCount: signal(tasks), ticketCount: signal<number | null>(tickets), live: signal(false) },
+      },
     ],
   });
   const injector = view.fixture.debugElement.injector;
@@ -62,13 +67,14 @@ describe('NavRailComponent', () => {
     expect(screen.getByRole('link', { name: 'Aufgaben 120 offen' })).toBeInTheDocument();
   });
 
-  it('puts Verwaltung and the account at the foot of the rail, after the spacer', async () => {
+  it('puts Hilfe, Verwaltung and the account at the foot of the rail, after the spacer', async () => {
     const { container } = await setup();
     const nav = container.querySelector('nav.rail') as HTMLElement;
     const children = Array.from(nav.children).map((c) => c.className.split(' ')[0] || c.tagName.toLowerCase());
     const spacer = children.indexOf('rail__spacer');
     expect(spacer).toBeGreaterThan(0);
-    expect(children.slice(spacer + 1)).toEqual(['rail__item', 'rail__account']);
+    expect(children.slice(spacer + 1)).toEqual(['rail__help', 'rail__item', 'rail__account']);
+    expect(within(nav).getByRole('button', { name: 'Hilfe' })).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: 'Konto: Ada Admin' })).toBeInTheDocument();
   });
 
@@ -87,5 +93,10 @@ describe('NavRailComponent', () => {
     const { container } = await setup(null);
     expect(container.querySelector('.mark__count')).toBeNull();
     expect(screen.getByRole('link', { name: 'Aufgaben' })).toBeInTheDocument();
+  });
+
+  it('counts the new tickets on the Tickets entry', async () => {
+    await setup(0, 3);
+    expect(screen.getByRole('link', { name: 'Tickets 3 neu' })).toHaveAttribute('href', '/tickets');
   });
 });

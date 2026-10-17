@@ -20,6 +20,7 @@ import {
   mapTimelineEvent,
   mapTransition,
   mapVersion,
+  messageFiles,
   toApplicationCreateBody,
 } from './mappers';
 import type {
@@ -48,6 +49,7 @@ import type {
   CommentCreateBody,
   CommentOutWire,
   CommentVisibility,
+  MessageFiles,
   DraftAttachmentOutWire,
   DraftUpload,
   EffectiveForm,
@@ -384,13 +386,17 @@ export class ApiClient {
       .pipe(map((comments) => comments.map(mapComment)));
   }
 
-  /** Applicants may write only `public` (the backend rejects `internal` with 403). */
+  /**
+   * Applicants may write only `public` (the backend rejects `internal` with 403).
+   * `files` binds draft uploads of `POST /apply/attachments` (at most 5).
+   */
   addComment(
     id: Uuid,
     body: string,
     visibility: CommentVisibility = 'public',
+    files: MessageFiles = {},
   ): Observable<ApplicationComment> {
-    const payload: CommentCreateBody = { body, visibility };
+    const payload: CommentCreateBody = { body, visibility, ...messageFiles(files) };
     return this.http
       .post<CommentOutWire>(`${this.base}/applications/${id}/comments`, payload)
       .pipe(map(mapComment));
@@ -802,6 +808,17 @@ export class ApiClient {
   addAgendaFreetext(meetingId: Uuid, title: string, nonPublic = false): Observable<AgendaItem[]> {
     return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
       title,
+      nonPublic,
+    });
+  }
+
+  /**
+   * POST /meetings/{id}/agenda — put a to-do of the gremium board on the agenda. The item
+   * takes the card title, and the server links the card to the item.
+   */
+  addAgendaTodo(meetingId: Uuid, todoId: Uuid, nonPublic = false): Observable<AgendaItem[]> {
+    return this.http.post<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
+      todoId,
       nonPublic,
     });
   }

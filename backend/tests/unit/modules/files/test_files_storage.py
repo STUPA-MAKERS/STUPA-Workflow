@@ -11,7 +11,6 @@ import pytest
 from app.modules.files.storage import (
     MinioStorage,
     StorageError,
-    _safe_disposition,
     build_object_storage,
 )
 from app.settings import load_settings
@@ -155,10 +154,6 @@ async def test_remove_error_wrapped(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(client, "remove_object", _boom)
     with pytest.raises(StorageError):
         await _storage(client).remove("k1")
-
-
-def test_safe_disposition_strips_quotes_and_controls() -> None:
-    assert _safe_disposition('a"b\r\n.pdf') == "ab.pdf"
 
 
 def test_build_object_storage_disabled_none() -> None:

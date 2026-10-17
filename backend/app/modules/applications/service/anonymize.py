@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, or_, select, update
 
 from app.modules.applications.models import (
     Applicant,
@@ -44,14 +44,19 @@ class AnonymizeOps(ApplicationsServiceBase):
         The method sets ``email`` and ``name`` to NULL and writes
         ``anonymized_at``. It also blanks every ``data`` field marked ``isPII`` and the
         free-text intake note of a capture (``capture_intake``, #11).
-        It removes the magic links and the attachments (GDPR Art. 17).
+        It removes the magic links and the attachments, the files of every comment
+        (internal and public) included (GDPR Art. 17).
 
         With a ``files`` service the method also removes the storage objects. With
         ``None`` it deletes the attachment rows only. ``actor`` names the audit
         actor for that deletion. With ``commit=False`` the transaction stays open.
         The caller, an erasure request or the cron, then commits atomically.
+
+        The application row is locked first, the lock that ``add_comment`` takes
+        before it binds files. A comment with files therefore commits before the
+        attachments are selected, or it sees the anonymization and refuses the files.
         """
-        app = await self._get_app(application_id)
+        app = await self._get_app(application_id, lock=True)
         applicant = (
             await self.session.execute(
                 select(Applicant).where(Applicant.application_id == application_id)
@@ -111,7 +116,8 @@ class AnonymizeOps(ApplicationsServiceBase):
         await auth_sessions.revoke_applicant_sessions(
             self.session, application_id, now=datetime.now(UTC)
         )
-        # An attachment may hold PII in the receipt or in the file name. With a
+        # An attachment may hold PII in the receipt or in the file name. This covers
+        # the files of the application and the files of all its comments. With a
         # FilesService the code removes the database row and the storage object.
         # Without it the code removes the database rows only.
         if files is not None:
@@ -119,8 +125,13 @@ class AnonymizeOps(ApplicationsServiceBase):
         else:
             await self.session.execute(
                 delete(Attachment).where(
-                    Attachment.application_id.is_not(None),
-                    Attachment.application_id == application_id,
+                    or_(
+                        Attachment.application_id.is_not(None)
+                        & (Attachment.application_id == application_id),
+                        Attachment.comment_id.in_(
+                            select(Comment.id).where(Comment.application_id == application_id)
+                        ),
+                    )
                 )
             )
         if commit:

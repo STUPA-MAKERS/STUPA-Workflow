@@ -314,11 +314,10 @@ export class FlowEditorComponent {
     return v ? Math.round((this.fitBounds().w / v.w) * 100) : 100;
   });
 
-  /** The lead line: the scope of the flow and, once known, its active version. */
-  protected readonly subtitle = computed(() => {
-    const notice = this.i18n.translate('admin.flow.globalNotice');
+  /** The meta of the header: the active version, once known. */
+  protected readonly versionMeta = computed(() => {
     const v = this.currentVersion();
-    return v === null ? notice : `${notice} · ${this.i18n.translate('admin.flow.versionActive', { n: v })}`;
+    return v === null ? null : this.i18n.translate('admin.flow.versionActive', { n: v });
   });
 
   /** The ⋮ menu of the header on a phone: "Versionen". */
@@ -730,7 +729,8 @@ export class FlowEditorComponent {
   /**
    * Shortcuts: Del or Backspace deletes the selection, Insert adds a state, Ctrl+Z
    * undoes, Ctrl+Y or Ctrl+Shift+Z redoes. The handler stays inactive while the user
-   * types in an input, with undo and redo as the exception. Normal text editing stays
+   * types in an input or works a select (a native one or the app-select combobox and its
+   * listbox), with undo and redo as the exception. Normal text editing stays
    * untouched.
    */
   @HostListener('document:keydown', ['$event'])
@@ -738,7 +738,11 @@ export class FlowEditorComponent {
     const target = event.target as HTMLElement | null;
     const tag = target?.tagName;
     const typing =
-      tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || !!target?.isContentEditable;
+      tag === 'INPUT' ||
+      tag === 'TEXTAREA' ||
+      tag === 'SELECT' ||
+      !!target?.isContentEditable ||
+      !!target?.closest?.('[role="combobox"], [role="listbox"]');
     const mod = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
 

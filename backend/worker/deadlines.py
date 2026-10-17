@@ -20,6 +20,9 @@ idempotent steps:
 5. Discard. An application whose email stays unconfirmed longer than
    `guest_application_settings.confirm_ttl_hours` is deleted, with its MinIO
    objects and a `guest_application_discard` audit entry without PII.
+6. To-do reminders. `process_todo_due` (`worker/todos.py`) sends `todo_due` for the
+   open cards due tomorrow. A failure of this step is logged and does not stop the
+   cycle.
 
 An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the flow. The
 reminder, deadline-action and auto-transition scans skip it. The magic-link verify
@@ -59,12 +62,14 @@ from app.modules.flow.models import Transition
 from app.modules.flow.service import FlowService
 from app.modules.livevote.broker import RedisBroker
 from app.modules.livevote.service import BrokerPublisher
+from app.modules.notifications.links import application_link
 from app.modules.notifications.queue import ArqMailQueue, MailQueue
 from app.modules.notifications.service import NotificationService
 from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError, NotFoundError
+from worker.todos import process_todo_due
 
 logger = logging.getLogger("app.deadlines")
 
@@ -146,10 +151,20 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     closed = await _process_votes(ctx, now)
     advanced = await _process_auto_transitions(ctx)
     discarded = await _discard_unconfirmed(ctx, now, settings)
+    todos = await _process_todo_due(ctx, now)
     return (
         f"reminders={reminded} actions={fired} votes={closed} "
-        f"auto={advanced} discarded={discarded}"
+        f"auto={advanced} discarded={discarded} todos={todos}"
     )
+
+
+async def _process_todo_due(ctx: dict[str, Any], now: datetime) -> int:
+    """Run the to-do due reminder; a failure costs only this step."""
+    try:
+        return await process_todo_due(ctx, now)
+    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+        logger.exception("todo_due reminders failed")
+        return 0
 
 
 async def _discard_unconfirmed(
@@ -276,6 +291,18 @@ async def _remind_one(
         if deadline is None:
             return False  # another worker holds it, or it is no longer due
         type_id = deadline.type_id
+        applicant_link = None
+        if deadline.application_id is not None:
+            # A guest applicant (no account) reads the application on the public
+            # applicant page.
+            created_by = await session.scalar(
+                select(Application.created_by).where(
+                    Application.id == deadline.application_id
+                )
+            )
+            applicant_link = application_link(
+                settings, deadline.application_id, guest=created_by is None
+            )
         if type_id is None and deadline.application_id is not None:
             type_id = await session.scalar(
                 select(Application.type_id).where(
@@ -294,6 +321,7 @@ async def _remind_one(
             },
             lang=None,
             idempotency_base=f"deadline:{deadline.id}",
+            applicant_link=applicant_link,
         )
         await svc.mark_reminded(deadline, now)
     logger.info("deadline reminder sent (deadline=%s kind=%s)", deadline_id, deadline.kind)

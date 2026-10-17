@@ -25,6 +25,7 @@ from uuid import UUID
 from sqlalchemy import select
 
 from app.db import get_sessionmaker
+from app.modules.notifications.links import MailLink
 from app.modules.notifications.queue import MailQueue
 from app.modules.notifications.service import (
     NotificationService,
@@ -140,6 +141,7 @@ async def notify_application_captured(
                     context={**context, "link": link},
                     idempotency_parts=(APPLICATION_CAPTURED_KEY, str(application_id)),
                     lang=lang,
+                    link=MailLink(link, "application"),
                 )
 
             if guest:

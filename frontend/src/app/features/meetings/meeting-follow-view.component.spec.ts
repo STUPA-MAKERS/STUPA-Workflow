@@ -1,4 +1,5 @@
 import { provideHttpClient } from '@angular/common/http';
+import { renderDeferred } from '../../../testing/defer';
 import {
   HttpTestingController,
   provideHttpClientTesting,
@@ -297,6 +298,7 @@ describe('MeetingFollowViewComponent', () => {
     it('shows the new text of the item of the room after a read of the agenda', async () => {
       const { context, fixture, container } = await setup();
       context();
+      await renderDeferred(fixture);
       const text = () => container.querySelector('app-top-sheet .ProseMirror')?.textContent ?? '';
       expect(text()).toContain('Zwischenstand.');
       // The same item with a new text, as the reload after a meeting_state gives it.

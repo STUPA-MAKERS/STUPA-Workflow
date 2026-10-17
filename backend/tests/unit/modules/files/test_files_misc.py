@@ -33,9 +33,16 @@ def test_attachment_size_check_constraint() -> None:
 
 
 def test_attachment_fk_cascade() -> None:
-    fk = next(iter(Attachment.__table__.foreign_keys))
-    assert fk.ondelete == "CASCADE"
-    assert fk.column.table.name == "application"
+    owners = {
+        fk.column.table.name: fk.ondelete for fk in Attachment.__table__.foreign_keys
+    }
+    assert owners == {
+        "application": "CASCADE",
+        "ticket": "CASCADE",
+        "ticket_note": "CASCADE",
+        "todo_comment": "CASCADE",
+        "comment": "CASCADE",
+    }
 
 
 class _NullLimiter:

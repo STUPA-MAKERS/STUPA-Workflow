@@ -7,7 +7,7 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { VoteOpenDialogComponent } from './vote-open-dialog.component';
 
-const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', votes: [] } as unknown as Meeting;
+const MEETING = { id: 'm-1', title: '34. Sitzung', status: 'live', isProtokollant: true, votes: [] } as unknown as Meeting;
 const APP_TOP: AgendaItem = { id: 't-3', applicationId: 'a-1', title: 'Zuschuss Party', position: 2 };
 const FREE_TOP: AgendaItem = { id: 't-8', applicationId: null, title: 'Verschiedenes', position: 7 };
 
@@ -76,7 +76,6 @@ describe('VoteOpenDialogComponent', () => {
     );
     expect(screen.getByRole('radio', { name: 'Einfach' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('switch', { name: 'Geheime Abstimmung' })).toHaveAttribute('aria-checked', 'false');
-    expect(screen.getByText('Stimmen werden ohne Namen gezählt')).toBeInTheDocument();
   });
 
   it('builds no tie break, no ballot change and no eligible count (O11, O18)', async () => {
@@ -189,11 +188,9 @@ describe('VoteOpenDialogComponent', () => {
       const { http, submit } = await open(PUBLIC);
       const sw = screen.getByRole('switch', { name: 'Gäste stimmen mit ab' });
       expect(sw).toHaveAttribute('aria-checked', 'true');
-      expect(screen.getByText(/7 zugelassene Gäste stimmen mit/)).toBeInTheDocument();
       expect(screen.getByRole('status')).toHaveTextContent('Stimmberechtigt jetzt: 26 (19 Mitglieder + 7 Gäste anwesend)');
       await userEvent.click(sw);
       expect(screen.getByRole('status')).toHaveTextContent('Stimmberechtigt: 23 Mitglieder (19 anwesend)');
-      expect(screen.getByText(/nur die Mitglieder stimmen ab/)).toBeInTheDocument();
       await submit();
       expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
         expect.objectContaining({ guestsVote: false }),
@@ -204,7 +201,6 @@ describe('VoteOpenDialogComponent', () => {
       const { http, submit } = await open(PUBLIC, { ...FREE_TOP, nonPublic: true });
       const sw = screen.getByRole('switch', { name: 'Gäste stimmen mit ab' });
       expect(sw).toHaveAttribute('aria-checked', 'false');
-      expect(screen.getByText(/In einem nicht öffentlichen TOP/)).toBeInTheDocument();
       await submit();
       expect(http.expectOne('/api/meetings/m-1/votes').request.body).toEqual(
         expect.objectContaining({ guestsVote: false }),
@@ -235,7 +231,6 @@ describe('VoteOpenDialogComponent', () => {
       expect(norm(cmp.question())).toBe(
         'Soll der Antrag „Zuschuss Party“ mit 900,00 € (beantragt 1.250,00 €) und 1 Auflage gefördert werden?',
       );
-      expect(screen.getByText(/Aus dem Vorschlag erzeugt/)).toBeInTheDocument();
       expect(await runAxe(container)).toHaveNoViolations();
       cmp.submit();
       expect(http.expectOne('/api/meetings/m-1/votes').request.body.proposal).toEqual({

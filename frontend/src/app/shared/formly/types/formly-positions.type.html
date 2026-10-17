@@ -84,9 +84,6 @@
               (checkedChange)="setNoOffers(pi, $event)"
             ><span class="pos__switchLabel">{{ t('apply.positions.noOffers') }}</span></app-switch>
           }
-          @if (!p.noOffers) {
-            <p class="pos__lead">{{ t('forms.positions.offersLead') }}</p>
-          }
 
           <div class="pos__offers" role="radiogroup" [attr.aria-label]="t('forms.positions.offers')">
             @for (o of p.offers; track $index; let oi = $index) {

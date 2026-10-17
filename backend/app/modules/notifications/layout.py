@@ -72,6 +72,38 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a vote delegation that "
         "concerns you was granted or revoked.",
     },
+    "ticket_created": {
+        "de": "Sie erhalten diese E-Mail, weil Sie gemeldete Tickets bearbeiten.",
+        "en": "You are receiving this email because you work on reported tickets.",
+    },
+    "ticket_message": {
+        "de": "Sie erhalten diese E-Mail, weil Sie gemeldete Tickets bearbeiten.",
+        "en": "You are receiving this email because you work on reported tickets.",
+    },
+    "ticket_answer": {
+        "de": "Sie erhalten diese E-Mail, weil Sie dieses Ticket gemeldet haben.",
+        "en": "You are receiving this email because you reported this ticket.",
+    },
+    "ticket_received": {
+        "de": "Sie erhalten diese E-Mail, weil Sie ein Problem, eine Frage oder "
+        "eine Idee gemeldet haben.",
+        "en": "You are receiving this email because you reported a problem, a "
+        "question or an idea.",
+    },
+    "todo_assigned": {
+        "de": "Sie erhalten diese E-Mail, weil Ihnen ein To-Do zugewiesen wurde.",
+        "en": "You are receiving this email because a to-do was assigned to you.",
+    },
+    "todo_mentioned": {
+        "de": "Sie erhalten diese E-Mail, weil Sie in einem To-Do erwähnt wurden.",
+        "en": "You are receiving this email because you were mentioned on a to-do.",
+    },
+    "todo_due": {
+        "de": "Sie erhalten diese E-Mail, weil ein To-Do, für das Sie zuständig sind, "
+        "morgen fällig ist.",
+        "en": "You are receiving this email because a to-do that you are responsible "
+        "for is due tomorrow.",
+    },
     "generic": {
         "de": "Sie erhalten diese E-Mail von der Antragsplattform.",
         "en": "You are receiving this email from the application platform.",
@@ -94,6 +126,10 @@ _CARD_STYLE = (
 )
 _HEAD_LINK_STYLE = (
     "font-size:18px;font-weight:700;color:#1f2933;text-decoration:none;"
+)
+_BUTTON_STYLE = (
+    "display:inline-block;background:#0b6e4f;color:#ffffff;font-weight:600;"
+    "text-decoration:none;border-radius:6px;padding:10px 18px;"
 )
 _FOOTER_STYLE = "padding:16px 16px 0;font-size:12px;line-height:1.5;color:#6b7686;"
 
@@ -130,6 +166,26 @@ def _linkify(escaped: str) -> str:
     return _URL_RE.sub(repl, escaped)
 
 
+def append_link_text(text: str, url: str, label: str) -> str:
+    """Add the line ``label: url`` to a plain-text body.
+
+    The function returns the text unchanged when it already contains the URL, for
+    example through ``{{ link }}`` in the template.
+    """
+    if url in text:
+        return text
+    return f"{text.rstrip()}\n\n{label}: {url}\n"
+
+
+def _action_button(url: str, label: str) -> str:
+    """Return the call-to-action button of the layout (escaped)."""
+    return (
+        '<p style="margin:20px 0 0;">'
+        f'<a href="{html.escape(url)}" style="{_BUTTON_STYLE}">{html.escape(label)}</a>'
+        "</p>"
+    )
+
+
 def text_to_html(text: str) -> str:
     """Convert a plain-text body to simple HTML.
 
@@ -154,12 +210,17 @@ def render_layout(
     base_url: str,
     reason: str,
     lang: str = "de",
+    action_url: str | None = None,
+    action_label: str | None = None,
 ) -> str:
     """Wrap the inner content in the branded mail layout (full document).
 
     This function escapes every value except `content_html`. The caller MUST
     pass safe HTML there: an autoescaped Jinja render or the output of
     `text_to_html`.
+
+    `action_url` adds a button to the element of the mail below the content. The
+    layout omits the button when the content already links the URL.
     """
     esc_title = html.escape(title)
     esc_site = html.escape(site_name)
@@ -167,6 +228,8 @@ def render_layout(
     base = html.escape(base_url.rstrip("/"))
     settings_url = f"{base}/account/notifications"
     hint = html.escape(_SETTINGS_HINT.get(lang, _SETTINGS_HINT["de"]))
+    if action_url and action_label and html.escape(action_url) not in content_html:
+        content_html = content_html + "\n" + _action_button(action_url, action_label)
     table_open = (
         '<table role="presentation" width="100%" cellpadding="0" '
         'cellspacing="0" style="background:#f2f4f8;padding:24px 0;">'

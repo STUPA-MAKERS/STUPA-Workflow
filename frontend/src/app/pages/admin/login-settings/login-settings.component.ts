@@ -72,7 +72,6 @@ export class LoginSettingsComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  protected readonly maxDays = MAX_SESSION_DAYS;
 
   /** The page needs the users right. The server checks it again. */
   protected readonly allowed = computed(() => this.auth.can('admin.users'));

@@ -10,6 +10,7 @@ import uuid
 
 import pytest
 
+from app.modules.notifications.links import MailLink
 from app.modules.notifications.models import MailTemplate
 from app.modules.notifications.schemas import (
     MailPreviewRequest,
@@ -308,23 +309,54 @@ async def test_notify_without_template_key_team_only_single_send() -> None:
     assert queue.messages[0].subject == "Statuswechsel: Antrag"
 
 
-async def test_notify_explicit_template_key_sends_once_for_all() -> None:
-    """Regression: an explicit templateKey keeps the single combined send."""
+async def test_notify_explicit_template_key_splits_by_audience() -> None:
+    """An explicit templateKey to applicant and team sends one mail per audience.
+
+    Each mail carries the link of its audience: a guest applicant cannot open the team
+    link. The audience is part of the idempotency key, so the two mails never coalesce.
+    """
+    tpl = _template()
+    session = FakeSession(scalars=[[], [tpl], [], [tpl]])
+    queue = FakeQueue()
+    svc = _service(session, queue)
+    resolver = FakeResolver(["a@x.de"])
+    svc.resolver = resolver  # type: ignore[assignment]
+    specs = [{"kind": "applicant"}, {"kind": "email", "ref": "t@x.de"}]
+    app_id = uuid.uuid4()
+    count = await svc.handle_notify_action(
+        {"type": "notify", "templateKey": "status_update", "recipients": specs},
+        application_id=app_id,
+        context={"status": "Y"},
+        applicant_link=MailLink(f"https://x.de/antrag/{app_id}", "application"),
+        team_link=MailLink(f"https://x.de/applications/{app_id}", "application"),
+    )
+    assert count == 2
+    assert [c[0] for c in resolver.calls] == [[specs[0]], [specs[1]]]
+    applicant, team = queue.messages
+    assert f"https://x.de/antrag/{app_id}" in applicant.text
+    assert f"https://x.de/applications/{app_id}" in team.text
+    assert applicant.idempotency_key != team.idempotency_key
+
+
+async def test_notify_explicit_template_key_to_one_audience_sends_once() -> None:
+    """An explicit templateKey to one audience keeps the single send and its link."""
     session = FakeSession(scalars=[[], [_template()]])
     queue = FakeQueue()
     svc = _service(session, queue)
-    resolver = FakeResolver(["a@x.de", "t@x.de"])
+    resolver = FakeResolver(["t@x.de", "u@x.de"])
     svc.resolver = resolver  # type: ignore[assignment]
-    specs = [{"kind": "applicant"}, {"kind": "email", "ref": "t@x.de"}]
+    specs = [{"kind": "email", "ref": "t@x.de"}, {"kind": "email", "ref": "u@x.de"}]
     count = await svc.handle_notify_action(
         {"type": "notify", "templateKey": "status_update", "recipients": specs},
         application_id=uuid.uuid4(),
         context={"status": "Y"},
+        team_link=MailLink("https://x.de/applications/1", "application"),
     )
     assert count == 1
-    assert len(queue.messages) == 1
-    assert queue.messages[0].to == ("a@x.de", "t@x.de")
-    assert len(resolver.calls) == 1 and resolver.calls[0][0] == specs
+    assert queue.messages[0].to == ("t@x.de", "u@x.de")
+    assert resolver.calls[0][0] == specs
+    assert "Antrag öffnen: https://x.de/applications/1" in queue.messages[0].text
+    assert 'href="https://x.de/applications/1"' in queue.messages[0].html
 
 
 async def test_notify_split_sends_filter_preferences_as_status_update(

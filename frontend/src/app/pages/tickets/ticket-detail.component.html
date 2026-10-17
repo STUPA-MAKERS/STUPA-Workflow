@@ -1,0 +1,419 @@
+@if (loading()) {
+  <!-- The loaded sheet with bars in place of the text: the same head, the fields column
+       beside the chat column (one view: the tabs over the chat), so nothing moves when
+       the ticket arrives. Fixed headings and labels are real text; the bars show after
+       300ms (`skel-in`). -->
+  <article class="td" [class.td--split]="split()" aria-busy="true">
+    <header class="td__head" aria-hidden="true">
+      <app-sheet-bar [bleed]="split()">
+        <span appSheetBarKicker class="skel-in"><span class="skel-text skel-text--muted td__skelKicker"></span></span>
+        <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
+        <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
+      </app-sheet-bar>
+      <h2 class="td__title skel-in">
+        <span class="skel-text td__skelTitle"></span>
+        @if (!split()) {
+          <span class="skel-text td__skelTitle td__skelTitle--second"></span>
+        }
+      </h2>
+      <p class="td__line skel-in"><span><span class="skel-text skel-text--muted td__skelLine"></span></span></p>
+      @if (manager) {
+        <div class="td__actions skel-in">
+          <span class="td__act"><span class="skel-box td__skelButton"></span></span>
+          <span class="td__act"><span class="skel-box td__skelButton td__skelButton--short"></span></span>
+        </div>
+      }
+    </header>
+    @if (split()) {
+      <div class="td__cols" aria-hidden="true">
+        <div class="td__col td__col--log">
+          <section class="td__sec">
+            <app-skeleton class="td__chat skel-in" variant="chat" [count]="6" />
+          </section>
+        </div>
+        <div class="td__col">
+          <ng-container *ngTemplateOutlet="detailsSkel" />
+        </div>
+      </div>
+    } @else {
+      <app-tabs class="td__tabs" idPrefix="td-busy" [tabs]="tabs()" [active]="'log'" aria-hidden="true" />
+      <section class="td__panel td__panel--log" aria-hidden="true">
+        <section class="td__sec">
+          <app-skeleton class="td__chat skel-in" variant="chat" [count]="6" [framed]="false" />
+        </section>
+      </section>
+    }
+    <span class="sr-only" role="status">{{ 'tickets.detail.loading' | t }}</span>
+  </article>
+} @else if (notFound()) {
+  <div class="td td--center">
+    <app-empty-state icon="ticket" [heading]="'tickets.detail.notFound' | t">
+      <a routerLink="/tickets" queryParamsHandling="preserve" class="td__backLink">{{ 'tickets.detail.backToList' | t }}</a>
+    </app-empty-state>
+  </div>
+} @else if (error()) {
+  <div class="td">
+    <p class="td__error" role="alert">{{ 'tickets.detail.error.load' | t }}</p>
+  </div>
+} @else if (ticket(); as ticket) {
+  <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
+    <header class="td__head">
+      <app-sheet-bar [bleed]="split()">
+        <span appSheetBarKicker class="ell" [title]="kicker()">{{ kickerParts().before }}<span class="mono">{{ kickerParts().number }}</span>{{ kickerParts().after }}</span>
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'tickets.detail.copyLink' | t"
+          (click)="copyLink()"
+        ><app-icon name="link" [size]="19" /></app-button>
+        @if (menuSections().length) {
+          <app-row-menu
+            [label]="'tickets.detail.menu' | t"
+            [sections]="menuSections()"
+            (selected)="onMenu($event)"
+          />
+        }
+      </app-sheet-bar>
+
+      <h2 id="td-title" class="td__title">{{ ticket.title }}</h2>
+      <p class="td__line">
+        <app-status-text [kind]="statusKind()">{{ statusLabel() }}</app-status-text>
+        <span class="td__dot" aria-hidden="true">·</span>
+        <span>{{ kindLabel() }}</span>
+        @if (manager) {
+          <span class="td__dot" aria-hidden="true">·</span>
+          <span>{{ assigneeName() }}</span>
+        }
+      </p>
+
+      @if (manager) {
+        <div #actions class="td__actions" role="group" [attr.aria-label]="'tickets.detail.actions' | t">
+          @if (open()) {
+            <app-button
+              class="td__act"
+              variant="fill"
+              [loading]="saving() === 'status' && closing() === null"
+              [disabled]="saving() !== null"
+              (click)="close('done')"
+            >
+              <app-icon name="check" [size]="17" />
+              {{ 'tickets.detail.done' | t }}
+            </app-button>
+            <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
+              {{ 'tickets.detail.reject' | t }}
+            </app-button>
+          } @else {
+            <app-button variant="tonal" [loading]="saving() === 'status'" (click)="reopen()">
+              <app-icon name="undo" [size]="17" />
+              {{ 'tickets.detail.reopen' | t }}
+            </app-button>
+          }
+        </div>
+      }
+
+      @if (ticket.duplicateOf; as dup) {
+        <app-note class="td__note" icon="copy">
+          {{ 'tickets.detail.duplicateOf' | t }}
+          <a class="td__link" [routerLink]="['/tickets', dup.id]" queryParamsHandling="preserve">{{ dup.number }}</a>
+        </app-note>
+      }
+      @if (ticket.anonymizedAt) {
+        <app-note class="td__note" icon="lock">
+          {{ 'tickets.detail.anonymized' | t: { date: (ticket.anonymizedAt | ldate: 'mediumDate') } }}
+        </app-note>
+      }
+    </header>
+
+    @if (split()) {
+      <div class="td__cols">
+        <div class="td__col td__col--log">
+          <ng-container *ngTemplateOutlet="log" />
+        </div>
+        <div class="td__col">
+          <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
+        </div>
+      </div>
+    } @else {
+      <app-tabs
+        #tabBar
+        class="td__tabs"
+        idPrefix="td"
+        [ariaLabel]="ticket.title"
+        [tabs]="tabs()"
+        [active]="tab()"
+        (activeChange)="selectTab($event)"
+      />
+      <section
+        class="td__panel td__panel--log"
+        role="tabpanel"
+        [id]="tabBar.panelId('log')"
+        [attr.aria-labelledby]="tabBar.tabId('log')"
+        [hidden]="tab() !== 'log'"
+      >
+        <ng-container *ngTemplateOutlet="log" />
+      </section>
+      <section
+        class="td__panel td__panel--details"
+        role="tabpanel"
+        [id]="tabBar.panelId('details')"
+        [attr.aria-labelledby]="tabBar.tabId('details')"
+        [hidden]="tab() !== 'details'"
+      >
+        <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
+      </section>
+    }
+  </article>
+}
+
+<!-- "Verlauf": the report, the notes and the events. -->
+<ng-template #log>
+  <section class="td__sec" [attr.aria-labelledby]="split() ? 'td-log' : null">
+    @if (split()) {
+      <h3 id="td-log" class="sr-only">{{ 'tickets.detail.log' | t }}</h3>
+    }
+    <app-chat
+      class="td__chat"
+      [draftKey]="'ticket.' + (ticket()?.id ?? '')"
+      [messages]="messages()"
+      [events]="events()"
+      [placeholder]="placeholder()"
+      [visibilityOptions]="visibilityOptions()"
+      [canPost]="manager || canReply()"
+      [canAttach]="!ticket()?.anonymizedAt"
+      (send)="sendNote($event)"
+      (retry)="retryNote($event)"
+      (discard)="discardNote($event)"
+      (edit)="editNote($event)"
+      (delete)="deleteNote($event)"
+      (refresh)="refreshThread()"
+    />
+  </section>
+</ng-template>
+
+<!-- "Details": reporter, assignee, kind, the to-dos and the technical context. -->
+<ng-template #details let-ticket>
+  <section class="td__sec" aria-labelledby="td-details">
+    <h3 id="td-details" class="sec td__secTitle" [class.sr-only]="!split()">{{ 'tickets.detail.details' | t }}</h3>
+    <!-- Side by side the fields pair up; in one column the e-mail follows the reporter.
+         The reporter reads the report time and the kind only. -->
+    <app-field-group>
+      @if (!manager) {
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="reportedRow" />
+          <app-field-row [label]="'tickets.detail.kind' | t">{{ kindLabel() }}</app-field-row>
+        </div>
+      } @else if (split()) {
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="reporterRow" />
+          <ng-container *ngTemplateOutlet="reportedRow" />
+        </div>
+        <ng-container *ngTemplateOutlet="emailRow" />
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="assigneeRow" />
+          <ng-container *ngTemplateOutlet="kindRow" />
+        </div>
+      } @else {
+        <ng-container *ngTemplateOutlet="reporterRow" />
+        <ng-container *ngTemplateOutlet="emailRow" />
+        <ng-container *ngTemplateOutlet="reportedRow" />
+        <ng-container *ngTemplateOutlet="assigneeRow" />
+        <ng-container *ngTemplateOutlet="kindRow" />
+      }
+    </app-field-group>
+    <ng-template #reporterRow>
+      <app-field-row [label]="'tickets.detail.reporter' | t">{{ reporter() }}</app-field-row>
+    </ng-template>
+    <ng-template #reportedRow>
+      <app-field-row [label]="'tickets.detail.reported' | t">
+        <time [attr.datetime]="ticket.createdAt">{{ reportedAt(ticket) }}</time>
+      </app-field-row>
+    </ng-template>
+    <ng-template #emailRow>
+      @if (ticket.reporter.email) {
+        <app-field-row [label]="'tickets.detail.email' | t">
+          <a class="td__mail" [attr.href]="'mailto:' + ticket.reporter.email">{{ ticket.reporter.email }}</a>
+        </app-field-row>
+      }
+    </ng-template>
+    <ng-template #assigneeRow>
+      <app-field-row [label]="'tickets.detail.assignee' | t">
+        <app-filter-select
+          class="td__select"
+          size="md"
+          [label]="'tickets.detail.assignee' | t"
+          [options]="assigneeOptions()"
+          [value]="ticket.assignee?.principalId ?? ''"
+          (valueChange)="setAssignee($event)"
+          [person]="assigneePerson()"
+          [text]="assigneeName()"
+        />
+      </app-field-row>
+    </ng-template>
+    <ng-template #kindRow>
+      <app-field-row [label]="'tickets.detail.kind' | t">
+        <app-filter-select
+          class="td__select"
+          size="md"
+          [label]="'tickets.detail.kind' | t"
+          [options]="kindOptions()"
+          [value]="ticket.kind"
+          (valueChange)="setKind($event)"
+          [icon]="kindIcon()"
+          [text]="kindLabel()"
+        />
+      </app-field-row>
+    </ng-template>
+  </section>
+
+  @if (manager) {
+    <section class="td__sec" aria-labelledby="td-todos">
+      <div class="td__secHead">
+        <h3 id="td-todos" class="sec td__secTitle">{{ 'tickets.todos.title' | t }}</h3>
+        <app-button variant="text" size="sm" (click)="todoOpen.set(true)">
+          <app-icon name="plus" [size]="16" />
+          {{ 'tickets.todos.add' | t }}
+        </app-button>
+      </div>
+      @if (todos().length) {
+        <ul class="rowgroup td__todos">
+          @for (card of todos(); track card.id) {
+            <li class="td__todo" [class.td__todo--done]="card.isDone">
+              <app-icon class="td__todoIcon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
+              <span class="td__todoText">
+                <a class="td__todoTitle" [routerLink]="['/todos', card.boardId]" [queryParams]="{ card: card.id }">{{ card.title }}</a>
+                <span class="td__todoSub">{{ todoSub(card) }}</span>
+              </span>
+              @if (card.assignees.length) {
+                <app-avatar-stack size="xs" [names]="todoNames(card)" [principalIds]="todoIds(card)" [max]="3" />
+              }
+            </li>
+          }
+        </ul>
+      }
+    </section>
+  }
+
+  @if (contextRows().length || contextLink()) {
+    <section class="td__sec" aria-labelledby="td-context">
+      <h3 id="td-context" class="sec td__secTitle">{{ 'tickets.detail.context' | t }}</h3>
+      <app-field-group>
+        @for (row of contextRows(); track row.label) {
+          <app-field-row [label]="row.label | t">
+            @if (row.href) {
+              <a class="td__url" [href]="row.href" target="_blank" rel="noopener">{{ row.value }}</a>
+            } @else {
+              {{ row.value }}
+            }
+          </app-field-row>
+        }
+        @if (contextLink(); as target) {
+          <app-field-row [label]="'tickets.detail.linked' | t">
+            <a class="td__url" [routerLink]="target.link">{{ target.title }}</a>
+          </app-field-row>
+        }
+      </app-field-group>
+    </section>
+  }
+</ng-template>
+
+<!-- The details while the ticket loads: the labels are real, the values are bars, in
+     the order and the pairs of the loaded fields. -->
+<ng-template #skelRow let-label="label" let-width="width">
+  <app-field-row [label]="label | t"><span class="skel-text skel-in" [style.width]="width"></span></app-field-row>
+</ng-template>
+<ng-template #detailsSkel>
+  <section class="td__sec">
+    <h3 class="sec td__secTitle">{{ 'tickets.detail.details' | t }}</h3>
+    @if (!manager) {
+      <app-field-group>
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.reported', width: '6rem' }" />
+          <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.kind', width: '4rem' }" />
+        </div>
+      </app-field-group>
+    } @else {
+      <app-field-group>
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.reporter', width: '7rem' }" />
+          <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.reported', width: '6rem' }" />
+        </div>
+        <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.email', width: '12rem' }" />
+        <div class="td__pair">
+          <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.assignee', width: '7rem' }" />
+          <ng-container *ngTemplateOutlet="skelRow; context: { label: 'tickets.detail.kind', width: '4rem' }" />
+        </div>
+      </app-field-group>
+    }
+  </section>
+  @if (manager) {
+    <section class="td__sec">
+      <div class="td__secHead">
+        <h3 class="sec td__secTitle">{{ 'tickets.todos.title' | t }}</h3>
+        <span class="td__skelAdd skel-in"><span class="skel-text skel-text--muted"></span></span>
+      </div>
+    </section>
+  }
+</ng-template>
+
+<!-- Frame 35: "Ticket erledigen?" with the open to-dos. -->
+<app-dialog
+  [open]="closing() !== null"
+  [title]="(closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="cancelClose()"
+>
+  <div class="td__closeBox">
+    <app-checkbox [ngModel]="completeTodos()" (ngModelChange)="completeTodos.set($event)">
+      <span class="td__closeLabel">
+        {{ (openTodoN() === 1 ? 'tickets.close.todosOne' : 'tickets.close.todosMany') | t: { n: openTodoN() } }}
+      </span>
+    </app-checkbox>
+    @if (openTodos().length) {
+      <ul class="td__closeList">
+        @for (card of openTodos(); track card.id) {
+          <li>{{ card.title }}</li>
+        }
+      </ul>
+    }
+  </div>
+  <app-button dialog-footer variant="text" (click)="cancelClose()">{{ 'action.cancel' | t }}</app-button>
+  <app-button dialog-footer variant="fill" (click)="confirmClose()">
+    {{ (closing() === 'rejected' ? 'tickets.detail.reject' : 'tickets.detail.done') | t }}
+  </app-button>
+</app-dialog>
+
+<!-- "Als Duplikat schließen …": pick the ticket this one repeats. -->
+<app-dialog
+  [open]="duplicateOpen()"
+  [title]="'tickets.duplicate.title' | t"
+  [closeLabel]="'action.cancel' | t"
+  (closed)="duplicateOpen.set(false)"
+>
+  <div class="td__dup">
+    <app-input
+      [label]="'tickets.duplicate.search' | t"
+      [ngModel]="duplicateSearch.text()"
+      (ngModelChange)="duplicateSearch.set($event)"
+    />
+    @if (duplicateHits().length) {
+      <ul class="rowgroup td__dupList">
+        @for (hit of duplicateHits(); track hit.id) {
+          <li>
+            <button type="button" class="td__dupHit" (click)="pickDuplicate(hit)">
+              <span class="mono td__dupNo">{{ hit.number }}</span>
+              <span class="td__dupTitle">{{ hit.title }}</span>
+              <span class="td__dupState">{{ statusOf(hit.status) }}</span>
+            </button>
+          </li>
+        }
+      </ul>
+    } @else if (duplicateSearch.applied()) {
+      <p class="td__none">{{ 'tickets.duplicate.none' | t }}</p>
+    }
+  </div>
+  <app-button dialog-footer variant="text" (click)="duplicateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
+</app-dialog>
+
+@if (manager && ticket(); as ticket) {
+  <app-ticket-todo-dialog [ticket]="ticket" [(open)]="todoOpen" (created)="onTodoCreated()" />
+}

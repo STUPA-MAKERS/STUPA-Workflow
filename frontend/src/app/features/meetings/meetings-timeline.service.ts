@@ -6,6 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { Meeting, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
 
 /** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
 export type MeetingChange =
@@ -47,7 +48,14 @@ export class MeetingsTimelineService implements OnDestroy {
       this.auth.inSubstitutePool(),
   );
 
+  /** The first load runs and nothing shows yet: the list draws its skeleton. */
   readonly loadingList = signal(false);
+  /**
+   * The list loads again (the Gremium filter changed) while the old meetings show. They
+   * stay, dimmed and inert, until the new ones arrive.
+   */
+  readonly reloadingList = signal(false);
+  private listSeq = 0;
 
   /** Upcoming meetings, chronologically forward (earliest on top). */
   readonly upcomingItems = signal<Meeting[]>([]);
@@ -64,6 +72,17 @@ export class MeetingsTimelineService implements OnDestroy {
   readonly gremiumFilter = signal<string>('');
   /** Gremien with at least one readable meeting. The backend provides the list. */
   readonly filterGremien = signal<{ id: string; name: string }[]>([]);
+  private readonly filterGremienLoaded = signal(false);
+  /**
+   * The filter Gremien have not arrived yet, and the person probably gets the chip (more
+   * than one Gremium, or every meeting). The list then holds the place of the chip row, so
+   * the rows do not move down when the answer comes.
+   */
+  readonly filterPending = computed(
+    () =>
+      !this.filterGremienLoaded() &&
+      (this.auth.isAdmin() || this.auth.can('meeting.view_all') || this.auth.gremien().length > 1),
+  );
   readonly filterGremiumOptions = computed<SelectOption[]>(() => [
     { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
     ...this.filterGremien().map((g) => ({ value: g.id, label: g.name })),
@@ -95,8 +114,14 @@ export class MeetingsTimelineService implements OnDestroy {
       .listMeetingFilterGremien()
       .pipe(takeUntilDestroyed())
       .subscribe({
-        next: (gs) => this.filterGremien.set(gs),
-        error: () => this.filterGremien.set([]),
+        next: (gs) => {
+          this.filterGremien.set(gs);
+          this.filterGremienLoaded.set(true);
+        },
+        error: () => {
+          this.filterGremien.set([]);
+          this.filterGremienLoaded.set(true);
+        },
       });
   }
 
@@ -104,11 +129,11 @@ export class MeetingsTimelineService implements OnDestroy {
     if (this.searchTimer !== null) clearTimeout(this.searchTimer);
   }
 
-  /** Debounced (~400 ms) header search. An empty query returns to the timeline. */
+  /** Debounced (~250 ms) header search. An empty query returns to the timeline. */
   onSearch(value: string): void {
     this.searchQuery.set(value);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.runSearch(), 400);
+    this.searchTimer = setTimeout(() => this.runSearch(), LIVE_SEARCH_DEBOUNCE_MS);
   }
 
   private runSearch(): void {
@@ -240,16 +265,21 @@ export class MeetingsTimelineService implements OnDestroy {
     this.lastChange.set({ kind: 'removed', id });
   }
 
-  /** Initial load: the first upcoming page and the past preview in parallel. */
+  /**
+   * Initial load: the first upcoming page and the past preview in parallel. Loaded
+   * meetings stay until the answer replaces them; only a late answer of an older load is
+   * dropped.
+   */
   loadList(): void {
     if (!this.canReadTimeline()) return;
-    this.upcomingItems.set([]);
-    this.pastItems.set([]);
+    const seq = ++this.listSeq;
+    const shown = this.upcomingItems().length + this.pastItems().length > 0;
     this.upcomingCursor = null;
     this.pastCursor = null;
     this.upcomingHasMore.set(false);
     this.pastHasMore.set(false);
-    this.loadingList.set(true);
+    this.loadingList.set(!shown);
+    this.reloadingList.set(shown);
     forkJoin({
       upcoming: this.api.listMeetingsTimeline({
         direction: 'upcoming',
@@ -263,7 +293,9 @@ export class MeetingsTimelineService implements OnDestroy {
       }),
     }).subscribe({
       next: ({ upcoming, past }) => {
+        if (seq !== this.listSeq) return;
         this.loadingList.set(false);
+        this.reloadingList.set(false);
         this.upcomingItems.set(upcoming.items);
         this.upcomingCursor = upcoming.nextCursor;
         this.upcomingHasMore.set(upcoming.nextCursor !== null);
@@ -273,7 +305,9 @@ export class MeetingsTimelineService implements OnDestroy {
         this.pastHasMore.set(past.nextCursor !== null);
       },
       error: () => {
+        if (seq !== this.listSeq) return;
         this.loadingList.set(false);
+        this.reloadingList.set(false);
         this.upcomingItems.set([]);
         this.pastItems.set([]);
       },

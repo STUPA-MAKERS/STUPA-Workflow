@@ -2,8 +2,8 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { I18nService } from '@core/i18n/i18n.service';
 import { AvatarService } from './avatar.service';
 
-/** The size of an avatar: 40px (`md`) or 32px (`sm`). */
-export type AvatarSize = 'md' | 'sm';
+/** The size of an avatar: 40px (`md`), 32px (`sm`) or 22px (`xs`, in a dense tile). */
+export type AvatarSize = 'md' | 'sm' | 'xs';
 
 /**
  * The initials of a name: the first letter of the first and of the last word.
@@ -24,7 +24,7 @@ export function initials(name: string): string {
 }
 
 /** The edge length of an avatar in CSS pixels, per size. */
-const AVATAR_PX: Record<AvatarSize, number> = { md: 40, sm: 32 };
+const AVATAR_PX: Record<AvatarSize, number> = { md: 40, sm: 32, xs: 22 };
 
 /**
  * The initials of a PERSON in a circle, or the Gravatar image of the person.
@@ -46,6 +46,7 @@ const AVATAR_PX: Record<AvatarSize, number> = { md: 40, sm: 32 };
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[class.av--sm]': "size() === 'sm'",
+    '[class.av--xs]': "size() === 'xs'",
     '[class.av--accent]': 'accent()',
     '[class.av--img]': 'loaded()',
     '[attr.role]': "decorative() ? null : 'img'",

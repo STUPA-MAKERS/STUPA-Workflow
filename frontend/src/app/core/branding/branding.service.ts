@@ -67,6 +67,21 @@ export class BrandingService {
 
   private readonly _gravatarEnabled = signal(true);
 
+  /** The handbook of the platform: the default of the backend until the config loads. */
+  static readonly DEFAULT_WIKI_URL = 'https://wiki.reutlingen.university/books/antragsplattform';
+
+  private readonly _wikiUrl = signal(BrandingService.DEFAULT_WIKI_URL);
+  private readonly _ticketsPublic = signal(false);
+
+  /** The link "Handbuch" of the help menu (`help.wikiUrl`). */
+  readonly wikiUrl = this._wikiUrl.asReadonly();
+
+  /**
+   * A visitor without a session may send a ticket (`tickets.publicEnabled`). False until
+   * the config loads, so the public header never offers a form the server refuses.
+   */
+  readonly ticketsPublic = this._ticketsPublic.asReadonly();
+
   /**
    * The admin switch for the Gravatar images of the avatars (`gravatarEnabled`). An older
    * config without the field counts as on. Read {@link loaded} as well: the avatars load
@@ -140,6 +155,8 @@ export class BrandingService {
         if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
         this._freetexts.set(cfg.branding?.freetexts ?? {});
         this._gravatarEnabled.set(cfg.branding?.gravatarEnabled !== false);
+        if (cfg.help?.wikiUrl) this._wikiUrl.set(cfg.help.wikiUrl);
+        this._ticketsPublic.set(cfg.tickets?.publicEnabled === true);
         this._loaded.set(true);
       },
       error: () => {

@@ -109,8 +109,10 @@ class _Session:
         self.refreshed = 0
         self.commit_raises: Exception | None = None
         self.bind = None
+        self.get_kw: list[dict[str, Any]] = []
 
-    async def get(self, _model: type, _pk: Any) -> Any:
+    async def get(self, _model: type, _pk: Any, **kw: Any) -> Any:
+        self.get_kw.append(kw)
         return self.get_results.pop(0) if self.get_results else None
 
     async def execute(self, stmt: Any) -> _Result:
@@ -1489,6 +1491,12 @@ async def test_anonymize_full_with_files_service_commit(
     assert files_calls == [(app.id, "admin")]
     assert session.committed == 1
     assert session.refreshed == 1
+    # The application row is locked before the attachments go, as add_comment locks
+    # it before it binds files.
+    assert session.get_kw[0] == {
+        "with_for_update": {"key_share": True},
+        "populate_existing": True,
+    }
 
 
 def _patch_pinned_keys(monkeypatch: pytest.MonkeyPatch, fields: list[FormFieldDef]) -> None:
@@ -1762,3 +1770,121 @@ async def test_patch_moves_a_relative_changed_deadline(
     )
     await ApplicationsService(session).patch(app.id, {"title": "new"}, changed_by="u")  # type: ignore[arg-type]
     assert _FakeFlow.scheduled == [(app, state)]
+
+
+async def test_add_comment_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.modules.applications.service import comments as comments_mod
+
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def _check(_s: object, **kw: Any) -> str:
+        calls.append(("check", kw))
+        return "tok"
+
+    async def _bind(_s: object, **kw: Any) -> None:
+        calls.append(("bind", kw))
+
+    monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
+    monkeypatch.setattr(comments_mod, "bind_drafts", _bind)
+    app = _app()
+    draft = uuid4()
+    session = _Session(get_results=[app], execute_results=[[]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.add_comment(
+        app.id,
+        author=None,
+        author_kind="applicant",
+        body="",
+        visibility="public",
+        attachment_ids=[draft],
+        draft_token="tok",
+        pepper="p",
+    )
+    assert [k for k, _ in calls] == ["check", "bind"]
+    # A comment with files locks the application before the anonymized check.
+    assert session.get_kw == [{"with_for_update": {"key_share": True}, "populate_existing": True}]
+    assert calls[1][1]["comment_id"] == out.id
+    assert calls[1][1]["attachment_ids"] == [draft]
+    assert session.flushed == 1
+    assert out.attachments == []
+
+
+async def test_add_comment_with_files_on_an_anonymized_application_is_422(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.applications.service import comments as comments_mod
+
+    async def _check(_s: object, **_kw: Any) -> str:
+        raise AssertionError("no draft check on an anonymized application")
+
+    monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
+    app = _app()
+    session = _Session(get_results=[app], scalar_results=[datetime.now(UTC)])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    with pytest.raises(ValidationProblem) as exc:
+        await svc.add_comment(
+            app.id,
+            author="sub-1",
+            author_kind="principal",
+            body="",
+            visibility="internal",
+            attachment_ids=[uuid4()],
+            draft_token="tok",
+            pepper="p",
+        )
+    assert exc.value.code == "application_anonymized"
+    assert session.added == []
+
+
+async def test_add_comment_without_files_on_an_anonymized_application_skips_the_check(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.applications.service import comments as comments_mod
+
+    async def _check(_s: object, **_kw: Any) -> None:
+        return None
+
+    monkeypatch.setattr(comments_mod, "check_message_drafts", _check)
+    app = _app()
+    # The anonymized marker would refuse files; a comment without files never asks.
+    session = _Session(get_results=[app], scalar_results=[datetime.now(UTC)], execute_results=[[]])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    out = await svc.add_comment(
+        app.id, author=None, author_kind="applicant", body="hallo", visibility="public"
+    )
+    assert out.body == "hallo"
+    # Without files the comment takes no lock on the application.
+    assert session.get_kw == [{}]
+
+
+async def test_delete_comment_removes_its_files_first() -> None:
+    app = _app()
+    c = _comment(application_id=app.id)
+    session = _Session(get_results=[app], execute_results=[[c], [], []])
+    svc = ApplicationsService(session)  # type: ignore[arg-type]
+    removed: list[tuple[str, list[UUID], str]] = []
+
+    locked: list[tuple[str, list[UUID]]] = []
+
+    class _Files:
+        async def lock_for_messages(self, owner: str, ids: list[UUID]) -> None:
+            locked.append((owner, list(ids)))
+
+        async def delete_for_messages(self, owner: str, ids: list[UUID], *, actor: str) -> int:
+            removed.append((owner, list(ids), actor))
+            assert session.deleted == []
+            return 1
+
+    await svc.delete_comment(
+        app.id,
+        c.id,
+        actor="sub-1",
+        viewer_sub="sub-1",
+        viewer_is_applicant=False,
+        can_manage=False,
+        files=_Files(),  # type: ignore[arg-type]
+    )
+    assert removed == [("comment", [c.id], "sub-1")]
+    # The file rows are locked before the COMMENT_DELETE audit entry.
+    assert locked == [("comment", [c.id])]
+    assert session.deleted == [c]

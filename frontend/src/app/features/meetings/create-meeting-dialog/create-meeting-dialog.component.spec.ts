@@ -10,6 +10,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { CreateMeetingDialogComponent } from './create-meeting-dialog.component';
+import { optionLabels, pickOption } from '../../../../testing/select';
 
 const GREMIEN = [
   { id: 'g-1', name: 'Studierendenparlament', slug: 'stupa' },
@@ -81,7 +82,7 @@ describe('CreateMeetingDialogComponent', () => {
   it('goes to step 2 with a prefilled title and lists only members who can keep the minutes (O20)', async () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
-    await userEvent.selectOptions(screen.getByLabelText(/Gremium/), 'g-1');
+    await pickOption(screen.getByLabelText(/Gremium/), 'Studierendenparlament');
     http.expectOne('/api/gremien/g-1/meeting-members').flush(MEMBERS);
     cmp.date.set('2026-11-10');
     cmp.time.set('18:00');
@@ -91,7 +92,7 @@ describe('CreateMeetingDialogComponent', () => {
     expect(screen.getByText('Schritt 2 von 2')).toBeInTheDocument();
     expect(cmp.title()).toBe('Sitzung des Studierendenparlament am 10. November 2026');
     const keeper = screen.getByLabelText('Protokollführung');
-    const names = within(keeper).getAllByRole('option').map((o) => o.textContent?.trim());
+    const names = await optionLabels(keeper);
     // Tom has no protocol.write. A member without a name shows the e-mail; without both,
     // "Ohne Namen".
     expect(names).toEqual(['— niemand —', 'Mara Keller', 'lea@x.de', 'Ohne Namen']);
@@ -195,8 +196,8 @@ describe('CreateMeetingDialogComponent', () => {
   it('offers a non-admin only the Gremien with session.manage', async () => {
     const { http, fixture } = await setup({ admin: false, managed: ['g-2'] });
     flushGremien(http, fixture);
-    const options = within(screen.getByLabelText(/Gremium/)).getAllByRole('option');
-    expect(options.map((o) => o.textContent?.trim())).toEqual(['Gremium wählen …', 'Finanzausschuss']);
+    // A required field has no row for its placeholder.
+    expect(await optionLabels(screen.getByLabelText(/Gremium/))).toEqual(['Finanzausschuss']);
   });
 
   it('says so when there is no Gremium to choose, also when the list fails', async () => {

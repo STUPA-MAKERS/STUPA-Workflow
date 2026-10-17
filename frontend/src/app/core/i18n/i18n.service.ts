@@ -5,6 +5,7 @@ import {
   type Locale,
   SUPPORTED_LOCALES,
   type TranslationKey,
+  loadCatalog,
 } from './translations';
 
 const STORAGE_KEY = 'ap.locale';
@@ -52,8 +53,14 @@ export class I18nService {
   /** `Intl` tag of the active locale (`de-DE` / `en-GB`). See {@link toFormatLocale}. */
   readonly formatLocale = computed(() => FORMAT_LOCALES[this._locale()]);
 
+  /** Counts the catalogs that arrived from their lazy chunk, so a read sees the new strings. */
+  private readonly _loaded = signal(0);
+
   /** Active translation table (for template bindings via the `t` pipe). */
-  readonly dictionary = computed(() => CATALOG[this._locale()]);
+  readonly dictionary = computed(() => {
+    this._loaded();
+    return CATALOG[this._locale()];
+  });
 
   constructor() {
     // Sync `<html lang>` with the resolved locale from the first paint (a11y and
@@ -63,11 +70,27 @@ export class I18nService {
     }
   }
 
+  /**
+   * Load the catalog of the active locale. The app initializer waits for it, so the first
+   * paint is in the right language. A failed load resolves too: the app then shows DE.
+   */
+  ready(): Promise<void> {
+    return this.load(this._locale());
+  }
+
   setLocale(locale: Locale): void {
     if (!SUPPORTED_LOCALES.includes(locale)) return;
     this._locale.set(locale);
     this.persist(locale);
     document.documentElement.lang = locale;
+    void this.load(locale);
+  }
+
+  private load(locale: Locale): Promise<void> {
+    return loadCatalog(locale).then(
+      () => this._loaded.update((n) => n + 1),
+      () => undefined,
+    );
   }
 
   /** Translate a key. Fallback chain: active locale → DE → the key itself. */

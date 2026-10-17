@@ -1,0 +1,156 @@
+:host {
+  display: contents;
+}
+
+.lp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+/* Desktop: the panel floats over everything, like the search palette, also over a
+   dialog that holds the picker. It sits near the top, because the hits grow downward. */
+.lp__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-dialog) + 1);
+  background: var(--color-scrim);
+}
+.lp--pop {
+  position: fixed;
+  z-index: calc(var(--z-dialog) + 2);
+  top: 96px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 2 * var(--space-4)));
+  max-height: calc(100dvh - 96px - var(--space-6));
+  padding: var(--space-3) var(--space-3) 0;
+  overflow: hidden;
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  box-shadow: var(--shadow-elevated);
+}
+
+.lp__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  color: var(--color-text-muted);
+}
+.lp__field {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+.lp__x {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.lp__x:hover {
+  color: var(--color-text);
+}
+
+.lp__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-inline: var(--space-1);
+}
+/* Compact kind chips: the picker is a dropdown, not a page filter row. */
+.lp__chips .lp__chip {
+  height: 28px;
+  padding-inline: var(--space-3);
+  font-size: 0.8125rem;
+}
+/* The search and the chips stay; the hits scroll and run from edge to edge. */
+.lp--pop .lp__results {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-inline: calc(-1 * var(--space-3));
+  padding-bottom: var(--space-3);
+  overflow-y: auto;
+}
+.lp--pop .lp__group {
+  margin-inline: var(--space-4);
+}
+.lp--pop .lp__hit {
+  padding-inline: var(--space-4);
+  border-radius: 0;
+}
+
+.lp__group {
+  margin: var(--space-2) var(--space-2) var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.lp__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.lp__hit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 10px var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.lp__hit:hover,
+.lp__hit--on {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.lp__hit:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.lp__icon,
+.lp__check {
+  flex: none;
+}
+.lp__text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.lp__title {
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.lp__sub {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.lp__note {
+  margin: 0;
+  padding: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.lp__note--error {
+  color: var(--color-danger);
+}

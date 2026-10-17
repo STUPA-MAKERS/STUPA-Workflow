@@ -167,7 +167,7 @@
       >
         <span class="choice__mark" [class.choice__mark--box]="multi" aria-hidden="true">
           @if (on) {
-            <app-icon name="check" [size]="18" />
+            <app-icon name="check" [size]="compact() ? 14 : 18" />
           }
         </span>
         <span class="choice__label">{{ c.erased ? ('election.candidate.erased' | t) : c.name }}</span>
@@ -199,7 +199,7 @@
       >
         <span class="choice__mark" aria-hidden="true">
           @if (abstain) {
-            <app-icon name="check" [size]="18" />
+            <app-icon name="check" [size]="compact() ? 14 : 18" />
           }
         </span>
         <span class="choice__label">{{ 'vote.option.abstain' | t }}</span>

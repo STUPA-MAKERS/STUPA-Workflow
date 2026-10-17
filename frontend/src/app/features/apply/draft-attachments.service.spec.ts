@@ -9,6 +9,7 @@ import { BrandingService } from '@core/branding/branding.service';
 import { AltchaService } from './altcha.service';
 import {
   DRAFT_FILES_KEY,
+  DRAFT_FILES_PERSIST,
   DraftAttachmentsService,
   uploadErrorKey,
 } from './draft-attachments.service';
@@ -46,6 +47,7 @@ interface Setup {
 function setup(
   opts: {
     loggedIn?: boolean;
+    persist?: boolean;
     upload?: jest.Mock;
     remove?: jest.Mock;
     solve?: jest.Mock;
@@ -75,6 +77,7 @@ function setup(
       { provide: AuthService, useValue: { isAuthenticated: signal(!!opts.loggedIn) } },
       { provide: AltchaService, useValue: { solve } },
       { provide: BrandingService, useValue: { attachmentLimits: signal(LIMITS) } },
+      ...(opts.persist === false ? [{ provide: DRAFT_FILES_PERSIST, useValue: false }] : []),
     ],
   });
   return { svc: TestBed.inject(DraftAttachmentsService), upload, remove, solve };
@@ -125,6 +128,21 @@ describe('DraftAttachmentsService', () => {
     const again = setup().svc;
     expect(again.token()).toBe('tok');
     expect(again.files().map((f) => f.id)).toEqual(['d1']);
+  });
+
+  it('keeps nothing in sessionStorage without persistence (the chat composer)', async () => {
+    sessionStorage.setItem(DRAFT_FILES_KEY, JSON.stringify({ token: 'old', files: [] }));
+    const { svc } = setup({ persist: false });
+    // A stored draft of the wizard is not read.
+    expect(svc.token()).toBeNull();
+    await svc.upload([file('a.pdf')]);
+    expect(svc.token()).toBe('tok');
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_FILES_KEY) as string)).toMatchObject({ token: 'old' });
+    svc.clear();
+    expect(svc.token()).toBeNull();
+    expect(svc.files()).toEqual([]);
+    // The wizard draft of the tab stays.
+    expect(sessionStorage.getItem(DRAFT_FILES_KEY)).not.toBeNull();
   });
 
   it('drops an expired, broken or empty stored draft', () => {
@@ -359,6 +377,107 @@ describe('DraftAttachmentsService', () => {
     resolve({ attachment: attachment('d1'), draftToken: 't', draftExpiresAt: '2999-01-01T00:00:00Z' });
     await done;
     expect(svc.busy()).toBe(false);
+  });
+
+  it('deletes an upload that lands after a discard, and sends no further file of the call', async () => {
+    const answer = new Subject<DraftUpload>();
+    const upload = jest.fn(() => answer);
+    const { svc, remove } = setup({ upload, loggedIn: true });
+    const done = svc.upload([file('a.pdf'), file('b.pdf')]);
+    await Promise.resolve();
+    expect(svc.busy()).toBe(true);
+    await svc.discard();
+    expect(svc.pending()).toEqual([]);
+    answer.next({ attachment: attachment('d1'), draftToken: 'old', draftExpiresAt: '2999-01-01T00:00:00Z' });
+    answer.complete();
+    const res = await done;
+    expect(res.uploaded).toEqual([]);
+    expect(svc.files()).toEqual([]);
+    expect(svc.token()).toBeNull();
+    expect(remove).toHaveBeenCalledWith('d1', 'old');
+    expect(upload).toHaveBeenCalledTimes(1);
+  });
+
+  it('queues a second call behind the first, so both files share one draft token', async () => {
+    const answers = [new Subject<DraftUpload>(), new Subject<DraftUpload>(), new Subject<DraftUpload>()];
+    let n = 0;
+    const upload = jest.fn(() => answers[n++]);
+    const land = (i: number, id: string) => {
+      answers[i].next({ attachment: attachment(id), draftToken: 'tok', draftExpiresAt: '2999-01-01T00:00:00Z' });
+      answers[i].complete();
+    };
+    const { svc } = setup({ upload, loggedIn: true });
+    const first = svc.upload([file('a.pdf')]);
+    const second = svc.upload([file('b.pdf'), file('c.pdf')]);
+    // The whole queue counts at once, not only the file on its way.
+    expect(svc.pending().map((p) => p.filename)).toEqual(['a.pdf', 'b.pdf', 'c.pdf']);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(upload).toHaveBeenCalledTimes(1);
+    land(0, 'd1');
+    await first;
+    await new Promise((r) => setTimeout(r));
+    expect(upload).toHaveBeenCalledTimes(2);
+    expect(upload.mock.calls[1][1]).toMatchObject({ token: 'tok' });
+    expect(svc.pending().map((p) => p.filename)).toEqual(['b.pdf', 'c.pdf']);
+    land(1, 'd2');
+    await new Promise((r) => setTimeout(r));
+    land(2, 'd3');
+    await second;
+    expect(svc.files().map((f) => f.id)).toEqual(['d1', 'd2', 'd3']);
+    expect(svc.busy()).toBe(false);
+    // An empty call adds nothing and resolves.
+    expect(await svc.upload([])).toEqual({ uploaded: [], failed: [] });
+  });
+
+  it('sends no file of a queued call after a discard, and drops its pending files', async () => {
+    const answer = new Subject<DraftUpload>();
+    const upload = jest.fn(() => answer);
+    const { svc } = setup({ upload, loggedIn: true });
+    const first = svc.upload([file('a.pdf')]);
+    const second = svc.upload([file('b.pdf')]);
+    await Promise.resolve();
+    await svc.discard();
+    answer.next({ attachment: attachment('d1'), draftToken: 'tok', draftExpiresAt: '2999-01-01T00:00:00Z' });
+    answer.complete();
+    await first;
+    expect(await second).toEqual({ uploaded: [], failed: [] });
+    expect(upload).toHaveBeenCalledTimes(1);
+    expect(svc.pending()).toEqual([]);
+  });
+
+  it('drops a file over a limit from pending at once', async () => {
+    const { svc } = setup();
+    const res = await svc.upload([file('big.pdf', 101)]);
+    expect(res.failed).toEqual([{ filename: 'big.pdf', reason: 'apply.files.error.tooLarge' }]);
+    expect(svc.pending()).toEqual([]);
+  });
+
+  it('takes a file out of the submit while its delete runs, and puts it back when refused', async () => {
+    const answer = new Subject<void>();
+    const remove = jest.fn(() => answer);
+    const { svc } = setup({ remove });
+    await svc.upload([file('a.pdf'), file('b.pdf'), file('c.pdf')]);
+    const done = svc.remove('d2');
+    expect(svc.attachmentIds()).toEqual(['d1', 'd3']);
+    expect(svc.files().map((f) => f.id)).toEqual(['d1', 'd3']);
+    answer.error(httpError(500));
+    expect(await done).toBe(false);
+    expect(svc.files().map((f) => f.id)).toEqual(['d1', 'd2', 'd3']);
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_FILES_KEY) as string).files).toHaveLength(3);
+  });
+
+  it('does not bring a file back when the draft ended during its refused delete', async () => {
+    const answer = new Subject<void>();
+    const remove = jest.fn(() => answer);
+    const { svc } = setup({ remove });
+    await svc.upload([file('a.pdf'), file('b.pdf')]);
+    const done = svc.remove('d1');
+    // The send bound the other file and forgot the draft.
+    svc.clear();
+    answer.error(httpError(500));
+    expect(await done).toBe(false);
+    expect(svc.files()).toEqual([]);
   });
 
   it('maps every refusal to its text', () => {

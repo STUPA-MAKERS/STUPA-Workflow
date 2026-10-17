@@ -60,6 +60,8 @@ from app.modules.livevote.vote_open import (
     eligible_count,
 )
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
+from app.modules.todos.live import publish_pings, todo_broker
+from app.modules.todos.service import TodoService
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
@@ -585,8 +587,9 @@ async def open_meeting_vote(
     creates the vote: the question waits as a ``draft`` until
     ``POST /meetings/{id}/votes/{voteId}/open`` opens it. A draft can be prepared in a
     planned or a live meeting, an open vote needs a live meeting (409
-    ``meeting_not_started`` / ``meeting_closed``). The caller must be the manager, the
-    protokollant, or hold the gremium permission ``vote.manage``. An application
+    ``meeting_not_started`` / ``meeting_closed``). A draft needs ``canManageVotes``.
+    An open vote also needs the protokollant of the meeting (403), because the
+    person who keeps the minutes runs the room. An application
     agenda item allows exactly one vote, because that vote fires the pass or fail
     branch on close. A free-text agenda item allows several generic questions.
     ``eligibleGroup`` is the Gremium of the meeting. The server derives the quorum
@@ -596,6 +599,9 @@ async def open_meeting_vote(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
+    if not payload.draft:
+        # The lead prepares a draft; only the protokollant opens a vote.
+        await service.assert_can_run_votes(meeting_id, principal)
     # An open vote needs a started meeting. Before ``live`` there is no protocol to
     # record the result in. A prepared draft only waits for the start.
     assert_vote_window(meeting, draft=payload.draft)
@@ -711,18 +717,20 @@ async def open_prepared_meeting_vote(
 ) -> MeetingOut:
     """Open a prepared draft vote of this meeting.
 
-    The caller must hold ``canManageVotes``, as for the create. The meeting must be
-    live. The draft can wait a long time, so the route runs the checks of the create
-    again: the application must still be in a vote state that the Gremium of the
-    meeting decides, and a vote with guests needs a meeting where guests vote and a
-    public agenda item (409 ``guests_vote_unavailable``). The quorum denominator comes
-    from the current roster, not from the roster at the create. The route broadcasts
+    The caller must hold ``canManageVotes`` and be the protokollant of the meeting
+    (403), as for an open create. The meeting must be live. The draft can wait a
+    long time, so the route runs the checks of the create again: the application
+    must still be in a vote state that the Gremium of the meeting decides, and a
+    vote with guests needs a meeting where guests vote and a public agenda item
+    (409 ``guests_vote_unavailable``). The quorum denominator comes from the current
+    roster, not from the roster at the create. The route broadcasts
     ``vote_opened``. 404 when the meeting has no such vote, 409 when the vote is no
     longer a draft.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_manage_votes:
         raise ForbiddenError("not allowed to open a vote in this meeting")
+    await service.assert_can_run_votes(meeting_id, principal)
     eligible = await draft_open_checks(service, agenda, meeting, vote_id)
     opened = await voting.open(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
@@ -789,15 +797,35 @@ async def add_agenda_item(
     agenda: AgendaDep,
     service: ServiceDep,
     principal: ReaderDep,
+    request: Request,
 ) -> list[AgendaItemOut]:
-    """Add an agenda item, either an application or a free-text item.
+    """Add an agenda item: an application, a free-text item or a to-do card.
 
     Only the meeting lead or an admin may edit the agenda. A closed meeting answers
-    409 ``meeting_closed``.
+    409 ``meeting_closed``. With ``todoId`` the card must be readable (404), live
+    and on the board of the meeting gremium (422 ``todo_archived`` /
+    ``todo_wrong_board``); a second item of the same card answers 409
+    ``todo_already_on_agenda``. The item takes the card title, and the card gets a
+    link to the item.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
+    if payload.todo_id is not None:
+        todos = TodoService(agenda.session)
+        card = await todos.card_for_agenda(payload.todo_id, meeting.gremium_id, principal)
+        item = await agenda.add_todo_in_tx(
+            meeting_id,
+            todo_id=card.id,
+            title=card.title,
+            non_public=payload.non_public,
+            actor=principal.sub,
+        )
+        await todos.link_agenda_item(card, item.id, principal)
+        await agenda.session.commit()
+        # The card got a link: the board pings it (to-do live channel, after the commit).
+        await publish_pings(todo_broker(request.app.state), todos.pings.drain())
+        return await agenda.list(meeting_id)
     return await agenda.add(
         meeting_id,
         payload.application_id,

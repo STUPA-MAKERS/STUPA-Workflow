@@ -1,17 +1,32 @@
-"""Internal/public comments on an application."""
+"""Internal/public comments on an application.
+
+A comment can carry files (at most five, the draft uploads of the composer). The send
+binds them with ``comment_id``; they are fixed after that. The delete of a comment
+removes its files with their objects. A file of a comment has no ``application_id``,
+so it never shows in the attachment list of the application. An anonymized
+application takes no comment files, because the retention ran once and would not
+see them again.
+"""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from uuid import UUID
 
 from sqlalchemy import select
 
-from app.modules.applications.models import Application, Comment
+from app.modules.applications.models import Applicant, Application, Comment
 from app.modules.applications.schemas import ActorOut, CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
-from app.shared.errors import ForbiddenError, NotFoundError
+from app.modules.files.drafts import bind_drafts, check_message_drafts
+from app.modules.files.schemas import MessageAttachmentOut
+from app.modules.files.service import FilesService
+from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
+
+#: The problem code of a comment with files on an anonymized application.
+APPLICATION_ANONYMIZED = "application_anonymized"
 
 
 def is_comment_author(
@@ -45,8 +60,33 @@ class CommentOps(ApplicationsServiceBase):
         body: str,
         visibility: str,
         allow_unconfirmed: bool = True,
+        attachment_ids: Sequence[UUID] = (),
+        draft_token: str | None = None,
+        pepper: str = "",
     ) -> CommentOut:
-        app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
+        """Add a comment and bind its files in the same transaction.
+
+        Raises:
+            NotFoundError: The application does not exist or is hidden (404).
+            ValidationProblem: Files on an anonymized application
+                (``application_anonymized``), files without a draft token, or a draft
+                that is missing, expired, foreign or infected (422).
+        """
+        # With files the application row is locked before the anonymized check, as
+        # the anonymization locks it. Otherwise a comment that binds files while the
+        # application is anonymized keeps them, because no later step looks for them.
+        app = await self._get_app(
+            application_id, allow_unconfirmed=allow_unconfirmed, lock=bool(attachment_ids)
+        )
+        if attachment_ids and await self._is_anonymized(application_id):
+            raise ValidationProblem(
+                "The application is anonymized and takes no files.",
+                code=APPLICATION_ANONYMIZED,
+                errors=[{"field": "attachmentIds", "msg": "application is anonymized"}],
+            )
+        token = await check_message_drafts(
+            self.session, attachment_ids=attachment_ids, token=draft_token, pepper=pepper
+        )
         comment = Comment(
             application_id=application_id,
             author=author,
@@ -55,8 +95,18 @@ class CommentOps(ApplicationsServiceBase):
             visibility=visibility,
         )
         self.session.add(comment)
+        if token is not None:
+            await self.session.flush()
+            await bind_drafts(
+                self.session,
+                attachment_ids=attachment_ids,
+                token=token,
+                pepper=pepper,
+                comment_id=comment.id,
+            )
         await self.session.commit()
         info = await self._comment_author_info(app, author, author_kind)
+        files = await self._comment_files([comment.id])
         return CommentOut(
             id=comment.id,
             author=info.legacy(author) if author else None,
@@ -66,7 +116,21 @@ class CommentOps(ApplicationsServiceBase):
             visibility=visibility,  # type: ignore[arg-type]
             at=comment.at,
             isOwn=True,  # the creator is always the viewer of the 201 response
+            attachments=files.get(comment.id, []),
         )
+
+    async def _is_anonymized(self, application_id: UUID) -> bool:
+        """Tell whether the applicant of the application is anonymized."""
+        at = await self.session.scalar(
+            select(Applicant.anonymized_at).where(Applicant.application_id == application_id)
+        )
+        return at is not None
+
+    async def _comment_files(
+        self, ids: Sequence[UUID]
+    ) -> dict[UUID, list[MessageAttachmentOut]]:
+        """Return the files of the comments in one query."""
+        return await FilesService(self.session).message_attachments("comment", ids)
 
     async def list_comments(
         self,
@@ -107,6 +171,7 @@ class CommentOps(ApplicationsServiceBase):
             # An applicant comment stores no sub.
             return ActorOut(kind="applicant" if c.author_kind == "applicant" else "deleted")
 
+        files = await self._comment_files([c.id for c in rows])
         return [
             CommentOut(
                 id=c.id,
@@ -122,6 +187,7 @@ class CommentOps(ApplicationsServiceBase):
                     viewer_sub=viewer_sub,
                     viewer_is_applicant=viewer_is_applicant,
                 ),
+                attachments=files.get(c.id, []),
             )
             for c in rows
         ]
@@ -243,6 +309,7 @@ class CommentOps(ApplicationsServiceBase):
         await self._audit_comment(comment, AuditAction.COMMENT_UPDATE, actor=actor)
         await self.session.commit()
         info = await self._comment_author_info(app, comment.author, comment.author_kind)
+        files = await self._comment_files([comment.id])
         return CommentOut(
             id=comment.id,
             author=info.legacy(comment.author) if comment.author else None,
@@ -257,6 +324,7 @@ class CommentOps(ApplicationsServiceBase):
                 viewer_sub=viewer_sub,
                 viewer_is_applicant=viewer_is_applicant,
             ),
+            attachments=files.get(comment.id, []),
         )
 
     async def delete_comment(
@@ -269,11 +337,13 @@ class CommentOps(ApplicationsServiceBase):
         viewer_is_applicant: bool,
         can_manage: bool,
         allow_unconfirmed: bool = True,
+        files: FilesService | None = None,
     ) -> None:
-        """Remove a comment for good.
+        """Remove a comment for good, with its files.
 
         Until this route existed, an internal comment posted as public could
-        only be removed by anonymizing the whole application.
+        only be removed by anonymizing the whole application. With a ``files``
+        service that has the object storage, the objects of the files go too.
 
         Raises:
             NotFoundError: The application or the comment does not exist (404).
@@ -287,6 +357,12 @@ class CommentOps(ApplicationsServiceBase):
             viewer_is_applicant=viewer_is_applicant,
             can_manage=can_manage,
         )
+        files = files or FilesService(self.session)
+        # The file rows are locked before the first audit entry, because
+        # ``finalize_scan`` of an infected file locks its row first and then waits for
+        # the lock of the audit chain (``FilesService.lock_for_messages``).
+        await files.lock_for_messages("comment", [comment.id])
         await self._audit_comment(comment, AuditAction.COMMENT_DELETE, actor=actor)
+        await files.delete_for_messages("comment", [comment.id], actor=actor)
         await self.session.delete(comment)
         await self.session.commit()

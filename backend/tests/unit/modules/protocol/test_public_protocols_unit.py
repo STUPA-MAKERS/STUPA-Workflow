@@ -334,7 +334,8 @@ def test_router_detail_404_and_pdf(client: tuple[TestClient, _FakeService]) -> N
     pdf = http.get(f"/api/public/protocols/{PID}/pdf")
     assert pdf.status_code == 200
     assert pdf.headers["content-disposition"] == (
-        'attachment; filename="Protokoll_asta_2026-10-05_oeffentlich.pdf"'
+        'attachment; filename="Protokoll_asta_2026-10-05_oeffentlich.pdf"; '
+        "filename*=UTF-8''Protokoll_asta_2026-10-05_oeffentlich.pdf"
     )
     # Other API routes carry no noindex header from this rule.
     assert "X-Robots-Tag" not in http.get("/api/health").headers

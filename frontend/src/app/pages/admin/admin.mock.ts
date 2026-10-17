@@ -19,6 +19,7 @@ import type {
   FormDraft,
   GuestSettings,
   MeetingSettings,
+  HelpTicketsSettings,
   LoginSettings,
   MailTemplate,
   FormOverviewItem,
@@ -79,6 +80,7 @@ export const MOCK_PERMISSIONS: string[] = [
   'privacy.manage',
   'backup.manage',
   'mcp.use',
+  'ticket.manage',
 ];
 
 export const MOCK_PRINCIPALS: AdminPrincipal[] = [
@@ -383,6 +385,14 @@ export const MOCK_DEADLINE_POLICIES: DeadlinePolicy[] = [
 /** The guest settings of the mock backend (the server defaults). */
 export const MOCK_GUEST_SETTINGS: GuestSettings = { confirmTtlHours: 12, linkTtlDays: null };
 export const MOCK_MEETING_SETTINGS: MeetingSettings = { openLeadMinutes: 60, confirmLeadMinutes: 10 };
+
+/** The settings of the page "Hilfe & Tickets", as the backend defaults them. */
+export const MOCK_HELP_TICKETS: HelpTicketsSettings = {
+  wikiUrl: 'https://wiki.reutlingen.university/books/antragsplattform',
+  publicEnabled: true,
+  notifyNew: true,
+  retentionMonths: 12,
+};
 
 /** The SSO login lifetimes of the mock: the defaults of the server. */
 export const MOCK_LOGIN_SETTINGS: LoginSettings = {

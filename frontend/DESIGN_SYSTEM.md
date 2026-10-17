@@ -162,6 +162,11 @@ These rules are binding for every page.
 - **Filter chips use `app-filter-select`.** A chip never opens a native `<select>`. On a
   desktop the menu is a popover, on a phone a bottom sheet. The language switch is such a
   chip too (`app-language-select`).
+- **A form select uses the app's `app-select`** (`@shared/ui/select`, `SelectFieldComponent`),
+  never the kit `SelectComponent` or a native `<select>`. The closed field is the filled
+  field with a chevron; the list is the same popover as `app-filter-select` on a desktop and
+  the bottom sheet on a phone. A menu row has no `title` tooltip while its text shows in
+  full. `no-native-select.contract.spec.ts` enforces this.
 - **Page header actions sit on the title row.** `app-page-header` centres the first row of
   actions on the title line. A long subtitle does not move them.
 - **Phone (< 768 px): bottom sheets.** Pickers, filters and secondary panes open as a bottom
@@ -197,8 +202,9 @@ Angular Testing Library, and `a11y.spec.ts` runs axe over them.
 - `app-switch` — `role="switch"` for a setting that applies at once.
 - `app-segmented` — a radio group in one row (Ausgabe/Einnahme, Anwesend/Abwesend). `width="equal"` makes the segments equal (list views), `width="fill"` lets them share the width of a form or a column; an option can carry a `count` (invoice segments), and `[check]="false"` leaves out the check mark where the column is narrow.
 - `app-tabs` — a tab bar with optional counts (Antrag | Verlauf 4).
-- `app-input`, `app-select`, `app-datepicker`, `app-time-input`, `app-currency-input` —
-  filled fields with the label inside the box. `app-checkbox` — an 18px box.
+- `app-input`, `app-datepicker`, `app-time-input`, `app-currency-input` — filled fields
+  with the label inside the box. The kit `app-select` renders a native `<select>`; the app
+  uses its own `app-select` from `@shared/ui/select` instead. `app-checkbox` — an 18px box.
 - `app-dialog` — a sheet (radius 24), title, actions at the right. Below 768px it is
   near-fullscreen.
 - `app-data-table`, `app-table` — the table frame (radius 16, cut line and tongue for

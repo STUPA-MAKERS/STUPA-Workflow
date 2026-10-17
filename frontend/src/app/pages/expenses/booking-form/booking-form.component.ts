@@ -19,8 +19,8 @@ import {
   InputComponent,
   SegmentedComponent,
   type SegmentedOption,
-  SelectComponent,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
@@ -91,7 +91,7 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     RowMenuComponent,
     ScrollFadeDirective,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     TranslatePipe,
   ],
   templateUrl: './booking-form.component.html',
@@ -178,7 +178,7 @@ export class BookingFormComponent {
 
   /** "Lastenrad Anzahlung · erfasst von Konrad Pfeiffer, 25.09.2026". */
   protected readonly subtitle = computed(() => {
-    if (this.mode() === 'create') return this.i18n.translate('expenses.form.required');
+    if (this.mode() === 'create') return '';
     const e = this.editingRow();
     if (!e) return '';
     const date = new Date(e.createdAt).toLocaleDateString(this.i18n.formatLocale(), {

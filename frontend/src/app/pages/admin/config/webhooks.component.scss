@@ -156,11 +156,6 @@
   padding: 0;
   font-weight: var(--fw-semibold);
 }
-.wh__hint {
-  margin: 0;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 .wh__eventGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));

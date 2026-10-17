@@ -33,11 +33,11 @@ import {
   IconComponent,
   InputComponent,
   SegmentedComponent,
-  SelectComponent,
   ToastService,
   type SegmentedOption,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   DRAFT_FILES_STORAGE_KEY,
   DraftAttachmentsService,
@@ -103,7 +103,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     IconComponent,
     InputComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     ScrollFadeDirective,
     SkeletonComponent,
     DraftFilesComponent,
@@ -235,14 +235,6 @@ export class ApplicationCaptureComponent {
       !this.drafts.busy() &&
       !this.drafts.hasFailed()
     );
-  });
-
-  /** The second line of the head: the chosen applicant, else the hint. */
-  protected readonly subtitle = computed(() => {
-    const name = this.mode() === 'account' ? this.pickedLabel() : this.guestName().trim();
-    return name
-      ? this.i18n.translate('applications.capture.subtitleFor', { name })
-      : this.i18n.translate('applications.capture.subtitle');
   });
 
   protected readonly pickedLabel = computed(() => {

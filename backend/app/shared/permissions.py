@@ -119,4 +119,18 @@ PERMISSION_CATALOGUE: tuple[str, ...] = (
     # MCP and agent access: issue OAuth tokens for API agents. An admin holds it through
     # the bypass. You can also assign it to a non-admin.
     "mcp.use",
+    # /tickets: read and work on the reported tickets (status, assignee, kind, notes).
+    # The reports carry the e-mail and the technical context of the reporter.
+    "ticket.manage",
+    # A global READ permission that only adds. The holder reads every to-do board of a
+    # Gremium and every team board: cards, comments, files and the history. The holder
+    # never writes a card, never configures a board and is no member of it, so nobody
+    # assigns or mentions the holder there. A personal board stays with its owner.
+    "todo.read_all",
+    # Global: read AND write the cards of every to-do board of a Gremium and of every
+    # team board (create, move, edit, comment, archive). It never configures a board
+    # (columns, labels, name: the Gremium permission `todo.configure`) and makes no
+    # member, so nobody assigns or mentions the holder there. A personal board stays
+    # with its owner.
+    "todo.all",
 )

@@ -210,6 +210,22 @@
 .ts__editor ::ng-deep .mde__host--disabled {
   opacity: 1;
 }
+/* The editor is a lazy chunk (Tiptap, KaTeX). Until it is there, three text lines in the
+   font and the line height of the editor hold the place; they show only after 300ms. */
+.ts__editor--wait p {
+  margin: 0;
+  font-size: 0.96875rem;
+  line-height: 1.7;
+}
+.ts__editor--wait .skel-text {
+  width: 72%;
+}
+.ts__editor--wait p:nth-child(2) .skel-text {
+  width: 58%;
+}
+.ts__editor--wait p:nth-child(3) .skel-text {
+  width: 64%;
+}
 
 .ts__empty {
   display: flex;
@@ -238,6 +254,11 @@
   color: var(--color-text-muted);
 }
 /* The keeper line of a closed meeting, below the title. */
+/* The to-dos linked to the item, between the title and the text. */
+.ts__todos {
+  flex: none;
+  padding: 0 var(--space-5) 10px;
+}
 .ts__keepers {
   display: flex;
   flex: none;

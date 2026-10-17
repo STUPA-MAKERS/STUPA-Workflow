@@ -28,13 +28,14 @@ import {
   IconComponent,
   InputComponent,
   SegmentedComponent,
-  SelectComponent,
   SwitchComponent,
   ToastService,
   type SegmentedOption,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS, errorDetail } from '../meetings-display.util';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
 const KINDS: readonly VoteKind[] = ['motion', 'election'];
@@ -78,6 +79,7 @@ export interface CandidateDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     TranslatePipe,
     DialogComponent,
@@ -85,7 +87,7 @@ export interface CandidateDraft {
     IconComponent,
     InputComponent,
     SegmentedComponent,
-    SelectComponent,
+    SelectFieldComponent,
     SwitchComponent,
     DecisionEditorComponent,
   ],
@@ -112,12 +114,13 @@ export class VoteOpenDialogComponent {
   readonly opened = output<Meeting>();
 
   /**
-   * The vote can open now: the meeting is live and no other vote is open. Otherwise
-   * the dialog only prepares the question.
+   * The vote can open now: the meeting is live, no other vote is open, and the user
+   * keeps the minutes (only the protokollant opens a vote). Otherwise the dialog only
+   * prepares the question.
    */
   readonly canOpen = computed(() => {
     const m = this.meeting();
-    return m.status === 'live' && !m.votes.some((v) => v.status === 'open');
+    return m.status === 'live' && m.isProtokollant && !m.votes.some((v) => v.status === 'open');
   });
 
   readonly question = signal('');

@@ -111,9 +111,25 @@
   flex: 1 0 var(--space-4);
 }
 
+.rail__help {
+  flex: none;
+  width: 100%;
+}
+
 .rail__account {
   flex: none;
   margin-top: 8px;
+}
+
+/* A screen up to about 1080px high: 56px steps and a closer brand, so all areas, the
+   help and the account fit at 1000px without a scroll bar. */
+@media (max-height: 1080px) {
+  .rail__brand {
+    margin-bottom: 14px;
+  }
+  .rail__item {
+    min-height: 56px;
+  }
 }
 
 /* A low laptop screen (1366x657 and similar): smaller steps, so every entry fits. */

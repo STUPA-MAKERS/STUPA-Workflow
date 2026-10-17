@@ -1,4 +1,5 @@
 import { Component, signal } from '@angular/core';
+import { DialogComponent } from '@stupa-makers/ui-kit';
 import { fireEvent, render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { runAxe } from '../../../../testing/a11y';
@@ -33,6 +34,27 @@ class HostComponent {
   closes = 0;
   withActions = true;
   withContent = true;
+}
+
+@Component({
+  standalone: true,
+  imports: [SideSheetComponent, DialogComponent],
+  template: `
+    <button type="button" (click)="open.set(true)">Kommentare</button>
+    <app-side-sheet heading="Kommentare" [(open)]="open" (closed)="closes = closes + 1">
+      <button type="button" (click)="ask.set(true)">Löschen</button>
+      <input aria-label="Nachricht" (keydown.escape)="$event.preventDefault()" />
+      <app-dialog title="Kommentar löschen?" [open]="ask()" (closed)="ask.set(false)">
+        <input aria-label="Grund" />
+        <button type="button">Endgültig löschen</button>
+      </app-dialog>
+    </app-side-sheet>
+  `,
+})
+class NestedHostComponent {
+  readonly open = signal(false);
+  readonly ask = signal(false);
+  closes = 0;
 }
 
 async function setup(configure?: (h: HostComponent) => void) {
@@ -81,6 +103,41 @@ describe('SideSheetComponent', () => {
     expect(host.closes).toBe(1);
     expect(opener).toHaveFocus();
     expect(document.body.style.overflow).toBe('auto');
+  });
+
+  it('leaves Escape and Tab to a dialog inside the sheet, and to a field that took the Escape', async () => {
+    const view = await render(NestedHostComponent);
+    const host = view.fixture.componentInstance;
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Kommentare' }));
+    const sheet = screen.getByRole('dialog', { name: 'Kommentare' });
+    await waitFor(() => expect(sheet).toContainElement(document.activeElement as HTMLElement));
+    await user.click(screen.getByRole('button', { name: 'Löschen' }));
+    view.fixture.detectChanges();
+    const ask = await screen.findByRole('dialog', { name: 'Kommentar löschen?' });
+    const reason = screen.getByRole('textbox', { name: 'Grund' });
+    const confirm = screen.getByRole('button', { name: 'Endgültig löschen' });
+    await waitFor(() => expect(ask).toContainElement(document.activeElement as HTMLElement));
+    // Tab from the last control of the dialog wraps inside the dialog, not to the sheet.
+    confirm.focus();
+    await user.tab();
+    expect(ask).toContainElement(document.activeElement as HTMLElement);
+    expect(sheet.querySelector('.ss__close, [aria-label="Schließen"]')).not.toHaveFocus();
+    reason.focus();
+    await user.keyboard('{Escape}');
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('dialog', { name: 'Kommentar löschen?' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Kommentare' })).toBeInTheDocument();
+    expect(host.open()).toBe(true);
+    expect(host.closes).toBe(0);
+    // A field that handles Escape itself keeps the sheet open as well.
+    screen.getByRole('textbox', { name: 'Nachricht' }).focus();
+    await user.keyboard('{Escape}');
+    expect(host.closes).toBe(0);
+    // Escape on the sheet itself still closes it.
+    screen.getByRole('button', { name: 'Löschen' }).focus();
+    await user.keyboard('{Escape}');
+    expect(host.closes).toBe(1);
   });
 
   it('closes on the close button and on the scrim', async () => {

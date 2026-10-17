@@ -193,14 +193,15 @@ export class MeetingSessionService implements OnDestroy {
   /**
    * Tell the room which agenda item runs now.
    *
-   * The protokollant leads, and the session lead may take over, so the gate is
-   * `canManageVotes`. Everybody else keeps a local selection. Only a live meeting
+   * Only the protokollant moves the room: the open item follows the minutes. The
+   * session lead and everybody else keep a local selection, so a look at another
+   * item does not move the beamer and the followers. Only a live meeting
    * has a "now": the server refuses it for a closed meeting, and a planned meeting
    * must not start with an item that a click during the preparation set.
    */
   setCurrentTop(itemId: Uuid): void {
     const m = this.meeting();
-    if (!m || !m.canManageVotes || m.status !== 'live' || m.currentAgendaItemId === itemId) return;
+    if (!m || !m.isProtokollant || m.status !== 'live' || m.currentAgendaItemId === itemId) return;
     this.api.patchMeeting(m.id, { currentAgendaItemId: itemId }).subscribe({
       next: (updated) => this.meeting.set(updated),
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
@@ -475,21 +476,34 @@ export class MeetingSessionService implements OnDestroy {
   finalize(opts: { publicWithheld?: boolean } = {}): void {
     const proto = this.protocol();
     // `isLocked` also covers `rendering`: no second start, no 409 on PATCH.
-    if (!proto || proto.isLocked || this.finalizing() || this.agendaSvc.savingTop()) return;
+    if (!proto || proto.isLocked || this.finalizing()) return;
     // F8, O13: the protocol is finalized only after the close (409 otherwise), as a
     // step of its own. The close never finalizes.
     if (this.meeting()?.status !== 'closed') return;
+    const meetingId = this.meeting()?.id;
+    if (!meetingId) return;
     this.finalizing.set(true);
-    // First persist the assembled TOP markdown, then finalize/render.
-    this.api.updateProtocol(proto.id, assembleProtocolMarkdown(this.agendaSvc.agenda())).subscribe({
-      next: (saved) => {
-        this.protocol.set(saved);
-        this.doFinalize(saved.id, opts);
-      },
-      error: () => {
+    // The server renders the PDF from the item texts it holds. The text typed within
+    // the last autosave delay reaches it first, or the last TOP stays empty in the PDF.
+    this.agendaSvc.persistBody(meetingId).subscribe((held) => {
+      if (!held) {
         this.finalizing.set(false);
         this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
-      },
+        return;
+      }
+      // Then persist the assembled TOP markdown, then finalize/render.
+      this.api
+        .updateProtocol(proto.id, assembleProtocolMarkdown(this.agendaSvc.agenda()))
+        .subscribe({
+          next: (saved) => {
+            this.protocol.set(saved);
+            this.doFinalize(saved.id, opts);
+          },
+          error: () => {
+            this.finalizing.set(false);
+            this.toast.error(this.i18n.translate('meetings.toast.saveFailed'));
+          },
+        });
     });
   }
 

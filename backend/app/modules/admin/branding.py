@@ -219,6 +219,43 @@ class SiteFreetexts(_CamelModel):
         return _cap_i18n(v, MAX_FREETEXT_CHARS)
 
 
+#: The default handbook of the help menu: the only wiki link of the app.
+DEFAULT_WIKI_URL = "https://wiki.reutlingen.university/books/antragsplattform"
+
+
+def check_http_url(url: str) -> str:
+    """Return the stripped URL, or raise ``ValueError`` unless it is http(s)."""
+    value = url.strip()
+    if not value.lower().startswith(("https://", "http://")):
+        raise ValueError("the URL must start with https:// or http://")
+    return value
+
+
+class HelpSettings(_CamelModel):
+    """The help menu: ``wikiUrl`` is the target of "Handbuch". http(s) only."""
+
+    wiki_url: str = Field(default=DEFAULT_WIKI_URL, alias="wikiUrl", max_length=2048)
+
+    @field_validator("wiki_url")
+    @classmethod
+    def _http_only(cls, v: str) -> str:
+        return check_http_url(v)
+
+
+class TicketSettings(_CamelModel):
+    """The ticket reports.
+
+    ``publicEnabled`` lets a person without a session report (ALTCHA). ``notifyNew``
+    mails each new ticket to the holders of ``ticket.manage``. ``retentionMonths`` is
+    the time after the close until the retention cron anonymizes a ticket; null means
+    never.
+    """
+
+    public_enabled: bool = Field(default=True, alias="publicEnabled")
+    notify_new: bool = Field(default=True, alias="notifyNew")
+    retention_months: int | None = Field(default=12, alias="retentionMonths", ge=1, le=120)
+
+
 class Branding(_CamelModel):
     """Full branding config (active or draft)."""
 
@@ -243,8 +280,24 @@ class Branding(_CamelModel):
     # contacts gravatar.com. False turns the proxy off: it answers 404 and the frontend
     # shows the initials. A config from before this field reads as True.
     gravatar_enabled: bool = Field(default=True, alias="gravatarEnabled")
+    # The help menu and the ticket reports ("Hilfe & Tickets"). A config from before
+    # these fields reads as the defaults.
+    help: HelpSettings = Field(default_factory=HelpSettings)
+    tickets: TicketSettings = Field(default_factory=TicketSettings)
 
     @field_validator("copyright")
     @classmethod
     def _cap_copyright(cls, v: I18nMap) -> I18nMap:
         return _cap_i18n(v, MAX_LABEL_CHARS)
+
+
+class PublicBranding(Branding):
+    """The branding of the public ``GET /site-config``.
+
+    The help and ticket settings stay out of it, because ``notifyNew`` and
+    ``retentionMonths`` are not public. The public config names ``help.wikiUrl`` and
+    ``tickets.publicEnabled`` on its top level instead.
+    """
+
+    help: HelpSettings = Field(default_factory=HelpSettings, exclude=True)
+    tickets: TicketSettings = Field(default_factory=TicketSettings, exclude=True)

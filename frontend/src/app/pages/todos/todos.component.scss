@@ -1,0 +1,284 @@
+@use 'breakpoints' as bp;
+@use '../../features/meetings/scroll-fade' as fade;
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+/* Phone: the pane page ends on the top edge of the bottom bar, not a gutter above it, so
+   the cards scroll right down to the bar. The room at the end (the floating button) is
+   padding inside the scroll areas. */
+@include bp.phone {
+  :host(.pane-page) {
+    margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
+  }
+}
+
+.td {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ------------------------------------------------------------------ bar */
+.td__bar {
+  flex: none;
+}
+.td__barRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.td__search {
+  flex: 0 1 18.75rem;
+  min-width: 12rem;
+}
+/* The board picker and the search start the bar; the filter chips end it. */
+.td__chips {
+  --td-chip-fade: var(--space-6);
+  display: flex;
+  flex: 0 1 auto;
+  margin-inline-start: auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.td__filter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  padding-inline: var(--space-3);
+}
+.td__chips > * {
+  flex: none;
+}
+.td__chips::-webkit-scrollbar {
+  display: none;
+}
+/* The strip scrolls sideways: a fade marks only the side where more chips are. */
+.td__chips.is-fade-start {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--td-chip-fade));
+  mask-image: linear-gradient(to right, transparent, #000 var(--td-chip-fade));
+}
+.td__chips.is-fade-end {
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--td-chip-fade));
+  mask-image: linear-gradient(to left, transparent, #000 var(--td-chip-fade));
+}
+.td__chips.is-fade-start.is-fade-end {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--td-chip-fade),
+    #000 calc(100% - var(--td-chip-fade)),
+    transparent
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent,
+    #000 var(--td-chip-fade),
+    #000 calc(100% - var(--td-chip-fade)),
+    transparent
+  );
+}
+.td__reset {
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-accent-text);
+  font: inherit;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.td__reset:hover {
+  background: var(--color-surface-2);
+}
+.td__reset:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+
+/* The places of the header button and of the filter chips while the board loads. */
+.td__skelIcon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+}
+.td__skelIcon .skel-box {
+  width: 22px;
+  height: 22px;
+}
+.td__skelChip {
+  width: 5rem;
+  height: 32px;
+  border-radius: var(--radius-md);
+}
+.td__skelChip--wide {
+  width: 6.75rem;
+}
+.td__skelChip--filter {
+  width: 6rem;
+  height: 36px;
+}
+
+/* ------------------------------------------------------------------ body */
+.td__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+/* The shared top and bottom fade where the body scrolls as a whole (the rows): an end
+   fades only while more content lies past it (`appScrollFade="y"` sets the classes), so
+   the cards do not end at a hard cut under the bar. Elsewhere the body does not scroll
+   (overflow visible), the directive sets no class, and a mask would cut off the list view
+   or a tall state. */
+.td__body--rows {
+  @include fade.fade-y(var(--space-5));
+}
+/* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the
+   board keeps its natural height. */
+.td__body--rows {
+  gap: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+.td__body--rows > app-todo-board-view,
+.td__body--rows > app-todo-board-skeleton,
+.td__body--rows > app-todo-board-rows {
+  flex: none;
+}
+/* The floating "+ To-Do" (56px high, --space-6 from the bottom) floats over the board, so
+   the columns keep their full height. Only a body that scrolls as a whole (the rows) gets
+   room at its end, because there the room scrolls away and the last row clears the button. */
+.td__body--rows.td__body--fab {
+  padding-bottom: calc(56px + var(--space-6));
+}
+@include bp.phone {
+  .td__body--rows.td__body--fab {
+    padding-bottom: calc(56px + 2 * var(--space-4));
+  }
+}
+/* An empty, filtered or failed body stands in the middle of the free height. */
+.td__state {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-4);
+}
+.td__error {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+/* ------------------------------------------------------------------ phone */
+/* The board picker starts the bar, the filter chip ends it. */
+.td--phone .td__filter,
+.td__skelChip--filter {
+  margin-inline-start: auto;
+}
+.td--phone .td__search,
+.td--phone .td__chips {
+  flex-basis: 100%;
+  max-width: none;
+}
+/* "+ To-Do" floats at the bottom right on every width, under the card drawer and its
+   scrim (--z-sticky is below --z-dialog). A phone keeps it above the bottom bar. */
+.td__fab {
+  position: fixed;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  z-index: var(--z-sticky);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--color-accent);
+  box-shadow: var(--shadow-md);
+  color: var(--color-on-accent);
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+}
+.td__fab:hover {
+  filter: brightness(1.08);
+}
+.td__fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+@include bp.phone {
+  .td__fab {
+    right: var(--space-4);
+    bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
+  }
+}
+
+/* ------------------------------------------------------------------ drawer */
+.td__scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dialog);
+  background: var(--color-scrim);
+}
+.td__drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--z-dialog);
+  display: flex;
+  flex-direction: column;
+  width: min(65rem, calc(100vw - var(--space-8)));
+  padding: 0 var(--space-6) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top-left-radius: var(--radius-xl);
+  border-bottom-left-radius: var(--radius-xl);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-elevated);
+  outline: 0;
+}
+.td__drawer > app-todo-card-detail {
+  flex: 1 1 auto;
+}
+/* Phone: the drawer is the page and ends on the bottom bar, which stays visible. */
+@include bp.phone {
+  .td__scrim,
+  .td__drawer {
+    bottom: var(--app-bottom-inset, 0px);
+  }
+  .td__drawer {
+    width: 100vw;
+    padding: var(--space-3) var(--space-4) 0;
+    border-radius: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .td__drawer {
+    animation: td-in 180ms ease-out;
+  }
+}
+@keyframes td-in {
+  from {
+    transform: translateX(2rem);
+    opacity: 0;
+  }
+}

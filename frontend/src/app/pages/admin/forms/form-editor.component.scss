@@ -376,13 +376,6 @@
   margin-left: calc(-1 * var(--space-2));
 }
 
-.fe__hint {
-  margin: 0;
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-  color: var(--color-text-muted);
-}
-
 .fe__muted {
   margin: 0;
   color: var(--color-text-muted);
@@ -573,6 +566,10 @@
   font: inherit;
 }
 
+.fe__pv-select {
+  max-width: 28rem;
+}
+
 .fe__pv-group {
   display: flex;
   flex-direction: column;
@@ -625,7 +622,8 @@
   .fe__preview {
     padding: var(--space-4);
   }
-  .fe__pv-control {
+  .fe__pv-control,
+  .fe__pv-select {
     max-width: 100%;
   }
 }

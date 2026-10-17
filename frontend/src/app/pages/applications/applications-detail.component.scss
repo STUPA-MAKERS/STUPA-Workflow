@@ -42,6 +42,18 @@
   height: 20px;
   border-radius: 6px;
 }
+.ad__skelComments {
+  width: auto;
+  padding-inline: 12px;
+}
+.ad__skelComments .skel-box {
+  width: 7.25rem;
+}
+@include bp.phone {
+  .ad__skelComments .skel-box {
+    width: 3rem;
+  }
+}
 .ad__skelTitle {
   width: 60%;
 }
@@ -292,23 +304,11 @@
 .ad__secTitle {
   padding: 0 var(--space-1);
 }
-.ad__secHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-}
-.ad__count {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 .ad__none {
   margin: 0;
   padding: 0 var(--space-1);
   color: var(--color-text-muted);
   font-size: var(--fs-small);
-}
-.ad__none--row {
-  padding: var(--space-4);
 }
 
 /* Two fields in one row of a field group (Eingegangen | Aktualisiert). A cell is at
@@ -409,113 +409,49 @@
   margin: 0;
   font-size: var(--fs-md);
 }
-.ad__editHint {
-  color: var(--color-text-muted);
-  font-size: 0.875rem;
-}
 /* The fields of the form: the global `.fe-form` grid (styles.scss). */
 .ad__edit {
   min-width: 0;
 }
 
 /* ------------------------------------------------------------------ comments */
-.ad__msg {
-  display: flex;
-  gap: var(--space-3);
-  padding: 12px var(--space-3) 12px var(--space-4);
-}
-.ad__msgBody {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.ad__msgHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 24px;
-}
-.ad__msgAuthor {
-  flex: 1 1 auto;
-  font-weight: var(--fw-semibold);
-}
-.ad__msgActions {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-  margin-block: -6px;
-}
-.ad__msgMeta {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
+/* The count of the comments on the header action: a small plate after the label. */
+.ad__commentsN {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
 }
-.ad__msgDot {
-  color: var(--color-text-subtle);
+/* The chat fills the sheet: the sheet passes its height down (`contentScrolls`), the log
+   takes the height between the head of the sheet and the composer and scrolls inside, and
+   the composer stays at the foot. The sheet is surface 2, so the messages of others take
+   the next step. */
+.ad__chat {
+  flex: 1 1 auto;
+  min-height: 0;
+  --chat-log-basis: 0;
+  --chat-log-min: 14rem;
+  --chat-composer-bottom: 0px;
+  --chat-bubble: var(--color-surface-3);
+  --chat-composer-surface: transparent;
+  --chat-composer-bleed: var(--space-4);
 }
-.ad__msgPublic {
-  color: var(--color-primary);
-}
-.ad__msgText {
-  margin: 4px 0 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.ad__composer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-}
-.ad__composerInput {
-  /* Below 10rem the toggle and the send button wrap to a second line. */
-  flex: 1 1 10rem;
-  min-width: 0;
-  min-height: var(--control-height);
-  max-height: 12rem;
-  padding: 10px 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  line-height: 1.4;
-  /* A plain field as on the board: no resize grip. It grows with its text where the
-     browser can (`field-sizing`), up to the max height, and then scrolls. */
-  resize: none;
-  field-sizing: content;
-  overflow-y: auto;
-}
-/* The toggle and the send button. They never split: on the second line they align
-   right as one group. */
-.ad__composerActions {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-}
-.ad__composerVis {
-  flex: none;
-}
-.ad__composerInput:focus-visible {
-  outline: none;
-}
-/* The ring marks the text field. The toggle draws its own focus ring. */
-.ad__composer:has(.ad__composerInput:focus-visible) {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+/* The bottom sheet of a phone has no height of its own: it takes the height of its
+   content up to 85dvh. A log with basis 0 adds only its min-height, so the sheet stays
+   at half the screen. Here the log takes the height of the thread, the sheet grows with
+   it to its cap, and the log then scrolls inside. */
+.ad__chat--sheet {
+  --chat-log-basis: auto;
 }
 
 /* ------------------------------------------------------------------ dialogs */
-.ad__dlgLead {
-  margin: 0 0 var(--space-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-/* The tree scrolls here, below the lead and above the fiscal year. An end fades only
+/* The tree scrolls here, above the fiscal year. An end fades only
    when more rows are past it (`appScrollFade` sets the classes). */
 .ad__ccTree {
   max-height: 50vh;
@@ -547,35 +483,6 @@
   display: block;
   margin-top: var(--space-3);
 }
-.ad__commentEdit {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-
-  span {
-    color: var(--color-text-muted);
-    font-size: var(--fs-small);
-    font-weight: var(--fw-medium);
-  }
-
-  textarea {
-    width: 100%;
-    resize: vertical;
-    padding: var(--space-2) var(--space-3);
-    border: 0;
-    border-radius: var(--radius-field);
-    background: var(--color-surface-3);
-    color: var(--color-text);
-    font: inherit;
-    line-height: 1.4;
-  }
-
-  textarea:focus-visible {
-    outline: 2px solid var(--color-focus-ring);
-    outline-offset: 1px;
-  }
-}
-
 /* Same affordance as the 404 page: a way out, styled as a button. */
 .ad__backLink {
   display: inline-flex;
@@ -599,10 +506,6 @@
   }
   .ad__pair {
     grid-template-columns: minmax(0, 1fr);
-  }
-  /* The bar keeps the title and the two buttons on one line. */
-  .ad__editHint {
-    display: none;
   }
 }
 /* A long intake note wraps inside its part instead of running out of the sheet. */

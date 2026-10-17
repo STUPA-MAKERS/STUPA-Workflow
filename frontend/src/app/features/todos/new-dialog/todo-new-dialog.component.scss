@@ -1,0 +1,130 @@
+@use 'field' as f;
+
+:host {
+  display: contents;
+}
+/* The dialog is wider than the shared `md` size, so two fields fit side by side. */
+:host ::ng-deep .dialog {
+  max-width: 39rem;
+}
+
+.tn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  container-type: inline-size;
+}
+.tn__pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+@container (max-width: 26rem) {
+  .tn__pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.tn__links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.tn__cap {
+  flex: 1 0 100%;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+}
+/* "+ Verknüpfen" sits on its own row under the chips. */
+.tn__add {
+  flex: 1 0 100%;
+  padding-inline-start: var(--space-1);
+}
+.tn__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 100%;
+  min-height: 32px;
+  padding: 4px 4px 4px var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-2);
+  font-size: var(--fs-small);
+}
+.tn__chip > app-icon {
+  flex: none;
+  color: var(--color-text-muted);
+}
+.tn__chipText {
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.tn__chipX {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.tn__chipX:hover {
+  background: var(--color-surface-3);
+  color: var(--color-text);
+}
+.tn__chipX:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+.tn__picker {
+  flex: 1 0 100%;
+}
+.tn__picker:empty {
+  display: none;
+}
+
+.tn__field {
+  @include f.box;
+  @include f.box-labelled;
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 26px;
+  cursor: text;
+}
+.tn__label {
+  @include f.label;
+}
+.tn__field:focus-within .tn__label {
+  @include f.label-focus;
+}
+.tn__textarea {
+  display: block;
+  width: 100%;
+  min-height: 4.5rem;
+  margin: 0;
+  padding: 0 var(--space-4) 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  resize: none;
+  field-sizing: content;
+}
+
+.tn__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}

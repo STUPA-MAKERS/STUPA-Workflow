@@ -9,6 +9,9 @@ clean:
 - the guard `attachmentPresent` does not count it,
 - the audit labels do not resolve its file name,
 - the anonymization and the GDPR delete of an application keep it.
+
+A file of an application comment has no `application_id` either: the attachment list,
+the guard and the application delete route leave it out too.
 """
 
 from __future__ import annotations
@@ -23,7 +26,7 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.deps import DbSession, SettingsDep, get_current_principal
-from app.modules.applications.models import Application
+from app.modules.applications.models import Application, Comment
 from app.modules.applications.service import ApplicationsService
 from app.modules.audit.service import AuditService
 from app.modules.auth.principal import Principal
@@ -56,9 +59,7 @@ class _MemoryStorage:
     async def get(self, key: str) -> bytes:
         return self.blobs[key]
 
-    async def get_stream(
-        self, key: str, *, chunk_size: int = 64 * 1024
-    ) -> AsyncIterator[bytes]:
+    async def get_stream(self, key: str, *, chunk_size: int = 64 * 1024) -> AsyncIterator[bytes]:
         async def _iter() -> AsyncIterator[bytes]:
             yield self.blobs[key]
 
@@ -195,7 +196,51 @@ async def test_a_bound_attachment_is_still_visible(
         app = await session.get(Application, app_id)
         assert app is not None
         assert (await build_base_context(session, app, manual=True)).has_attachment
-        labels = await AuditService(session).resolve_target_labels(
-            [("attachment", str(bound.id))]
-        )
+        labels = await AuditService(session).resolve_target_labels([("attachment", str(bound.id))])
         assert labels == {("attachment", str(bound.id)): "beleg.pdf"}
+
+
+async def test_a_comment_file_is_no_application_attachment(
+    migrated: tuple[str, str],
+    maker: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    storage = _MemoryStorage()
+    app_id = await _app(maker)
+    async with maker() as session:
+        comment = Comment(
+            application_id=app_id, author_kind="applicant", body="", visibility="public"
+        )
+        session.add(comment)
+        await session.flush()
+        row = Attachment(
+            comment_id=comment.id,
+            filename="anhang.pdf",
+            mime="application/pdf",
+            size=9,
+            storage_key=f"{app_id}/c/anhang.pdf",
+            scanned=True,
+            scan_result="clean",
+        )
+        session.add(row)
+        await session.commit()
+        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        assert row.id not in {a.id for a in await files.list_for_application(app_id)}
+        app = await session.get(Application, app_id)
+        assert app is not None
+        # The guard counts the bound attachments only, not the comment file.
+        bound = bool(await files.list_for_application(app_id))
+        assert (await build_base_context(session, app, manual=True)).has_attachment is bound
+    api = build_api(migrated[1], settings, monkeypatch)
+
+    def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
+        object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
+        return FilesService(session, storage=object_storage, settings=request_settings)
+
+    api.dependency_overrides[get_files_service] = _files
+    api.dependency_overrides[get_current_principal] = lambda: _ADMIN
+    with TestClient(api) as client:
+        assert client.delete(f"/api/attachments/{row.id}").status_code == 404
+    async with maker() as session:
+        assert await session.get(Attachment, row.id) is not None

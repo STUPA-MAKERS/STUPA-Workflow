@@ -24,10 +24,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.notifications.kinds import NOTIFICATION_KINDS
 from app.modules.notifications.layout import (
+    append_link_text,
     reason_text,
     render_layout,
     text_to_html,
 )
+from app.modules.notifications.links import MailLink
 from app.modules.notifications.mail import MailMessage, compute_idempotency_key
 from app.modules.notifications.models import (
     MailTemplate,
@@ -440,12 +442,14 @@ class NotificationService:
         context: dict[str, Any],
         idempotency_parts: tuple[str, ...],
         lang: str | None = None,
+        link: MailLink | None = None,
     ) -> bool:
         """Send one notification kind.
 
         The method drops the recipients that opted out. It prefers the DB template
         ``template_key`` and falls back to the builtin. It wraps the mail in the
-        layout.
+        layout. ``link`` is the deep link to the element of the mail: the context
+        gets it as ``link``, and the mail shows it (see `links`).
 
         Returns:
             True when the method enqueued a mail.
@@ -455,6 +459,9 @@ class NotificationService:
         )
         if not recipients:
             return False
+        # A template may use `{{ link }}`. The empty default keeps a mail without a
+        # link safe under StrictUndefined.
+        context = {"link": link.url if link is not None else "", **context}
         tpl = await self._get_template_by_key(template_key)
         if tpl is not None:
             return await self._render_and_enqueue(
@@ -464,6 +471,7 @@ class NotificationService:
                 lang=lang,
                 idempotency_parts=idempotency_parts,
                 reason=kind,
+                link=link,
             )
         try:
             rendered = render_mail(
@@ -476,14 +484,9 @@ class NotificationService:
         except TemplateRenderError as exc:  # defensive: builtins cover their own vars
             logger.warning("builtin template %r render failed: %s", template_key, exc)
             return False
-        msg = MailMessage(
-            to=tuple(recipients),
-            subject=rendered.subject,
-            text=rendered.text,
-            html=self._layout_html(rendered, kind),
-            idempotency_key=compute_idempotency_key(*idempotency_parts),
+        return await self._enqueue(
+            self._message(rendered, recipients, kind, idempotency_parts, link)
         )
-        return await self._enqueue(msg)
 
     async def handle_notify_action(
         self,
@@ -494,10 +497,16 @@ class NotificationService:
         context: dict[str, Any] | None = None,
         lang: str | None = None,
         idempotency_base: str | None = None,
+        applicant_link: MailLink | None = None,
+        team_link: MailLink | None = None,
     ) -> int:
         """Handle the `notify` flow action.
 
         Ad-hoc mode: ``{"type":"notify","templateKey":"...","recipients":[...]}``.
+
+        ``applicant_link`` and ``team_link`` are the deep links to the application for
+        the applicant and for the team. A guest applicant cannot open the team link,
+        so a mail to both audiences goes out as two mails, each with its own link.
 
         Returns:
             The number of enqueued sends.
@@ -510,7 +519,9 @@ class NotificationService:
         context.setdefault("applicationTitle", "")
         context.setdefault("status", "")
         template_key = action.get("templateKey") or action.get("template_key")
-        if template_key:
+        applicant_specs = [s for s in specs if s.get("kind") == "applicant"]
+        team_specs = [s for s in specs if s.get("kind") != "applicant"]
+        if template_key and not (applicant_specs and team_specs):
             return await self._notify_send(
                 template_key=str(template_key),
                 specs=specs,
@@ -518,17 +529,36 @@ class NotificationService:
                 context=context,
                 lang=lang,
                 idempotency_base=idempotency_base,
+                link=applicant_link if applicant_specs else team_link,
             )
+        if template_key:
+            # One explicit template for both audiences: one mail per audience, each
+            # with its own link. The audience is part of the idempotency parts, so the
+            # two mails get distinct keys.
+            count = 0
+            for audience, partition, link in (
+                ("applicant", applicant_specs, applicant_link),
+                ("team", team_specs, team_link),
+            ):
+                count += await self._notify_send(
+                    template_key=str(template_key),
+                    specs=partition,
+                    application_id=application_id,
+                    context=context,
+                    lang=lang,
+                    idempotency_base=idempotency_base,
+                    link=link,
+                    audience=audience,
+                )
+            return count
         # No explicit templateKey. The flow editor often stores the action with
         # recipients only. Applicants get the applicant-facing default and every other
         # recipient kind gets the team-facing wording. The template key is part of the
         # idempotency parts, so the two sends get distinct keys.
-        applicant_specs = [s for s in specs if s.get("kind") == "applicant"]
-        team_specs = [s for s in specs if s.get("kind") != "applicant"]
         count = 0
-        for partition_key, partition in (
-            (DEFAULT_NOTIFY_TEMPLATE_KEY, applicant_specs),
-            (TEAM_NOTIFY_TEMPLATE_KEY, team_specs),
+        for partition_key, partition, link in (
+            (DEFAULT_NOTIFY_TEMPLATE_KEY, applicant_specs, applicant_link),
+            (TEAM_NOTIFY_TEMPLATE_KEY, team_specs, team_link),
         ):
             if not partition:
                 continue
@@ -539,6 +569,7 @@ class NotificationService:
                 context=context,
                 lang=lang,
                 idempotency_base=idempotency_base,
+                link=link,
             )
         return count
 
@@ -551,6 +582,8 @@ class NotificationService:
         context: dict[str, Any],
         lang: str | None,
         idempotency_base: str | None,
+        link: MailLink | None = None,
+        audience: str | None = None,
     ) -> int:
         """Resolve, filter and enqueue one `notify` send for ``template_key``."""
         # Derive the real notification kind from the catalogue. It drives both the
@@ -570,6 +603,9 @@ class NotificationService:
         idem = _idem_parts(
             idempotency_base, "notify", str(application_id or ""), template_key
         )
+        if audience is not None:
+            idem = (*idem, audience)
+        context = {"link": link.url if link is not None else "", **context}
         tpl = await self._get_template_by_key(template_key)
         if tpl is not None:
             ok = await self._render_and_enqueue(
@@ -579,6 +615,7 @@ class NotificationService:
                 lang=lang,
                 idempotency_parts=idem,
                 reason=reason,
+                link=link,
             )
             return int(ok)
         # The DB holds no template, so use the builtin fallback. A catalogue key (for
@@ -591,14 +628,9 @@ class NotificationService:
             lang=lang or self.settings.mail_default_lang,
             default_lang=self.settings.mail_default_lang,
         )
-        msg = MailMessage(
-            to=tuple(recipients),
-            subject=rendered.subject,
-            text=rendered.text,
-            html=self._layout_html(rendered, reason),
-            idempotency_key=compute_idempotency_key(*idem),
+        return int(
+            await self._enqueue(self._message(rendered, recipients, reason, idem, link))
         )
-        return int(await self._enqueue(msg))
 
     async def send_magic_link(
         self, *, email: str, link: str, lang: str | None = None
@@ -649,13 +681,16 @@ class NotificationService:
             default_lang=self.settings.mail_default_lang,
         )
 
-    def _layout_html(self, rendered: RenderedMail, reason: str) -> str:
+    def _layout_html(
+        self, rendered: RenderedMail, reason: str, link: MailLink | None = None
+    ) -> str:
         """Wrap the mail content in the branded HTML layout.
 
         The method uses the template HTML as content. Jinja2 renders that HTML with
         autoescape. When the template has no HTML, the method escapes the text body and
         wraps it. Every mail therefore has one consistent HTML version with the footer
-        that says why the reader gets it.
+        that says why the reader gets it. ``link`` adds the button to the element of
+        the mail.
         """
         inner = rendered.html or text_to_html(rendered.text)
         return render_layout(
@@ -665,6 +700,32 @@ class NotificationService:
             base_url=self.settings.public_base_url,
             reason=reason_text(reason, rendered.lang),
             lang=rendered.lang,
+            action_url=link.url if link is not None else None,
+            action_label=link.label(rendered.lang) if link is not None else None,
+        )
+
+    def _message(
+        self,
+        rendered: RenderedMail,
+        recipients: list[str],
+        reason: str,
+        idempotency_parts: tuple[str, ...],
+        link: MailLink | None,
+    ) -> MailMessage:
+        """Build the mail: the text with the link line, the HTML with the layout.
+
+        The HTML comes from the text before the link line, so the HTML shows the link
+        as a button only.
+        """
+        text = rendered.text
+        if link is not None:
+            text = append_link_text(text, link.url, link.label(rendered.lang))
+        return MailMessage(
+            to=tuple(recipients),
+            subject=rendered.subject,
+            text=text,
+            html=self._layout_html(rendered, reason, link),
+            idempotency_key=compute_idempotency_key(*idempotency_parts),
         )
 
     async def _render_and_enqueue(
@@ -676,6 +737,7 @@ class NotificationService:
         lang: str | None,
         idempotency_parts: tuple[str, ...],
         reason: str = "generic",
+        link: MailLink | None = None,
     ) -> bool:
         """Render the template and enqueue the mail.
 
@@ -690,14 +752,9 @@ class NotificationService:
         except TemplateRenderError as exc:
             logger.warning("template %r render failed: %s", tpl.key, exc)
             return False
-        msg = MailMessage(
-            to=tuple(recipients),
-            subject=rendered.subject,
-            text=rendered.text,
-            html=self._layout_html(rendered, reason),
-            idempotency_key=compute_idempotency_key(*idempotency_parts),
+        return await self._enqueue(
+            self._message(rendered, recipients, reason, idempotency_parts, link)
         )
-        return await self._enqueue(msg)
 
     async def _enqueue(self, msg: MailMessage) -> bool:
         if self.queue is None:

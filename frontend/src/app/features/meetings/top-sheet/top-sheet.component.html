@@ -69,16 +69,28 @@
       </p>
     }
 
+    @if (!follow()) {
+      <app-todo-linked-list class="ts__todos" kind="agenda_item" headingId="ts-todos" [showTitle]="false" [targetId]="t.id" />
+    }
+
     @if (follow()) {
       <div class="ts__rule"></div>
-      <app-markdown-editor
-        class="ts__editor"
-        [docKey]="docKey()"
-        [voteInfo]="voteInfo()"
-        [value]="t.body ?? ''"
-        [disabled]="true"
-        [placeholder]="'participant.top.empty' | t"
-      />
+      @defer (on immediate) {
+        <app-markdown-editor
+          class="ts__editor"
+          [docKey]="docKey()"
+          [voteInfo]="voteInfo()"
+          [value]="t.body ?? ''"
+          [disabled]="true"
+          [placeholder]="'participant.top.empty' | t"
+        />
+      } @placeholder {
+        <div class="ts__editor ts__editor--wait" aria-hidden="true">
+          <p class="skel-in"><span class="skel-text"></span></p>
+          <p class="skel-in"><span class="skel-text"></span></p>
+          <p class="skel-in"><span class="skel-text"></span></p>
+        </div>
+      }
     } @else if (proto || m.status === 'planned') {
       <!-- A locked protocol has no format bar and no save state, so no rule either. A
            planned meeting has no protocol yet: its text is prepared here. -->
@@ -103,6 +115,14 @@
           </div>
         }
         <span class="ts__spacer"></span>
+        <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+          @switch (saveState()) {
+            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+            @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
+            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+            @default {}
+          }
+        </span>
         <app-segmented
           class="ts__mode"
           width="equal"
@@ -112,14 +132,6 @@
           [value]="mode()"
           (valueChange)="setMode($event)"
         />
-        <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-          @switch (saveState()) {
-            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-            @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
-            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-            @default {}
-          }
-        </span>
       </div>
       <div class="ts__rule"></div>
       }
@@ -144,17 +156,24 @@
           ></textarea>
         </div>
       } @else {
-        <app-markdown-editor
-          #ed
-          class="ts__editor"
-          [docKey]="docKey()"
-          [voteInfo]="voteInfo()"
-          [value]="t.body ?? ''"
-          [disabled]="!editable()"
-          [placeholder]="'meetings.protocol.placeholder' | t"
-          [hint]="'meetings.protocol.hint' | t"
-          (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
-        />
+        @defer (on immediate) {
+          <app-markdown-editor
+            #ed
+            class="ts__editor"
+            [docKey]="docKey()"
+            [voteInfo]="voteInfo()"
+            [value]="t.body ?? ''"
+            [disabled]="!editable()"
+            [placeholder]="'meetings.protocol.placeholder' | t"
+            (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
+          />
+        } @placeholder {
+          <div class="ts__editor ts__editor--wait" aria-hidden="true">
+            <p class="skel-in"><span class="skel-text"></span></p>
+            <p class="skel-in"><span class="skel-text"></span></p>
+            <p class="skel-in"><span class="skel-text"></span></p>
+          </div>
+        }
       }
     }
   } @else {

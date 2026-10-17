@@ -50,11 +50,6 @@
   font-size: var(--fs-body);
   font-weight: var(--fw-semibold);
 }
-.ns__desc {
-  margin: var(--space-1) 0 0;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
 .ns__fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

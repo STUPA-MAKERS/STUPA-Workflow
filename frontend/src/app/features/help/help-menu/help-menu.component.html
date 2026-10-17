@@ -1,0 +1,67 @@
+<ng-template #entries>
+  <a
+    class="hm__item"
+    [href]="branding.wikiUrl()"
+    target="_blank"
+    rel="noopener"
+    (click)="onWiki()"
+  >
+    <app-icon name="book" [size]="19" />
+    <span class="hm__text">
+      <span>{{ 'help.wiki' | t }}</span>
+      <span class="hm__url">{{ wikiLabel() }}</span>
+    </span>
+    <app-icon class="hm__ext" name="ext" [size]="16" />
+  </a>
+  @if (canReport()) {
+    <div class="hm__sep" role="separator"></div>
+    <button type="button" class="hm__item" (click)="report()">
+      <app-icon name="chat" [size]="19" />
+      <span class="hm__text">{{ 'help.report' | t }}</span>
+    </button>
+  }
+</ng-template>
+
+@switch (variant()) {
+  @case ('sheet') {
+    <div class="hm hm--sheet" role="group" [attr.aria-labelledby]="panelId + '-cap'">
+      <span class="hm__cap cap" [id]="panelId + '-cap'">{{ 'help.title' | t }}</span>
+      <ng-container [ngTemplateOutlet]="entries" />
+    </div>
+  }
+  @default {
+    <button
+      #trigger
+      type="button"
+      [class]="variant() === 'header' ? 'hm__head' : 'hm__rail'"
+      [class.is-open]="open()"
+      [attr.aria-expanded]="open()"
+      [attr.aria-controls]="open() ? panelId : null"
+      (click)="toggle()"
+    >
+      @if (variant() === 'header') {
+        <app-icon name="help" [size]="18" />
+        <span>{{ 'help.title' | t }}</span>
+      } @else {
+        <span class="hm__ind"><app-icon name="help" [size]="22" /></span>
+        <span class="hm__label">{{ 'help.title' | t }}</span>
+      }
+    </button>
+    @if (open()) {
+      <div
+        #panel
+        class="hm hm--popover"
+        role="region"
+        [id]="panelId"
+        [attr.aria-label]="'help.title' | t"
+        [style.left.px]="position().left"
+        [style.right.px]="position().right"
+        [style.top.px]="position().top"
+        [style.bottom.px]="position().bottom"
+      >
+        <p class="hm__title">{{ 'help.title' | t }}</p>
+        <ng-container [ngTemplateOutlet]="entries" />
+      </div>
+    }
+  }
+}

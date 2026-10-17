@@ -99,8 +99,7 @@
 }
 .pp__meta,
 .pp__counts,
-.pp__pdfMeta,
-.pp__hint {
+.pp__pdfMeta {
   color: var(--color-text-muted);
   font-size: var(--fs-sm);
 }
@@ -195,10 +194,6 @@ mark {
 .pp__more {
   align-self: center;
   margin-top: var(--space-2);
-}
-.pp__hint {
-  margin: 0;
-  text-align: center;
 }
 
 @include bp.phone {

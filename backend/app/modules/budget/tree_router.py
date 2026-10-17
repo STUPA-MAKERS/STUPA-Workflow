@@ -68,6 +68,7 @@ from app.modules.budget.tree_schemas import (
 )
 from app.shared.antiabuse import body_cap
 from app.shared.errors import ForbiddenError, ProblemDetail, ValidationProblem
+from app.shared.filenames import content_disposition
 from app.shared.paging import Page
 
 router = APIRouter(tags=["budget"])
@@ -780,11 +781,10 @@ async def get_invoice_file(invoice_id: UUID, service: ServiceDep) -> Response:
     app origin.
     """
     data, _mime, name = await service.invoice_file_bytes(invoice_id)
-    safe = "".join(c for c in name if c.isprintable() and c not in '"\\\r\n')
     return Response(
         content=data,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe}"'},
+        headers={"Content-Disposition": content_disposition("attachment", name)},
     )
 
 

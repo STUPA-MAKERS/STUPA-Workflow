@@ -60,7 +60,7 @@
               <div class="as__who">
                 <app-avatar [name]="row.name" [principalId]="row.a.principalId" size="sm" [decorative]="true" />
                 <div class="as__names">
-                  <span class="as__name ell" [title]="row.name">
+                  <span class="as__name ell" [appTruncated]="row.name" #cut="appTruncated" [attr.title]="cut.truncated() ? row.name : null">
                     {{ row.name }}
                     @if (row.a.isSelf) {
                       <span class="as__muted">{{ 'meetings.attendance.you' | t }}</span>
@@ -81,7 +81,7 @@
                       (blur)="saveNote(row.a, note.value)"
                     />
                   } @else if (row.sub) {
-                    <span class="as__sub ell" [title]="row.sub">{{ row.sub }}</span>
+                    <span class="as__sub ell" [appTruncated]="row.sub" #cut2="appTruncated" [attr.title]="cut2.truncated() ? row.sub : null">{{ row.sub }}</span>
                   }
                 </div>
               </div>
@@ -103,7 +103,7 @@
                         [attr.aria-checked]="o.value === row.value"
                         [attr.aria-disabled]="o.blocked || saving() ? 'true' : null"
                         [attr.tabindex]="tabStop(row, o)"
-                        [title]="(o.blocked ?? o.label) | t"
+                        [attr.title]="o.blocked ? (o.blocked | t) : null"
                         (click)="choose(row, o)"
                         (keydown)="onKey($event, row, i)"
                       >{{ o.label | t }}</button>
@@ -149,7 +149,7 @@
               @for (d of meetingDelegations(); track d.id) {
                 <li class="as__item">
                   <app-avatar [name]="d.delegatorName ?? '—'" [principalId]="d.delegatorId" size="sm" [decorative]="true" />
-                  <span class="as__itemText ell" [title]="delegationLine(d)">{{ delegationLine(d) }}</span>
+                  <span class="as__itemText ell" [appTruncated]="delegationLine(d)" #cut3="appTruncated" [attr.title]="cut3.truncated() ? delegationLine(d) : null">{{ delegationLine(d) }}</span>
                   @if (d.delegateVoting) {
                     <span class="as__muted as__nowrap">{{ 'meetings.attendanceSheet.withVote' | t }}</span>
                   }
@@ -173,7 +173,7 @@
               @for (name of viewers(); track name) {
                 <li class="as__item">
                   <app-avatar [name]="name" size="sm" [decorative]="true" />
-                  <span class="as__itemText ell" [title]="name">{{ name }}</span>
+                  <span class="as__itemText ell" [appTruncated]="name" #cut4="appTruncated" [attr.title]="cut4.truncated() ? name : null">{{ name }}</span>
                 </li>
               } @empty {
                 <li class="as__item as__muted">{{ 'meetings.viewers.empty' | t }}</li>

@@ -61,10 +61,12 @@ from app.modules.applications.share import ShareService
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth import service as auth_service
+from app.modules.files.service import FilesService
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.forms.schemas import EffectiveFormOut
 from app.modules.notifications.captured import notify_application_captured
+from app.modules.notifications.comments import comment_mail_text
 from app.modules.notifications.privacy import notify_erasure_requested
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import (
@@ -886,6 +888,10 @@ async def add_comment(
     The route triggers comment mails. A public principal comment goes to the
     applicant. An applicant comment goes to everybody who can act on the current
     state.
+
+    ``attachmentIds`` and ``draftToken`` bind up to five draft uploads to the
+    comment. The body may be empty then. A draft that is missing, expired, foreign
+    or infected gives 422 ``draft_attachments_missing``.
     """
     if payload.visibility == "internal" and not access.can_see_internal:
         raise ForbiddenError("Applicants may only post public comments.")
@@ -897,6 +903,9 @@ async def add_comment(
         body=payload.body,
         visibility=payload.visibility,
         allow_unconfirmed=access.is_owning_applicant,
+        attachment_ids=payload.attachment_ids,
+        draft_token=payload.draft_token,
+        pepper=settings.magic_link_secret,
     )
     pool = getattr(request.app.state, "arq_pool", None)
     background.add_task(
@@ -906,7 +915,7 @@ async def add_comment(
         comment.id,
         access.author_kind,
         payload.visibility,
-        payload.body,
+        comment_mail_text(payload.body, [a.filename for a in comment.attachments]),
         # Display name for the team mail. The applicant mail names the Gremium.
         comment.author,
         pool,
@@ -980,6 +989,7 @@ async def update_comment(
 async def delete_comment(
     comment_id: UUID,
     service: ServiceDep,
+    request: Request,
     access: Annotated[Access, Depends(require_app_read)],
 ) -> None:
     """Delete a comment.
@@ -987,8 +997,10 @@ async def delete_comment(
     Only the AUTHOR of the comment or a principal with ``application.manage``
     may do this. The delete is final and the audit log records it. Before this
     route existed, a comment posted with the wrong visibility could only be
-    removed by anonymizing the whole application.
+    removed by anonymizing the whole application. The files of the comment go
+    with it, objects included.
     """
+    storage = getattr(request.app.state, "object_storage", None)
     await service.delete_comment(
         access.application_id,
         comment_id,
@@ -998,6 +1010,7 @@ async def delete_comment(
         can_manage=access.principal is not None
         and access.principal.has(MANAGE_PERMISSION),
         allow_unconfirmed=access.is_owning_applicant,
+        files=FilesService(service.session, storage=storage),
     )
 
 

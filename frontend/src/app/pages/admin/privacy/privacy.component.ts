@@ -22,8 +22,15 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
+import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, ErasureRequest } from '../admin.models';
 
@@ -62,6 +69,7 @@ const PERSON_HITS = 6;
     SearchPillComponent,
     AvatarComponent,
     StatusTextComponent,
+    RowMenuComponent,
   ],
   templateUrl: './privacy.component.html',
   styleUrl: './privacy.component.scss',
@@ -97,12 +105,35 @@ export class PrivacyComponent {
 
   protected readonly retentionMonths = signal<number | null>(null);
 
+  /** A phone shows cards: the actions of a request go into the ⋮ menu of its card. */
+  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  /** The ⋮ menu of an open request on a phone: the same two actions as the buttons. */
+  protected readonly rowMenu = computed<RowMenuSection[]>(() => [
+    {
+      items: [
+        { id: 'reject', label: this.i18n.translate('admin.privacy.reject') },
+        { id: 'execute', label: this.i18n.translate('admin.privacy.execute'), danger: true },
+      ],
+    },
+  ]);
+
+  protected onRowMenu(row: ErasureRequest, item: RowMenuItem): void {
+    if (item.id === 'reject') this.openReject(row);
+    else if (item.id === 'execute') this.askExecute(row);
+  }
+
   protected readonly columns = computed<ColumnDef[]>(() => [
     { key: 'status', label: this.i18n.translate('admin.privacy.col.status'), width: '8rem' },
     { key: 'subjectType', label: this.i18n.translate('admin.privacy.col.subject'), width: '7rem' },
     { key: 'email', label: this.i18n.translate('admin.privacy.col.email'), card: 'title' },
     { key: 'createdAt', label: this.i18n.translate('admin.privacy.col.created'), width: '8rem' },
-    { key: 'actions', label: this.i18n.translate('admin.common.actions'), align: 'end', width: '13rem' },
+    {
+      key: 'actions',
+      label: this.i18n.translate('admin.common.actions'),
+      align: 'end',
+      width: '13rem',
+      card: 'actions',
+    },
   ]);
 
   /** Status of a request as coloured text. */

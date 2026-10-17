@@ -1,0 +1,197 @@
+@use '../../../features/todos/todo-labels' as lbl;
+
+@include lbl.colors;
+
+:host {
+  display: contents;
+}
+/* Wider than the shared `md` dialog, so the labels fit in one row. */
+:host ::ng-deep .dialog {
+  max-width: 40rem;
+}
+/* Four sections (Allgemein, Spalten, Labels, Archiv), each an accent heading over a row
+   group, as on the admin settings pages. The row group draws the separators. */
+.bs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+.bs__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+/* The heading row has the height of the small text button beside it, so a section with
+   a button and one without start their content at the same distance. */
+.bs__secHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 2rem;
+  padding-inline-start: var(--space-1);
+}
+.bs__title {
+  margin: 0;
+}
+.bs__cols {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bs__col {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: 0 var(--space-1) 0 var(--space-3);
+}
+.bs__col.cdk-drag-preview {
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  box-shadow: var(--shadow-elevated);
+}
+.rowgroup > .bs__col.cdk-drag-placeholder {
+  outline: 1.5px dashed var(--color-accent);
+  outline-offset: -1.5px;
+  background: transparent;
+}
+.bs__grip {
+  display: inline-flex;
+  color: var(--color-text-subtle);
+  cursor: grab;
+}
+.bs__colName {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.bs__doneTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+.bs__cards {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.bs__inline,
+.bs__labelForm {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.bs__input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+  color: var(--color-text);
+  font: inherit;
+}
+.bs__input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+}
+.bs__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-2);
+}
+.bs__confirmText {
+  margin: 0;
+}
+.bs__confirmFoot {
+  display: flex;
+  flex: 1 0 100%;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.bs__labelRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+}
+.bs__none {
+  color: var(--color-text-muted);
+}
+/* A label is a compact filled pill, one step above its row. */
+.bs__label {
+  height: 30px;
+  padding-inline: var(--space-3);
+  border-color: transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-regular);
+}
+.bs__dot {
+  @include lbl.dot;
+}
+.bs__swatches {
+  display: flex;
+  gap: var(--space-2);
+}
+.bs__swatch {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  background: var(--lbl);
+  cursor: pointer;
+}
+.bs__swatch[aria-checked='true'] {
+  border-color: var(--color-text);
+  box-shadow: inset 0 0 0 2px var(--color-surface-1);
+}
+.bs__swatch:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+/* A switch row, as on the admin settings pages: the label at the start, the switch at
+   the end. */
+.bs__row {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+}
+.bs__days {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+.bs__daysField {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+.bs__daysInput {
+  flex: none;
+  width: 4.5rem;
+  min-height: 36px;
+  background: var(--color-surface-3);
+  text-align: end;
+}

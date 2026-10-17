@@ -27,6 +27,7 @@ import {
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -50,6 +51,7 @@ const SEARCH_ABOVE = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     TranslatePipe,
     AvatarComponent,

@@ -109,6 +109,8 @@ const MOCK_PRINCIPAL: Principal = {
     'budget.export',
     // "API-Zugang" in the account menu and the account navigation, and the MCP setup.
     'mcp.use',
+    // The tickets of the help menu.
+    'ticket.manage',
   ],
   groups: [],
   gremien: [

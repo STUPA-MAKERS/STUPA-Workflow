@@ -62,8 +62,8 @@ UNNAMED: Mapping[str, str] = {"de": "Ohne Namen", "en": "No name"}
 #: own, and a filter the list applies where it does not. A bare list URL would drop the
 #: reader back into the search they just ran.
 #:
-#: One table rather than seven f-strings scattered through the sources, so a new kind
-#: cannot ship a URL that forgets which record it is about.
+#: One table rather than an f-string in each source, so a new kind cannot ship a URL
+#: that forgets which record it is about.
 HIT_URL: Mapping[SearchKind, str] = {
     "application": "/applications/{id}",
     "meeting": "/meetings/{id}",
@@ -73,6 +73,18 @@ HIT_URL: Mapping[SearchKind, str] = {
     "gremium": "/admin/gremien/{id}/members",
     # `sub` and not the row id: it is what the principal search matches on.
     "principal": "/admin/users?q={id}",
+    "ticket": "/tickets/{id}",
+    # The fallback only: the source builds `/todos/{boardId}?card={id}` per hit, because
+    # the card opens on its own board.
+    "todo": "/todos?card={id}",
+}
+
+#: The status of a ticket hit, in the reader's language.
+TICKET_STATUS: Mapping[str, Mapping[str, str]] = {
+    "new": {"de": "Neu", "en": "New"},
+    "in_progress": {"de": "In Arbeit", "en": "In progress"},
+    "done": {"de": "Erledigt", "en": "Done"},
+    "rejected": {"de": "Abgelehnt", "en": "Rejected"},
 }
 
 
@@ -101,6 +113,8 @@ class SearchService:
             "budget": self._budgets,
             "gremium": self._gremien,
             "principal": self._principals,
+            "ticket": self._tickets,
+            "todo": self._todos,
         }
         # Sequential, not gathered: they share one AsyncSession, and a session is not
         # safe for concurrent use. Each query is small and indexed.
@@ -293,6 +307,42 @@ class SearchService:
                 url=HIT_URL["principal"].format(id=quote(p.sub)),
             )
             for p in rows
+        ]
+
+    async def _tickets(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
+        """Reuses `TicketService.list`, behind `ticket.manage` like `GET /api/tickets`."""
+        from app.modules.tickets.access import TICKET_MANAGE
+        from app.modules.tickets.service import TicketService
+
+        if not principal.has(TICKET_MANAGE):
+            return []
+        page = await TicketService(self.session).list(q=q, limit=PER_KIND + 1)
+        return [
+            SearchHit(
+                kind="ticket",
+                id=str(t.id),
+                title=f"{t.number} · {t.title}",
+                subtitle=TICKET_STATUS[t.status].get(lang, TICKET_STATUS[t.status]["de"]),
+                url=HIT_URL["ticket"].format(id=t.id),
+            )
+            for t in page.items
+        ]
+
+    async def _todos(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
+        """Reuses `TodoService.search`, behind the board read rule of the todos module."""
+        from app.modules.todos.links import card_url
+        from app.modules.todos.service import TodoService
+
+        rows = await TodoService(self.session).search(q, principal, limit=PER_KIND + 1)
+        return [
+            SearchHit(
+                kind="todo",
+                id=str(card.id),
+                title=card.title,
+                subtitle=f"{board.name} · {column.name}",
+                url=card_url(board.id, card.id),
+            )
+            for card, board, column in rows
         ]
 
 

@@ -1,0 +1,132 @@
+<p class="sr-only" aria-live="assertive">{{ announce() }}</p>
+
+@for (row of sections(); track row.board.id) {
+  <section class="br" [class.br--closed]="!isOpen(row)" [class.br--readonly]="!canDrag(row)" [attr.aria-labelledby]="'br-h-' + row.board.id" [attr.data-board-id]="row.board.id">
+    <header class="br__head">
+      <h2 class="br__title" [id]="'br-h-' + row.board.id">
+        <button
+          type="button"
+          class="br__toggle"
+          [attr.aria-expanded]="isOpen(row)"
+          [attr.aria-controls]="isOpen(row) ? 'br-c-' + row.board.id : null"
+          (click)="toggle(row)"
+        >
+          <app-icon class="br__chev" [name]="isOpen(row) ? 'chevron-down' : 'chevron-right'" [size]="18" />
+          <app-icon class="br__kind" [name]="icon[row.board.kind]" [size]="16" />
+          <span class="br__name ell">{{ row.board.name }}</span>
+          <span class="br__count num">{{ row.count }}</span>
+        </button>
+      </h2>
+      @if (!row.board.canWrite) {
+        <span class="br__tag">
+          <app-icon name="lock" [size]="12" />
+          {{ 'todos.rows.readOnly' | t }}
+        </span>
+      }
+      @if (row.board.id !== leadId()) {
+      <a
+        class="br__open"
+        [routerLink]="['/todos', row.board.id]"
+        [attr.aria-label]="'todos.rows.openBoard' | t: { name: row.board.name }"
+        [title]="'todos.rows.openBoard' | t: { name: row.board.name }"
+      >
+        <app-icon name="chevron-right" [size]="18" />
+      </a>
+      }
+    </header>
+
+    @if (isOpen(row) && phone()) {
+      <!-- Phone: one list of the cards of every column, no drag; a long press opens the
+           "Verschieben" sheet of the page. -->
+      @if (row.count) {
+        <div class="br__list" role="list" [id]="'br-c-' + row.board.id" [attr.aria-label]="row.board.name">
+          @for (col of row.columns; track col.id) {
+            @for (card of list(row, col); track card.id) {
+              <app-todo-card-tile
+                role="listitem"
+                appLongPress
+                [appLongPressOff]="!row.board.canWrite"
+                [card]="card"
+                [labels]="row.labels"
+                [done]="col.isDone"
+                [today]="today()"
+                [column]="col.name"
+                (open)="openCard.emit(card.id)"
+                (appLongPress)="askMenu(row, card)"
+              />
+            }
+            @if (more(row, col) > 0) {
+              <div class="br__moreItem" role="listitem">
+                <button type="button" class="br__more" (click)="expand(col)">
+                  {{ 'todos.board.more' | t: { n: more(row, col) } }}
+                </button>
+              </div>
+            }
+          }
+        </div>
+      } @else {
+        <p class="br__empty" [id]="'br-c-' + row.board.id">{{ 'todos.board.columnEmpty' | t }}</p>
+      }
+    } @else if (isOpen(row)) {
+      <!-- cdkScrollable: a drag in the row scrolls it sideways and measures its drop lists anew.
+           The lists of all writable rows connect by id (cdkDropListConnectedTo). -->
+      <div class="br__cols" cdkScrollable [id]="'br-c-' + row.board.id">
+        @for (col of row.columns; track col.id; let ci = $index) {
+          <div class="br__col">
+            <p class="br__colHead">
+              <span class="br__colName ell">{{ col.name }}</span>
+              <span class="br__colCount num">{{ count(row, col) }}</span>
+              @if (col.isDone) {
+                <app-icon class="br__doneIcon" name="check" [size]="13" />
+              }
+            </p>
+            <div
+              class="br__cards"
+              cdkDropList
+              role="list"
+              [id]="dropId(col.id)"
+              [attr.aria-label]="row.board.name + ' · ' + col.name"
+              [cdkDropListData]="col.id"
+              [cdkDropListDisabled]="!canDrag(row)"
+              [cdkDropListConnectedTo]="canDrag(row) ? connected() : []"
+              [cdkDropListEnterPredicate]="enter[row.board.kind]"
+              [attr.data-board-kind]="row.board.kind"
+              (cdkDropListEntered)="onEnter($event)"
+              (cdkDropListDropped)="drop(row, $event)"
+            >
+              @for (card of list(row, col); track card.id; let i = $index) {
+                <div
+                  class="br__item"
+                  role="listitem"
+                  cdkDrag
+                  cdkDragPreviewClass="br__preview"
+                  [cdkDragStartDelay]="dragDelay"
+                  [cdkDragData]="card.id"
+                  [cdkDragDisabled]="!canDrag(row)"
+                  (cdkDragStarted)="onDragStart(col)"
+                  (cdkDragEnded)="ptr.set(null)"
+                  (keyup)="onTileKeyUp($event)"
+                  (keydown)="onTileKey($event, row, card, ci, i)"
+                >
+                  <app-todo-card-tile
+                    [card]="card"
+                    [labels]="row.labels"
+                    [done]="col.isDone"
+                    [today]="today()"
+                    [lifted]="kb()?.cardId === card.id"
+                    (open)="openCard.emit(card.id)"
+                  />
+                </div>
+              }
+            </div>
+            @if (more(row, col) > 0) {
+              <button type="button" class="br__more" (click)="expand(col)">
+                {{ 'todos.board.more' | t: { n: more(row, col) } }}
+              </button>
+            }
+          </div>
+        }
+      </div>
+    }
+  </section>
+}

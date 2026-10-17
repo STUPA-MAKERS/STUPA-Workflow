@@ -33,6 +33,7 @@ export const ADMIN_AREA_PERMISSIONS = [
   'admin.notifications',
   'privacy.manage',
   'webhook.manage',
+  'ticket.manage',
   'audit.read',
   'backup.manage',
   'budget.structure',
@@ -45,12 +46,14 @@ export type NavKey =
   | 'start'
   | 'applications'
   | 'tasks'
+  | 'todos'
   | 'meetings'
   | 'gremien'
   | 'voting'
   | 'budget'
   | 'expenses'
   | 'invoices'
+  | 'tickets'
   | 'admin';
 
 /** One entry of the navigation rail and of the phone bar. */
@@ -67,6 +70,8 @@ export interface NavItem {
   inAnyCommittee?: boolean;
   /** Also visible with a scoped budget view. */
   scopedBudgetView?: boolean;
+  /** Also visible to a principal who reported a ticket. */
+  reportedTickets?: boolean;
   /** Match the active route exactly. */
   exact?: boolean;
   /** `end` entries sit at the foot of the rail, after the spacer. */
@@ -82,6 +87,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // Without application.read these pages show only the applications and tasks of the user.
   { key: 'applications', path: '/applications', labelKey: 'nav.applications', icon: 'file', permissions: [], place: 'main' },
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
+  // Every session has at least the personal board.
+  { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',
@@ -125,6 +132,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
   { key: 'expenses', path: '/expenses', labelKey: 'nav.expenses', icon: 'swap', permissions: BUDGET_PERMISSIONS, place: 'main' },
   { key: 'invoices', path: '/invoices', labelKey: 'nav.invoices', icon: 'receipt', permissions: BUDGET_PERMISSIONS, place: 'main' },
+  { key: 'tickets', path: '/tickets', labelKey: 'nav.tickets', icon: 'ticket', permissions: ['ticket.manage'], reportedTickets: true, place: 'main' },
   { key: 'admin', path: '/admin', labelKey: 'nav.admin', icon: 'shield', permissions: ADMIN_AREA_PERMISSIONS, place: 'end' },
 ];
 
@@ -148,7 +156,8 @@ export class NavService {
         this.globalAllows(item) ||
         (item.gremiumPermissions ?? []).some((p) => this.auth.canInAnyGremium(p)) ||
         (!!item.inAnyCommittee && inAnyCommittee) ||
-        (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()),
+        (!!item.scopedBudgetView && this.auth.hasScopedBudgetView()) ||
+        (!!item.reportedTickets && this.auth.hasReportedTickets()),
     );
   });
 

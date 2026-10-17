@@ -1,0 +1,25 @@
+@if (cards().length) {
+  <section
+    class="tl"
+    [attr.aria-labelledby]="showTitle() ? headingId() : null"
+    [attr.aria-label]="showTitle() ? null : ('todos.linked.title' | t)"
+  >
+    @if (showTitle()) {
+      <h3 class="sec tl__title" [id]="headingId()">{{ 'todos.linked.title' | t }}</h3>
+    }
+    <ul class="rowgroup tl__list">
+      @for (card of cards(); track card.id) {
+        <li class="tl__row" [class.tl__row--done]="card.isDone">
+          <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
+          <span class="tl__text">
+            <a class="tl__link" [routerLink]="['/todos', card.boardId]" [queryParams]="{ card: card.id }">{{ card.title }}</a>
+            <span class="tl__sub">{{ sub(card) }}</span>
+          </span>
+          @if (card.assignees.length) {
+            <app-avatar-stack [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
+          }
+        </li>
+      }
+    </ul>
+  </section>
+}

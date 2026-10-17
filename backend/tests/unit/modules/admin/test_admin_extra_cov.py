@@ -396,6 +396,7 @@ async def test_put_draft_creates_new_version_above_active() -> None:
     active = _scv(5, active=True)
     db = fake_session(
         result(active),  # _latest -> active, so the service creates a new draft
+        result(active),  # _active -> the source of help and tickets
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(active),  # get._active
@@ -417,6 +418,7 @@ async def test_put_draft_creates_new_version_above_active() -> None:
 async def test_put_draft_no_versions_creates_version_1() -> None:
     db = fake_session(
         result(),  # _latest -> None, so base is 0
+        result(),  # _active -> None, so help and tickets are the defaults
         result(),  # audit advisory lock
         result(),  # audit prev-hash
         result(),  # get._active -> None
@@ -526,3 +528,142 @@ def test_module_constants_consistency() -> None:
     assert set(gr.FORCED_ROLE_DEFAULT_PERMS) == set(FORCED_ROLE_KEYS)
     for perms in gr.FORCED_ROLE_DEFAULT_PERMS.values():
         assert all(p in GREMIUM_PERMISSIONS for p in perms)
+
+
+# -- help & tickets ("Hilfe & Tickets") ----------------------------------------------
+
+
+def test_public_branding_hides_the_help_and_ticket_settings() -> None:
+    from app.modules.admin.branding import HelpSettings, PublicBranding
+
+    with pytest.raises(ValueError, match="https://"):
+        HelpSettings(wikiUrl="javascript:alert(1)")
+    assert HelpSettings(wikiUrl="  http://wiki.example.org  ").wiki_url == (
+        "http://wiki.example.org"
+    )
+    dumped = PublicBranding().model_dump(by_alias=True)
+    assert "help" not in dumped
+    assert "tickets" not in dumped
+    full = Branding().model_dump(by_alias=True)
+    assert full["help"]["wikiUrl"].startswith("https://wiki.reutlingen.university/")
+    assert full["tickets"] == {"publicEnabled": True, "notifyNew": True, "retentionMonths": 12}
+
+
+async def test_public_names_the_wiki_and_the_public_switch() -> None:
+    branding = Branding.model_validate(
+        {"tickets": {"publicEnabled": False}, "help": {"wikiUrl": "https://w.example.org"}}
+    )
+    active = _scv(2, active=True, branding=branding.model_dump(by_alias=True))
+    out = (await SiteConfigService(fake_session(result(active))).public()).model_dump(by_alias=True)
+    assert out["help"] == {"wikiUrl": "https://w.example.org"}
+    assert out["tickets"] == {"publicEnabled": False}
+    assert "help" not in out["branding"]
+    assert "tickets" not in out["branding"]
+
+
+async def test_active_branding_reads_the_active_row_or_the_defaults() -> None:
+    from app.modules.admin.site_config_service import active_branding
+
+    active = _scv(1, active=True, branding=Branding(appName="A").model_dump(by_alias=True))
+    assert (await active_branding(fake_session(result(active)))).app_name == "A"
+    assert (await active_branding(fake_session(result()))).tickets.retention_months == 12
+
+
+async def test_help_tickets_reads_the_active_settings() -> None:
+    branding = Branding.model_validate({"tickets": {"retentionMonths": None, "notifyNew": False}})
+    active = _scv(1, active=True, branding=branding.model_dump(by_alias=True))
+    out = await SiteConfigService(fake_session(result(active))).help_tickets()
+    assert out.model_dump(by_alias=True) == {
+        "wikiUrl": "https://wiki.reutlingen.university/books/antragsplattform",
+        "publicEnabled": True,
+        "notifyNew": False,
+        "retentionMonths": None,
+    }
+
+
+@pytest.fixture
+def revisions(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, object]]:
+    from app.modules.admin import site_config_service as scs
+
+    recorded: list[dict[str, object]] = []
+
+    class _Revisions:
+        def __init__(self, _session: object) -> None:
+            pass
+
+        async def record(self, **kw: object) -> None:
+            recorded.append(kw)
+
+    monkeypatch.setattr(scs, "ConfigRevisionService", _Revisions)
+    return recorded
+
+
+def _settings(**kw: object):
+    from app.modules.admin.schemas import HelpTicketsSettings
+
+    return HelpTicketsSettings.model_validate(
+        {
+            "wikiUrl": "https://w.example.org",
+            "publicEnabled": False,
+            "notifyNew": False,
+            "retentionMonths": 6,
+            **kw,
+        }
+    )
+
+
+async def test_put_help_tickets_writes_a_new_active_version(
+    revisions: list[dict[str, object]],
+) -> None:
+    active = _scv(4, active=True, branding=Branding(appName="Keep").model_dump(by_alias=True))
+    db = fake_session(result(active), result(active), result())
+    out = await SiteConfigService(db).put_help_tickets(_settings(), "admin")
+    assert out.retention_months == 6
+    (row,) = [o for o in db.added if isinstance(o, SiteConfigVersion)]
+    assert (row.version, row.active) == (5, True)
+    assert row.branding["appName"] == "Keep"
+    assert row.branding["tickets"]["publicEnabled"] is False
+    assert db.committed == 1
+    (rev,) = revisions
+    assert rev["extra_data"] == {"siteConfigVersion": 5, "section": "helpTickets"}
+
+
+async def test_put_help_tickets_patches_an_open_draft(
+    revisions: list[dict[str, object]],
+) -> None:
+    active = _scv(4, active=True)
+    draft = _scv(5, active=False, branding={"appName": "Draft"})
+    db = fake_session(result(active), result(draft), result())
+    await SiteConfigService(db).put_help_tickets(_settings(retentionMonths=None), "admin")
+    (row,) = [o for o in db.added if isinstance(o, SiteConfigVersion)]
+    assert row.version == 6
+    assert draft.version == 7
+    assert draft.branding["appName"] == "Draft"
+    assert draft.branding["help"] == {"wikiUrl": "https://w.example.org"}
+    assert draft.branding["tickets"]["retentionMonths"] is None
+
+
+async def test_put_help_tickets_on_an_empty_database(
+    revisions: list[dict[str, object]],
+) -> None:
+    draft = _scv(1, active=False, branding=None)
+    draft.branding = None  # type: ignore[assignment]
+    db = fake_session(result(), result(draft), result())
+    await SiteConfigService(db).put_help_tickets(_settings(), "admin")
+    assert draft.version == 3
+    assert draft.branding["tickets"]["notifyNew"] is False
+    db = fake_session(result(), result(), result())
+    await SiteConfigService(db).put_help_tickets(_settings(), "admin")
+    (row,) = [o for o in db.added if isinstance(o, SiteConfigVersion)]
+    assert row.version == 1
+
+
+def test_help_tickets_settings_validate_url_and_months() -> None:
+    with pytest.raises(ValueError):
+        _settings(wikiUrl="ftp://x")
+    with pytest.raises(ValueError):
+        _settings(retentionMonths=0)
+    with pytest.raises(ValueError):
+        _settings(retentionMonths=121)
+    with pytest.raises(ValueError):
+        _settings(extra=1)

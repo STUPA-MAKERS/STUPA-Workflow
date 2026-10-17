@@ -45,6 +45,13 @@ describe('AvatarComponent', () => {
     expect(host).toHaveClass('av--sm');
     expect(host).toHaveClass('av--accent');
   });
+
+  it('carries the extra small class', async () => {
+    const view = await render(AvatarComponent, { inputs: { name: 'Mara Keller', size: 'xs' } });
+    const host = view.fixture.nativeElement as HTMLElement;
+    expect(host).toHaveClass('av--xs');
+    expect(host).not.toHaveClass('av--sm');
+  });
 });
 
 describe('AvatarComponent with an image', () => {
@@ -140,11 +147,17 @@ describe('AvatarStackComponent', () => {
     expect(container.querySelectorAll('app-avatar')).toHaveLength(4);
     expect(container.querySelector('.stack__rest')).toHaveTextContent('+2');
     expect(container.querySelector('.stack__rest')).not.toHaveClass('av--sm');
+    expect(container.querySelector('.stack__rest')).not.toHaveClass('av--xs');
     expect(
       screen.getByRole('img', {
         name: 'Mara Keller, Jonas Weber, Paul Neumann, Erika Beispiel, 2 weitere',
       }),
     ).toBeTruthy();
+  });
+
+  it('draws an extra small rest', async () => {
+    const { container } = await render(AvatarStackComponent, { inputs: { names: NAMES, max: 2, size: 'xs' } });
+    expect(container.querySelector('.stack__rest')).toHaveClass('av--xs');
   });
 
   it('is one image: the single avatars are hidden from screen readers', async () => {

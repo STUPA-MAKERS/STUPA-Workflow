@@ -8,10 +8,10 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
   InputComponent,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../../admin-api.service';
 import { type GuestSettings, MAX_CONFIRM_TTL_HOURS, MAX_LINK_TTL_DAYS } from '../../admin.models';
 
@@ -58,7 +58,7 @@ function draftOf(s: GuestSettings): Draft {
   selector: 'app-guest-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, SelectComponent, NoteComponent, SkeletonComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, SelectFieldComponent, NoteComponent, SkeletonComponent],
   templateUrl: './guest-settings.component.html',
   styleUrl: './guest-settings.component.scss',
 })
@@ -68,7 +68,6 @@ export class GuestSettingsComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  protected readonly maxHours = MAX_CONFIRM_TTL_HOURS;
   protected readonly maxDays = MAX_LINK_TTL_DAYS;
 
   /** The section needs the deadline right. The server checks it again. */

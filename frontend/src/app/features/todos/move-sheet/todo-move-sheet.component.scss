@@ -1,0 +1,66 @@
+:host {
+  display: contents;
+}
+.ms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+.ms__sub {
+  margin: calc(-1 * var(--space-2)) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+/* The rows run to the edges of the sheet; the chosen one is a full-width band. */
+.ms__list {
+  display: flex;
+  flex-direction: column;
+  margin-inline: calc(-1 * var(--space-4));
+}
+.ms__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: var(--fw-medium);
+  text-align: start;
+  cursor: pointer;
+}
+.ms__row--on {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.ms__row:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.ms__radio {
+  flex: none;
+}
+.ms__name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ms__count {
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ms__cap {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-semibold);
+}
+.ms__foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}

@@ -1,14 +1,12 @@
 :host {
   display: block;
+  /* Nothing shows for the first 300ms, so a fast answer draws no placeholder at all
+     (the delay of `.skel-in`). */
+  animation: skel-in 150ms var(--ease-standard, ease) 300ms both;
 }
 .sk {
   display: flex;
   flex-direction: column;
-}
-/* The blocks take the colour of a raised surface, so they show on the page and on a
-   sheet alike. */
-.skel {
-  background: var(--color-surface-3);
 }
 /* A record row in the shape of a list row (`app-list-item`): 64px, a wide leading block
    and a narrower trailing one, so a list of rows reads as rows rather than as a stack of
@@ -34,10 +32,6 @@
   border-bottom-left-radius: var(--radius-lg);
   border-bottom-right-radius: var(--radius-lg);
 }
-/* On the row surface the blocks need one step more to show. */
-.sk__row .skel {
-  background: var(--color-surface-4);
-}
 .sk__row-lead {
   width: 40%;
 }
@@ -52,9 +46,9 @@
 .sk__item {
   display: flex;
   align-items: center;
-  gap: var(--space-4);
+  gap: var(--li-gap, var(--space-4));
   min-height: 4rem;
-  padding: 10px var(--space-4);
+  padding: 10px var(--li-pad-x, var(--space-4));
 }
 .sk__itemBody {
   display: flex;
@@ -82,4 +76,85 @@
   margin-inline-end: 2rem;
   font-size: 0.8125rem;
   line-height: 1.375rem;
+}
+
+/* The lead tile (a 40px kind icon, or the size the page sets: the date block of a meeting)
+   and the trailing person circle of a row. */
+.sk__itemLead {
+  width: var(--sk-lead-w, 40px);
+  height: var(--sk-lead-h, 40px);
+  border-radius: var(--radius-md);
+}
+.sk__itemAvatar {
+  width: 32px;
+  height: 32px;
+  margin-inline-end: var(--sk-trail-end, 0);
+  border-radius: 50%;
+}
+
+/* `bubbles`: the geometry of the messages of `app-chat` (10px between the messages, a
+   32px avatar, a bubble of one line is 40px, of two lines 61px). Keep these in step with
+   `chat.component.scss`. */
+.sk__bubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.sk__msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+.sk__msg--own {
+  justify-content: flex-end;
+}
+.sk__avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+.sk__bubble {
+  max-width: 74%;
+  height: 40px;
+  border-radius: 6px 16px 16px 6px;
+}
+.sk__bubble--two {
+  height: 61px;
+}
+.sk__msg--own .sk__bubble {
+  border-radius: 16px 6px 6px 16px;
+}
+
+/* `chat`: the log and the composer of `app-chat`. The log takes the free height and
+   keeps its messages at the bottom, as the loaded log does. */
+:host(.sk-host--chat) {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.sk--chat {
+  flex: 1 1 auto;
+  gap: var(--space-3);
+  min-height: 0;
+}
+.sk__log {
+  display: flex;
+  /* The same basis as the log of `app-chat`, so the placeholder fills the same height. */
+  flex: 1 1 var(--chat-log-basis, auto);
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: var(--chat-log-min, 10rem);
+  padding: 4px 0 12px;
+  overflow: hidden;
+}
+.sk__log--framed {
+  padding: 12px var(--space-4) 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+.sk__composer {
+  flex: none;
+  height: 52px;
+  border-radius: 26px;
+  background: var(--color-surface-3);
 }

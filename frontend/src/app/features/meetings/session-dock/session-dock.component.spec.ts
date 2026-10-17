@@ -243,7 +243,6 @@ describe('SessionDockComponent', () => {
       expect(within(picker).getByText('PP')).toBeInTheDocument();
       expect(within(picker).getByText('Anwesend')).toBeInTheDocument();
       expect(within(picker).getByText('Offen')).toBeInTheDocument();
-      expect(within(picker).getByText('Nur Mitglieder mit dem Recht „Protokoll führen“.')).toBeInTheDocument();
       const search = within(picker).getByRole('searchbox', { name: 'Mitglied suchen' });
       await userEvent.type(search, 'mika');
       expect(within(picker).getAllByRole('button', { name: /Mika Mitglied/ })).toHaveLength(1);

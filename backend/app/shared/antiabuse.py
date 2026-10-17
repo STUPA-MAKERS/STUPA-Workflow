@@ -129,6 +129,7 @@ def body_cap(limit_attr: str) -> Callable[[Request, Settings], None]:
 
 enforce_auth_payload_limit = body_cap("max_auth_payload_bytes")
 enforce_application_payload_limit = body_cap("max_application_payload_bytes")
+enforce_ticket_payload_limit = body_cap("max_ticket_payload_bytes")
 
 # Room for the multipart frame around the file: boundaries, part headers and the small
 # form fields (field key, flag, ALTCHA solution).
@@ -148,9 +149,7 @@ def enforce_attachment_body_cap(request: Request, settings: SettingsDep) -> None
         raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
 
 
-async def _enforce(
-    limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str
-) -> None:
+async def _enforce(limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str) -> None:
     result = await limiter.hit(key, limit=limit, window_seconds=window)
     if not result.allowed:
         raise RateLimitedError(detail, retry_after=result.retry_after)
@@ -259,6 +258,41 @@ async def rate_limit_applications(
         limit=settings.rl_applications_ip_per_hour,
         window=_HOUR,
         detail="Too many application submissions from this IP. Try again later.",
+    )
+
+
+async def rate_limit_tickets(
+    request: Request,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /tickets``: 10/h/IP. An OAuth token (the logged-in MCP) is exempt."""
+    if _is_oauth_principal(principal):
+        return
+    await _enforce(
+        limiter,
+        f"tickets:ip:{client_ip(request)}",
+        limit=settings.rl_tickets_ip_per_hour,
+        window=_HOUR,
+        detail="Too many ticket reports from this IP. Try again later.",
+    )
+
+
+async def rate_limit_ticket_messages(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /tickets/mine/{id}/notes``: 60/h per account, because each message mails the team."""
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"ticket-messages:principal:{principal.sub}",
+        limit=settings.rl_ticket_messages_per_hour,
+        window=_HOUR,
+        detail="Too many ticket messages. Try again later.",
     )
 
 
@@ -396,9 +430,7 @@ def require_altcha(field: str = "altcha") -> Callable[..., Awaitable[None]]:
         try:
             await verifier.verify(solution)
         except AltchaError as exc:
-            raise BadRequestError(
-                "Altcha verification failed.", code="altcha_failed"
-            ) from exc
+            raise BadRequestError("Altcha verification failed.", code="altcha_failed") from exc
 
     return dependency
 

@@ -3,19 +3,31 @@
   type="button"
   class="chip fs__chip"
   [class.fs__chip--md]="size() === 'md'"
+  [class.fs__chip--icon]="iconOnly()"
   [class.on]="active()"
   aria-haspopup="listbox"
   [attr.aria-expanded]="open()"
   [attr.aria-controls]="open() ? listId : null"
   [attr.aria-label]="chipName()"
-  [title]="chipText()"
+  [attr.title]="iconOnly() ? label() : null"
   (click)="toggle()"
   (keydown)="onTriggerKey($event)"
 >
-  @if (icon(); as lead) {
+  @if (person(); as who) {
+    <app-avatar class="fs__av" size="xs" [decorative]="true" [name]="who.name" [principalId]="who.principalId" />
+  } @else if (icon(); as lead) {
     <app-icon [name]="lead" [size]="15" />
   }
-  <span class="ell fs__text">{{ chipText() }}</span>
+  @if (!iconOnly()) {
+    <!-- A tooltip only where the text is cut: a full text needs no second copy. -->
+    <span
+      class="ell fs__text"
+      [appTruncated]="chipText()"
+      #chipCut="appTruncated"
+      [attr.title]="chipCut.truncated() ? chipText() : null"
+      >{{ chipText() }}</span
+    >
+  }
   @if (chevron()) {
     <app-icon class="fs__chev" name="down" [size]="15" />
   }
@@ -41,7 +53,6 @@
           [class.fs__option--sheet]="inSheet"
           [attr.aria-selected]="isOn(opt.value)"
           [attr.tabindex]="opt.value === tabValue() ? 0 : -1"
-          [title]="opt.label"
           (click)="choose(opt)"
         >
           @if (multiple()) {
@@ -51,7 +62,13 @@
               }
             </span>
           }
-          <span class="fs__label">{{ opt.label }}</span>
+          <span
+            class="fs__label"
+            [appTruncated]="opt.label"
+            #cut="appTruncated"
+            [attr.title]="cut.truncated() ? opt.label : null"
+            >{{ opt.label }}</span
+          >
           @if (!multiple() && isOn(opt.value)) {
             <app-icon class="fs__check" name="check" [size]="18" />
           }

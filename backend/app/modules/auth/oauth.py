@@ -39,7 +39,12 @@ FORBIDDEN_PERMISSIONS: frozenset[str] = frozenset(
 # `meetings:write` token of a lead can manage those votes also without `votes:write`.
 # `read` holds `meeting.view_all`, a global read-only key, so an admin token keeps the
 # view over the meetings of every gremium. For the same reason `read` holds
-# `gremium.view_all`, the global read key of the tab "Gremien".
+# `gremium.view_all`, the global read key of the tab "Gremien", and `todo.read_all`,
+# the global read key of the to-do boards. `todos:write` holds `todo.all`, the global
+# write key of the to-do cards; the to-dos read with any of `todo.write`, `todo.all`
+# and `todo.read_all` in the scope and write with `todo.write` or `todo.all`. Through
+# `todo.all` or `todo.read_all` a team board also needs its own permission in the
+# scope, so a `read` token never opens the board "Plattform" (`ticket.manage`).
 SCOPES: dict[str, frozenset[str]] = {
     "read": frozenset(
         {
@@ -51,6 +56,7 @@ SCOPES: dict[str, frozenset[str]] = {
             "audit.verify",
             "meeting.view_all",
             "gremium.view_all",
+            "todo.read_all",
         }
     ),
     "applications:write": frozenset(
@@ -59,6 +65,8 @@ SCOPES: dict[str, frozenset[str]] = {
     "votes:write": frozenset({"vote.manage"}),
     "budget:write": frozenset({"budget.structure", "budget.book"}),
     "meetings:write": frozenset({"session.manage", "protocol.write", "protocol.finalize"}),
+    "tickets:write": frozenset({"ticket.manage"}),
+    "todos:write": frozenset({"todo.write", "todo.configure", "todo.all"}),
     "forms:write": frozenset({"form.configure"}),
     "flows:write": frozenset({"flow.configure"}),
     "admin:write": frozenset(
@@ -118,6 +126,8 @@ SCOPE_ORDER: tuple[str, ...] = (
     "applications:write",
     "votes:write",
     "meetings:write",
+    "todos:write",
+    "tickets:write",
     "budget:write",
     "forms:write",
     "flows:write",

@@ -3,6 +3,7 @@ import { RouterLink, RouterLinkActive } from '@angular/router';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
+import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { searchShortcutKeys } from '../../features/search/shortcut';
 import { AccountMenuComponent } from '../account-menu/account-menu.component';
@@ -13,7 +14,8 @@ import { NavService } from '../nav.service';
  * The navigation rail: 96px at the start edge of every signed-in page above the phone
  * width. The mark leads to the start page. Below it the search opens the palette, so the
  * search is in reach on every page also without a keyboard. Then come the areas the principal may open
- * (RBAC filter in {@link NavService}), a spacer, the administration and the account.
+ * (RBAC filter in {@link NavService}), a spacer, the help menu, the administration and
+ * the account.
  *
  * The task count and the live mark come from `RailStatusService` through `app-nav-mark`.
  */
@@ -21,7 +23,15 @@ import { NavService } from '../nav.service';
   selector: 'app-nav-rail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, TranslatePipe, IconComponent, AccountMenuComponent, NavMarkComponent],
+  imports: [
+    RouterLink,
+    RouterLinkActive,
+    TranslatePipe,
+    IconComponent,
+    AccountMenuComponent,
+    HelpMenuComponent,
+    NavMarkComponent,
+  ],
   templateUrl: './nav-rail.component.html',
   styleUrl: './nav-rail.component.scss',
 })

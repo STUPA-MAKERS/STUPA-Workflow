@@ -1,45 +1,48 @@
-<div class="gmb__tools">
-  <app-search-pill
-    class="gmb__search"
-    size="md"
-    [placeholder]="searchPlaceholder()"
-    [label]="'gremien.members.searchLabel' | t"
-    [clearable]="true"
-    [value]="query()"
-    (valueChange)="query.set($event)"
-  />
-  <div class="gmb__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
-    <app-filter-select
-      [label]="'gremien.members.role' | t"
-      [options]="roleOptions()"
-      [value]="role()"
-      (valueChange)="role.set($event)"
-      [text]="roleText()"
-      [active]="role() !== ''"
-      [icon]="role() ? 'check' : null"
-      [chevron]="!role()"
+<!-- On a phone the page scrolls: the search and the filters stay at the top. -->
+<app-sticky-bar [sticky]="phone()">
+  <div class="gmb__tools">
+    <app-search-pill
+      class="gmb__search"
+      size="md"
+      [placeholder]="searchPlaceholder()"
+      [label]="'gremien.members.searchLabel' | t"
+      [clearable]="true"
+      [value]="query()"
+      (valueChange)="query.set($event)"
     />
-    <app-filter-select
-      [label]="'gremien.members.former' | t"
-      [options]="formerOptions()"
-      [value]="former() ? 'former' : ''"
-      (valueChange)="setFormer($event)"
-      [text]="'gremien.members.former' | t"
-      [active]="former()"
-      [icon]="former() ? 'check' : null"
-      [chevron]="!former()"
-    />
-    @if (!phone()) {
-      <app-button
-        variant="text"
-        [iconOnly]="true"
-        [ariaLabel]="'gremien.members.export' | t"
-        [disabled]="loading() || !groups().length"
-        (click)="exportCsv()"
-      ><app-icon name="download" [size]="20" /></app-button>
-    }
+    <div class="gmb__chips" role="group" [attr.aria-label]="'gremien.filters' | t">
+      <app-filter-select
+        [label]="'gremien.members.role' | t"
+        [options]="roleOptions()"
+        [value]="role()"
+        (valueChange)="role.set($event)"
+        [text]="roleText()"
+        [active]="role() !== ''"
+        [icon]="role() ? 'check' : null"
+        [chevron]="!role()"
+      />
+      <app-filter-select
+        [label]="'gremien.members.former' | t"
+        [options]="formerOptions()"
+        [value]="former() ? 'former' : ''"
+        (valueChange)="setFormer($event)"
+        [text]="'gremien.members.former' | t"
+        [active]="former()"
+        [icon]="former() ? 'check' : null"
+        [chevron]="!former()"
+      />
+      @if (!phone()) {
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'gremien.members.export' | t"
+          [disabled]="loading() || !groups().length"
+          (click)="exportCsv()"
+        ><app-icon name="download" [size]="20" /></app-button>
+      }
+    </div>
   </div>
-</div>
+</app-sticky-bar>
 
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />

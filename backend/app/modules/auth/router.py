@@ -85,6 +85,7 @@ def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
 async def login(
     settings: SettingsDep,
     client: Annotated[Literal["web", "pwa"], Query()] = SESSION_CLIENT_WEB,
+    return_to: Annotated[str | None, Query(alias="returnTo", max_length=2048)] = None,
 ) -> RedirectResponse:
     """Redirect to the IdP with the auth code flow and PKCE.
 
@@ -96,6 +97,10 @@ async def login(
     then gets the lifetime of the app (`login_settings.pwa_session_days`), else that
     of a browser tab. The value only selects a lifetime; both stay bounded by the
     admin settings and the check at the IdP.
+
+    `returnTo` is the path of the app where the login started. The callback sends the
+    browser back there. A value that is not a same-origin path of the app
+    (`sessions.safe_return_to`) is dropped, and the callback goes to the home page.
     """
     if not settings.oidc_enabled:
         raise NotFoundError("OIDC is not configured.")
@@ -111,7 +116,14 @@ async def login(
     response = RedirectResponse(url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     response.set_cookie(
         settings.oidc_tx_cookie_name,
-        sessions.issue_oidc_tx(settings.session_secret, state, verifier, nonce, client),
+        sessions.issue_oidc_tx(
+            settings.session_secret,
+            state,
+            verifier,
+            nonce,
+            client,
+            sessions.safe_return_to(return_to),
+        ),
         max_age=_TX_MAX_AGE,
         **_cookie_kwargs(settings),  # type: ignore[arg-type]
     )
@@ -174,8 +186,11 @@ async def callback(
     await db.commit()
 
     # If an OAuth AS login is in flight (MCP, ap_oauth_tx set), go to the code-mint
-    # step instead of the app home. The target stays same-origin, so no open redirect.
+    # step instead of the app home. Else go back to the page where the login started.
+    # Both targets stay same-origin, so no open redirect.
     dest = settings.public_base_url
+    if tx.get("return_to"):
+        dest = settings.public_base_url.rstrip("/") + tx["return_to"]
     if request.cookies.get(settings.oauth_tx_cookie_name):
         dest = settings.public_base_url.rstrip("/") + "/api/oauth/finish"
     days = session_days(await load_login_settings(db), tx["client"])
@@ -291,7 +306,15 @@ async def me(
         gremium_permissions=await _gremium_permissions(db, principal),
         has_scoped_budget_view=await _has_scoped_budget_view(db, principal.sub),
         in_substitute_pool=await _in_substitute_pool(db, principal.sub),
+        has_reported_tickets=await _has_reported_tickets(db, principal.sub),
     )
+
+
+async def _has_reported_tickets(db: DbSession, sub: str) -> bool:
+    """Tell if `sub` reported a ticket that is not anonymized (the tab "Tickets")."""
+    from app.modules.tickets.service import has_reported_tickets
+
+    return await has_reported_tickets(db, sub)
 
 
 async def _in_substitute_pool(db: DbSession, sub: str) -> bool:

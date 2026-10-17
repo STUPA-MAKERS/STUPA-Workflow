@@ -67,9 +67,9 @@ describe('TransitionDetailComponent', () => {
         },
       ],
     });
-    // The label appears in the add-select option and as the card title.
-    expect(screen.getAllByText('Webhook auslösen').length).toBeGreaterThanOrEqual(2);
-    expect(screen.getAllByText('Zur nächsten Sitzung').length).toBeGreaterThanOrEqual(2);
+    // The label is the card title; the closed add field renders no options.
+    expect(screen.getAllByText('Webhook auslösen').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Zur nächsten Sitzung').length).toBeGreaterThanOrEqual(1);
     expect(c.actionParam({ type: 'assignBudget', budgetId: 'b1' }, 'budgetId')).toBe('b1');
     expect(c.actionParam({ type: 'assignBudget' }, 'budgetId')).toBe('');
     expect(c.recipientsOf({ type: 'notify' })).toEqual([]);
@@ -154,7 +154,6 @@ describe('TransitionDetailComponent', () => {
       },
       { budgetTree: TREE },
     );
-    expect(screen.getByText('Leer = Gremium der Abstimmung.')).toBeInTheDocument();
     // The pickers show the path key and the name, an unknown id shows no id.
     expect(screen.getAllByText('VSM · Studierendenschaft')).toHaveLength(2);
     expect(screen.getByText('Unbekannte Kostenstelle')).toBeInTheDocument();

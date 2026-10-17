@@ -14,7 +14,9 @@ import { filter } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, IsoDateTime, Uuid } from '@core/api/models';
+import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
 import { IconComponent } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
@@ -25,12 +27,42 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { flowColorKind, type StatusKind } from '@shared/status-kind.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
+import {
+  FilterSelectComponent,
+  type FilterSelectOption,
+} from '@shared/ui/filter-select/filter-select.component';
+import { NO_FILTER, dueInfo, isoDay, matchesFilter, type DueTone, type Translate } from '../../features/todos/todos.util';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { ApplicationsPageService } from '../applications/applications-page.service';
 import { groupByMonth, type MonthGroup } from '../applications/applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 
 const DAY_MS = 86_400_000;
+
+/** "Anzeigen": both groups, or one of them. */
+export type TasksShow = 'all' | 'applications' | 'todos';
+/** "Fällig" over the To-Dos. */
+export type TasksDue = '' | 'overdue' | 'week' | 'none';
+
+const SHOW_TEXT: Record<TasksShow, TranslationKey> = {
+  all: 'tasks.show.all',
+  applications: 'tasks.show.applications',
+  todos: 'tasks.show.todos',
+};
+
+const DUE_TEXT: Record<TasksDue, TranslationKey> = {
+  '': 'todos.filter.due',
+  overdue: 'todos.filter.overdue',
+  week: 'todos.filter.week',
+  none: 'todos.filter.noDate',
+};
+
+/** One To-Do as the template shows it. */
+interface TodoRow {
+  item: TodoMineItem;
+  due: string | null;
+  tone: DueTone;
+}
 
 /** One row as the template shows it. */
 interface TaskRow {
@@ -61,6 +93,12 @@ interface TaskRow {
  * When the detail changes the open application (a transition, for example), the list
  * loads again. If the application is no longer a task, the page opens the next task, or
  * the empty state when no task is left.
+ *
+ * Below the applications the group "To-Dos" lists the open cards assigned to the user
+ * over all boards (`GET /todos/mine`, by due date, frames 10 and 15). A card opens as
+ * `/tasks/todo/:cardId` with the card detail in the right pane. While To-Dos exist, the
+ * groups carry headings with their counts and the chips "Anzeigen" and "Fällig" filter
+ * them; without To-Dos the page looks as before.
  */
 @Component({
   selector: 'app-tasks',
@@ -77,6 +115,7 @@ interface TaskRow {
     SkeletonComponent,
     StatusTextComponent,
     ScrollFadeDirective,
+    FilterSelectComponent,
   ],
   providers: [ApplicationsPageService],
   host: { '[class.pane-page]': 'split()' },
@@ -90,6 +129,7 @@ export class TasksComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly page = inject(ApplicationsPageService);
   private readonly frame = inject(PageFrameService);
+  private readonly todosApi = inject(TodosApiService);
 
   readonly tasks = signal<ApplicationListItem[]>([]);
   readonly loading = signal(true);
@@ -110,6 +150,49 @@ export class TasksComponent implements OnDestroy {
 
   /** The id of the application in the detail pane, from the child route. */
   readonly selectedId = signal<Uuid | null>(null);
+  /** The id of the To-Do in the detail pane (`/tasks/todo/:cardId`). */
+  readonly selectedTodo = signal<Uuid | null>(null);
+  readonly detailOpen = computed(() => this.selectedId() !== null || this.selectedTodo() !== null);
+
+  /** The open cards assigned to me; a failed request leaves the group out. */
+  readonly todos = signal<TodoMineItem[]>([]);
+  private todoSeq = 0;
+  readonly show = signal<TasksShow>('all');
+  readonly due = signal<TasksDue>('');
+  readonly hasTodos = computed(() => this.todos().length > 0);
+  /** Without open to-dos the filter is hidden, so it must not hide the applications. */
+  readonly showApplications = computed(() => !this.hasTodos() || this.show() !== 'todos');
+  readonly showTodos = computed(() => this.hasTodos() && this.show() !== 'applications');
+
+  readonly todoRows = computed<TodoRow[]>(() => {
+    const today = isoDay(new Date(Date.now()));
+    const f = { ...NO_FILTER, due: this.due() };
+    const ctx = { today, mine: new Set<Uuid>(), labels: new Map() };
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    return this.todos()
+      .filter((item) => matchesFilter(item, f, ctx))
+      .map((item) => {
+        if (!item.dueDate) return { item, due: null, tone: 'normal' as DueTone };
+        const info = dueInfo(item.dueDate, today, this.i18n.formatLocale(), t);
+        return { item, due: info.note ? `${info.date} · ${info.note}` : info.date, tone: info.tone };
+      });
+  });
+
+  readonly showOptions = computed<FilterSelectOption[]>(() => [
+    { value: 'all', label: this.i18n.translate('tasks.show.all') },
+    { value: 'applications', label: this.i18n.translate('tasks.show.applications') },
+    { value: 'todos', label: this.i18n.translate('tasks.show.todos') },
+  ]);
+  readonly showText = computed(
+    () => `${this.i18n.translate('tasks.show.label')}: ${this.i18n.translate(SHOW_TEXT[this.show()])}`,
+  );
+  readonly dueOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('todos.filter.all') },
+    { value: 'overdue', label: this.i18n.translate('todos.filter.overdue') },
+    { value: 'week', label: this.i18n.translate('todos.filter.week') },
+    { value: 'none', label: this.i18n.translate('todos.filter.noDate') },
+  ]);
+  readonly dueText = computed(() => this.i18n.translate(DUE_TEXT[this.due()]));
 
   readonly rows = computed<TaskRow[]>(() =>
     this.tasks().map((item) => ({
@@ -124,9 +207,16 @@ export class TasksComponent implements OnDestroy {
     })),
   );
 
-  /** The rows by month of submission, like the applications list. */
+  /**
+   * The rows by month of submission, like the applications list. Beside the to-dos the
+   * group "Anträge" has no month headings, so its rows are one list: as one row group per
+   * month, the groups met without the gap of the rows and with round corners between
+   * them.
+   */
   readonly groups = computed<MonthGroup<TaskRow>[]>(() =>
-    groupByMonth(this.rows(), this.i18n.locale()),
+    this.hasTodos()
+      ? [{ key: 'all', label: '', items: this.rows() }]
+      : groupByMonth(this.rows(), this.i18n.locale()),
   );
 
   constructor() {
@@ -136,6 +226,7 @@ export class TasksComponent implements OnDestroy {
       error: () => this.types.set([]),
     });
     this.load();
+    this.loadTodos();
 
     // The open application comes from the child route (`/tasks/:id`).
     this.readSelection();
@@ -165,6 +256,27 @@ export class TasksComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.frame.fill.set(false);
+  }
+
+  setShow(value: string): void {
+    this.show.set(value === 'applications' || value === 'todos' ? value : 'all');
+  }
+
+  setDue(value: string): void {
+    this.due.set((['overdue', 'week', 'none'] as const).find((d) => d === value) ?? '');
+  }
+
+  /** Read the To-Dos again (the pane changed or archived one). */
+  loadTodos(): void {
+    const seq = ++this.todoSeq;
+    this.todosApi.mine().subscribe({
+      next: (m) => {
+        if (seq === this.todoSeq) this.todos.set(m.items);
+      },
+      error: () => {
+        if (seq === this.todoSeq) this.todos.set([]);
+      },
+    });
   }
 
   /** Application title (system title field) with fallback. */
@@ -225,7 +337,9 @@ export class TasksComponent implements OnDestroy {
   }
 
   private readSelection(): void {
-    this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
+    const child = this.route.snapshot.firstChild?.paramMap;
+    this.selectedId.set(child?.get('id') ?? null);
+    this.selectedTodo.set(child?.get('cardId') ?? null);
   }
 
   /**

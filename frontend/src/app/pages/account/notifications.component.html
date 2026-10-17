@@ -2,7 +2,6 @@
   <app-page-header
     [flush]="true"
     [title]="'account.notifications.title' | t"
-    [subtitle]="'account.notifications.intro' | t"
   />
 
   @if (error(); as e) {
@@ -16,12 +15,7 @@
       @for (p of rows(); track p.kind) {
         <li class="nt__row">
           <app-switch [checked]="p.enabled" (checkedChange)="toggle(p.kind, $event)">
-            <span class="nt__text">
-              <span class="nt__label">{{ kindLabel(p.kind) }}</span>
-              @if (kindHint(p.kind); as hint) {
-                <span class="nt__hint">{{ hint }}</span>
-              }
-            </span>
+            <span class="nt__label">{{ kindLabel(p.kind) }}</span>
           </app-switch>
         </li>
       }

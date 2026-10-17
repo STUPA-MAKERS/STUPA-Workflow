@@ -32,8 +32,6 @@ export class PublicJoinSettingsComponent {
   readonly quorumPercent = input<number | null>(null);
   /** The join link of an existing meeting, or `null` (create dialog, not loaded yet). */
   readonly link = input<JoinLink | null>(null);
-  /** The create dialog: the link exists only after the create. */
-  readonly creating = input(false);
   readonly rotating = input(false);
   readonly rotate = output<void>();
 

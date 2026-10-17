@@ -97,7 +97,11 @@ describe('ShareLinksDialogComponent', () => {
     // The whole link shows as text that wraps; nothing cuts it with an ellipsis.
     const link = screen.getByText('https://x.example/s/token-abc');
     expect(link.tagName).toBe('CODE');
-    expect(link.parentElement).toHaveTextContent('Öffentlicher Link: https://x.example/s/token-abc');
+    const anchor = link.closest('a');
+    expect(anchor).toHaveAttribute('href', 'https://x.example/s/token-abc');
+    expect(anchor).toHaveAttribute('target', '_blank');
+    expect(anchor).toHaveAttribute('rel', 'noopener');
+    expect(anchor?.parentElement).toHaveTextContent('Öffentlicher Link: https://x.example/s/token-abc');
   });
 
   it('sends the chosen lifetime and drops an empty note', async () => {

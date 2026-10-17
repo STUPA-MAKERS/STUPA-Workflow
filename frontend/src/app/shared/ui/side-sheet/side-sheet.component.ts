@@ -47,7 +47,8 @@ const NO_DRAG = 'button, a, input, select, textarea';
  *
  * It is a modal dialog: the focus moves into the sheet when it opens and comes back to
  * where it was when it closes, Tab stays inside, Escape and a click on the scrim close
- * it, and the page behind does not scroll.
+ * it, and the page behind does not scroll. A dialog inside the sheet keeps its own
+ * Escape and Tab: the sheet ignores keys that start in it.
  *
  * `open` is two-way: `[(open)]="attendanceOpen"`. `closed` fires when the sheet closes
  * itself (Escape, the scrim, the close button).
@@ -156,7 +157,11 @@ export class SideSheetComponent {
   }
 
   protected onKey(event: KeyboardEvent): void {
+    // A dialog inside the sheet (the delete question of the chat, "Neues To-Do") handles
+    // its own Escape and Tab, and so does a field that already took the Escape.
+    if ((event.target as Element).closest('[role="dialog"]') !== event.currentTarget) return;
     if (event.key === 'Escape') {
+      if (event.defaultPrevented) return;
       event.preventDefault();
       event.stopPropagation();
       this.close();

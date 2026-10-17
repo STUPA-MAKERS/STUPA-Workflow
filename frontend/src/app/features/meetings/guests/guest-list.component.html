@@ -5,10 +5,10 @@
         <app-avatar [name]="row.name" size="sm" [decorative]="true" />
         <div class="g__names">
           <span class="g__nameLine">
-            <span class="g__name ell" [title]="row.name">{{ row.name }}</span>
+            <span class="g__name ell" [appTruncated]="row.name" #cut="appTruncated" [attr.title]="cut.truncated() ? row.name : null">{{ row.name }}</span>
             <span class="g__tag">{{ 'guests.tag' | t }}</span>
           </span>
-          <span class="g__sub ell" [title]="row.sub">{{ row.sub }}</span>
+          <span class="g__sub ell" [appTruncated]="row.sub" #cut2="appTruncated" [attr.title]="cut2.truncated() ? row.sub : null">{{ row.sub }}</span>
         </div>
       </div>
       <div class="g__ctl">
@@ -52,7 +52,6 @@
   [closeLabel]="'action.cancel' | t"
   (closed)="removing.set(null)"
 >
-  <p class="g__explain">{{ 'guests.list.removeHint' | t }}</p>
   <app-button dialog-footer variant="text" (click)="removing.set(null)">{{ 'action.cancel' | t }}</app-button>
   <app-button dialog-footer variant="danger" (click)="confirmRemove()">{{ 'guests.list.remove' | t }}</app-button>
 </app-dialog>

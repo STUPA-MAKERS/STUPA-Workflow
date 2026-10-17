@@ -1,0 +1,159 @@
+:host {
+  display: block;
+}
+
+.ht {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.ht__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+}
+
+.ht__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.ht__secTitle {
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+
+/* The switches share one rounded box, one row each (frame 25). */
+.ht__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  border-radius: var(--radius-field);
+}
+.ht__row {
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-2);
+  justify-content: center;
+}
+.ht__row--split {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+.ht__label {
+  flex: 1 1 12rem;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+}
+
+/* "Gesperrte Absender": the rows of the switch box, a name and a quiet line each. */
+.ht__blocks,
+.ht__skelBlocks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ht__block {
+  display: flex;
+  flex: 1 1 14rem;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ht__block .ht__label {
+  flex: none;
+  overflow-wrap: anywhere;
+}
+/* Items with a dot between two of them, also after a wrap. Every part draws its dot in
+   the --ht-sep strip before it. The list starts --ht-sep before the clip edge, so the dot
+   of a part that starts a line (also the first part) is clipped: no line starts or ends
+   with a dot. */
+.ht__meta {
+  --ht-sep: 16px;
+  min-width: 0;
+  overflow-x: clip;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ht__parts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-inline-start: calc(-1 * var(--ht-sep));
+  min-width: 0;
+}
+.ht__part {
+  min-width: 0;
+}
+.ht__part::before {
+  display: inline-block;
+  width: var(--ht-sep);
+  color: var(--color-text-subtle);
+  text-align: center;
+  content: '·';
+  content: '·' / '';
+}
+.ht__link {
+  color: var(--color-accent-text);
+}
+.ht__empty {
+  margin: 0;
+  padding: 0 var(--space-1);
+  color: var(--color-text-muted);
+}
+
+/* ------------------------------------------------------------------ loading */
+/* A filled field with its label inside (56px), as `app-input` draws it. */
+.ht__skelField {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-height: var(--field-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-field);
+  background: var(--color-surface-sunken);
+}
+.ht__skelFieldLabel {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+.ht__skelFieldValue {
+  line-height: var(--lh-body);
+}
+.ht__skelFieldValue .skel-text {
+  width: 22rem;
+}
+/* The track of `app-switch`. */
+.ht__skelSwitch {
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+}
+.ht__skelName {
+  width: 14rem;
+}
+.ht__skelMeta {
+  width: 18rem;
+}
+.ht__skelButton {
+  width: 6.5rem;
+  height: var(--control-height);
+  border-radius: 999px;
+}
+.ht__skelButton--text {
+  width: 6rem;
+}
+.ht__skelButton--sm {
+  width: 6.5rem;
+  height: var(--control-height-sm);
+}

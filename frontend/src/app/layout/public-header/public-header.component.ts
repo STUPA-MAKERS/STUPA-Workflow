@@ -6,11 +6,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ThemeService } from '@core/theme/theme.service';
 import { IconComponent } from '@stupa-makers/ui-kit';
+import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
 
 /**
  * The top bar of the public frame (landing page, apply wizard, status page, magic link,
- * 404 while signed out): the wordmark, the language, the appearance and "Anmelden".
+ * 404 while signed out): the wordmark, the help menu, the language, the appearance and
+ * "Anmelden".
  *
  * A signed-out visitor has no account menu, so language and appearance stay in the bar.
  */
@@ -18,7 +20,7 @@ import { LanguageSelectComponent } from '../language-select/language-select.comp
   selector: 'app-public-header',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, TranslatePipe, IconComponent, LanguageSelectComponent],
+  imports: [RouterLink, TranslatePipe, IconComponent, HelpMenuComponent, LanguageSelectComponent],
   templateUrl: './public-header.component.html',
   styleUrl: './public-header.component.scss',
 })

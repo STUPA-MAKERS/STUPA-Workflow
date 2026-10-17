@@ -108,16 +108,24 @@
 //   safe area in the installed app). Work pages have no footer (route data `footer`).
 // - A large sheet with round corners in a pane page must clip what scrolls in it: the
 //   rounded element is the scroll container, or an `overflow: hidden` parent of it.
-// - A dialog or a side sheet of the page is an overlay. Closed, it is empty, but as a
-//   flex item it would still take the gap of the host. `display: contents` gives it no
-//   box of its own.
+// - A side sheet of the page is an overlay. Closed, it is empty, but as a flex item it
+//   would still take the gap of the host. `display: contents` gives it no box of its own.
+//   A dialog has no box anywhere (see `app-dialog` below).
 .pane-page {
   flex: 1 1 0;
   min-height: 0;
   margin-bottom: calc(var(--pane-foot-gap, 0px) - var(--main-pad-bottom, 0px));
 }
-.pane-page > app-dialog,
 .pane-page > app-side-sheet {
+  display: contents;
+}
+
+// A dialog is an overlay: its backdrop is fixed. Open or closed, the `app-dialog` host adds
+// no box, so it takes no gap and no track in the flex column or grid of the page that holds
+// it. With a box, an open dialog in a flex column moves everything after it by one gap (the
+// meeting dock rose by 24px while "TOP hinzufügen" was open). Global, because the dialog of
+// the UI kit sets no display on its host.
+app-dialog {
   display: contents;
 }
 
@@ -201,11 +209,19 @@
    Always pair a placeholder with a `role="status"` message for a screen reader: the
    blocks themselves are decorative and hidden from the accessibility tree.
    --------------------------------------------------------------------------- */
+/* The block takes the fill and the slow sweep of `.skel-text` below, not a pulse: many
+   blocks that blink together make the whole page flicker. */
 .skel {
   display: block;
   border-radius: var(--radius-sm, 4px);
-  background: var(--color-surface-sunken);
-  animation: skel-pulse 1.4s var(--ease-standard, ease) infinite;
+  --skel-fill: color-mix(in srgb, var(--color-text) 9%, transparent);
+  --skel-shine: color-mix(in srgb, var(--color-text) 5%, transparent);
+  background-color: var(--skel-fill);
+  background-image: linear-gradient(90deg, transparent 0, var(--skel-shine) 50%, transparent 100%);
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  background-position: -100% 0;
+  animation: skel-sweep 1.8s var(--ease-standard, ease) infinite;
 }
 .skel--line {
   height: 0.75rem;
@@ -229,15 +245,6 @@ td:first-child > .skel--bar {
   border: var(--border-width) solid var(--color-border);
   background: var(--color-surface);
 }
-@keyframes skel-pulse {
-  0%,
-  100% {
-    opacity: 0.5;
-  }
-  50% {
-    opacity: 1;
-  }
-}
 @media (prefers-reduced-motion: reduce) {
   .skel {
     animation: none;
@@ -257,6 +264,7 @@ td:first-child > .skel--bar {
    - `.skel-stale`: on content that is reloading. It stays as it is for 300ms, then
      dims; it never moves. Pair it with `inert` and `aria-busy`.
    - `.skel-progress`: a thin bar at the top of a reloading area, also after 300ms.
+     `.skel-progress--foot` puts it on the lower edge (under a sticky filter bar).
    No pulse: one slow, faint sweep, which stops under reduced motion.
    --------------------------------------------------------------------------- */
 .skel-text,
@@ -340,6 +348,11 @@ td:first-child > .skel--bar {
   to {
     left: 100%;
   }
+}
+/* The bar on the lower edge of its area: under the search and the chips of a list pane. */
+.skel-progress--foot {
+  top: auto;
+  bottom: 0;
 }
 @media (prefers-reduced-motion: reduce) {
   .skel-text,

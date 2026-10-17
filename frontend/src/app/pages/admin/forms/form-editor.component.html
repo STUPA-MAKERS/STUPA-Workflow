@@ -72,14 +72,20 @@
                     @case ('textarea') { <textarea class="fe__pv-control" rows="3" disabled></textarea> }
                     @case ('checkbox') { <input type="checkbox" disabled /> }
                     @case ('select') {
-                      <select class="fe__pv-control" disabled>
-                        @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
-                      </select>
+                      <app-select
+                        class="fe__pv-select"
+                        [disabled]="true"
+                        [ariaLabel]="resolved(field.label) || ('admin.forms.untitledQuestion' | t)"
+                        [placeholder]="'formly.select.placeholder' | t"
+                      />
                     }
                     @case ('multiselect') {
-                      <select class="fe__pv-control" multiple disabled>
-                        @for (o of field.options ?? []; track $index) { <option>{{ resolved(o.label) || o.value }}</option> }
-                      </select>
+                      <app-select
+                        class="fe__pv-select"
+                        [disabled]="true"
+                        [ariaLabel]="resolved(field.label) || ('admin.forms.untitledQuestion' | t)"
+                        [placeholder]="'formly.select.placeholder' | t"
+                      />
                     }
                     @case ('date') { <input class="fe__pv-control" type="date" disabled /> }
                     @case ('number') { <input class="fe__pv-control" type="number" disabled /> }
@@ -281,7 +287,6 @@
                 @if (isPositions(field.type)) {
                   <fieldset class="fe__sub fe__panel">
                     <legend class="cap fe__cap">{{ 'admin.form.positions' | t }}</legend>
-                    <p class="fe__hint">{{ 'admin.form.positionsHint' | t }}</p>
                     <div class="fe__pair">
                       <app-input
                         type="number"
@@ -301,7 +306,6 @@
                     <app-checkbox
                       [ngModel]="field.validation?.allowNoOffers !== false"
                       (ngModelChange)="setAllowNoOffers(pos, $event)"
-                      [hint]="'admin.form.allowNoOffersHint' | t"
                     >{{ 'admin.form.allowNoOffers' | t }}</app-checkbox>
                   </fieldset>
                 }
@@ -329,8 +333,6 @@
                       <app-checkbox [(ngModel)]="field.isPII" (ngModelChange)="touch()">{{ 'admin.form.isPII' | t }}</app-checkbox>
                       @if (isNumeric(field.type)) {
                         <app-checkbox [ngModel]="field.isPromoted" (ngModelChange)="onPromotedToggle(pos, $event)">{{ 'admin.form.isPromoted' | t }}</app-checkbox>
-                      } @else if (isPositions(field.type)) {
-                        <span class="fe__hint">{{ 'admin.form.autoPromoted' | t }}</span>
                       }
                     </div>
                     @if (isNumeric(field.type) && field.isPromoted) {
@@ -397,12 +399,10 @@
           <app-checkbox
             [ngModel]="hasBudget()"
             (ngModelChange)="hasBudget.set($event)"
-            [hint]="'admin.forms.hasBudgetHint' | t"
           >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
           <app-checkbox
             [ngModel]="cmpRequired()"
             (ngModelChange)="cmpRequired.set($event)"
-            [hint]="'admin.forms.cmpRequiredHint' | t"
           >{{ 'admin.forms.cmpRequired' | t }}</app-checkbox>
           @if (cmpRequired()) {
             <app-input

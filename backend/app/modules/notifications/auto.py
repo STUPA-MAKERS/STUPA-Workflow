@@ -21,6 +21,7 @@ from dataclasses import dataclass
 from sqlalchemy import select
 
 from app.db import get_sessionmaker
+from app.modules.notifications.links import meeting_link
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.service import NotificationService
 from app.settings import Settings
@@ -90,6 +91,7 @@ class DelegationMailInfo:
     gremium_name: str | None
     delegator_name: str | None
     voting: bool
+    meeting_id: uuid.UUID | None = None
 
 
 async def meeting_delegation_mail_info(
@@ -118,6 +120,7 @@ async def meeting_delegation_mail_info(
                     delegator.c.display_name,
                     delegator.c.email,
                     MeetingDelegation.delegate_voting,
+                    Meeting.id,
                 )
                 .join(
                     Principal,
@@ -142,7 +145,7 @@ async def meeting_delegation_mail_info(
         return None
     if row is None:
         return None
-    email, title, date, gremium_name, d_name, d_email, voting = row
+    email, title, date, gremium_name, d_name, d_email, voting, meeting_id = row
     return DelegationMailInfo(
         delegation_id=delegation_id,
         email=email,
@@ -151,6 +154,7 @@ async def meeting_delegation_mail_info(
         gremium_name=gremium_name,
         delegator_name=d_name or d_email,
         voting=bool(voting),
+        meeting_id=meeting_id,
     )
 
 
@@ -216,6 +220,7 @@ class AutoMailer:
                     "gremiumName": gremium_name or "",
                 },
                 idempotency_parts=("meeting_created", str(meeting.id)),
+                link=meeting_link(settings, meeting.id),
             )
 
     async def _delegation_changed(
@@ -258,6 +263,9 @@ class AutoMailer:
                     template_key,
                     str(info.delegation_id),
                 ),
+                link=meeting_link(settings, info.meeting_id)
+                if info.meeting_id is not None
+                else None,
             )
 
 

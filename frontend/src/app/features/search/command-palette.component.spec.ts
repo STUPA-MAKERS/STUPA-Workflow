@@ -59,6 +59,15 @@ function pressInField(key: string, init: KeyboardEventInit = {}): KeyboardEvent 
   return event;
 }
 
+/** The title of a hit row. Its text is split into highlight spans, so match the whole row title. */
+function rowTitle(text: string): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLElement>('.pal__rowTitle')].find(
+      (el) => el.textContent?.replace(/\s+/g, ' ').trim() === text,
+    ) ?? null
+  );
+}
+
 /** Let the 180ms debounce elapse and answer the request it produced. */
 async function answer(http: HttpTestingController, body: SearchResults = HITS) {
   jest.advanceTimersByTime(200);
@@ -153,7 +162,7 @@ describe('CommandPaletteComponent', () => {
     await answer(http);
     fixture.detectChanges();
 
-    expect(screen.getByTitle('Anschaffung Beamer')).toBeInTheDocument();
+    expect(rowTitle('Anschaffung Beamer')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('Anträge')).toBeInTheDocument();
   });
@@ -184,11 +193,11 @@ describe('CommandPaletteComponent', () => {
     cmp.onQuery('Beamer');
     await answer(http);
     fixture.detectChanges();
-    expect(screen.getByTitle('Anschaffung Beamer')).toBeInTheDocument();
+    expect(rowTitle('Anschaffung Beamer')).toBeInTheDocument();
 
     cmp.onQuery('B');
     fixture.detectChanges();
-    expect(screen.queryByTitle('Anschaffung Beamer')).not.toBeInTheDocument();
+    expect(rowTitle('Anschaffung Beamer')).toBeNull();
   });
 
   it('moves the highlight with the arrow keys and opens the row on Enter', async () => {

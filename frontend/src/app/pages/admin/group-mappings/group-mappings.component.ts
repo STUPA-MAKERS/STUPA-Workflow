@@ -13,10 +13,10 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  SelectComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import type {
   Gremium,
@@ -26,6 +26,7 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
+import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -89,6 +90,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TruncatedDirective,
     FormsModule,
     RouterLink,
     TranslatePipe,
@@ -96,7 +98,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
     SkeletonComponent,
     ButtonComponent,
     InputComponent,
-    SelectComponent,
+    SelectFieldComponent,
     DialogComponent,
     IconComponent,
   ],
@@ -323,7 +325,7 @@ export class GroupMappingsComponent {
   /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.add`. */
   protected key(
     kind: MappingKind,
-    suffix: 'title' | 'hint' | 'add' | 'empty' | 'editTitle' | 'deleteBody',
+    suffix: 'title' | 'add' | 'empty' | 'editTitle' | 'deleteBody',
   ): TranslationKey {
     return `admin.groupMappings.${kind}.${suffix}` as TranslationKey;
   }

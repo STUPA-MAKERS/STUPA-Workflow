@@ -127,7 +127,6 @@ describe('guests in the attendance sheet (#17, variant A)', () => {
 
     await userEvent.click(within(sheet()).getByRole('button', { name: 'Aktionen für Malte K.' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Gast entfernen' }));
-    expect(screen.getByText(/kann danach nicht mehr abstimmen/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Gast entfernen' }));
     expect(api.decideMeetingGuest).toHaveBeenCalledWith('m-1', 'g-3', 'remove');
   });

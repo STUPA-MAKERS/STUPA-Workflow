@@ -140,9 +140,7 @@ class Settings(BaseSettings):
     @property
     def bootstrap_admin_email_set(self) -> set[str]:
         """Emails from `BOOTSTRAP_ADMIN_EMAILS` (comma-separated, trimmed, lowercased)."""
-        return {
-            e.strip().lower() for e in self.bootstrap_admin_emails.split(",") if e.strip()
-        }
+        return {e.strip().lower() for e in self.bootstrap_admin_emails.split(",") if e.strip()}
 
     # Session and applicant cookie (HttpOnly + Secure + SameSite=Lax).
     session_cookie_name: str = "ap_session"
@@ -346,6 +344,11 @@ class Settings(BaseSettings):
     # only a mail address or a token, so the bound stays tight. A larger body gets 413.
     max_auth_payload_bytes: int = 8192
 
+    # Body cap of the ticket report (POST /tickets, anti-DoS). A report holds a title,
+    # a Markdown body of at most 10000 characters and a small context. A larger body
+    # gets 413.
+    max_ticket_payload_bytes: int = 65536
+
     # Altcha proof-of-work. Without a secret the verification is off (dev/test), and
     # the field only passes through. The Altcha sidecar shares this secret
     # (deploy/.env: ALTCHA_HMAC_SECRET).
@@ -359,6 +362,12 @@ class Settings(BaseSettings):
     rl_magic_link_mail_per_hour: int = 3
     rl_magic_link_verify_ip_per_hour: int = 20
     rl_applications_ip_per_hour: int = 10
+    # POST /tickets: reports per hour per IP. A session counts too, because a campus NAT
+    # rarely sends ten reports an hour; an OAuth token is exempt.
+    rl_tickets_ip_per_hour: int = 10
+    # POST /tickets/mine/{id}/notes: messages per hour per reporter account. Each one
+    # mails the team, so a flood of messages must not become a flood of mails.
+    rl_ticket_messages_per_hour: int = 60
     rl_attachments_per_hour: int = 30  # POST /attachments: 30 per hour per applicant
     # Default limit on all writing endpoints. It keys on the IP and stays generous. It
     # catches an endpoint without its own stricter limit (defense in depth).
@@ -414,9 +423,7 @@ class Settings(BaseSettings):
                 contains "*".
         """
         if self.environment == "production" and "*" in self.forwarded_allow_ips:
-            raise ValueError(
-                'FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).'
-            )
+            raise ValueError('FORWARDED_ALLOW_IPS must not be "*" in production (security.md §3).')
         return self
 
     @property
@@ -492,9 +499,7 @@ def load_settings(**overrides: Any) -> Settings:
         return Settings(**overrides)
     except ValidationError as exc:
         missing = [
-            ".".join(str(p) for p in err["loc"])
-            for err in exc.errors()
-            if err["type"] == "missing"
+            ".".join(str(p) for p in err["loc"]) for err in exc.errors() if err["type"] == "missing"
         ]
         if missing:
             raise SettingsError(

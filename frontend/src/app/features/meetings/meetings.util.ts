@@ -51,6 +51,48 @@ export function voteSnippetHead(vote: MeetingVote): string {
 }
 
 /**
+ * The ids of the closed votes whose callout is in `body`. Two votes can share a
+ * question, and then they share the head line, so a head line counts for one vote only.
+ * A callout whose whole text equals the snippet of a vote belongs to that vote first.
+ * The other head lines go to the remaining votes in the given order (oldest first). The
+ * backend matches the same way in `votes_in_body`.
+ */
+export function votesInText(body: string, votes: readonly MeetingVote[]): Set<string> {
+  const closed = votes.filter((v) => v.status === 'closed');
+  const heads = new Map<string, number>();
+  for (const line of body.split('\n')) {
+    const key = line.trim();
+    heads.set(key, (heads.get(key) ?? 0) + 1);
+  }
+  const exact = new Map<string, number>();
+  const found = new Set<string>();
+  const take = (vote: MeetingVote): void => {
+    const head = voteSnippetHead(vote);
+    heads.set(head, (heads.get(head) ?? 0) - 1);
+    found.add(vote.id);
+  };
+  for (const vote of closed) {
+    const snippet = voteSnippet(vote);
+    if (!exact.has(snippet)) exact.set(snippet, countOf(body, snippet));
+    const left = exact.get(snippet) ?? 0;
+    if (left > 0 && (heads.get(voteSnippetHead(vote)) ?? 0) > 0) {
+      exact.set(snippet, left - 1);
+      take(vote);
+    }
+  }
+  for (const vote of closed) {
+    if (!found.has(vote.id) && (heads.get(voteSnippetHead(vote)) ?? 0) > 0) take(vote);
+  }
+  return found;
+}
+
+function countOf(text: string, part: string): number {
+  let n = 0;
+  for (let i = text.indexOf(part); i >= 0; i = text.indexOf(part, i + part.length)) n++;
+  return n;
+}
+
+/**
  * The question in the head line of the callout. A runoff (F2) copies the question of its
  * election, so its head names the round: "Frage (2. Wahlgang)". Each round then has its
  * own head line, as in the backend `build_election_snippet`.

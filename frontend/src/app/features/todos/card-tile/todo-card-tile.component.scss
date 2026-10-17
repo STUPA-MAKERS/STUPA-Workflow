@@ -1,0 +1,173 @@
+@use '../todo-labels' as lbl;
+
+@include lbl.colors;
+
+/* A tile a step above its column: white on the grey column in the light theme, surface 3
+   on the surface 1 column in the dark theme. `--stack-ring` gives the avatar rings the
+   colour of the tile. */
+:host {
+  --tile-bg: var(--color-surface-1);
+  --tile-hover: var(--color-surface-3);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-3) var(--space-3) 10px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--tile-bg);
+  color: var(--color-text);
+  cursor: grab;
+  --stack-ring: var(--tile-bg);
+}
+:host-context([data-theme='dark']) {
+  --tile-bg: var(--color-surface-3);
+  --tile-hover: var(--color-surface-4);
+  --avatar-bg: var(--color-surface-4);
+}
+:host(:hover) {
+  --tile-bg: var(--tile-hover);
+}
+/* A tile with a long press (`appLongPress`): no text callout and no selection on touch. */
+:host(.long-press) {
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+:host(.tt--lifted) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 0;
+  box-shadow: var(--shadow-elevated);
+}
+
+.tt__labels {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.tt__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tt__dot {
+  @include lbl.dot;
+}
+
+.tt__title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--fs-md);
+  font-weight: var(--fw-medium);
+  line-height: 1.375rem;
+  text-wrap: wrap;
+}
+.tt__doneIcon {
+  flex: none;
+  margin-top: 2px;
+  color: var(--color-accent-text);
+}
+/* The title is the button; its pseudo element stretches over the whole tile. */
+.tt__open {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
+  cursor: inherit;
+}
+.tt__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.tt__open:focus-visible {
+  outline: none;
+}
+.tt__open:focus-visible::after {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+:host(.tt--done) .tt__title {
+  font-weight: var(--fw-regular);
+}
+
+.tt__link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.tt__link app-icon {
+  flex: none;
+}
+
+.tt__facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px var(--space-3);
+  min-height: 22px;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+}
+/* The column of the card in a list of the phone: the muted tag of the board rows. */
+.tt__col {
+  flex: none;
+  max-width: 10rem;
+  padding: 1px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--fw-medium);
+}
+:host-context([data-theme='dark']) .tt__col {
+  background: var(--color-surface-4);
+}
+.tt__fact {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tt__fact--muted {
+  color: var(--color-text-subtle);
+}
+.tt__fact--overdue {
+  color: var(--color-danger);
+  font-weight: var(--fw-semibold);
+}
+.tt__fact--soon {
+  color: var(--color-warning);
+  font-weight: var(--fw-semibold);
+}
+.tt__people {
+  display: inline-flex;
+  margin-inline-start: auto;
+}
+/* The people of a tile are 24px circles, a little larger than the shared extra small size. */
+.tt__people ::ng-deep .av--xs {
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.625rem;
+}
+.tt__nobody {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 50%;
+  color: var(--color-text-subtle);
+}
