@@ -496,6 +496,14 @@ async def test_manifest_uses_config_names() -> None:
     assert man["display"] == "standalone"
     assert man["id"] == "/"
     assert "icons" in man
+    assert man["theme_color"] == man["background_color"] == "#f6f7f5"
+
+
+async def test_manifest_dark_scheme_takes_the_dark_bar_colours() -> None:
+    active = _scv(1, active=True, branding=Branding().model_dump(by_alias=True))
+    db = fake_session(result(active))
+    man = await SiteConfigService(db).manifest("dark")
+    assert man["theme_color"] == man["background_color"] == "#101211"
 
 
 async def test_manifest_falls_back_to_defaults_when_blank() -> None:

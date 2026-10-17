@@ -13,6 +13,8 @@ inline SVG is not allowed. Invalid branding fails with 422.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -47,6 +49,13 @@ from app.shared.errors import ConflictError
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "STUPA"
 
+# The page background of the design system per theme (``--color-bg`` of the ui-kit
+# tokens, ``THEME_COLOR`` of the frontend ThemeService). An installed Android app paints
+# its status and navigation bar with these manifest colours, and the manifest has no
+# per-scheme variant, so the frontend links ``?scheme=dark`` while the dark theme is in
+# effect.
+MANIFEST_COLORS: dict[str, str] = {"light": "#f6f7f5", "dark": "#101211"}
+
 # The static manifest fields, that is everything except name and short_name.
 # They are the single source of truth for the PWA manifest that the API serves.
 _MANIFEST_BASE: dict = {
@@ -61,10 +70,6 @@ _MANIFEST_BASE: dict = {
     "display": "standalone",
     "scope": "./",
     "start_url": "./",
-    # The light page background of the design system. The theme-color meta tags in
-    # index.html colour the browser bars per theme; the manifest takes one value.
-    "theme_color": "#f6f7f5",
-    "background_color": "#f6f7f5",
     "icons": [
         {"src": "icons/icon-72x72.png", "sizes": "72x72", "type": "image/png", "purpose": "any"},
         {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png", "purpose": "any"},
@@ -348,17 +353,21 @@ class SiteConfigService:
         await self.session.commit()
         return _help_tickets_of(branding)
 
-    async def manifest(self) -> dict:
+    async def manifest(self, scheme: Literal["light", "dark"] = "light") -> dict:
         """Build the PWA manifest from the active branding config.
 
         ``name`` and ``short_name`` come from the config. An empty value falls
-        back to the default. All other fields are static.
+        back to the default. ``theme_color`` and ``background_color`` follow
+        ``scheme``. All other fields are static.
         """
         branding = _branding(await self._active())
+        color = MANIFEST_COLORS[scheme]
         return {
             "name": branding.app_name.strip() or DEFAULT_APP_NAME,
             "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,
             **_MANIFEST_BASE,
+            "theme_color": color,
+            "background_color": color,
         }
 
 
