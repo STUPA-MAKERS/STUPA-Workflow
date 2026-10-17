@@ -443,13 +443,15 @@ class NotificationService:
         idempotency_parts: tuple[str, ...],
         lang: str | None = None,
         link: MailLink | None = None,
+        builtin_html: dict[str, str] | None = None,
     ) -> bool:
         """Send one notification kind.
 
         The method drops the recipients that opted out. It prefers the DB template
         ``template_key`` and falls back to the builtin. It wraps the mail in the
         layout. ``link`` is the deep link to the element of the mail: the context
-        gets it as ``link``, and the mail shows it (see `links`).
+        gets it as ``link``, and the mail shows it (see `links`). ``builtin_html`` is
+        the HTML body of the builtin; without it the layout escapes the text body.
 
         Returns:
             True when the method enqueued a mail.
@@ -477,6 +479,7 @@ class NotificationService:
             rendered = render_mail(
                 subject_i18n=builtin_subject,
                 body_i18n=builtin_body,
+                body_html_i18n=builtin_html,
                 context=context,
                 lang=lang or self.settings.mail_default_lang,
                 default_lang=self.settings.mail_default_lang,

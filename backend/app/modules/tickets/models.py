@@ -122,6 +122,11 @@ class TicketNote(UUIDPkMixin, Base):
     author_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("principal.id"), nullable=True)
     body: Mapped[str] = mapped_column(Text)
     visibility: Mapped[str] = mapped_column(Text, default="internal", server_default="internal")
+    # The principal ids (as strings) of the holders of ``ticket.manage`` that the note
+    # mentions. Only a team note mentions; the reporter never sees the list.
+    mentions: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     edited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

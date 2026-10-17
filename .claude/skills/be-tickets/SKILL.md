@@ -69,6 +69,7 @@ context of the report.
   id. The reporter sees no assignee, no context, no reporter block, no to-dos; a team author
   shows by name only: no e-mail fallback of `PersonRef` and no `principalId`, because the id
   opens the Gravatar of the e-mail. `updatedAt` also moves on internal activity.
+- Mentions (`ticket_note.mentions`, migration `e7eeac24423f`): `NoteCreate.mentions` (≤ 50) and `NotePatch.mentions` (staff edit, null keeps) name holders of `ticket.manage` (the set of `GET /tickets/assignees`), else 422 `mention_not_member`. `TicketNoteOut.mentions` is `PersonRef[]`, empty for the reporter; the reporter routes take no mentions (`ReporterNoteCreate`, `NoteBody`) and the reporter edit keeps them. New mentions minus the author get `ticket_mentioned` after the commit (`get_mention_mail_sender`).
 - `POST /api/tickets/{id}/notes` takes `visibility` (`internal` default, `public`);
   `TicketNoteOut` carries `visibility` and `fromReporter`.
 - `GET /api/auth/me` carries `has_reported_tickets` (a ticket of the account that is not

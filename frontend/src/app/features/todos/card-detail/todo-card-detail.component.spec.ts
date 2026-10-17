@@ -966,8 +966,13 @@ describe('TodoCardDetailComponent', () => {
 
   it('posts, retries, edits and deletes comments, with mentions of members', async () => {
     const { cmp, api, toast, changed, commentsChanged } = await setup();
-    cmp.sendComment({ body: 'Hallo @Jonas Weber' });
-    expect(api.addComment).toHaveBeenCalledWith('k-1', 'Hallo @Jonas Weber', ['p-2'], { body: 'Hallo @Jonas Weber' });
+    cmp.sendComment({ body: 'Hallo @Jonas Weber', mentions: ['p-2'] });
+    expect(api.addComment).toHaveBeenCalledWith('k-1', 'Hallo @Jonas Weber', ['p-2'], {
+      body: 'Hallo @Jonas Weber',
+      mentions: ['p-2'],
+    });
+    // The "@" list of the chat: the members of the board with a name.
+    expect(cmp.mentionables().map((p) => p.principalId)).toContain('p-2');
     expect(cmp.card()?.comments.map((c) => c.id)).toEqual(['cm-1', 'cm-2']);
     expect(cmp.card()?.commentCount).toBe(1);
     // A comment write gives the page only the count, never the drawer's copy of the card.
@@ -986,8 +991,10 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.messages().some((m) => m.state === 'failed')).toBe(false);
 
     const sent = commentsChanged.mock.calls.length;
+    cmp.editComment({ id: 'cm-1', body: 'Geändert @Jonas Weber', mentions: ['p-2'] });
+    expect(api.editComment).toHaveBeenCalledWith('k-1', 'cm-1', 'Geändert @Jonas Weber', ['p-2']);
     cmp.editComment({ id: 'cm-1', body: 'Geändert' });
-    expect(commentsChanged).toHaveBeenCalledTimes(sent + 1);
+    expect(commentsChanged).toHaveBeenCalledTimes(sent + 2);
     expect(api.editComment).toHaveBeenCalledWith('k-1', 'cm-1', 'Geändert', []);
     expect(cmp.card()?.comments[0].body).toBe('Geändert');
     api.editComment.mockReturnValueOnce(throwError(() => new Error('x')));

@@ -44,4 +44,7 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     "todo_mentioned",
     # Reminder the day before an assigned to-do is due.
     "todo_due",
+    # The user was mentioned in a comment on an application or in a ticket note
+    # (`comment_mentioned`, `ticket_mentioned`).
+    "mention",
 )

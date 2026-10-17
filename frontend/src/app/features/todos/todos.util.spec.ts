@@ -18,7 +18,6 @@ import {
   linkTitle,
   longDay,
   matchesFilter,
-  mentionIds,
   moveRequest,
   parseDay,
   personName,
@@ -441,17 +440,6 @@ describe('todos.util', () => {
       const stupa = summary({ id: 's', kind: 'gremium', gremiumId: 'gr-stupa' });
       expect(defaultBoard([asta, fs, stupa], ['gr-stupa'])?.id).toBe('s');
       expect(defaultBoard([personal, asta, fs, stupa], ['gr-stupa'])?.id).toBe('p');
-    });
-
-    it('finds the people a comment mentions, each once', () => {
-      const members = [
-        { principalId: 'p-1', displayName: 'Selin Yıldız' },
-        { principalId: 'p-2', displayName: 'Jonas' },
-        { principalId: 'p-1', displayName: 'Selin Yıldız' },
-        { principalId: 'p-3', displayName: null },
-      ];
-      expect(mentionIds('Hallo @Selin Yıldız und @Jonas', members)).toEqual(['p-1', 'p-2']);
-      expect(mentionIds('Hallo', members)).toEqual([]);
     });
   });
 });

@@ -16,6 +16,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, JsonValue, field_va
 from app.modules.files.schemas import AttachmentOut, MessageAttachmentOut, MessageFilesIn
 from app.settings import get_settings
 from app.shared.altcha import AltchaSolutionStr
+from app.shared.mentions import MAX_MENTIONS
 from app.shared.people import PersonRef
 
 TicketKind = Literal["bug", "question", "idea"]
@@ -163,6 +164,9 @@ class TicketNoteOut(_CamelModel):
     attachments: list[MessageAttachmentOut] = Field(default_factory=list)
     visibility: NoteVisibility = "internal"
     from_reporter: bool = Field(default=False, serialization_alias="fromReporter")
+    # The mentioned holders of ``ticket.manage``, in the stored order. The view of the
+    # reporter (``/tickets/mine``) gets an empty list.
+    mentions: list[PersonRef] = Field(default_factory=list)
 
 
 class TicketRef(_CamelModel):
@@ -203,9 +207,19 @@ class TicketPatch(_CamelIn):
 
 
 class NoteBody(_CamelIn):
-    """The edit of a note: the text only."""
+    """The edit of a message of the reporter: the text only. It keeps the mentions."""
 
     body: str = Field(min_length=1, max_length=10000)
+
+
+class NotePatch(NoteBody):
+    """The edit of a team note: the text and, optionally, the mentions.
+
+    ``mentions`` null keeps the stored mentions; a list replaces them, with the rules
+    of ``NoteCreate``. Only a person that the list adds gets the mail.
+    """
+
+    mentions: list[UUID] | None = Field(default=None, max_length=MAX_MENTIONS)
 
 
 class NoteCreate(MessageFilesIn, _CamelIn):
@@ -216,10 +230,13 @@ class NoteCreate(MessageFilesIn, _CamelIn):
 
     body: str = Field(max_length=10000)
     visibility: NoteVisibility = "internal"
+    # The principal ids of the mentioned holders of ``ticket.manage`` (at most 50,
+    # duplicates drop). Another id gives 422 ``mention_not_member``.
+    mentions: list[UUID] = Field(default_factory=list, max_length=MAX_MENTIONS)
 
 
 class ReporterNoteCreate(MessageFilesIn, _CamelIn):
-    """A message of the reporter. It is always ``public``."""
+    """A message of the reporter. It is always ``public`` and mentions nobody."""
 
     body: str = Field(max_length=10000)
 

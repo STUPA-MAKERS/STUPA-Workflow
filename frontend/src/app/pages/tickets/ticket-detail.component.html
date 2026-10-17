@@ -180,6 +180,7 @@
       [visibilityOptions]="visibilityOptions()"
       [canPost]="manager || canReply()"
       [canAttach]="!ticket()?.anonymizedAt"
+      [mentionables]="mentionables()"
       (send)="sendNote($event)"
       (retry)="retryNote($event)"
       (discard)="discardNote($event)"
