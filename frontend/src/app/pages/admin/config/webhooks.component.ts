@@ -33,6 +33,7 @@ import {
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
 } from '../admin.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 function emptyHook(): WebhookConfig {
   return { id: '', name: '', url: '', events: [], active: true };
@@ -55,6 +56,7 @@ function emptyHook(): WebhookConfig {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,

@@ -37,9 +37,9 @@
   </div>
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <p class="gmt__status">{{ 'gremien.meetings.noMatch' | t }}</p>
+    <app-empty-state rows="3" [heading]="'gremien.meetings.noMatch' | t" />
   } @else {
-    <app-empty-state icon="users" [heading]="'gremien.meetings.empty' | t" />
+    <app-empty-state rows="3" [heading]="'gremien.meetings.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {

@@ -26,6 +26,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** A meeting row of the dialog. */
 interface MeetingChoice {
@@ -65,6 +66,7 @@ function localToday(): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     ScrollFadeDirective,
     FormsModule,
     TranslatePipe,

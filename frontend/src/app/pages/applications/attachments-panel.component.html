@@ -127,7 +127,7 @@
       }
     </ul>
   } @else {
-    <p class="att__empty">{{ 'applications.attachments.empty' | t }}</p>
+    <app-empty-state rows="3" [heading]="'applications.attachments.empty' | t" />
   }
 
   <!-- Drop overlay. It shows while a file hovers over the panel. -->

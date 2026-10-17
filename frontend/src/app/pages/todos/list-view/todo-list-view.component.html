@@ -79,7 +79,9 @@
             </span>
           </div>
         } @empty {
-          <div role="row" class="lv__emptyRow"><span role="cell">{{ 'todos.board.columnEmpty' | t }}</span></div>
+          <div role="row" class="lv__emptyRow">
+            <div role="cell"><app-empty-state rows="1" [heading]="'todos.board.columnEmpty' | t" /></div>
+          </div>
         }
       }
     </div>

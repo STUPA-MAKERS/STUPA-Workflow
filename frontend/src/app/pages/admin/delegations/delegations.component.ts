@@ -21,6 +21,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
 export function localToday(now = new Date()): string {
@@ -45,6 +46,7 @@ export function localToday(now = new Date()): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,

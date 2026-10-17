@@ -121,7 +121,7 @@
               </div>
             </div>
           } @else {
-            <p class="fd__none">{{ 'expenses.sub.none' | t }}</p>
+            <app-empty-state rows="3" [heading]="'expenses.sub.none' | t" />
           }
         </section>
       }

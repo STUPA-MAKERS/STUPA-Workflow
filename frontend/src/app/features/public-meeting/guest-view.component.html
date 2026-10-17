@@ -121,7 +121,7 @@
           <h3 class="gv__protoHead">{{ 'meetings.agenda.top' | t: { n: item.position } }} · {{ item.title }}</h3>
           <app-markdown-view [src]="item.body ?? ''" [imageSrc]="null" />
         } @empty {
-          <p class="gv__muted">{{ 'guests.view.protocolEmpty' | t }}</p>
+          <app-empty-state rows="3" [heading]="'guests.view.protocolEmpty' | t" />
         }
       </section>
     }

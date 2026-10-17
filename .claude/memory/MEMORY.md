@@ -25,7 +25,7 @@ sibling memory here.
 - [nextcloud-parity-ui](nextcloud-parity-ui.md) — admin UIs (user table, form builder) modeled on Nextcloud
 - [ui-patterns-and-backlog2](ui-patterns-and-backlog2.md) — add-via-dialog, typeahead, dropdowns, per-entity subpages, no expert-mode
 - [mobile-view-decisions](mobile-view-decisions.md) — phone bottom bar + "Mehr" sheet (replaced the hamburger drawer), card tables, vertical stacking, 768px
-- [empty-state-convention](empty-state-convention.md) — global `.empty-state` utility = one source for all table/list/card empty-states
+- [empty-state-convention](empty-state-convention.md) — `app-empty-state` with ghost rows = the one empty state for lists, panes, searches and missing records
 - [no-uuids-in-ui](no-uuids-in-ui.md) — never show raw UUIDs or ids in the UI, resolve to names server-side (`_author_names`)
 - [loading-overlay-convention](loading-overlay-convention.md) — overlay = GET-only interceptor + `SKIP_LOADING` token, mutations/polls/typeahead opt out
 - [tailwind-preflight-off-borders](tailwind-preflight-off-borders.md) — preflight OFF: single-side borders need `border-0` + `border-solid`

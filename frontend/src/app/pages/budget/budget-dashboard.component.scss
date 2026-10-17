@@ -42,11 +42,6 @@
 .bd__emptyLink:focus-visible {
   text-decoration: underline;
 }
-.bd__none {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
 
 /* ------------------------------------------------------------------ frame
    Wide: the pane (title, year, overview, search, tree) beside the sheet.

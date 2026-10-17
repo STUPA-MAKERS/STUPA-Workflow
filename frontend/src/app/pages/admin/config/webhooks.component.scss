@@ -61,8 +61,7 @@
   border-radius: var(--radius-md);
   font-size: var(--fs-xs);
 }
-.wh__noEvents,
-.wh__muted {
+.wh__noEvents {
   margin: 0;
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -130,11 +129,6 @@
   font-size: var(--fs-sm);
   color: var(--color-danger);
 }
-.wh__empty {
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-}
-
 .wh__form {
   display: flex;
   flex-direction: column;

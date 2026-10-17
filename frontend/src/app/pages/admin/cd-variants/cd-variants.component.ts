@@ -52,6 +52,7 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -126,6 +127,7 @@ function errorCode(err: unknown): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

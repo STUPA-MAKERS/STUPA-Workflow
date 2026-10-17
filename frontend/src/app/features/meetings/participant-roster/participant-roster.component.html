@@ -23,6 +23,6 @@
       }
     </ul>
   } @else {
-    <p class="pr__muted">{{ 'meetings.attendance.empty' | t }}</p>
+    <app-empty-state rows="3" [heading]="'meetings.attendance.empty' | t" />
   }
 </section>

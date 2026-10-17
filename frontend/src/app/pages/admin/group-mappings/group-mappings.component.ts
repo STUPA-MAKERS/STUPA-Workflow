@@ -27,6 +27,7 @@ import type {
   Role,
 } from '../admin.models';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -90,6 +91,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
     RouterLink,

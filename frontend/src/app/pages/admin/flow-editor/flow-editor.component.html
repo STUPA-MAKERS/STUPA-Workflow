@@ -296,7 +296,7 @@
             (dissolve)="dissolveCurrentGroup()"
           />
         } @else {
-          <p class="fe__empty">{{ 'admin.flow.selectHint' | t }}</p>
+          <app-empty-state fill rows="3" [heading]="'admin.flow.selectHint' | t" />
         }
 
         <details class="fe__json">

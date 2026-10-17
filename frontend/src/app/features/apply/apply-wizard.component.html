@@ -29,23 +29,25 @@
     <div class="wz__body">
       <!-- 1 · Antragsart -->
       <section class="wz__step" [hidden]="currentStep() !== 'type'">
-        <div class="wz__types rowgroup" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
-          @for (t of types(); track t.id) {
-            <button
-              type="button"
-              class="wz__type"
-              role="radio"
-              [attr.aria-checked]="typeId() === t.id"
-              [class.is-selected]="typeId() === t.id"
-              (click)="selectType(t.id)"
-            >
-              <span class="wz__radio" aria-hidden="true"></span>
-              <span class="wz__typeName">{{ t.name }}</span>
-            </button>
-          } @empty {
-            <p class="wz__empty">{{ 'apply.type.empty' | t }}</p>
-          }
-        </div>
+        @if (types().length) {
+          <div class="wz__types rowgroup" role="radiogroup" [attr.aria-label]="'apply.type.legend' | t">
+            @for (t of types(); track t.id) {
+              <button
+                type="button"
+                class="wz__type"
+                role="radio"
+                [attr.aria-checked]="typeId() === t.id"
+                [class.is-selected]="typeId() === t.id"
+                (click)="selectType(t.id)"
+              >
+                <span class="wz__radio" aria-hidden="true"></span>
+                <span class="wz__typeName">{{ t.name }}</span>
+              </button>
+            }
+          </div>
+        } @else {
+          <app-empty-state rows="3" [heading]="'apply.type.empty' | t" />
+        }
         @if (loadingForm()) {
           <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
         }

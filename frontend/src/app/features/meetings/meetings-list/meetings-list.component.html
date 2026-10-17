@@ -94,7 +94,7 @@
             </section>
           }
           @if (timeline.searchEmpty()) {
-            <p class="mtl__status">{{ 'meetings.list.searchEmpty' | t }}</p>
+            <app-empty-state class="mtl__empty" [heading]="'meetings.list.searchEmpty' | t" />
           }
           @if (timeline.searchHasMore() || timeline.loadingSearch()) {
             <div class="mtl__more">
@@ -107,7 +107,6 @@
         } @else if (!groups().length) {
           <app-empty-state
             class="mtl__empty"
-            icon="users"
             [heading]="'meetings.overview.empty' | t"
             [body]="(canCreate() ? 'meetings.overview.emptyCreate' : 'meetings.overview.emptyBody') | t"
           />
@@ -117,7 +116,7 @@
         } @else {
           <div class="mtl__groups" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
           @if (!hasUpcoming()) {
-            <p class="mtl__status">{{ 'meetings.list.noUpcoming' | t }}</p>
+            <app-empty-state class="mtl__upcoming" rows="2" [heading]="'meetings.list.noUpcoming' | t" />
           }
           @for (g of groups(); track g.key) {
             <section class="mtl__group" [attr.aria-labelledby]="'mtl-g-' + g.key">
@@ -167,13 +166,13 @@
           <div class="mtl__none" role="alert">
             @if (e.kind === 'forbidden') {
               <app-empty-state
-                icon="lock"
+                fill
                 [heading]="'meetings.overview.selForbidden' | t"
                 [body]="'meetings.overview.selForbiddenBody' | t"
               />
             } @else {
               <app-empty-state
-                icon="alert"
+                fill
                 [heading]="'meetings.overview.selFailed' | t"
                 [body]="'meetings.overview.selFailedBody' | t"
               >
@@ -187,7 +186,7 @@
         }
       } @else if (split()) {
         <div class="mtl__none">
-          <app-empty-state icon="users" [heading]="'meetings.overview.none' | t" />
+          <app-empty-state fill [heading]="'meetings.overview.none' | t" />
         </div>
       }
     </div>

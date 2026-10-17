@@ -25,10 +25,6 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.td--center {
-  align-items: center;
-  justify-content: center;
-}
 .td__error {
   margin: 0;
   padding: var(--space-5) 0;
@@ -163,12 +159,6 @@
 }
 .td__secHead app-icon {
   margin-inline-end: 4px;
-}
-.td__none {
-  margin: 0;
-  padding: 0 var(--space-1);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
 }
 
 /* Two fields side by side, each on its own surface like a row of the group. */

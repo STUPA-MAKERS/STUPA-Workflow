@@ -148,7 +148,7 @@
           </div>
         }
       } @empty {
-        <p class="chat__empty">{{ 'chat.empty' | t }}</p>
+        <app-empty-state class="chat__empty" rows="3" [heading]="'chat.empty' | t" />
       }
     }
   </div>

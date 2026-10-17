@@ -295,7 +295,7 @@
       </app-button>
     }
   } @else {
-    <h2 class="fv__startTitle">{{ 'participant.wait.closedEmpty' | t }}</h2>
+    <app-empty-state class="fv__empty" rows="3" level="2" [heading]="'participant.wait.closedEmpty' | t" />
   }
 </ng-template>
 

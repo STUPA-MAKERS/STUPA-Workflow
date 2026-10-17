@@ -1,29 +1,31 @@
-<ul class="g__rows rowgroup rowgroup--bg3">
-  @for (row of rows(); track row.g.id) {
-    <li class="g__row" [class.g__row--gone]="row.g.status !== 'admitted'">
-      <div class="g__who">
-        <app-avatar [name]="row.name" size="sm" [decorative]="true" />
-        <div class="g__names">
-          <span class="g__nameLine">
-            <span class="g__name ell" [appTruncated]="row.name" #cut="appTruncated" [attr.title]="cut.truncated() ? row.name : null">{{ row.name }}</span>
-            <span class="g__tag">{{ 'guests.tag' | t }}</span>
-          </span>
-          <span class="g__sub ell" [appTruncated]="row.sub" #cut2="appTruncated" [attr.title]="cut2.truncated() ? row.sub : null">{{ row.sub }}</span>
+@if (rows().length) {
+  <ul class="g__rows rowgroup rowgroup--bg3">
+    @for (row of rows(); track row.g.id) {
+      <li class="g__row" [class.g__row--gone]="row.g.status !== 'admitted'">
+        <div class="g__who">
+          <app-avatar [name]="row.name" size="sm" [decorative]="true" />
+          <div class="g__names">
+            <span class="g__nameLine">
+              <span class="g__name ell" [appTruncated]="row.name" #cut="appTruncated" [attr.title]="cut.truncated() ? row.name : null">{{ row.name }}</span>
+              <span class="g__tag">{{ 'guests.tag' | t }}</span>
+            </span>
+            <span class="g__sub ell" [appTruncated]="row.sub" #cut2="appTruncated" [attr.title]="cut2.truncated() ? row.sub : null">{{ row.sub }}</span>
+          </div>
         </div>
-      </div>
-      <div class="g__ctl">
-        <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
-        @if (row.menu.length) {
-          <app-row-menu [sections]="row.menu" [label]="'guests.list.menu' | t: { name: row.name }" (selected)="onMenu(row, $event.id)" />
-        } @else {
-          <span class="g__menuGap" aria-hidden="true"></span>
-        }
-      </div>
-    </li>
-  } @empty {
-    <li class="g__empty">{{ (query() ? 'meetings.dock.noMember' : 'guests.list.empty') | t }}</li>
-  }
-</ul>
+        <div class="g__ctl">
+          <app-status-text [kind]="row.status.kind">{{ row.status.key | t }}</app-status-text>
+          @if (row.menu.length) {
+            <app-row-menu [sections]="row.menu" [label]="'guests.list.menu' | t: { name: row.name }" (selected)="onMenu(row, $event.id)" />
+          } @else {
+            <span class="g__menuGap" aria-hidden="true"></span>
+          }
+        </div>
+      </li>
+    }
+  </ul>
+} @else {
+  <app-empty-state rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'guests.list.empty') | t" />
+}
 
 <app-dialog
   [open]="renaming() !== null"

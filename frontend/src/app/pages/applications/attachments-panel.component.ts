@@ -34,6 +34,7 @@ import {
 } from '@shared/ui/image-thumb/image-thumb.component';
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { formatBytes } from './applications.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Attachments panel.
@@ -58,6 +59,7 @@ import { formatBytes } from './applications.util';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

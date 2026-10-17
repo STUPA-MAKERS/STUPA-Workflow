@@ -5,6 +5,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
@@ -44,7 +45,7 @@ const TEAM_KINDS: ReadonlyMap<string, string> = new Map([
   selector: 'app-account-notifications',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NoteComponent, PageHeaderComponent, SkeletonComponent, SwitchComponent, TranslatePipe],
+  imports: [EmptyStateComponent, NoteComponent, PageHeaderComponent, SkeletonComponent, SwitchComponent, TranslatePipe],
   templateUrl: './notifications.component.html',
   styleUrl: './notifications.component.scss',
 })

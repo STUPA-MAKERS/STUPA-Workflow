@@ -35,6 +35,7 @@ import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FRAME_MODES, type FrameModeKey, type FramePage } from './frame-modes';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One group of the navigation with the pages the principal may open. */
 interface NavGroup {
@@ -129,6 +130,7 @@ const sheetScroll = new Map<number, number>();
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     PageHeaderComponent,
     RouterOutlet,
     RouterLink,

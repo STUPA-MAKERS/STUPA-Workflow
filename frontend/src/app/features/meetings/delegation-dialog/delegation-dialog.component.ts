@@ -34,6 +34,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * "Vertretung einrichten" (board Teilnahme-Vertretung): the member picks who represents
@@ -54,6 +55,7 @@ import { TruncatedDirective } from '@shared/truncated.directive';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
     NgTemplateOutlet,

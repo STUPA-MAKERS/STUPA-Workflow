@@ -142,7 +142,11 @@
       }
     </ul>
   } @else if (!loading() && !loadError()) {
-    <p class="al__empty">{{ 'admin.audit.empty' | t }}</p>
+    <app-empty-state [heading]="'admin.audit.empty' | t">
+      @if (activeFilterCount()) {
+        <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
+      }
+    </app-empty-state>
   }
 
   <div #sentinel class="al__sentinel" aria-hidden="true"></div>

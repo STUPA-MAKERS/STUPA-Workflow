@@ -31,6 +31,7 @@ import {
   sortGremiumRoles,
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 let nextId = 0;
 
@@ -54,6 +55,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
