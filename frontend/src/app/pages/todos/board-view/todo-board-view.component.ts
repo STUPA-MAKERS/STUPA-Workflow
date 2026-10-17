@@ -6,8 +6,10 @@ import {
   DestroyRef,
   ElementRef,
   Injector,
+  NgZone,
   afterNextRender,
   computed,
+  effect,
   inject,
   input,
   output,
@@ -26,6 +28,13 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
 import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
+
+/** The pager counts as at a page within this share of a page (a fractional screen width). */
+const ARRIVED = 0.05;
+
+function reduceMotion(): boolean {
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 /** The done column shows this many cards until "n weitere" opens the rest. */
 export const DONE_PREVIEW = 3;
@@ -66,11 +75,12 @@ interface KeyDrag {
  * with "+ To-Do", which opens a quick field for a title.
  *
  * Phone: one page per column behind tabs with the counts. The pages sit side by side in
- * a horizontal scroller with CSS scroll snap, so a swipe moves one column; the tab and
- * the dots follow the page where the scroll ends, and a tab scrolls to its page. The
- * pager fills the free height and each page scrolls down by itself; an empty column
- * shows "Keine Karten" in the middle. The dots sit at the bottom, on the line of the
- * "+ To-Do" button of the page. No drag: a long press on a tile of a writable board
+ * a horizontal scroller with CSS scroll snap, so a swipe moves one column, and a tab
+ * scrolls to its page. The ink under the tabs moves with the scroll, between two tabs
+ * while the pager is between two pages, and the active tab changes at the half way. The
+ * pager and the tab bar run to the edges of the screen, so a card or a tab leaves at the
+ * edge and not at the gutter. Each page scrolls down by itself; an empty column shows
+ * "Keine Karten" in the middle. No drag: a long press on a tile of a writable board
  * emits `menu`, and the page moves the card through its "Verschieben" sheet. The swipe
  * stays a swipe, because a drift of the finger stops the press.
  */
@@ -166,9 +176,55 @@ export class TodoBoardViewComponent {
   readonly phoneColumn = signal(0);
   /** Phone: the horizontal scroller with one page per column. */
   private readonly pager = viewChild<ElementRef<HTMLElement>>('pager');
-  private scrollTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly stopTimer = inject(DestroyRef).onDestroy(() => {
-    if (this.scrollTimer) clearTimeout(this.scrollTimer);
+  /** Phone: the tab bar and the ink that moves under it. */
+  private readonly tabBar = viewChild<ElementRef<HTMLElement>>('tabBar');
+  private readonly ink = viewChild<ElementRef<HTMLElement>>('ink');
+  /** A tapped tab: the page the pager scrolls to. The tabs keep it until the scroll arrives. */
+  private target: number | null = null;
+  private inkFrame = 0;
+  private readonly resize =
+    typeof ResizeObserver === 'function' ? new ResizeObserver(() => this.placeInk()) : null;
+  private readonly stopInk = inject(DestroyRef).onDestroy(() => {
+    cancelAnimationFrame(this.inkFrame);
+    this.resize?.disconnect();
+  });
+
+  private readonly zone = inject(NgZone);
+  /** A web font that loads after the first frame changes the width of the tabs. */
+  private readonly fontsReady = (typeof document !== 'undefined' ? document.fonts?.ready : undefined)?.then(
+    () => this.placeInk(),
+  );
+
+  /** The ink follows a new active tab, new counts and a new size of the bar. */
+  private readonly inkFollows = effect((onCleanup) => {
+    this.tabs();
+    this.phoneColumn();
+    const bar = this.tabBar()?.nativeElement;
+    if (!bar) return;
+    const place = (): void => this.placeInk();
+    let strip: HTMLElement | null = null;
+    this.resize?.observe(bar);
+    const ref = afterNextRender(
+      () => {
+        strip = bar.querySelector<HTMLElement>('[role="tablist"]');
+        this.zone.runOutsideAngular(() => strip?.addEventListener('scroll', place, { passive: true }));
+        this.placeInk();
+      },
+      { injector: this.injector },
+    );
+    onCleanup(() => {
+      ref.destroy();
+      strip?.removeEventListener('scroll', place);
+      this.resize?.unobserve(bar);
+    });
+  });
+
+  /** Only a new active tab moves the tab strip, so a strip scrolled by hand stays put. */
+  private readonly tabFollows = effect((onCleanup) => {
+    this.phoneColumn();
+    if (!this.tabBar()) return;
+    const ref = afterNextRender(() => this.revealTab(), { injector: this.injector });
+    onCleanup(() => ref.destroy());
   });
 
   /** The cards of each column as shown: the filters, the keyboard drag, the done preview. */
@@ -448,29 +504,90 @@ export class TodoBoardViewComponent {
     this.phoneColumn.set(i);
     const el = this.pager()?.nativeElement;
     if (!el?.clientWidth) return;
-    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // A scroll to the page that is already there fires no scroll event to end the hold.
+    if (Math.abs(Math.abs(el.scrollLeft) / el.clientWidth - i) < ARRIVED) return;
     // `scrollLeft` is negative in a right-to-left page; the sign follows the direction.
     const sign = getComputedStyle(el).direction === 'rtl' ? -1 : 1;
-    el.scrollTo({ left: sign * i * el.clientWidth, behavior: reduce ? 'auto' : 'smooth' });
+    this.target = i;
+    el.scrollTo({ left: sign * i * el.clientWidth, behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+
+  /** The pager moved: the ink follows in the next frame, the tab at the half way. */
+  onPagerScroll(): void {
+    this.syncPage();
+    cancelAnimationFrame(this.inkFrame);
+    this.zone.runOutsideAngular(() => {
+      this.inkFrame = requestAnimationFrame(() => this.placeInk());
+    });
+  }
+
+  /** A finger on the pager ends the scroll to a tapped tab: the tabs follow the swipe. */
+  onPagerTouch(): void {
+    this.target = null;
+  }
+
+  /** The scroll came to rest: whatever page it rests on is the active tab, a tapped tab or not. */
+  onPagerRest(): void {
+    this.target = null;
+    this.syncPage();
   }
 
   /**
-   * A swipe moved the pager. `scrollend` names the page where the snap ends; a browser
-   * without that event gets the same after 150ms without a scroll.
+   * The active tab is the page that fills most of the pager. During the scroll to a
+   * tapped tab, the tapped tab stays active, so the tabs between do not light up.
    */
-  onPagerScroll(): void {
-    if (this.scrollTimer) clearTimeout(this.scrollTimer);
-    this.scrollTimer = setTimeout(() => this.syncPage(), 150);
+  syncPage(): void {
+    const pos = this.pagerPos();
+    if (pos === null) return;
+    if (this.target !== null) {
+      if (Math.abs(pos - this.target) > ARRIVED) return;
+      this.target = null;
+    }
+    const last = this.columns().length - 1;
+    this.phoneColumn.set(Math.max(0, Math.min(Math.round(pos), last)));
   }
 
-  /** The tab and the dots follow the page that fills the pager. */
-  syncPage(): void {
-    if (this.scrollTimer) clearTimeout(this.scrollTimer);
-    this.scrollTimer = null;
+  /**
+   * The ink under the tabs: at a page, under its tab; between two pages, between their
+   * tabs, with the width blended. The rectangles come from the tabs themselves, so a long
+   * label, a scrolled tab bar and a right-to-left page need nothing extra.
+   */
+  placeInk(): void {
+    const bar = this.tabBar()?.nativeElement;
+    const ink = this.ink()?.nativeElement;
+    if (!bar || !ink) return;
+    const tabs = bar.querySelectorAll<HTMLElement>('[role="tab"]');
+    if (!tabs.length) return;
+    const last = tabs.length - 1;
+    const pos = Math.max(0, Math.min(this.pagerPos() ?? this.phoneColumn(), last));
+    const i = Math.floor(pos);
+    const f = pos - i;
+    const from = tabs[i].getBoundingClientRect();
+    const to = tabs[Math.min(i + 1, last)].getBoundingClientRect();
+    const left = from.left + (to.left - from.left) * f - bar.getBoundingClientRect().left;
+    ink.style.width = `${from.width + (to.width - from.width) * f}px`;
+    ink.style.transform = `translateX(${left}px)`;
+  }
+
+  /** The tab bar scrolls sideways when the tabs are wider than the screen: show the active tab. */
+  private revealTab(): void {
+    const bar = this.tabBar()?.nativeElement;
+    const strip = bar?.querySelector<HTMLElement>('[role="tablist"]');
+    const tab = strip?.querySelectorAll<HTMLElement>('[role="tab"]')[this.phoneColumn()];
+    if (!strip || !tab) return;
+    // The strip runs to the screen edges; a tab counts as shown inside the gutter.
+    const pad = parseFloat(getComputedStyle(strip).paddingLeft) || 0;
+    const s = strip.getBoundingClientRect();
+    const t = tab.getBoundingClientRect();
+    const start = s.left + pad;
+    const end = s.right - pad;
+    const by = t.left < start ? t.left - start : t.right > end ? t.right - end : 0;
+    if (by) strip.scrollBy({ left: by, behavior: reduceMotion() ? 'auto' : 'smooth' });
+  }
+
+  /** The pager position in pages: 1.5 is half way from the second page to the third. */
+  private pagerPos(): number | null {
     const el = this.pager()?.nativeElement;
-    if (!el?.clientWidth) return;
-    const i = Math.round(Math.abs(el.scrollLeft) / el.clientWidth);
-    const last = this.columns().length - 1;
-    this.phoneColumn.set(Math.max(0, Math.min(i, last)));
+    return el?.clientWidth ? Math.abs(el.scrollLeft) / el.clientWidth : null;
   }
 }
