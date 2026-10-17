@@ -94,7 +94,7 @@ describe('TodoCardDetailComponent', () => {
     expect(api.card).toHaveBeenCalledWith('k-1');
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
-    expect(screen.getByText('Studierendenparlament · To-Do')).toBeInTheDocument();
+    expect(document.querySelector('.cd__kicker')).toHaveTextContent('Studierendenparlament · To-Do');
     expect(screen.getByText(/^Angelegt von Selin Yıldız · /)).toBeInTheDocument();
     // The thread has no heading of its own; its column carries the name.
     expect(screen.queryByRole('heading', { name: 'Aktivität' })).toBeNull();
@@ -230,6 +230,11 @@ describe('TodoCardDetailComponent', () => {
     late.next(detail({ id: 'k-9', boardId: 'b-7', boardName: 'AStA' }));
     detect();
     expect(cmp.kicker()).toBe('AStA · To-Do');
+    // The board in the kicker links to the board.
+    const boardLink = screen.getByTestId('cd-board');
+    expect(boardLink).toHaveTextContent('AStA');
+    expect(boardLink).toHaveAttribute('href', '/todos/b-7');
+    expect(boardLink.closest('.sheet-bar__kicker')).not.toBeNull();
     expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
   });
 

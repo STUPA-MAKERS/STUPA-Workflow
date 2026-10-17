@@ -67,7 +67,11 @@
           {{ 'todos.card.back' | t }}
         </button>
       }
-      <app-sheet-bar [kicker]="kicker()" [bleed]="mode() === 'pane'">
+      <app-sheet-bar [bleed]="mode() === 'pane'">
+        <span appSheetBarKicker class="cd__kicker ell" [title]="kicker()">
+          <a class="cd__kickerBoard" data-testid="cd-board" [routerLink]="['/todos', card.boardId]">{{ card.boardName }}</a>
+          · {{ 'todos.card.kickerKind' | t }}
+        </span>
         @if (mode() === 'pane' && boardLink(); as link) {
           <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
             {{ 'todos.card.openInBoard' | t }}

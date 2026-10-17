@@ -50,6 +50,24 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
+/* The board in the kicker leads to the board; it keeps the muted kicker colour until hover. */
+.cd__kicker {
+  display: block;
+  min-width: 0;
+}
+.cd__kickerBoard {
+  color: inherit;
+  text-decoration: none;
+}
+.cd__kickerBoard:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
+.cd__kickerBoard:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
 .cd__boardLink {
   display: inline-flex;
   align-items: center;

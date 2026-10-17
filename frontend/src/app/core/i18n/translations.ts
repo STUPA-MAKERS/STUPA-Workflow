@@ -3973,6 +3973,7 @@ export const de = {
   'todos.linked.title': 'To-Dos',
   'todos.linked.due': 'fällig {date}',
   'todos.card.kicker': '{board} · To-Do',
+  'todos.card.kickerKind': 'To-Do',
   'todos.card.created': 'Angelegt von {name} · {date}',
   'todos.card.archivedOn': 'Archiviert am {date}',
   'todos.card.loading': 'Karte wird geladen…',

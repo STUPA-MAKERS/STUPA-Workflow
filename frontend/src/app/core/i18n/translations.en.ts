@@ -3907,6 +3907,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.linked.title': 'To-dos',
   'todos.linked.due': 'due {date}',
   'todos.card.kicker': '{board} · To-do',
+  'todos.card.kickerKind': 'To-do',
   'todos.card.created': 'Created by {name} · {date}',
   'todos.card.archivedOn': 'Archived on {date}',
   'todos.card.loading': 'Loading the card…',
