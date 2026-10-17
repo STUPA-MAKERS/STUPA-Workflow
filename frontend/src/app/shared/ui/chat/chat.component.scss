@@ -621,14 +621,12 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
-/* A mentioned person in a message: the name in bold, in the accent of the thread. */
+/* A mentioned person in a message: the name in bold, in the accent (in an own bubble,
+   which already has the accent, in its text colour). No underline: it is no link. */
 .chat__text ::ng-deep .chat__mention {
   color: var(--color-accent-text);
   font-weight: var(--fw-semibold);
 }
 .chat__row--own .chat__text ::ng-deep .chat__mention {
   color: inherit;
-  text-decoration: underline;
-  text-decoration-thickness: 1px;
-  text-underline-offset: 2px;
 }
