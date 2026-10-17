@@ -171,6 +171,14 @@
 :host(.cd--pane:not(.cd--phone)) .cd__chat {
   --chat-log-basis: 0;
 }
+/* A card without the write right or an archived card has no composer, so the thread is
+   a record: the frame takes the height of its entries, not the height of the column.
+   A long thread scrolls inside the log. */
+.cd__col--readonly .cd__chat,
+:host(.cd--pane:not(.cd--phone)) .cd__col--readonly .cd__chat {
+  --chat-log-basis: auto;
+  flex: 0 1 auto;
+}
 
 .cd__secTitle {
   margin: 0;

@@ -8,7 +8,9 @@
   >
     <app-icon name="cal" [size]="15" />
     <span>{{ text() ?? ('todos.due.none' | t) }}</span>
-    <app-icon class="dc__chev" name="down" [size]="15" />
+    @if (!disabled()) {
+      <app-icon class="dc__chev" name="down" [size]="15" />
+    }
   </button>
   <input
     #native

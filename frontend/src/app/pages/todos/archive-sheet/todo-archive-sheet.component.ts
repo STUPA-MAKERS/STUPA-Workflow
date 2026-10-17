@@ -6,7 +6,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { liveSearch } from '@shared/live-search';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { isoDay, shortDay } from '../../../features/todos/todos.util';
 
@@ -21,7 +21,7 @@ export const ARCHIVE_PAGE = 50;
   selector: 'app-todo-archive-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, SearchPillComponent, SideSheetComponent],
+  imports: [TranslatePipe, ButtonComponent, IconComponent, SearchPillComponent, SideSheetComponent],
   templateUrl: './todo-archive-sheet.component.html',
   styleUrl: './todo-archive-sheet.component.scss',
 })
