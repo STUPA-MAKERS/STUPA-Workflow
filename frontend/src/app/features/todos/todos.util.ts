@@ -11,8 +11,11 @@ import type {
   TodoLink,
   TodoLinkKind,
   TodoLinkTarget,
+  TodoVoteResult,
+  TodoVoteStatus,
 } from '@core/api/todos.service';
 import type { TranslationKey } from '@core/i18n/translations';
+import { formatMoney } from '@shared/decision/decision.util';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import type { IconName } from '@stupa-makers/ui-kit';
 
@@ -35,6 +38,10 @@ export const LINK_ICON: Record<TodoLinkKind, IconName> = {
   application: 'file',
   meeting: 'users',
   agenda_item: 'list',
+  vote: 'vote',
+  gremium: 'landmark',
+  invoice: 'receipt',
+  expense: 'swap',
   ticket: 'chat',
   todo: 'circleok',
 };
@@ -43,12 +50,42 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
   application: 'todos.linkKind.application',
   meeting: 'todos.linkKind.meeting',
   agenda_item: 'todos.linkKind.agenda_item',
+  vote: 'todos.linkKind.vote',
+  gremium: 'todos.linkKind.gremium',
+  invoice: 'todos.linkKind.invoice',
+  expense: 'todos.linkKind.expense',
   ticket: 'todos.linkKind.ticket',
   todo: 'todos.linkKind.todo',
 };
 
 /** The kinds of the link picker, in the order of the server answer. */
-export const LINK_KINDS: readonly TodoLinkKind[] = ['application', 'meeting', 'agenda_item', 'ticket', 'todo'];
+export const LINK_KINDS: readonly TodoLinkKind[] = [
+  'application',
+  'meeting',
+  'agenda_item',
+  'vote',
+  'gremium',
+  'invoice',
+  'expense',
+  'ticket',
+  'todo',
+];
+
+/** The state of a vote link: the result once closed, else the status. */
+const VOTE_STATUS_LABEL: Record<TodoVoteStatus, TranslationKey> = {
+  draft: 'voting.list.status.draft',
+  open: 'meetings.voteStatus.open',
+  closed: 'meetings.voteStatus.closed',
+  cancelled: 'meetings.voteStatus.cancelled',
+};
+
+const VOTE_RESULT_LABEL: Record<TodoVoteResult, TranslationKey> = {
+  passed: 'vote.result.passed',
+  rejected: 'vote.result.rejected',
+  tie: 'vote.result.tie',
+  elected: 'vote.result.elected',
+  runoff: 'vote.result.runoff',
+};
 
 export const TICKET_STATUS_LABEL: Record<string, TranslationKey> = {
   new: 'tickets.status.new',
@@ -178,6 +215,21 @@ export function linkSub(
         if (!title.startsWith(`${top}:`) && title !== top) parts.push(top);
       }
       break;
+    case 'vote':
+      if (d.meetingTitle) parts.push(d.meetingTitle);
+      if (d.voteResult) parts.push(t(VOTE_RESULT_LABEL[d.voteResult]));
+      else if (d.voteStatus) parts.push(t(VOTE_STATUS_LABEL[d.voteStatus]));
+      break;
+    case 'invoice':
+      if (d.number && !title.startsWith(d.number)) parts.push(d.number);
+      if (d.counterparty && d.counterparty !== title) parts.push(d.counterparty);
+      if (d.amount) parts.push(formatMoney(d.amount, locale));
+      else if (d.date) parts.push(longDay(d.date, locale));
+      break;
+    case 'expense':
+      if (d.costCentre) parts.push(d.costCentre);
+      if (d.amount) parts.push(formatMoney(d.amount, locale));
+      break;
     case 'ticket':
       if (d.number && !title.startsWith(d.number)) parts.push(d.number);
       if (d.status) parts.push(t(TICKET_STATUS_LABEL[d.status] ?? 'tickets.status.new'));
@@ -197,6 +249,9 @@ export function linkLine(link: TodoLink, today: string, locale: string, t: Trans
   const parts = [kind];
   if (link.kind === 'ticket' && link.detail?.number) parts.push(link.detail.number);
   parts.push(link.title);
+  if ((link.kind === 'invoice' || link.kind === 'expense') && link.detail?.amount) {
+    parts.push(formatMoney(link.detail.amount, locale));
+  }
   if ((link.kind === 'meeting' || link.kind === 'agenda_item') && link.detail?.date) {
     const d = parseDay(link.detail.date);
     if (d) {

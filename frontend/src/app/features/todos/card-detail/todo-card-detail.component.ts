@@ -37,6 +37,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
+import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
@@ -135,6 +136,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     EmptyStateComponent,
     FilterSelectComponent,
     IconComponent,
+    MarkdownImageUploadDirective,
     MarkdownViewComponent,
     NoteComponent,
     RowMenuComponent,

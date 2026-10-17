@@ -440,6 +440,21 @@ async def test_can_view_gremium_refuses_a_capped_token(monkeypatch: pytest.Monke
     assert not await can_view_gremium(None, principal, uuid.uuid4())  # type: ignore[arg-type]
 
 
+async def test_gremium_view_scope_is_the_set_form(monkeypatch: pytest.MonkeyPatch) -> None:
+    gid = uuid.uuid4()
+
+    async def ids(*_a: Any, **_k: Any) -> set[uuid.UUID]:
+        return {gid}
+
+    monkeypatch.setattr(gremium_roles, "gremium_member_ids", ids)
+    view_all = Principal(sub="u", permissions={GREMIUM_VIEW_ALL})
+    member = Principal(sub="u")
+    capped = Principal(sub="u", scope_permissions=frozenset({"budget.write"}))
+    assert await gremium_roles.gremium_view_scope(None, view_all) is None  # type: ignore[arg-type]
+    assert await gremium_roles.gremium_view_scope(None, member) == {gid}  # type: ignore[arg-type]
+    assert await gremium_roles.gremium_view_scope(None, capped) == set()  # type: ignore[arg-type]
+
+
 # --- 6. routes --------------------------------------------------------------
 
 GREMIUM_ID = uuid.uuid4()

@@ -17,3 +17,8 @@
 .bd__cc {
   --fd-phone-order: 5;
 }
+/* The linked to-dos come last; the list is not a `.fd__sec`, so it sets the order itself. */
+.bd__todos {
+  --fd-phone-order: 6;
+  order: var(--fd-phone-order);
+}

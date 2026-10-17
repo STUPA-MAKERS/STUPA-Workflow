@@ -149,6 +149,18 @@ def enforce_attachment_body_cap(request: Request, settings: SettingsDep) -> None
         raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
 
 
+def enforce_media_body_cap(request: Request, settings: SettingsDep) -> None:
+    """Answer 413 when the ``Content-Length`` of a Markdown image is clearly too large.
+
+    The limit is ``markdown_image_max_bytes`` plus room for the multipart frame. The
+    route reads the file under the authoritative cap, also for a chunked body.
+    """
+    limit = settings.markdown_image_max_bytes + _MULTIPART_OVERHEAD_BYTES
+    raw = request.headers.get("content-length")
+    if raw is not None and raw.isdigit() and int(raw) > limit:
+        raise PayloadTooLargeError(f"Request body exceeds {limit} bytes.")
+
+
 async def _enforce(limiter: RateLimiter, key: str, *, limit: int, window: int, detail: str) -> None:
     result = await limiter.hit(key, limit=limit, window_seconds=window)
     if not result.allowed:
@@ -326,6 +338,29 @@ async def rate_limit_attachments(
     )
 
 
+async def rate_limit_media_images(
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    principal: Annotated[Principal | None, Depends(get_current_principal)],
+) -> None:
+    """``POST /media/images``: ``rl_media_images_per_hour`` per principal.
+
+    Only a principal may upload, so the key is the ``sub``. The route answers 401
+    without one; this dependency then does nothing. The limit applies to an OAuth
+    token (MCP) too and shares the budget of the person: every upload costs a Pillow
+    decode, and an agent can loop.
+    """
+    if principal is None:
+        return
+    await _enforce(
+        limiter,
+        f"media-images:principal:{principal.sub}",
+        limit=settings.rl_media_images_per_hour,
+        window=_HOUR,
+        detail="Too many uploads. Try again later.",
+    )
+
+
 async def rate_limit_applicant_search(
     settings: SettingsDep,
     limiter: RateLimiterDep,
@@ -399,6 +434,19 @@ async def rate_limit_public_protocols(
         limiter,
         f"public-protocols:ip:{client_ip(request)}",
         limit=settings.rl_public_protocols_ip_per_hour,
+        window=_HOUR,
+        detail="Too many requests from this IP. Try again later.",
+    )
+
+
+async def rate_limit_public_protocol_images(
+    request: Request, settings: SettingsDep, limiter: RateLimiterDep
+) -> None:
+    """The images of the public protocols page: a generous limit per IP."""
+    await _enforce(
+        limiter,
+        f"public-protocol-images:ip:{client_ip(request)}",
+        limit=settings.rl_public_protocol_images_ip_per_hour,
         window=_HOUR,
         detail="Too many requests from this IP. Try again later.",
     )

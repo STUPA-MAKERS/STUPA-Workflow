@@ -57,6 +57,8 @@ Backend domain modules (`backend/app/modules/<module>`):
   100 % branch gate)*
 - **be-config-revision** — versioned config + audit + revert
 - **be-files** — MinIO attachments, ClamAV scan, signed URLs
+- **be-media** — Markdown images: upload, Pillow re-encode, canonical `/api/media/images/<id>`,
+  public protocol images, images in the protocol PDF
 - **be-pdf** — client to the typst render service (protocols only; applications no
   longer render a PDF)
 - **be-privacy** — DSGVO/GDPR anonymization, export/erasure

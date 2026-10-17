@@ -48,5 +48,6 @@ describe('PublicProtocolsService', () => {
     expect(req.request.method).toBe('GET');
     req.flush({});
     expect(api.pdfUrl('p-1')).toBe('/api/public/protocols/p-1/pdf');
+    expect(api.imageUrl('p 1', 'i')).toBe('/api/public/protocols/p%201/images/i');
   });
 });

@@ -16,7 +16,18 @@ import type { TicketStatus } from './tickets.service';
 
 export type TodoBoardKind = 'gremium' | 'personal' | 'team';
 export type TodoLabelColor = 'green' | 'blue' | 'violet' | 'amber' | 'red' | 'gray';
-export type TodoLinkKind = 'application' | 'meeting' | 'agenda_item' | 'ticket' | 'todo';
+export type TodoLinkKind =
+  | 'application'
+  | 'meeting'
+  | 'agenda_item'
+  | 'vote'
+  | 'gremium'
+  | 'invoice'
+  | 'expense'
+  | 'ticket'
+  | 'todo';
+export type TodoVoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
+export type TodoVoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
 
 export interface TodoBoardSummary {
   id: Uuid;
@@ -54,6 +65,16 @@ export interface TodoLinkDetail {
   boardName?: string | null;
   columnName?: string | null;
   isDone?: boolean | null;
+  /** Invoice (gross) or booking amount, a decimal string in EUR. */
+  amount?: string | null;
+  /** The supplier of an invoice, the correspondent of a booking. */
+  counterparty?: string | null;
+  /** The path key of the cost centre of a booking ("VS-800-04"). */
+  costCentre?: string | null;
+  invoiceStatus?: 'open' | 'paid' | null;
+  bookingKind?: 'expense' | 'income' | null;
+  voteStatus?: TodoVoteStatus | null;
+  voteResult?: TodoVoteResult | null;
 }
 
 export interface TodoLink {

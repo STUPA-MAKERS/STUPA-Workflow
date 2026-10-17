@@ -25,6 +25,7 @@ import {
 import { bookedOn } from '../invoice-figures';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 
 /**
  * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
@@ -49,6 +50,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
     RowMenuComponent,
     SegBarComponent,
     StatusTextComponent,
+    TodoLinkedListComponent,
     TranslatePipe,
   ],
   templateUrl: './invoice-detail.component.html',

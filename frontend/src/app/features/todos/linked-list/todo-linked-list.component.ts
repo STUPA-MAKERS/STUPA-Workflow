@@ -10,7 +10,8 @@ import { personName, type Translate } from '../todos.util';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 
 /**
- * The back-reference "To-Dos" of an object (an application, an agenda item): the cards
+ * The back-reference "To-Dos" of an object (an application, an agenda item, a vote, an
+ * invoice, a booking): the cards
  * linked to it that the viewer may read (`GET /todos/linked`), each with its board, its
  * column, the due date and the people. A row opens the card on its board.
  *

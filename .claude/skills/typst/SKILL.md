@@ -32,9 +32,10 @@ description: Internal-only protocol Markdown→PDF render service (`typst/`) —
 - **Box icons are per-glyph:** LaTeX `\vcenter`ed each FontAwesome glyph, so `icons.<name>.top` holds a measured offset. pytex asked for `vote-yea`, `clipboard-check`, `clock`, which FontAwesome 4 lacks — those places have no icon on purpose (tally box, Aufgabe box, the space before a `{{time}}`).
 - **Deliberate fixes over pytex:** public `datalines` reach the title page; `€` in a callout; bold in a vote question; `:::antrag` fences dropped; `~~strike~~`; ISO date → `15.06.2026, 18:30`; the title-page label column widens for a long label.
 - **Page breaks can differ from pytex** (TeX's page builder shrinks glue on full pages; Typst never shrinks). Boxes are unbreakable, like the LaTeX minipage.
+- **Images (be-media):** only `![alt](/api/media/images/<uuid>)` with an uploaded asset `img-<uuid>.<png|jpg|gif|webp>` shows an image (`image` node with `asset`; a paragraph of only that image is a `figure`: centered, ≤ text width, ≤ 12 cm high, never above its natural size). Every other image (URL, relative path, `data:`, missing asset) prints its alt text. `convert_body(markdown, meta, assets)` gets the asset names from `build_document`. typst 0.15 reads PNG, JPEG, GIF and WEBP (animations: the first frame). The asset caps leave room for the logos plus the 48 images of the backend budget.
 - **Typst version:** pinned in `Dockerfile` and the CI `typst` job (keep both in step). The flake dev shell may ship another version; the layout tests pass on 0.14 and 0.15.
 - **Egress-less:** compose puts `typst` on `typst_net` only (`internal: true`), read-only rootfs, tmpfs `/tmp`, `cap_drop: ALL`.
-- **Env:** `TYPST_MAX_BODY_BYTES` (32 MiB), `TYPST_MAX_ASSETS` (16), `TYPST_MAX_ASSET_BYTES` (2 MiB), `TYPST_COMPILE_TIMEOUT_S` (60), `TYPST_MAX_CONCURRENCY` (2), plus `TYPST_BIN`/`TYPST_FONT_DIRS`/`TYPST_TEMPLATE_DIR`/`TYPST_HSRT_DIR`/`TYPST_PACKAGE_DIR` for the layout.
+- **Env:** `TYPST_MAX_BODY_BYTES` (32 MiB), `TYPST_MAX_ASSETS` (64), `TYPST_MAX_ASSET_BYTES` (8 MiB), `TYPST_COMPILE_TIMEOUT_S` (60), `TYPST_MAX_CONCURRENCY` (2), plus `TYPST_BIN`/`TYPST_FONT_DIRS`/`TYPST_TEMPLATE_DIR`/`TYPST_HSRT_DIR`/`TYPST_PACKAGE_DIR` for the layout.
 - **Tests:** `nix develop .#typst -c sh -c 'cd typst && .venv/bin/pytest'`. Unit tests fake the compiler; integration tests need `typst` + `pdftotext` on PATH and skip otherwise.
 
-**Related:** be-pdf, be-protocol, deploy
+**Related:** be-pdf, be-protocol, be-media, deploy

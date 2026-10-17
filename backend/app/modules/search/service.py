@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.admin.models import Gremium
 from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
+from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
 from app.search import dialect_of, trigram_rank
@@ -195,7 +196,7 @@ class SearchService:
 
     async def _invoices(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Requires one of the budget read permissions, like `GET /api/invoices`."""
-        if not _has_budget_read(principal):
+        if not has_budget_read(principal):
             return []
         from app.modules.budget.tree.service import BudgetTreeService
 
@@ -215,7 +216,7 @@ class SearchService:
 
     async def _expenses(self, q: str, principal: Principal, lang: str) -> list[SearchHit]:
         """Requires one of the budget read permissions, like `GET /api/expenses`."""
-        if not _has_budget_read(principal):
+        if not has_budget_read(principal):
             return []
         from app.modules.budget.tree.service import BudgetTreeService
 
@@ -246,7 +247,7 @@ class SearchService:
             q, [Budget.name, Budget.path_key], dialect=dialect_of(self.session)
         )
         stmt = select(Budget).where(where, Budget.hidden_in_budget.is_(False))
-        if not _has_budget_read(principal):
+        if not has_budget_read(principal):
             member = await gremium_member_ids(self.session, principal.sub)
             if not member:
                 return []
@@ -344,11 +345,6 @@ class SearchService:
             )
             for card, board, column in rows
         ]
-
-
-def _has_budget_read(principal: Principal) -> bool:
-    """The permission trio that `GET /api/invoices` and `/api/expenses` accept."""
-    return any(principal.has(p) for p in ("budget.view", "budget.structure", "budget.book"))
 
 
 def _untitled(lang: str) -> str:

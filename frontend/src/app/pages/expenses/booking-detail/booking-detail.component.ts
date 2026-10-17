@@ -31,6 +31,7 @@ import {
 import { bookedOn } from '../../invoices/invoice-figures';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 
 /**
  * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
@@ -55,6 +56,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
     SegBarComponent,
     SkeletonComponent,
     StatusTextComponent,
+    TodoLinkedListComponent,
     TranslatePipe,
   ],
   templateUrl: './booking-detail.component.html',

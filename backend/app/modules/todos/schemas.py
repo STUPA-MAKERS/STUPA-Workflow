@@ -17,7 +17,28 @@ from app.shared.people import PersonRef
 
 TodoBoardKind = Literal["gremium", "personal", "team"]
 TodoLabelColor = Literal["green", "blue", "violet", "amber", "red", "gray"]
-TodoLinkKind = Literal["application", "meeting", "agenda_item", "ticket", "todo"]
+TodoLinkKind = Literal[
+    "application",
+    "meeting",
+    "agenda_item",
+    "vote",
+    "gremium",
+    "invoice",
+    "expense",
+    "ticket",
+    "todo",
+]
+#: The kinds of a back-reference (``GET /todos/linked``): every kind but a card.
+TodoLinkedKind = Literal[
+    "application",
+    "meeting",
+    "agenda_item",
+    "vote",
+    "gremium",
+    "invoice",
+    "expense",
+    "ticket",
+]
 TodoEventKind = Literal[
     "created",
     "moved",
@@ -31,6 +52,10 @@ TodoEventKind = Literal[
     "restored",
 ]
 TicketStatus = Literal["new", "in_progress", "done", "rejected"]
+VoteStatus = Literal["draft", "open", "closed", "cancelled"]
+VoteResult = Literal["passed", "rejected", "tie", "elected", "runoff"]
+InvoiceStatus = Literal["open", "paid"]
+BookingKind = Literal["expense", "income"]
 
 
 class _Out(BaseModel):
@@ -80,6 +105,13 @@ class TodoLinkDetail(_Out):
     board_name: str | None = Field(default=None, serialization_alias="boardName")
     column_name: str | None = Field(default=None, serialization_alias="columnName")
     is_done: bool | None = Field(default=None, serialization_alias="isDone")
+    amount: str | None = None
+    counterparty: str | None = None
+    cost_centre: str | None = Field(default=None, serialization_alias="costCentre")
+    invoice_status: InvoiceStatus | None = Field(default=None, serialization_alias="invoiceStatus")
+    booking_kind: BookingKind | None = Field(default=None, serialization_alias="bookingKind")
+    vote_status: VoteStatus | None = Field(default=None, serialization_alias="voteStatus")
+    vote_result: VoteResult | None = Field(default=None, serialization_alias="voteResult")
 
 
 class TodoLinkOut(_Out):

@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -47,6 +47,11 @@ export class PublicProtocolDetailComponent {
   protected readonly loading = signal(true);
   protected readonly notFound = signal(false);
   protected readonly error = signal(false);
+  /** The images of the protocol stream through its public route, so no login is needed. */
+  protected readonly imageSrc = computed(() => {
+    const id = this.protocol()?.id;
+    return id ? (image: string) => this.api.imageUrl(id, image) : null;
+  });
 
   /** "Di, 29.09.2026". */
   protected when(p: PublicProtocolDetail): string {

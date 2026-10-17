@@ -4,6 +4,9 @@ import userEvent from '@testing-library/user-event';
 import type { Invoice, InvoiceBooking } from '../../budget/budget-tree.api';
 import type { CostCentreLabel } from '../../budget/expense-display.util';
 import { InvoiceDetailComponent } from './invoice-detail.component';
+import { NO_LINKED_TODOS } from '../../../../testing/todo-fixtures';
+import { of } from 'rxjs';
+import { TodosApiService } from '@core/api/todos.service';
 
 const BOOKING: InvoiceBooking = {
   id: 'b-1',
@@ -63,7 +66,7 @@ async function setup(inputs: Record<string, unknown> = {}) {
       ...inputs,
     },
     on: handlers,
-    providers: [provideRouter([])],
+    providers: [provideRouter([]), NO_LINKED_TODOS],
   });
   return { view, ...handlers, user: userEvent.setup() };
 }
@@ -86,6 +89,19 @@ describe('InvoiceDetailComponent', () => {
     expect(links[1].getAttribute('href')).toBe('/expenses?id=b-1');
     expect(text()).toContain('900,00 € von 2.890,00 €');
     expect(text()).toContain('Noch nicht verbucht: 1.990,00 €');
+  });
+
+  it('lists the to-dos that link the invoice', async () => {
+    const linked = jest.fn(() =>
+      of([{ id: 'k-1', boardId: 'b', boardName: 'StuPa', title: 'Rechnung prüfen', columnName: 'Offen', isDone: false, dueDate: null, assignees: [] }]),
+    );
+    await render(InvoiceDetailComponent, {
+      inputs: { invoice: INVOICE, canManage: false, split: true },
+      providers: [provideRouter([]), { provide: TodosApiService, useValue: { linked } }],
+    });
+    expect(linked).toHaveBeenCalledWith('invoice', INVOICE.id);
+    expect(screen.getByRole('heading', { name: 'To-Dos' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Rechnung prüfen' }).getAttribute('href')).toBe('/todos/b?card=k-1');
   });
 
   it('says how the due date stands', async () => {

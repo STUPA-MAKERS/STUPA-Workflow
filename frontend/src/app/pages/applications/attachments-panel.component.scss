@@ -83,7 +83,8 @@
   min-height: 58px;
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
 }
-.att__icon {
+.att__icon,
+.att__thumb {
   flex: none;
   color: var(--color-text-muted);
 }

@@ -41,6 +41,13 @@ A logo entry is a vendored name (`HSRT`, `INF`, `ASTA`, `STUPA`, `ECHO`,
 `MAKERS`, `MAKERS-RAlign`, `MAKERS-Icon`, `Skyline`) or the name of an
 uploaded asset (PNG, JPEG, GIF, WebP, SVG or PDF).
 
+An uploaded image of the text travels the same way, as the asset
+`img-<uuid>.<ext>` (`png`, `jpg`, `gif`, `webp`). The Markdown refers to it as
+`![alt](/api/media/images/<uuid>)`. Only that path with an uploaded asset shows
+an image; every other image prints its alt text, because the render has no
+network and reads no file of the author. A paragraph that holds only an image
+prints it as a block: centered, at most the text width and 12 cm high.
+
 | Status | Meaning |
 |---|---|
 | 200 | `application/pdf` |
@@ -55,8 +62,8 @@ uploaded asset (PNG, JPEG, GIF, WebP, SVG or PDF).
 | Variable | Default | Meaning |
 |---|---|---|
 | `TYPST_MAX_BODY_BYTES` | 33554432 | maximum request size |
-| `TYPST_MAX_ASSETS` | 16 | maximum number of assets |
-| `TYPST_MAX_ASSET_BYTES` | 2097152 | maximum size of one asset |
+| `TYPST_MAX_ASSETS` | 64 | maximum number of assets (logos plus the images of the text) |
+| `TYPST_MAX_ASSET_BYTES` | 8388608 | maximum size of one asset |
 | `TYPST_COMPILE_TIMEOUT_S` | 60 | wall-clock limit of one compile |
 | `TYPST_MAX_CONCURRENCY` | 2 | compiles that run at the same time |
 

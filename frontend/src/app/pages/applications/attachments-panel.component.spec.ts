@@ -57,6 +57,24 @@ describe('AttachmentsPanelComponent', () => {
     expect(screen.getByRole('heading', { name: 'Anhänge' })).toHaveClass('sr-only');
   });
 
+  it('shows a thumbnail for a clean image and the clip icon for other files', async () => {
+    const view = await render(AttachmentsPanelComponent, {
+      inputs: { applicationId: APP_ID, canUpload: false },
+      providers: [provideHttpClient(), provideHttpClientTesting(), { provide: USE_MOCK_API, useValue: false }],
+    });
+    const http = view.fixture.debugElement.injector.get(HttpTestingController);
+    http.expectOne(`/api/applications/${APP_ID}/attachments`).flush([
+      wire({ id: 'img', filename: 'foto.png', mime: 'image/png', scanned: true }),
+      wire({ id: 'scan', filename: 'neu.jpg', mime: 'image/jpeg', scanned: false }),
+      wire({ id: 'pdf', filename: 'plan.pdf', scanned: true }),
+    ]);
+    view.detectChanges();
+    const thumbs = [...document.querySelectorAll<HTMLImageElement>('.att__thumb img')];
+    expect(thumbs.map((i) => i.getAttribute('src'))).toEqual(['/api/attachments/img/download?inline=1']);
+    expect(document.querySelectorAll('.att__icon')).toHaveLength(2);
+    http.verify();
+  });
+
   it('shows the empty state and no upload control without permission', async () => {
     await setup(false);
     expect(screen.getByText('Noch keine Anhänge hochgeladen.')).toBeInTheDocument();

@@ -10,6 +10,7 @@ import { type Observable, from, of, throwError } from 'rxjs';
 import { delay, mergeMap } from 'rxjs/operators';
 import { USE_MOCK_API } from './api.config';
 import type { Delegation } from './delegations.service';
+import type { MediaImage } from '@shared/markdown/media-api.service';
 import type {
   OnBehalfApplication,
   ApplicationCreatedWire,
@@ -1600,6 +1601,23 @@ function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
   };
 }
 
+let MOCK_MEDIA_SEQ = 0;
+
+/** The answer to a Markdown image upload. The mock keeps no bytes, so the image does not
+ *  load in the mock mode; the reference in the text is real. */
+export function mockMediaImage(body: unknown): MediaImage {
+  const file = body instanceof FormData ? body.get('file') : null;
+  const id = `00000000-0000-4000-8000-${String(++MOCK_MEDIA_SEQ).padStart(12, '0')}`;
+  return {
+    id,
+    url: `/api/media/images/${id}`,
+    mime: file instanceof File && file.type ? file.type : 'image/png',
+    width: 640,
+    height: 480,
+    size: file instanceof File ? file.size : 1024,
+  };
+}
+
 /** The paths of the account pages and the consent page (`mock-account.ts`). */
 const MOCK_ACCOUNT_PATH =
   /(^|\/)api\/(notifications\/preferences|oauth\/grants(\/[^/]+)?|oauth\/consent(-request)?|mcp\/(config|package))$/;
@@ -1968,6 +1986,8 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/auth/logout')) return ok(LOGOUT_OUT);
     // A draft upload of the wizard (Z4): the file stays in the scan, the token stays.
     if (p.endsWith('/apply/attachments')) return ok(mockDraftUpload(req.body), 201);
+    // A Markdown image: the server re-encodes it and answers with its canonical path.
+    if (p.endsWith('/media/images')) return ok(mockMediaImage(req.body), 201);
     if (p.endsWith('/invoices/parse')) {
       const file = req.body instanceof FormData ? req.body.get('file') : null;
       const name = file instanceof File ? file.name : 'rechnung.pdf';
