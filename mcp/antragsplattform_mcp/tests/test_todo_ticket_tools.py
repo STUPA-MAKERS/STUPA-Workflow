@@ -191,6 +191,13 @@ def test_tickets_get_and_note(fake_api: _FakeApi) -> None:
     ]
 
 
+def test_tickets_note_passes_the_mentions(fake_api: _FakeApi) -> None:
+    asyncio.run(tickets.tickets_note("t1", "@Anna bitte", mentions=["p1"]))
+    assert fake_api.calls == [
+        ("POST", "/tickets/t1/notes", {"body": "@Anna bitte", "mentions": ["p1"]}),
+    ]
+
+
 def test_tickets_update_unassigns_with_null(fake_api: _FakeApi) -> None:
     asyncio.run(tickets.tickets_update("t1", S.TicketPatch(assigneeId=None)))
     asyncio.run(

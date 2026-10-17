@@ -6,6 +6,12 @@ removes its files with their objects. A file of a comment has no ``application_i
 so it never shows in the attachment list of the application. An anonymized
 application takes no comment files, because the retention ran once and would not
 see them again.
+
+A comment can mention members (``mentions``, principal ids). Only a caller who reads
+the internal comments mentions, and only a person of `mentionable_people`; else the
+write is 422 ``mention_not_member``. The create and the edit put the mentions that
+they added into ``added_mentions``, and the router mails exactly those after the
+commit. The applicant view never sees the list (A12, O16).
 """
 
 from __future__ import annotations
@@ -15,6 +21,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 
+from app.modules.applications.mentions import mentionable_ids, mentionable_people
 from app.modules.applications.models import Applicant, Application, Comment
 from app.modules.applications.schemas import ActorOut, CommentOut
 from app.modules.applications.service.service_base import ApplicationsServiceBase
@@ -24,6 +31,15 @@ from app.modules.files.drafts import bind_drafts, check_message_drafts
 from app.modules.files.schemas import MessageAttachmentOut
 from app.modules.files.service import FilesService
 from app.shared.errors import ForbiddenError, NotFoundError, ValidationProblem
+from app.shared.mentions import (
+    check_mentions,
+    mention_error,
+    mention_ids,
+    new_mentions,
+    stored_mentions,
+    unique_mentions,
+)
+from app.shared.people import PersonRef, person_refs
 
 #: The problem code of a comment with files on an anonymized application.
 APPLICATION_ANONYMIZED = "application_anonymized"
@@ -51,6 +67,50 @@ def is_comment_author(
 class CommentOps(ApplicationsServiceBase):
     """Add, list, edit and remove application comments."""
 
+    #: The mentions that the last create or edit added, for the mention mail.
+    added_mentions: Sequence[UUID] = ()
+
+    async def _checked_mentions(
+        self, application_id: UUID, mentions: Sequence[UUID], *, may_mention: bool
+    ) -> list[UUID]:
+        """Return the mentions without duplicates, after the check.
+
+        Raises:
+            ValidationProblem: A mention by a caller who does not read the internal
+                comments, or a mention outside `mentionable_people` (HTTP 422,
+                ``mention_not_member``).
+        """
+        wanted = unique_mentions(mentions)
+        if not wanted:
+            return wanted
+        if not may_mention:
+            raise mention_error()
+        check_mentions(wanted, await mentionable_ids(self.session, application_id))
+        return wanted
+
+    async def mentionable(self, application_id: UUID) -> list[PersonRef]:
+        """Return the persons whom a comment on the application may mention.
+
+        The caller checked that the viewer reads the internal comments. An
+        unconfirmed guest submission answers 404, like the comment list of a
+        principal.
+
+        Raises:
+            NotFoundError: The application does not exist or is unconfirmed (404).
+        """
+        await self._get_app(application_id, allow_unconfirmed=False)
+        return await mentionable_people(self.session, application_id)
+
+    async def _mention_refs(
+        self, rows: Sequence[Comment], *, applicant_view: bool
+    ) -> dict[UUID, list[PersonRef]]:
+        """Resolve the mentions of the comments in one query; empty in the applicant view."""
+        if applicant_view:
+            return {}
+        ids = {c.id: mention_ids(c.mentions) for c in rows}
+        refs = await person_refs(self.session, (pid for pids in ids.values() for pid in pids))
+        return {cid: [refs[pid] for pid in pids] for cid, pids in ids.items()}
+
     async def add_comment(
         self,
         application_id: UUID,
@@ -63,14 +123,21 @@ class CommentOps(ApplicationsServiceBase):
         attachment_ids: Sequence[UUID] = (),
         draft_token: str | None = None,
         pepper: str = "",
+        mentions: Sequence[UUID] = (),
+        may_mention: bool = False,
     ) -> CommentOut:
         """Add a comment and bind its files in the same transaction.
+
+        ``may_mention`` is true when the caller reads the internal comments
+        (``Access.can_see_internal``). Every mention is new, so ``added_mentions``
+        holds all of them.
 
         Raises:
             NotFoundError: The application does not exist or is hidden (404).
             ValidationProblem: Files on an anonymized application
                 (``application_anonymized``), files without a draft token, or a draft
-                that is missing, expired, foreign or infected (422).
+                that is missing, expired, foreign or infected (422). A mention that
+                the caller may not make (422, ``mention_not_member``).
         """
         # With files the application row is locked before the anonymized check, as
         # the anonymization locks it. Otherwise a comment that binds files while the
@@ -84,6 +151,9 @@ class CommentOps(ApplicationsServiceBase):
                 code=APPLICATION_ANONYMIZED,
                 errors=[{"field": "attachmentIds", "msg": "application is anonymized"}],
             )
+        wanted = await self._checked_mentions(
+            application_id, mentions, may_mention=may_mention
+        )
         token = await check_message_drafts(
             self.session, attachment_ids=attachment_ids, token=draft_token, pepper=pepper
         )
@@ -93,6 +163,7 @@ class CommentOps(ApplicationsServiceBase):
             author_kind=author_kind,
             body=body,
             visibility=visibility,
+            mentions=stored_mentions(wanted),
         )
         self.session.add(comment)
         if token is not None:
@@ -105,8 +176,10 @@ class CommentOps(ApplicationsServiceBase):
                 comment_id=comment.id,
             )
         await self.session.commit()
+        self.added_mentions = wanted
         info = await self._comment_author_info(app, author, author_kind)
         files = await self._comment_files([comment.id])
+        refs = await self._mention_refs([comment], applicant_view=not may_mention)
         return CommentOut(
             id=comment.id,
             author=info.legacy(author) if author else None,
@@ -117,6 +190,7 @@ class CommentOps(ApplicationsServiceBase):
             at=comment.at,
             isOwn=True,  # the creator is always the viewer of the 201 response
             attachments=files.get(comment.id, []),
+            mentions=refs.get(comment.id, []),
         )
 
     async def _is_anonymized(self, application_id: UUID) -> bool:
@@ -151,7 +225,8 @@ class CommentOps(ApplicationsServiceBase):
         In the ``applicant_view`` a comment of a member names the Gremium of the
         application as its author (A12, O16). A comment of the logged-in creator
         keeps the own name, unless the creator submitted for another email (F23)
-        and the viewer is the magic-link applicant.
+        and the viewer is the magic-link applicant. The applicant view also gets
+        no mentions (an empty list), because they are member names.
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         stmt = select(Comment).where(Comment.application_id == application_id)
@@ -172,6 +247,7 @@ class CommentOps(ApplicationsServiceBase):
             return ActorOut(kind="applicant" if c.author_kind == "applicant" else "deleted")
 
         files = await self._comment_files([c.id for c in rows])
+        refs = await self._mention_refs(rows, applicant_view=applicant_view)
         return [
             CommentOut(
                 id=c.id,
@@ -188,6 +264,7 @@ class CommentOps(ApplicationsServiceBase):
                     viewer_is_applicant=viewer_is_applicant,
                 ),
                 attachments=files.get(c.id, []),
+                mentions=refs.get(c.id, []),
             )
             for c in rows
         ]
@@ -284,6 +361,8 @@ class CommentOps(ApplicationsServiceBase):
         viewer_is_applicant: bool,
         can_manage: bool,
         allow_unconfirmed: bool = True,
+        mentions: Sequence[UUID] | None = None,
+        may_mention: bool = False,
     ) -> CommentOut:
         """Replace the body of a comment in place.
 
@@ -293,9 +372,15 @@ class CommentOps(ApplicationsServiceBase):
         it to internal would only hide it from the applicant who read it. Use
         the delete for that case.
 
+        ``mentions`` None keeps the stored mentions; a list replaces them after the
+        same check as the create. ``added_mentions`` holds the ids that the list adds,
+        so an edit never mails a person twice.
+
         Raises:
             NotFoundError: The application or the comment does not exist (404).
             ForbiddenError: The caller is neither the author nor a manager (403).
+            ValidationProblem: A mention that the caller may not make (422,
+                ``mention_not_member``).
         """
         app = await self._get_app(application_id, allow_unconfirmed=allow_unconfirmed)
         comment = await self._get_comment(application_id, comment_id)
@@ -305,11 +390,19 @@ class CommentOps(ApplicationsServiceBase):
             viewer_is_applicant=viewer_is_applicant,
             can_manage=can_manage,
         )
+        self.added_mentions = []
+        if mentions is not None:
+            wanted = await self._checked_mentions(
+                application_id, mentions, may_mention=may_mention
+            )
+            self.added_mentions = new_mentions(wanted, mention_ids(comment.mentions))
+            comment.mentions = stored_mentions(wanted)
         comment.body = body
         await self._audit_comment(comment, AuditAction.COMMENT_UPDATE, actor=actor)
         await self.session.commit()
         info = await self._comment_author_info(app, comment.author, comment.author_kind)
         files = await self._comment_files([comment.id])
+        refs = await self._mention_refs([comment], applicant_view=not may_mention)
         return CommentOut(
             id=comment.id,
             author=info.legacy(comment.author) if comment.author else None,
@@ -325,6 +418,7 @@ class CommentOps(ApplicationsServiceBase):
                 viewer_is_applicant=viewer_is_applicant,
             ),
             attachments=files.get(comment.id, []),
+            mentions=refs.get(comment.id, []),
         )
 
     async def delete_comment(
