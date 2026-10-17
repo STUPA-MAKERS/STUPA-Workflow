@@ -18,7 +18,7 @@ module does not duplicate them.
 from __future__ import annotations
 
 from datetime import date
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import (
@@ -1441,13 +1441,17 @@ async def get_public_site_config(
 
 # Dynamic PWA manifest, auth-free. The active site config is the source of truth.
 # The edge proxy (nginx) maps the browser-linked ``/manifest.webmanifest`` to this
-# route, so name and short_name follow the configured app name.
+# route, so name and short_name follow the configured app name. ``scheme=dark`` gives the
+# dark bar colours; the frontend links it while the dark theme is in effect.
 @public_router.get("/manifest.webmanifest", include_in_schema=False)
-async def get_manifest(service: SiteServiceDep) -> Response:
+async def get_manifest(
+    service: SiteServiceDep,
+    scheme: Annotated[Literal["light", "dark"], Query()] = "light",
+) -> Response:
     """PWA manifest from the active branding config (application/manifest+json)."""
     import json
 
-    body = json.dumps(await service.manifest(), ensure_ascii=False)
+    body = json.dumps(await service.manifest(scheme), ensure_ascii=False)
     return Response(
         content=body,
         media_type="application/manifest+json",

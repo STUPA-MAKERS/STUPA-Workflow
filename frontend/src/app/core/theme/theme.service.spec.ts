@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { THEME_COLOR, ThemeService } from './theme.service';
+import { MANIFEST_HREF, THEME_COLOR, ThemeService } from './theme.service';
 
 describe('ThemeService', () => {
   let matchesMock: boolean;
@@ -153,6 +153,29 @@ describe('ThemeService', () => {
 
     it('uses the background tokens of the design system, not the old brand green', () => {
       expect(THEME_COLOR).toEqual({ light: '#f6f7f5', dark: '#101211' });
+    });
+  });
+
+  describe('manifest link', () => {
+    let link: HTMLLinkElement;
+
+    beforeEach(() => {
+      link = document.createElement('link');
+      link.setAttribute('rel', 'manifest');
+      link.setAttribute('href', 'manifest.webmanifest');
+      document.head.appendChild(link);
+    });
+
+    afterEach(() => link.remove());
+
+    it('links the manifest whose bar colours match the theme in effect', () => {
+      const svc = service();
+      svc.init();
+      expect(link.getAttribute('href')).toBe(MANIFEST_HREF.light);
+      svc.setPreference('dark');
+      expect(link.getAttribute('href')).toBe('manifest.webmanifest?scheme=dark');
+      svc.setPreference('light');
+      expect(link.getAttribute('href')).toBe('manifest.webmanifest');
     });
   });
 });
