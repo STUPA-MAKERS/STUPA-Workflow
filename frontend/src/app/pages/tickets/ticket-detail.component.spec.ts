@@ -898,6 +898,52 @@ describe('TicketDetailComponent', () => {
     }
   });
 
+  it('opens a link to a note in the log and scrolls the note into view', async () => {
+    const proto = Element.prototype as { scrollIntoView?: unknown };
+    const before = proto.scrollIntoView;
+    const scroll = jest.fn();
+    proto.scrollIntoView = scroll;
+    try {
+      const { cmp, harness } = await start('/tickets/t40#note-n1');
+      harness.detectChanges();
+      await harness.fixture.whenStable();
+      expect(cmp.tab()).toBe('log');
+      expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+      // A reload of the same ticket (after a change) leaves the tab and the scroll.
+      cmp.tab.set('details');
+      scroll.mockClear();
+      (cmp as unknown as { show(t: unknown): void }).show(cmp.ticket());
+      harness.detectChanges();
+      await harness.fixture.whenStable();
+      expect(cmp.tab()).toBe('details');
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      proto.scrollIntoView = before;
+    }
+  });
+
+  it('leaves the log at its end for a link to a note that is gone', async () => {
+    const proto = Element.prototype as { scrollIntoView?: unknown };
+    const before = proto.scrollIntoView;
+    const scroll = jest.fn();
+    proto.scrollIntoView = scroll;
+    try {
+      const { harness } = await start('/tickets/t40#note-gone');
+      await harness.fixture.whenStable();
+      expect(scroll).not.toHaveBeenCalled();
+    } finally {
+      proto.scrollIntoView = before;
+    }
+  });
+
+  it('offers the staff the ticket team after "@", and the reporter nobody', async () => {
+    const { cmp } = await start();
+    expect(cmp.mentionables().map((p: { displayName: string }) => p.displayName)).toEqual(
+      expect.arrayContaining([MARA.displayName, JONAS.displayName]),
+    );
+    expect(cmp.mentionables()).toHaveLength(2);
+  });
+
   it('sends, edits and deletes notes, and never the report', async () => {
     const { cmp, api, toast } = await start();
     cmp.sendNote({ body: 'Fix ist offen.' });
@@ -906,11 +952,20 @@ describe('TicketDetailComponent', () => {
       'Fix ist offen.',
       { body: 'Fix ist offen.' },
       undefined,
+      undefined,
+    );
+    cmp.sendNote({ body: '@Ada hilft', mentions: ['p-ada'] });
+    expect(api.addNote).toHaveBeenLastCalledWith(
+      't40',
+      '@Ada hilft',
+      { body: '@Ada hilft', mentions: ['p-ada'] },
+      undefined,
+      ['p-ada'],
     );
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1', 'n9']);
 
     cmp.editNote({ id: 'n1', body: 'Prüfe ich morgen.' });
-    expect(api.editNote).toHaveBeenCalledWith('t40', 'n1', 'Prüfe ich morgen.');
+    expect(api.editNote).toHaveBeenCalledWith('t40', 'n1', 'Prüfe ich morgen.', undefined);
     expect(cmp.notes()[0].body).toBe('Prüfe ich morgen.');
     cmp.deleteNote({ id: 'n9' });
     expect(cmp.notes().map((n) => n.id)).toEqual(['n1']);
@@ -1115,6 +1170,7 @@ describe('TicketDetailComponent', () => {
       '',
       expect.objectContaining({ attachmentIds: ['d1'], draftToken: 'tok' }),
       undefined,
+      undefined,
     );
     const failed = cmp.messages().at(-1)!;
     expect(failed.attachments).toEqual([file]);
@@ -1222,6 +1278,7 @@ describe('TicketDetailComponent', () => {
         'Antwort',
         { body: 'Antwort', visibility: 'public' },
         'public',
+        undefined,
       );
     });
 

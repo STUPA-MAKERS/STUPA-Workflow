@@ -18,7 +18,8 @@ The link of an application depends on the reader:
 
 A comment mail to a reader of ``/applications/{id}`` ends its link with
 ``#comment-{comment id}``. The page then opens the comments and scrolls to that
-comment. The link of a guest has no fragment.
+comment. The link of a guest has no fragment. A mention mail of a ticket note ends
+its link with ``#note-{note id}`` in the same way.
 """
 
 from __future__ import annotations
@@ -107,9 +108,17 @@ def privacy_admin_link(settings: Settings) -> MailLink:
     return MailLink(f"{_base(settings)}/admin/privacy", "privacy")
 
 
-def ticket_link(settings: Settings, ticket_id: UUID | str) -> MailLink:
-    """Return the link to a ticket: the team and the reporter account open the same path."""
-    return MailLink(f"{_base(settings)}/tickets/{ticket_id}", "ticket")
+def ticket_link(
+    settings: Settings, ticket_id: UUID | str, *, note_id: UUID | str | None = None
+) -> MailLink:
+    """Return the link to a ticket: the team and the reporter account open the same path.
+
+    ``note_id`` adds the fragment ``#note-{id}``, which opens the ticket at that note.
+    """
+    url = f"{_base(settings)}/tickets/{ticket_id}"
+    if note_id is not None:
+        url += f"#note-{note_id}"
+    return MailLink(url, "ticket")
 
 
 def todo_link(settings: Settings, board_id: UUID | str, card_id: UUID | str) -> MailLink:

@@ -58,9 +58,9 @@
   </div>
 } @else if (!groups().length) {
   @if (filterActive()) {
-    <p class="gdc__status">{{ 'gremien.decisions.noMatch' | t }}</p>
+    <app-empty-state rows="3" [heading]="'gremien.decisions.noMatch' | t" />
   } @else {
-    <app-empty-state icon="vote" [heading]="'gremien.decisions.empty' | t" />
+    <app-empty-state rows="3" [heading]="'gremien.decisions.empty' | t" />
   }
 } @else {
   @for (g of groups(); track g.key) {

@@ -475,17 +475,6 @@ export function defaultBoard(
   );
 }
 
-/** The ids of the people a comment names as "@Display Name". */
-export function mentionIds(body: string, members: readonly { principalId: Uuid; displayName: string | null }[]): Uuid[] {
-  const ids: Uuid[] = [];
-  for (const m of members) {
-    if (m.displayName && body.includes(`@${m.displayName}`) && !ids.includes(m.principalId)) {
-      ids.push(m.principalId);
-    }
-  }
-  return ids;
-}
-
 /** An app route of a link ("/meetings/m-1?item=a-1") as router path and query. */
 export function splitUrl(url: string): { path: string; query: Record<string, string> } {
   const [path, search = ''] = url.split('?');

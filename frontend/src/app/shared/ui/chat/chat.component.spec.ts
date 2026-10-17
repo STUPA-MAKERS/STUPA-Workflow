@@ -13,6 +13,7 @@ import { AltchaService } from '../../../features/apply/altcha.service';
 import { ChatDrafts } from './chat-drafts';
 import { ChatComponent, SCAN_BACKOFF, chatUploadError } from './chat.component';
 import type { ChatEvent, ChatMessage, ChatVisibility } from './chat.models';
+import type { ChatPerson } from './chat-mentions';
 
 /** A time today, so the day separator reads "Heute". */
 function today(h: number, m = 0): string {
@@ -60,6 +61,8 @@ interface SetupOpts {
   fine?: boolean;
   canAttach?: boolean;
   loading?: boolean;
+  mentionables?: ChatPerson[];
+  publicMentions?: boolean;
   /** The answer of an upload; default: a draft with the file's name. */
   upload?: (file: File, opts: { token?: string | null }) => Observable<DraftUpload>;
 }
@@ -105,6 +108,8 @@ async function setup(opts: SetupOpts = {}) {
       draftKey: opts.draftKey ?? 't1',
       canAttach: opts.canAttach ?? false,
       loading: opts.loading ?? false,
+      mentionables: opts.mentionables ?? [],
+      publicMentions: opts.publicMentions ?? true,
     },
     on: { send, edit, delete: del, retry, discard, refresh },
     providers: [
@@ -453,6 +458,274 @@ describe('ChatComponent', () => {
     it('has no composer without the right to post', async () => {
       await setup({ canPost: false });
       expect(screen.queryByRole('textbox')).toBeNull();
+    });
+  });
+
+  describe('mentions', () => {
+    const people: ChatPerson[] = [
+      { principalId: 'p-1', displayName: 'Jonas Weber' },
+      { principalId: 'p-2', displayName: 'Selin Yıldız' },
+    ];
+    const type = (box: HTMLTextAreaElement, value: string) =>
+      fireEvent.input(box, { target: { value, selectionStart: value.length } });
+    const list = () => screen.queryByRole('listbox', { name: 'Personen erwähnen' });
+
+    it('lists the people after "@" and takes one with the keys, then sends the ids', async () => {
+      const { input, send, view } = await setup({ mentionables: people });
+      type(input(), 'Hallo @');
+      view.fixture.detectChanges();
+      expect(within(list()!).getAllByRole('option')).toHaveLength(2);
+      expect(input()).toHaveAttribute('aria-controls', list()!.id);
+      expect(input().getAttribute('aria-activedescendant')).toBe(
+        within(list()!).getAllByRole('option')[0].id,
+      );
+      fireEvent.keyDown(input(), { key: 'ArrowDown' });
+      fireEvent.keyUp(input(), { key: 'ArrowDown' });
+      view.fixture.detectChanges();
+      expect(within(list()!).getByRole('option', { name: 'Selin Yıldız' })).toHaveAttribute(
+        'aria-selected',
+        'true',
+      );
+      fireEvent.keyDown(input(), { key: 'Tab' });
+      fireEvent.keyUp(input(), { key: 'Tab' });
+      view.fixture.detectChanges();
+      expect(input().value).toBe('Hallo @Selin Yıldız ');
+      expect(list()).toBeNull();
+      expect(input()).not.toHaveAttribute('aria-controls');
+      expect(document.activeElement).toBe(input());
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenCalledWith({ body: 'Hallo @Selin Yıldız', mentions: ['p-2'] });
+    });
+
+    it('takes a person with a click, follows the pointer and keeps the focus in the text', async () => {
+      const { input, view } = await setup({ mentionables: people });
+      input().focus();
+      type(input(), '@jo');
+      view.fixture.detectChanges();
+      const option = within(list()!).getByRole('option', { name: 'Jonas Weber' });
+      fireEvent.mouseEnter(option);
+      view.fixture.detectChanges();
+      expect(option).toHaveAttribute('aria-selected', 'true');
+      expect(fireEvent.mouseDown(option)).toBe(false);
+      fireEvent.click(option);
+      view.fixture.detectChanges();
+      expect(input().value).toBe('@Jonas Weber ');
+      expect(input().selectionStart).toBe(13);
+    });
+
+    it('closes on Escape and on blur, and sends no mentions without a name', async () => {
+      const { input, send, view } = await setup({ mentionables: people });
+      type(input(), '@se');
+      view.fixture.detectChanges();
+      fireEvent.keyDown(input(), { key: 'Escape' });
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      fireEvent.click(input());
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      type(input(), '@se @jo');
+      view.fixture.detectChanges();
+      expect(list()).not.toBeNull();
+      fireEvent.blur(input());
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      type(input(), 'Ohne Namen');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenCalledWith({ body: 'Ohne Namen' });
+    });
+
+    it('offers no list without people', async () => {
+      const { input, view } = await setup();
+      type(input(), '@jo');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+    });
+
+    it('marks the mentioned people in a message', async () => {
+      await setup({
+        messages: [
+          msg('a', today(9), {
+            body: 'Hallo @Selin Yıldız, schau mal',
+            mentions: [
+              { principalId: 'p-2', displayName: 'Selin Yıldız' },
+              { principalId: null, displayName: null },
+            ],
+          }),
+        ],
+      });
+      expect(document.querySelector('.chat__mention')).toHaveTextContent('@Selin Yıldız');
+    });
+
+    it('lists the people in an edit and sends the new mentions; without people the mentions stay', async () => {
+      const own = [msg('m', today(9), { own: true, body: 'Alt' })];
+      const { edit, view, set } = await setup({ messages: own, mentionables: people });
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      type(box(), 'Alt @jo');
+      view.fixture.detectChanges();
+      expect(list()).toHaveClass('chat__mentions--below');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      view.fixture.detectChanges();
+      expect(box().value).toBe('Alt @Jonas Weber ');
+      fireEvent.keyDown(box(), { key: 'Escape' });
+      expect(screen.queryByRole('textbox', { name: 'Nachricht bearbeiten' })).toBeNull();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      type(box(), 'Alt @Jonas Weber!');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: 'Alt @Jonas Weber!',
+        mentions: ['p-1'],
+        restore: expect.any(Function),
+      });
+
+      set('mentionables', []);
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      type(box(), 'Neu');
+      fireEvent.click(box());
+      fireEvent.keyUp(box(), { key: 'a' });
+      fireEvent.blur(box());
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: 'Neu',
+        restore: expect.any(Function),
+      });
+    });
+
+    it('mentions only in an internal message where the other side reads the public ones', async () => {
+      const own = [
+        msg('pub', today(9), { own: true, body: 'Alt', visibility: 'public' }),
+        msg('int', today(9, 1), { own: true, body: 'Intern', visibility: 'internal' }),
+      ];
+      const { cmp, input, send, edit, view } = await setup({
+        messages: own,
+        mentionables: people,
+        publicMentions: false,
+        visibilityOptions: ['public', 'internal'],
+      });
+      type(input(), '@jo');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      cmp.setVisibility('internal');
+      type(input(), '@jo');
+      view.fixture.detectChanges();
+      expect(list()).not.toBeNull();
+      // The switch back to public closes the open list.
+      cmp.setVisibility('public');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      type(input(), '@Jonas Weber');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({ body: '@Jonas Weber', visibility: 'public' });
+
+      const editButton = (i: number) =>
+        screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })[i];
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      fireEvent.click(editButton(0));
+      type(box(), 'Alt @jo');
+      view.fixture.detectChanges();
+      expect(list()).toBeNull();
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'pub',
+        body: 'Alt @jo',
+        restore: expect.any(Function),
+      });
+      view.fixture.detectChanges();
+      fireEvent.click(editButton(1));
+      type(box(), 'Intern @Jonas Weber!');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'int',
+        body: 'Intern @Jonas Weber!',
+        mentions: ['p-1'],
+        restore: expect.any(Function),
+      });
+    });
+
+    it('keeps the chosen person where two people have the same name', async () => {
+      const twins: ChatPerson[] = [
+        { principalId: 'k-1', displayName: 'Kim' },
+        { principalId: 'k-2', displayName: 'Kim' },
+      ];
+      const own = [
+        msg('m', today(9), {
+          own: true,
+          body: '@Kim',
+          mentions: [{ principalId: 'k-2', displayName: 'Kim' }],
+        }),
+      ];
+      const { input, send, edit, view } = await setup({ messages: own, mentionables: twins });
+      type(input(), '@ki');
+      view.fixture.detectChanges();
+      fireEvent.keyDown(input(), { key: 'ArrowDown' });
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({ body: '@Kim', mentions: ['k-2'] });
+      // The next message starts without the earlier choice.
+      type(input(), '@Kim ');
+      fireEvent.keyDown(input(), { key: 'Enter' });
+      expect(send).toHaveBeenLastCalledWith({ body: '@Kim', mentions: ['k-1'] });
+      // An edit keeps the person that the message mentions.
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      const box = screen.getByRole('textbox', { name: 'Nachricht bearbeiten' });
+      type(box as HTMLTextAreaElement, '@Kim, bitte');
+      fireEvent.keyDown(box, { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: '@Kim, bitte',
+        mentions: ['k-2'],
+        restore: expect.any(Function),
+      });
+    });
+
+    it('keeps a stored mention of a person who left the list while the text names them', async () => {
+      const own = [
+        msg('m', today(9), {
+          own: true,
+          body: '@Otto Alt bitte',
+          mentions: [{ principalId: 'p-9', displayName: 'Otto Alt' }],
+        }),
+      ];
+      const { edit } = await setup({ messages: own, mentionables: people });
+      const box = () =>
+        screen.getByRole('textbox', { name: 'Nachricht bearbeiten' }) as HTMLTextAreaElement;
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      type(box(), '@Otto Alt bitte prüfen, @Jonas Weber!');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: '@Otto Alt bitte prüfen, @Jonas Weber!',
+        mentions: ['p-9', 'p-1'],
+        restore: expect.any(Function),
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Nachricht bearbeiten' }));
+      type(box(), 'Ohne Otto');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(edit).toHaveBeenLastCalledWith({
+        id: 'm',
+        body: 'Ohne Otto',
+        mentions: [],
+        restore: expect.any(Function),
+      });
+    });
+
+    it('does nothing when the text box of a pick is gone', async () => {
+      const { cmp } = await setup({ mentionables: people });
+      cmp.editMentions.update('@jo', 3);
+      cmp.pickMention(cmp.editMentions, people[0]);
+      expect(cmp.editMentions.open()).toBe(true);
+      cmp.composerMentions.close();
+      const box = screen.getByRole('textbox', {
+        name: 'Nachricht schreiben …',
+      }) as HTMLTextAreaElement;
+      box.value = 'x';
+      cmp.pickMention(cmp.composerMentions, people[0]);
+      expect(box.value).toBe('x');
     });
   });
 

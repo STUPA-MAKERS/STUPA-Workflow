@@ -12,6 +12,7 @@ import { ButtonComponent, DialogComponent, InputComponent } from '@stupa-makers/
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clockTime } from '../meetings-display.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 interface GuestRow {
   g: MeetingGuest;
@@ -33,6 +34,7 @@ interface GuestRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
     TranslatePipe,

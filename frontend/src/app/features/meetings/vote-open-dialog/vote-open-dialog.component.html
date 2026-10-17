@@ -79,7 +79,7 @@
           }
         </ol>
       } @else {
-        <p class="vod__empty">{{ 'election.dialog.none' | t }}</p>
+        <app-empty-state rows="2" [heading]="'election.dialog.none' | t" />
       }
       @if (memberOptions().length > 0) {
         <app-select

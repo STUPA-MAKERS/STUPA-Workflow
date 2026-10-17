@@ -27,6 +27,7 @@ import {
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** Edit state of the create dialog: title in DE and EN, Gremium, and budget flag. */
 interface NewForm {
@@ -54,6 +55,7 @@ function emptyForm(): NewForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     RouterLink,
     TranslatePipe,

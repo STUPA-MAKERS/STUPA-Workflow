@@ -38,13 +38,12 @@
       <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>
     </div>
   } @else {
-    <p class="cs__none">{{ 'account.calendar.none' | t }}</p>
-    <div class="cs__actions">
-      <app-button variant="fill" size="sm" [loading]="busy()" (click)="rotate()">
+    <app-empty-state rows="2" [heading]="'account.calendar.none' | t">
+      <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
         <app-icon name="link" [size]="16" />
         {{ 'account.calendar.generate' | t }}
       </app-button>
-    </div>
+    </app-empty-state>
   }
 </ng-template>
 

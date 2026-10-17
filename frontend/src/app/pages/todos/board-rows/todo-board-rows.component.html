@@ -65,7 +65,7 @@
           }
         </div>
       } @else {
-        <p class="br__empty" [id]="'br-c-' + row.board.id">{{ 'todos.board.columnEmpty' | t }}</p>
+        <app-empty-state class="br__empty" rows="1" [id]="'br-c-' + row.board.id" [heading]="'todos.board.columnEmpty' | t" />
       }
     } @else if (isOpen(row)) {
       <!-- cdkScrollable: a drag in the row scrolls it sideways and measures its drop lists anew.

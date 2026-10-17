@@ -160,14 +160,11 @@
         <app-todo-board-skeleton [view]="phone() ? 'rows' : 'board'" [phone]="phone()" [natural]="true" />
         <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
       } @else if (allEmpty()) {
-        <div class="td__state">
-          <app-empty-state icon="circleok" [heading]="'todos.all.empty' | t" />
-        </div>
+        <app-empty-state fill [heading]="'todos.all.empty' | t" />
       } @else if (noMatch()) {
-        <div class="td__state">
-          <app-empty-state icon="filter" [heading]="'todos.noMatch' | t" />
+        <app-empty-state fill [heading]="'todos.noMatch' | t">
           <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
-        </div>
+        </app-empty-state>
       }
       <app-todo-board-rows
         source="all"
@@ -192,9 +189,7 @@
       />
       <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
     } @else if (notFound()) {
-      <div class="td__state">
-        <app-empty-state icon="circleok" [heading]="'todos.notFound' | t" />
-      </div>
+      <app-empty-state fill [heading]="'todos.notFound' | t" />
     } @else if (error()) {
       <div class="td__state" role="alert">
         <p class="td__error">{{ 'todos.error.load' | t }}</p>
@@ -202,10 +197,9 @@
       </div>
     } @else if (board(); as b) {
       @if (noMatch()) {
-        <div class="td__state">
-          <app-empty-state icon="filter" [heading]="'todos.noMatch' | t" />
+        <app-empty-state fill [heading]="'todos.noMatch' | t">
           <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
-        </div>
+        </app-empty-state>
       } @else if (view() === 'list') {
         <app-todo-list-view
           [board]="b"

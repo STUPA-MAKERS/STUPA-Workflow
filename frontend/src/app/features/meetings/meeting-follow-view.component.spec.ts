@@ -415,7 +415,7 @@ describe('MeetingFollowViewComponent', () => {
       const { context } = await setup({ meeting: member({ status: 'closed' }), agenda: [] });
       context();
       expect(screen.getByText('0 TOPs')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { level: 2, name: 'Diese Sitzung hatte keine TOPs.' })).toBeInTheDocument();
+      expect(screen.getByText('Diese Sitzung hatte keine TOPs.')).toBeInTheDocument();
       expect(screen.queryByText(/Die Sitzung beginnt/)).toBeNull();
       expect(screen.queryByText('Kalender abonnieren')).toBeNull();
     });

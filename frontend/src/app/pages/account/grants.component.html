@@ -76,6 +76,8 @@
       <app-note kind="error" icon="alert" role="alert">{{ 'account.grants.error' | t }}</app-note>
     } @else if (loading() && grants().length === 0) {
       <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
+    } @else if (grants().length === 0) {
+      <app-empty-state rows="3" [heading]="'account.grants.empty' | t" />
     } @else {
       <ul class="rowgroup gr__list" [attr.aria-label]="'account.grants.active' | t" [attr.aria-busy]="loading()">
         @for (g of grants(); track g.id) {
@@ -104,8 +106,6 @@
               {{ 'account.grants.revoke' | t }}
             </app-button>
           </li>
-        } @empty {
-          <li class="gr__empty">{{ 'account.grants.empty' | t }}</li>
         }
       </ul>
     }

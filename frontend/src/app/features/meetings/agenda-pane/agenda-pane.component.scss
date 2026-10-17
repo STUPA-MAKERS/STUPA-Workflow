@@ -182,12 +182,6 @@
   outline-offset: 1px;
 }
 
-.ap__empty {
-  padding: var(--space-4) var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
 /* Drag and drop: the lift and the drop box of the to-do board. The row in the hand is
    lifted onto an opaque surface with a shadow and tilted a little; the grip shows on it. */
 .ap__preview {

@@ -44,6 +44,7 @@ import { ChatComponent } from '@shared/ui/chat/chat.component';
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
+import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
   FilterSelectComponent,
@@ -73,7 +74,6 @@ import {
   linkSub,
   linkTitle,
   longDay,
-  mentionIds,
   personName,
   relativeDays,
   splitUrl,
@@ -379,9 +379,13 @@ export class TodoCardDetailComponent {
       own: c.isOwn,
       canEdit: c.isOwn && writes,
       attachments: toChatAttachments(this.apiBase, c.attachments),
+      mentions: c.mentions,
     }));
     return [...comments, ...this.outbox.messages()];
   });
+
+  /** The "@" list of the comments: the members of the board. */
+  readonly mentionables = computed(() => chatPeople(this.members()));
 
   readonly events = computed<ChatEvent[]>(() =>
     (this.card()?.events ?? []).map((e) => ({
@@ -962,7 +966,7 @@ export class TodoCardDetailComponent {
   // ------------------------------------------------------------------ comments
 
   private postComment(req: ChatSend): Observable<TodoComment> {
-    return this.api.addComment(this.cardId(), req.body, mentionIds(req.body, this.members()), req);
+    return this.api.addComment(this.cardId(), req.body, req.mentions ?? [], req);
   }
 
   sendComment(req: ChatSend): void {
@@ -981,7 +985,7 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     const current = this.current();
-    this.api.editComment(c.id, edit.id, edit.body, mentionIds(edit.body, this.members())).subscribe({
+    this.api.editComment(c.id, edit.id, edit.body, edit.mentions ?? []).subscribe({
       next: (comment) => {
         if (!current()) return;
         this.patchComments((cur) => ({

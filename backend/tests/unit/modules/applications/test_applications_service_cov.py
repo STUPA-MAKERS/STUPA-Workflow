@@ -1410,11 +1410,11 @@ async def test_list_comments_include_internal() -> None:
     app = _app()
     c1 = _Obj(
         id=uuid4(), author="sub-1", author_kind="principal", body="intern",
-        visibility="internal", at=NOW,
+        visibility="internal", at=NOW, mentions=[],
     )
     c2 = _Obj(
         id=uuid4(), author=None, author_kind="applicant", body="öffentlich",
-        visibility="public", at=NOW,
+        visibility="public", at=NOW, mentions=[],
     )
     session = _Session(
         get_results=[app],
@@ -1432,7 +1432,7 @@ async def test_list_comments_public_only() -> None:
     app = _app()
     c = _Obj(
         id=uuid4(), author="sub-1", author_kind="principal", body="x",
-        visibility="public", at=NOW,
+        visibility="public", at=NOW, mentions=[],
     )
     session = _Session(
         get_results=[app],

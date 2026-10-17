@@ -7,6 +7,7 @@ import type { StatusKind } from '@shared/status-kind.util';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { memberAttendanceKey } from '../meetings-display.util';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 let nextId = 0;
 
@@ -33,7 +34,7 @@ interface RosterRow {
   selector: 'app-participant-roster',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, AvatarComponent, StatusTextComponent],
+  imports: [EmptyStateComponent, TranslatePipe, AvatarComponent, StatusTextComponent],
   templateUrl: './participant-roster.component.html',
   styleUrl: './participant-roster.component.scss',
 })

@@ -14,6 +14,7 @@ import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoBoard, type TodoBoardKind, type TodoBoardSummary } from '@core/api/todos.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { ButtonComponent, DialogComponent, type SelectOption } from '@stupa-makers/ui-kit';
 import { canTransfer, sortedColumns } from '../todos.util';
@@ -39,7 +40,7 @@ export interface TodoTransferTarget {
   selector: 'app-todo-transfer-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, SelectFieldComponent],
+  imports: [FormsModule, TranslatePipe, ButtonComponent, DialogComponent, EmptyStateComponent, SelectFieldComponent],
   templateUrl: './todo-transfer-dialog.component.html',
   styleUrl: './todo-transfer-dialog.component.scss',
 })

@@ -393,7 +393,7 @@ class Comment(UUIDPkMixin, Base):
 
     RBAC shows `visibility='internal'` to a principal only. It shows `'public'`
     also to the applicant behind the magic link. `author_kind` separates a
-    principal author from an applicant author.
+    principal author from an applicant author. ``mentions`` holds principal ids.
     """
 
     __tablename__ = "comment"
@@ -405,6 +405,12 @@ class Comment(UUIDPkMixin, Base):
     author_kind: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)
     visibility: Mapped[str] = mapped_column(Text)
+    # The principal ids (as strings) of the members that the comment mentions. Only a
+    # member who reads the internal comments is mentionable, and the applicant view
+    # never shows the list (A12, O16).
+    mentions: Mapped[list[str]] = mapped_column(
+        JSONB, default=list, server_default=text("'[]'::jsonb")
+    )
     at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

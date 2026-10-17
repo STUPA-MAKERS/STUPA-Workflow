@@ -151,7 +151,7 @@
                 }
               </ul>
             } @else {
-              <p class="um__muted">{{ 'admin.users.merge.nothing' | t }}</p>
+              <app-empty-state rows="2" [heading]="'admin.users.merge.nothing' | t" />
             }
             <p class="um__legend um__muted">{{ 'admin.users.merge.legend' | t }}</p>
           </section>

@@ -46,8 +46,8 @@
     <span class="sr-only" role="status">{{ 'tickets.detail.loading' | t }}</span>
   </article>
 } @else if (notFound()) {
-  <div class="td td--center">
-    <app-empty-state icon="ticket" [heading]="'tickets.detail.notFound' | t">
+  <div class="td">
+    <app-empty-state fill [heading]="'tickets.detail.notFound' | t">
       <a routerLink="/tickets" queryParamsHandling="preserve" class="td__backLink">{{ 'tickets.detail.backToList' | t }}</a>
     </app-empty-state>
   </div>
@@ -180,6 +180,7 @@
       [visibilityOptions]="visibilityOptions()"
       [canPost]="manager || canReply()"
       [canAttach]="!ticket()?.anonymizedAt"
+      [mentionables]="mentionables()"
       (send)="sendNote($event)"
       (retry)="retryNote($event)"
       (discard)="discardNote($event)"
@@ -408,7 +409,7 @@
         }
       </ul>
     } @else if (duplicateSearch.applied()) {
-      <p class="td__none">{{ 'tickets.duplicate.none' | t }}</p>
+      <app-empty-state rows="3" [heading]="'tickets.duplicate.none' | t" />
     }
   </div>
   <app-button dialog-footer variant="text" (click)="duplicateOpen.set(false)">{{ 'action.cancel' | t }}</app-button>

@@ -22,6 +22,7 @@ import type { ConfigRevision, ConfigRevisionDiff } from '../admin.models';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -37,6 +38,7 @@ import { TruncatedDirective } from '@shared/truncated.directive';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     TruncatedDirective,
     SkeletonComponent,
     StatusTextComponent,

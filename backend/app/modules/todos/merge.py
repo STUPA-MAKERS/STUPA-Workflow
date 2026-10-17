@@ -8,13 +8,15 @@ column. A label moves with its cards; when the target board has a label of the s
 name (case-insensitive), the cards take that label instead.
 
 ``rewrite_mentions`` replaces the id of the source in the ``mentions`` list of every
-comment, so a mention follows the merge like the author does.
+comment, so a mention follows the merge like the author does. The same statement
+serves every chat table with a ``mentions`` list (``MENTION_TABLES``): the to-do
+comments, the application comments and the ticket notes.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any, cast
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from sqlalchemy import delete, func, select, text, update
@@ -111,25 +113,44 @@ async def fold_personal_board(session: AsyncSession, source_id: UUID, target_id:
     return len(cards)
 
 
+#: The tables with a ``mentions`` list of principal ids. The name goes into the SQL
+#: text, so only these literals are valid.
+MentionTable = Literal["todo_comment", "comment", "ticket_note"]
+MENTION_TABLES: tuple[MentionTable, ...] = ("todo_comment", "comment", "ticket_note")
+
 _MENTIONS = (
-    "UPDATE todo_comment SET mentions = ("
+    "UPDATE {table} SET mentions = ("
     " SELECT coalesce(jsonb_agg(DISTINCT CASE WHEN m = CAST(:old AS text)"
     " THEN CAST(:new AS text) ELSE m END), '[]'::jsonb)"
     " FROM jsonb_array_elements_text(mentions) AS m"
     ") WHERE mentions @> jsonb_build_array(CAST(:old AS text))"
 )
 _MENTION_COUNT = (
-    "SELECT count(*) FROM todo_comment WHERE mentions @> jsonb_build_array(CAST(:old AS text))"
+    "SELECT count(*) FROM {table} WHERE mentions @> jsonb_build_array(CAST(:old AS text))"
 )
 
 
-async def rewrite_mentions(session: AsyncSession, old: UUID, new: UUID, *, apply: bool) -> int:
-    """Replace ``old`` by ``new`` in the mentions of every comment.
+async def rewrite_mentions(
+    session: AsyncSession,
+    old: UUID,
+    new: UUID,
+    *,
+    apply: bool,
+    table: MentionTable = "todo_comment",
+) -> int:
+    """Replace ``old`` by ``new`` in the mentions of every row of ``table``.
+
+    Raises:
+        ValueError: ``table`` is not in ``MENTION_TABLES``.
 
     Returns:
-        The number of comments that mention ``old``.
+        The number of rows that mention ``old``.
     """
+    if table not in MENTION_TABLES:
+        raise ValueError(f"no mentions table: {table}")
     if not apply:
-        return int(await session.scalar(text(_MENTION_COUNT).bindparams(old=str(old))) or 0)
-    result = await session.execute(text(_MENTIONS).bindparams(old=str(old), new=str(new)))
+        count = text(_MENTION_COUNT.format(table=table)).bindparams(old=str(old))
+        return int(await session.scalar(count) or 0)
+    stmt = text(_MENTIONS.format(table=table)).bindparams(old=str(old), new=str(new))
+    result = await session.execute(stmt)
     return cast("CursorResult[Any]", result).rowcount

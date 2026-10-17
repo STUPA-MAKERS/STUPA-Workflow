@@ -3,7 +3,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
   } @else if (revisions().length === 0) {
-    <p class="vh__empty">{{ 'admin.config.history.empty' | t }}</p>
+    <app-empty-state rows="3" [heading]="'admin.config.history.empty' | t" />
   } @else {
     <ol class="rowgroup vh__list">
       @for (rev of revisions(); track rev.id) {

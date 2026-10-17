@@ -18,7 +18,7 @@ unknown ticket or note gives 404.
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -27,6 +27,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Respons
 from app.deps import DbSession, Principal, SettingsDep, get_current_principal, require_principal
 from app.modules.admin.site_config_service import active_branding
 from app.modules.files.service import FilesService
+from app.modules.notifications.mentions import notify_ticket_mentions
 from app.modules.notifications.provider import mail_queue_from_pool
 from app.modules.notifications.tickets import (
     notify_ticket_created,
@@ -37,6 +38,7 @@ from app.modules.tickets.access import TICKET_MANAGE
 from app.modules.tickets.schemas import (
     NoteBody,
     NoteCreate,
+    NotePatch,
     ReporterNoteCreate,
     ReporterTicketDetail,
     ReporterTicketItem,
@@ -144,6 +146,40 @@ def get_note_mail_sender() -> NoteMailSender:
 
 
 NoteMails = Annotated[NoteMailSender, Depends(get_note_mail_sender)]
+
+#: Sends ``ticket_mentioned`` to the new mentions of a note (background task).
+MentionMailSender = Callable[[Settings, UUID, list[UUID], object], Awaitable[None]]
+
+
+async def _deliver_mention_mails(
+    settings: Settings, note_id: UUID, recipients: list[UUID], pool: object
+) -> None:
+    queue = mail_queue_from_pool(pool)  # type: ignore[arg-type]
+    await notify_ticket_mentions(
+        queue=queue, settings=settings, note_id=note_id, recipients=recipients
+    )
+
+
+def get_mention_mail_sender() -> MentionMailSender:
+    """Return the injectable mention-mail sender that a test can override."""
+    return _deliver_mention_mails
+
+
+MentionMails = Annotated[MentionMailSender, Depends(get_mention_mail_sender)]
+
+
+def _queue_mention_mails(
+    background: BackgroundTasks,
+    send: MentionMailSender,
+    settings: Settings,
+    request: Request,
+    note_id: UUID,
+    added: Sequence[UUID],
+) -> None:
+    """Queue the mention mails of the mentions that a write added; none, no task."""
+    if added:
+        pool = getattr(request.app.state, "arq_pool", None)
+        background.add_task(send, settings, note_id, list(added), pool)
 
 
 async def require_public_or_session(
@@ -458,11 +494,16 @@ async def add_ticket_note(
     background: BackgroundTasks,
     request: Request,
     send_mail: NoteMails,
+    send_mentions: MentionMails,
 ) -> TicketNoteOut:
     """Add a note. ``attachmentIds`` and ``draftToken`` bind its files.
 
     ``visibility`` is ``internal`` (the default) or ``public``: the reporter account
     reads a public note in ``/tickets/mine`` and gets the mail ``ticket_answer``.
+
+    ``mentions`` names holders of ``ticket.manage`` (``GET /tickets/assignees``);
+    another id gives 422 ``mention_not_member``. Each mentioned person except the
+    author gets the mail ``ticket_mentioned``.
 
     A draft that is missing, expired, foreign or infected gives 422
     ``draft_attachments_missing``; files on an anonymized ticket 422
@@ -472,6 +513,9 @@ async def add_ticket_note(
     if note.visibility == "public":
         pool = getattr(request.app.state, "arq_pool", None)
         background.add_task(send_mail, settings, note.id, pool)
+    _queue_mention_mails(
+        background, send_mentions, settings, request, note.id, service.added_mentions
+    )
     return note
 
 
@@ -483,12 +527,27 @@ async def add_ticket_note(
 async def edit_ticket_note(
     ticket_id: UUID,
     note_id: UUID,
-    payload: NoteBody,
+    payload: NotePatch,
     service: ServiceDep,
     principal: Manager,
+    settings: SettingsDep,
+    background: BackgroundTasks,
+    request: Request,
+    send_mentions: MentionMails,
 ) -> TicketNoteOut:
-    """Change an own note. Another author gives 403 ``not_note_author``."""
-    return await service.edit_note(ticket_id, note_id, payload.body, principal)
+    """Change an own note. Another author gives 403 ``not_note_author``.
+
+    ``mentions`` null keeps the stored mentions; a list replaces them (422
+    ``mention_not_member`` as at the create). Only a person that the list adds gets
+    the mail ``ticket_mentioned``.
+    """
+    note = await service.edit_note(
+        ticket_id, note_id, payload.body, principal, mentions=payload.mentions
+    )
+    _queue_mention_mails(
+        background, send_mentions, settings, request, note.id, service.added_mentions
+    )
+    return note
 
 
 @router.delete(

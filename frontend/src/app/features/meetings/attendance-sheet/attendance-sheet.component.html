@@ -53,7 +53,7 @@
         }
         @if (guestsActive() && tab() === 'guests') {
           <app-guest-list [meeting]="m" [query]="query()" />
-        } @else {
+        } @else if (rows().length) {
         <ul class="as__rows rowgroup rowgroup--bg3">
           @for (row of rows(); track row.a.principalId) {
             <li class="as__row" [class.as__row--conflict]="row.conflict">
@@ -136,10 +136,10 @@
                 </p>
               }
             </li>
-          } @empty {
-            <li class="as__empty">{{ (query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t }}</li>
           }
         </ul>
+        } @else {
+          <app-empty-state rows="3" [heading]="(query() ? 'meetings.dock.noMember' : 'meetings.attendance.empty') | t" />
         }
 
         @if (meetingDelegations().length) {
@@ -169,16 +169,20 @@
         @if (m.canWrite && m.status === 'live') {
           <section class="as__sec" [attr.aria-label]="'meetings.viewers.title' | t">
             <h3 class="as__cap cap">{{ 'meetings.attendanceSheet.viewers' | t: { n: viewers().length } }}</h3>
-            <ul class="as__list rowgroup rowgroup--bg3" aria-live="polite">
-              @for (name of viewers(); track name) {
-                <li class="as__item">
-                  <app-avatar [name]="name" size="sm" [decorative]="true" />
-                  <span class="as__itemText ell" [appTruncated]="name" #cut4="appTruncated" [attr.title]="cut4.truncated() ? name : null">{{ name }}</span>
-                </li>
-              } @empty {
-                <li class="as__item as__muted">{{ 'meetings.viewers.empty' | t }}</li>
+            <div aria-live="polite">
+              @if (viewers().length) {
+                <ul class="as__list rowgroup rowgroup--bg3">
+                  @for (name of viewers(); track name) {
+                    <li class="as__item">
+                      <app-avatar [name]="name" size="sm" [decorative]="true" />
+                      <span class="as__itemText ell" [appTruncated]="name" #cut4="appTruncated" [attr.title]="cut4.truncated() ? name : null">{{ name }}</span>
+                    </li>
+                  }
+                </ul>
+              } @else {
+                <app-empty-state rows="2" [heading]="'meetings.viewers.empty' | t" />
               }
-            </ul>
+            </div>
           </section>
         }
       </div>

@@ -24,6 +24,7 @@ import {
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
@@ -39,6 +40,7 @@ import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     SheetBarComponent,
     ButtonComponent,
     IconComponent,

@@ -50,6 +50,7 @@ import type {
   ChatVisibility,
 } from '@shared/ui/chat/chat.models';
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
+import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
@@ -101,6 +102,8 @@ import {
 
 type DetailTab = 'log' | 'details';
 
+/** The fragment of a link to one note: `#note-<id>`. */
+const NOTE_FRAGMENT = /^note-(.+)$/;
 /**
  * The scan state of a report file: the three-state `scanState` of the server, so that
  * a file with a finding shows as quarantined and not as a link. `scanned` alone only
@@ -237,6 +240,8 @@ export class TicketDetailComponent {
 
   private id: Uuid = '';
   private seq = 0;
+  /** The note of the `#note-` link that the log already showed for this ticket. */
+  private linkedNote: string | null = null;
   readonly ticket = signal<TicketDetail | null>(null);
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -376,7 +381,7 @@ export class TicketDetailComponent {
   private readonly outbox = new ChatOutbox<TicketNote>(
     (req) =>
       this.manager
-        ? this.api.addNote(this.id, req.body, req, req.visibility)
+        ? this.api.addNote(this.id, req.body, req, req.visibility, req.mentions)
         : this.api.addMyNote(this.id, req.body, req),
     (created) => this.notes.update((list) => appendOnce(list, created)),
     (err) =>
@@ -385,6 +390,9 @@ export class TicketDetailComponent {
       ),
     draftDropper(this.files),
   );
+
+  /** The "@" list of the staff: the holders of `ticket.manage`. The reporter gets none. */
+  readonly mentionables = computed(() => (this.manager ? chatPeople(this.assignees()) : []));
 
   readonly messages = computed<ChatMessage[]>(() => {
     const t = this.ticket();
@@ -419,6 +427,7 @@ export class TicketDetailComponent {
       own: n.isOwn,
       attachments: toChatAttachments(this.apiBase, n.attachments),
       visibility: this.manager ? (n.visibility ?? 'internal') : null,
+      mentions: n.mentions,
     }));
     return [body, ...notes, ...this.outbox.messages()];
   });
@@ -481,6 +490,7 @@ export class TicketDetailComponent {
       this.todos.set([]);
       this.loading.set(true);
       this.tab.set('log');
+      this.linkedNote = null;
     }
     this.notFound.set(false);
     this.error.set(false);
@@ -548,6 +558,26 @@ export class TicketDetailComponent {
   private show(t: TicketDetail): void {
     this.ticket.set(t);
     this.notes.set(t.notes);
+    this.showLinkedNote();
+  }
+
+  /**
+   * A link to a note (`#note-<id>`, the mention mail) opens the log and scrolls the note
+   * into view once the thread rendered. A note that is gone leaves the log at its end.
+   * This happens once per ticket: a reload after a change leaves the tab and the scroll.
+   */
+  private showLinkedNote(): void {
+    const id = NOTE_FRAGMENT.exec(this.route.snapshot.fragment ?? '')?.[1];
+    if (!id || this.linkedNote === id || !this.notes().some((n) => n.id === id)) return;
+    this.linkedNote = id;
+    this.tab.set('log');
+    afterNextRender(
+      () => {
+        const el = document.querySelector(`[data-msg-id="${CSS.escape(id)}"]`);
+        el?.scrollIntoView?.({ block: 'center' });
+      },
+      { injector: this.injector },
+    );
   }
 
   loadTodos(): void {
@@ -748,7 +778,7 @@ export class TicketDetailComponent {
   editNote(change: ChatEdit): void {
     if (change.id === BODY_ID) return;
     const edit = this.manager
-      ? this.api.editNote(this.id, change.id, change.body)
+      ? this.api.editNote(this.id, change.id, change.body, change.mentions)
       : this.api.editMyNote(this.id, change.id, change.body);
     edit.subscribe({
       next: (n) => this.notes.update((list) => list.map((x) => (x.id === n.id ? n : x))),

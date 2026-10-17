@@ -7,7 +7,7 @@
       <app-button variant="text" size="sm" (click)="retry()">{{ 'gremien.list.retry' | t }}</app-button>
     </div>
   } @else if (empty()) {
-    <p class="gad__status">{{ 'gremien.attendance.detailEmpty' | t }}</p>
+    <app-empty-state rows="3" [heading]="'gremien.attendance.detailEmpty' | t" />
   } @else {
     @for (g of groups(); track g.month) {
       @if (g.meetings.length) {

@@ -40,6 +40,8 @@ export interface ChatMessage {
   visibility?: ChatVisibility | null;
   attachments?: ChatAttachment[];
   state?: ChatMessageState;
+  /** The people the message mentions: their "@Name" is marked in the text. */
+  mentions?: readonly PersonRef[];
 }
 
 /** A status change or another event: small text in the middle of the thread. */
@@ -54,6 +56,7 @@ export interface ChatSend {
   /** May be '' when the message has files. */
   body: string;
   visibility?: ChatVisibility;
+  /** The ids of the people the text names as "@Name"; set only when it names someone. */
   mentions?: string[];
   /** The draft ids of the composer files; set only when the composer holds files. */
   attachmentIds?: string[];
@@ -70,6 +73,8 @@ export interface ChatSend {
 export interface ChatEdit {
   id: string;
   body: string;
+  /** The ids of the people the new text names as "@Name"; unset where the chat has no list. */
+  mentions?: string[];
   restore?: () => void;
 }
 

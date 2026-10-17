@@ -131,12 +131,11 @@ describe('AccountGrantsComponent', () => {
     expect(screen.queryByRole('heading', { name: /Aktive Zugriffe · / })).toBeNull();
   });
 
-  it('shows the empty list as one line in the row group, not as a large empty state', async () => {
+  it('shows the empty list as the shared empty state, not as a row of an empty list', async () => {
     const api = makeApi({ listGrants: jest.fn(() => of([])) });
     const view = await setup({ api });
-    const list = screen.getByRole('list', { name: 'Aktive Zugriffe' });
-    expect(within(list).getByRole('listitem')).toHaveTextContent('Keine aktiven Zugriffe.');
-    expect(view.container.querySelector('app-empty-state')).toBeNull();
+    expect(screen.queryByRole('list', { name: 'Aktive Zugriffe' })).toBeNull();
+    expect(view.container.querySelector('app-empty-state')).toHaveTextContent('Keine aktiven Zugriffe.');
   });
 
   it('does not name the MCP config block with aria-labelledby (a pre has no name)', async () => {

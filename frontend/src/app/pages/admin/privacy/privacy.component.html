@@ -4,62 +4,65 @@
   <!-- Erasure requests (GDPR Art. 17) -->
   <section class="pv__queue" aria-labelledby="pv-queue">
     <h2 class="sec pv__secTitle" id="pv-queue">{{ 'admin.privacy.queueTitle' | t }}</h2>
-    <app-data-table
-      surface="rowgroup"
-      [loading]="loading()"
-      [loadingText]="'common.loading' | t"
-      [columns]="columns()"
-      [rows]="erasures()"
-      [emptyText]="'admin.privacy.queueEmpty' | t"
-    >
-      <ng-template appCell="status" let-r>
-        @let st = erasureStatus($any(r).status);
-        <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-      </ng-template>
-      <ng-template appCell="subjectType" let-r>{{ subjectLabel($any(r).subjectType) }}</ng-template>
-      <ng-template appCell="email" let-r>
-        @if ($any(r).email) {
-          <span class="pv__mail mono">{{ $any(r).email }}</span>
-        } @else if ($any(r).status === 'executed') {
-          <span class="pv__muted">{{ 'admin.privacy.noEmail' | t }}</span>
-        } @else {
-          <span class="pv__muted">—</span>
-        }
-      </ng-template>
-      <ng-template appCell="createdAt" let-r>
-        <span class="mono pv__date">{{ $any(r).createdAt | ldate: 'mediumDate' }}</span>
-      </ng-template>
-      <ng-template appCell="actions" let-r>
-        @if ($any(r).status === 'open') {
-          @if (phone()) {
-            <app-row-menu
-              [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
-              [sections]="rowMenu()"
-              (selected)="onRowMenu($any(r), $event)"
-            />
+    @if (loading() || erasures().length) {
+      <app-data-table
+        surface="rowgroup"
+        [loading]="loading()"
+        [loadingText]="'common.loading' | t"
+        [columns]="columns()"
+        [rows]="erasures()"
+      >
+        <ng-template appCell="status" let-r>
+          @let st = erasureStatus($any(r).status);
+          <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+        </ng-template>
+        <ng-template appCell="subjectType" let-r>{{ subjectLabel($any(r).subjectType) }}</ng-template>
+        <ng-template appCell="email" let-r>
+          @if ($any(r).email) {
+            <span class="pv__mail mono">{{ $any(r).email }}</span>
+          } @else if ($any(r).status === 'executed') {
+            <span class="pv__muted">{{ 'admin.privacy.noEmail' | t }}</span>
           } @else {
-            <span class="pv__rowActions">
-              <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
-              @let who = $any(r).email || subjectLabel($any(r).subjectType);
-              <app-button
-                variant="tonal"
-                size="sm"
-                [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
-                (click)="openReject($any(r))"
-                >{{ 'admin.privacy.reject' | t }}</app-button
-              >
-              <app-button
-                variant="danger"
-                size="sm"
-                [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
-                (click)="askExecute($any(r))"
-                >{{ 'admin.privacy.execute' | t }}</app-button
-              >
-            </span>
+            <span class="pv__muted">—</span>
           }
-        }
-      </ng-template>
-    </app-data-table>
+        </ng-template>
+        <ng-template appCell="createdAt" let-r>
+          <span class="mono pv__date">{{ $any(r).createdAt | ldate: 'mediumDate' }}</span>
+        </ng-template>
+        <ng-template appCell="actions" let-r>
+          @if ($any(r).status === 'open') {
+            @if (phone()) {
+              <app-row-menu
+                [label]="('admin.common.actions' | t) + ': ' + ($any(r).email || subjectLabel($any(r).subjectType))"
+                [sections]="rowMenu()"
+                (selected)="onRowMenu($any(r), $event)"
+              />
+            } @else {
+              <span class="pv__rowActions">
+                <!-- Each button names its request, so a list of the buttons tells the rows apart. -->
+                @let who = $any(r).email || subjectLabel($any(r).subjectType);
+                <app-button
+                  variant="tonal"
+                  size="sm"
+                  [ariaLabel]="('admin.privacy.reject' | t) + ': ' + who"
+                  (click)="openReject($any(r))"
+                  >{{ 'admin.privacy.reject' | t }}</app-button
+                >
+                <app-button
+                  variant="danger"
+                  size="sm"
+                  [ariaLabel]="('admin.privacy.execute' | t) + ': ' + who"
+                  (click)="askExecute($any(r))"
+                  >{{ 'admin.privacy.execute' | t }}</app-button
+                >
+              </span>
+            }
+          }
+        </ng-template>
+      </app-data-table>
+    } @else {
+      <app-empty-state [heading]="'admin.privacy.queueEmpty' | t" />
+    }
   </section>
 
   <div class="pv__cards">

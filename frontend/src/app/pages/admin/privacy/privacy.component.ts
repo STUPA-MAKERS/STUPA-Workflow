@@ -33,6 +33,7 @@ import {
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, ErasureRequest } from '../admin.models';
+import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The picker shows this many hits. A longer list means: type more. */
 const PERSON_HITS = 6;
@@ -56,6 +57,7 @@ const PERSON_HITS = 6;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    EmptyStateComponent,
     FormsModule,
     TranslatePipe,
     LocalizedDatePipe,
