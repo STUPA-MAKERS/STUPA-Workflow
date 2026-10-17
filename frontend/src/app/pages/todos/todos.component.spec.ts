@@ -516,7 +516,7 @@ describe('TodosComponent', () => {
       (cmp as unknown as { onPings(p: unknown[]): void }).onPings([{ type: 'board', boardId: 'b-1' }]);
     });
 
-    it('leaves room for the floating button below the board', async () => {
+    it('marks the body for the floating button (only the rows get room at their end)', async () => {
       const { harness } = await start('/todos/b-1');
       expect(harness.routeNativeElement?.querySelector('.td__body')).toHaveClass('td__body--fab');
     });

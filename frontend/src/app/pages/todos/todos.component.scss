@@ -141,13 +141,14 @@
 .td__body--rows > app-todo-board-rows {
   flex: none;
 }
-/* The floating "+ To-Do" (56px high, --space-6 from the bottom) must not cover the end of
-   the last column or the last row: the scroll area ends above it, on every width. */
-.td__body--fab {
+/* The floating "+ To-Do" (56px high, --space-6 from the bottom) floats over the board, so
+   the columns keep their full height. Only a body that scrolls as a whole (the rows) gets
+   room at its end, because there the room scrolls away and the last row clears the button. */
+.td__body--rows.td__body--fab {
   padding-bottom: calc(56px + var(--space-6));
 }
 @include bp.phone {
-  .td__body--fab {
+  .td__body--rows.td__body--fab {
     padding-bottom: calc(56px + var(--space-4));
   }
 }
