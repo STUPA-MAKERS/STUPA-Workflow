@@ -309,12 +309,12 @@ async def test_votes_follow_the_read_scope_of_the_vote_list(vote_scope: dict[str
     session = ScriptedSession(
         execute=[
             [(_vote(), "33. Sitzung", date(2026, 5, 1)), (by_app, None, None), (bare, None, None)],
-            [(APP, {"title": "Antrag"})],
-        ]
+        ],
+        scalars=[[_app(APP)]],
     )
     resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
     out = await resolver.resolve(
-        [("vote", VOTE), ("vote", by_app.id), ("vote", bare.id), ("vote", uuid.uuid4())], USER
+        [("vote", VOTE), ("vote", by_app.id), ("vote", bare.id), ("vote", uuid.uuid4())], READER
     )
     seen = out[("vote", VOTE)]
     assert (seen.title, seen.url) == ("Antrag annehmen?", f"/voting/{VOTE}")
@@ -326,6 +326,21 @@ async def test_votes_follow_the_read_scope_of_the_vote_list(vote_scope: dict[str
     assert HIDDEN in out.values()
     assert vote_scope["calls"] == 1
     assert "LEFT OUTER JOIN meeting" in str(session.statements[0])
+
+
+async def test_vote_titles_need_a_readable_application(
+    vote_scope: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def _deny(_db: Any, _app_id: uuid.UUID, _p: Any, _a: Any) -> None:
+        raise ForbiddenError("no")
+
+    monkeypatch.setattr(links_mod, "resolve_app_read", _deny)
+    by_app = _vote(question=None, application_id=APP)
+    session = ScriptedSession(execute=[[(by_app, None, None)]], scalars=[[_app(APP)]])
+    resolver = LinkResolver(session, FakeAccess())  # type: ignore[arg-type]
+    out = await resolver.resolve([("vote", VOTE)], USER)
+    assert out[("vote", VOTE)].accessible
+    assert out[("vote", VOTE)].title == ""
 
 
 async def test_votes_none_readable(vote_scope: dict[str, Any]) -> None:

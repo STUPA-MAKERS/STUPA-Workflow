@@ -279,6 +279,20 @@ class LinkResolver:
         ).all()
         return {aid: _title_of(data) or "" for aid, data in rows}
 
+    async def _readable_application_titles(
+        self, ids: set[uuid.UUID], principal: Principal
+    ) -> dict[uuid.UUID, str]:
+        """The titles of the applications in ``ids`` that the principal can read."""
+        if not ids:
+            return {}
+        stmt = select(Application).where(Application.id.in_(ids))
+        apps = (await self.session.scalars(stmt)).all()
+        return {
+            a.id: _title_of(a.data) or ""
+            for a in apps
+            if await self._application_readable(a, principal)
+        }
+
     async def _votes(self, ids: set[uuid.UUID], principal: Principal) -> dict[uuid.UUID, Resolved]:
         rows = (
             await self.session.execute(
@@ -289,8 +303,9 @@ class LinkResolver:
         ).all()
         if not rows:
             return {}
-        titles = await self._application_titles(
-            {v.application_id for v, _t, _d in rows if not v.question and v.application_id}
+        titles = await self._readable_application_titles(
+            {v.application_id for v, _t, _d in rows if not v.question and v.application_id},
+            principal,
         )
         out: dict[uuid.UUID, Resolved] = {}
         for vote, meeting_title, meeting_date in rows:
