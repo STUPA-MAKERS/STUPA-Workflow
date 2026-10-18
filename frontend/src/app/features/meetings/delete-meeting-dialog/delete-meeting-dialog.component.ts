@@ -14,13 +14,9 @@ import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  ButtonComponent,
-  DialogComponent,
-  IconComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { errorCode, errorDetail } from '../meetings-display.util';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * "Sitzung löschen": the confirmation before a meeting goes for good.
@@ -36,7 +32,7 @@ import { errorCode, errorDetail } from '../meetings-display.util';
   selector: 'app-delete-meeting-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, DialogComponent, ButtonComponent, IconComponent],
+  imports: [ConfirmDialogComponent, TranslatePipe],
   templateUrl: './delete-meeting-dialog.component.html',
   styleUrl: './delete-meeting-dialog.component.scss',
 })

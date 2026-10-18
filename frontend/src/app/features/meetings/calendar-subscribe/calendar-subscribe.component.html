@@ -23,11 +23,11 @@
     } @else {
       <div class="cs__actions">
         <app-button variant="danger" size="sm" (click)="askRotate()">
-          <app-icon name="repeat" [size]="16" />
+          <app-icon name="repeat" />
           {{ 'account.calendar.rotate' | t }}
         </app-button>
         <app-button variant="tonal" size="sm" (click)="copy()">
-          <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16" />
+          <app-icon [name]="copied() ? 'check' : 'copy'" />
           {{ (copied() ? 'account.calendar.copied' : 'account.calendar.copy') | t }}
         </app-button>
       </div>
@@ -40,7 +40,7 @@
   } @else {
     <app-empty-state rows="2" [heading]="'account.calendar.none' | t">
       <app-button variant="tonal" size="sm" [loading]="busy()" (click)="rotate()">
-        <app-icon name="link" [size]="16" />
+        <app-icon name="link" />
         {{ 'account.calendar.generate' | t }}
       </app-button>
     </app-empty-state>

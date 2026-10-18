@@ -164,7 +164,7 @@
       }
       <span class="wz__navGap"></span>
       @if (activeIndex() > 0) {
-        <app-button variant="outlined" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
+        <app-button variant="text" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
       }
       @if (currentStep() === 'review') {
         <app-button
@@ -197,15 +197,11 @@
   }
 </div>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDiscard()"
   [title]="'apply.discard.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDiscard.set(false)"
->
-  <p class="wz__dialogText">{{ 'apply.discard.body' | t }}</p>
-  <div dialog-footer>
-    <app-button variant="text" (click)="confirmDiscard.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="discardDraft()">{{ 'apply.nav.discard' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'apply.discard.body' | t"
+  [confirmLabel]="'apply.nav.discard' | t"
+  (confirm)="discardDraft()"
+  (cancel)="confirmDiscard.set(false)"
+/>

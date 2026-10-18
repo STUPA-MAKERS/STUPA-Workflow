@@ -21,6 +21,8 @@
   </button>
 
   @if (!auth.isAuthenticated()) {
-    <button type="button" class="pub__login" (click)="login()">{{ 'action.login' | t }}</button>
+    <app-button class="pub__login" variant="outlined" (click)="login()">{{
+      'action.login' | t
+    }}</app-button>
   }
 </header>

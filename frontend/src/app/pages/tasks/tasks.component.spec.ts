@@ -269,12 +269,18 @@ describe('TasksComponent', () => {
   });
 
   it('shows an error, not an empty list, when the request fails', async () => {
-    const { cmp } = await start('/tasks', [[]], { tasksError: true });
+    const { cmp, listTasks, harness } = await start('/tasks', [[]], { tasksError: true });
     expect(cmp.tasks()).toEqual([]);
     expect(cmp.loading()).toBe(false);
     expect(cmp.error()).toBe(true);
     expect(screen.getByRole('alert')).toHaveTextContent('Aufgaben konnten nicht geladen werden.');
     expect(screen.queryByText('Keine offenen Aufgaben.')).not.toBeInTheDocument();
+    // "Erneut versuchen" sends the request again.
+    const calls = listTasks.mock.calls.length;
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    harness.detectChanges();
+    expect(listTasks).toHaveBeenCalledTimes(calls + 1);
+    expect(cmp.error()).toBe(true);
   });
 
   it('tolerates a failing type load and an untitled task without a state', async () => {

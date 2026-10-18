@@ -290,14 +290,14 @@ describe('SubstitutePoolComponent', () => {
   });
 
   it('names a failed load and an empty pool', async () => {
-    await setup({
-      delegations: makeDelegations({
-        substitutes: jest.fn(() => throwError(() => ({ status: 403 }))),
-      }),
-    });
+    const substitutes = jest.fn(() => throwError(() => ({ status: 403 })));
+    const { fixture } = await setup({ delegations: makeDelegations({ substitutes }) });
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Die Stellvertretungen konnten nicht geladen werden.',
     );
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    fixture.detectChanges();
+    expect(substitutes).toHaveBeenCalledTimes(2);
   });
 
   it('names a failed load and an empty pool (2)', async () => {

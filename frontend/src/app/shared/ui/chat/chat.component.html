@@ -62,14 +62,14 @@
                       [iconOnly]="true"
                       [ariaLabel]="'chat.edit' | t"
                       (click)="startEdit(m)"
-                    ><app-icon name="edit" [size]="16" /></app-button>
+                    ><app-icon name="edit" /></app-button>
                     <app-button
                       variant="text"
                       size="sm"
                       [iconOnly]="true"
                       [ariaLabel]="'chat.delete' | t"
                       (click)="askDelete(m)"
-                    ><app-icon name="trash" [size]="16" /></app-button>
+                    ><app-icon name="trash" /></app-button>
                   </span>
                 }
                 @if (editingId() === m.id) {
@@ -260,7 +260,7 @@
           [disabled]="full()"
           [ariaLabel]="'chat.attach' | t"
           (click)="pickFiles()"
-        ><app-icon name="clip" [size]="19" /></app-button>
+        ><app-icon name="clip" /></app-button>
         <input
           #fileInput
           class="chat__fileInput"
@@ -279,23 +279,18 @@
         [iconOnly]="true"
         [disabled]="uploading()"
         [ariaLabel]="'chat.send' | t"
-      ><app-icon name="send" [size]="17" /></app-button>
+      ><app-icon name="send" /></app-button>
     </div>
   </form>
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="deleting() !== null"
   [title]="'chat.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="deleting.set(null)"
->
-  <p>{{ 'chat.deleteConfirm' | t }}</p>
-  <div dialog-footer>
-    <app-button variant="text" (click)="deleting.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="confirmDelete()">{{ 'chat.deleteShort' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'chat.deleteConfirm' | t"
+  (confirm)="confirmDelete()"
+  (cancel)="deleting.set(null)"
+/>
 
 <app-side-sheet
   side="bottom"

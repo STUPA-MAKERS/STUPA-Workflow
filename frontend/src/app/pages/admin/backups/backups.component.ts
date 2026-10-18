@@ -27,6 +27,7 @@ import { AdminApiService } from '../admin-api.service';
 import { formatBytes } from '../admin-health/admin-health.util';
 import type { Backup, BackupKind } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** File name the browser saves an archive under. Mirrors the server-side name. */
 function archiveFileName(createdAt: string): string {
@@ -59,6 +60,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

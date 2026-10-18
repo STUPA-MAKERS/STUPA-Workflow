@@ -3,7 +3,7 @@
   <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t">
     @if (canCreate()) {
       <app-button actions variant="fill" (click)="openCreate()">
-        <app-icon name="plus" [size]="18" /> {{ 'admin.forms.add' | t }}
+        <app-icon name="plus" /> {{ 'admin.forms.add' | t }}
       </app-button>
     }
   </app-page-header>
@@ -115,17 +115,11 @@
 </app-dialog>
 
 <!-- Delete an application type. This action needs the admin.types_delete permission. -->
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
-  [title]="'admin.forms.delete' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="cancelDelete()"
->
-  <p class="fl__confirm">{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
-  <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="cancelDelete()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
-      {{ 'admin.forms.delete' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+  [title]="'admin.forms.deleteTitle' | t"
+  [body]="'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() }"
+  [busy]="deleting()"
+  (confirm)="confirmDeleteType()"
+  (cancel)="cancelDelete()"
+/>

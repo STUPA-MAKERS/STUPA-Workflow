@@ -481,6 +481,12 @@ export class TicketDetailComponent {
 
   // --- loading ------------------------------------------------------------
 
+  /** Load the ticket again after a failed load. */
+  retry(): void {
+    this.loading.set(true);
+    this.load(this.id);
+  }
+
   private load(id: Uuid): void {
     const seq = ++this.seq;
     if (id !== this.id) {

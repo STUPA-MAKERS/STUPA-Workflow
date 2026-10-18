@@ -241,14 +241,9 @@
   bottom: 0;
 }
 
-.apps__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.apps__status--error {
-  color: var(--color-danger);
+/* The note starts at the edge of the filters and the rows. */
+.apps__loadError {
+  margin: var(--space-4) 0;
 }
 .apps__sentinel {
   height: 1px;

@@ -53,7 +53,7 @@
   </div>
 } @else if (error()) {
   <div class="td">
-    <p class="td__error" role="alert">{{ 'tickets.detail.error.load' | t }}</p>
+    <app-note class="td__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.detail.error.load' | t }}</app-note>
   </div>
 } @else if (ticket(); as ticket) {
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
@@ -65,7 +65,7 @@
           [iconOnly]="true"
           [ariaLabel]="'tickets.detail.copyLink' | t"
           (click)="copyLink()"
-        ><app-icon name="link" [size]="19" /></app-button>
+        ><app-icon name="link" /></app-button>
         @if (menuSections().length) {
           <app-row-menu
             [label]="'tickets.detail.menu' | t"
@@ -96,7 +96,7 @@
               [disabled]="saving() !== null"
               (click)="close('done')"
             >
-              <app-icon name="check" [size]="17" />
+              <app-icon name="check" />
               {{ 'tickets.detail.done' | t }}
             </app-button>
             <app-button class="td__act" variant="tonal" [disabled]="saving() !== null" (click)="close('rejected')">
@@ -104,7 +104,7 @@
             </app-button>
           } @else {
             <app-button variant="tonal" [loading]="saving() === 'status'" (click)="reopen()">
-              <app-icon name="undo" [size]="17" />
+              <app-icon name="undo" />
               {{ 'tickets.detail.reopen' | t }}
             </app-button>
           }
@@ -271,7 +271,7 @@
       <div class="td__secHead">
         <h3 id="td-todos" class="sec td__secTitle">{{ 'tickets.todos.title' | t }}</h3>
         <app-button variant="text" size="sm" (click)="todoOpen.set(true)">
-          <app-icon name="plus" [size]="16" />
+          <app-icon name="plus" />
           {{ 'tickets.todos.add' | t }}
         </app-button>
       </div>

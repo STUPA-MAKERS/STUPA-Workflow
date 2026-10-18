@@ -12,7 +12,7 @@
       }
       @if (canEdit()) {
         <app-button class="rm__add" size="sm" variant="tonal" (click)="openAdd()">
-          <app-icon name="plus" [size]="16" /> {{ 'admin.gremiumRoles.add' | t }}
+          <app-icon name="plus" /> {{ 'admin.gremiumRoles.add' | t }}
         </app-button>
       }
     </header>
@@ -21,7 +21,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
   } @else if (failed()) {
-    <p class="rm__error" role="alert">{{ 'admin.gremiumRoles.loadFailed' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'admin.gremiumRoles.loadFailed' | t }}</app-note>
   } @else if (!sorted().length) {
     <app-empty-state shape="table" rows="3" [heading]="'admin.gremiumRoles.empty' | t" />
   } @else {
@@ -136,21 +136,11 @@
   (deleteRequested)="askDelete($event)"
 />
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremiumRoles.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(null)"
->
-  @if (confirmDelete(); as r) {
-    <p class="rm__dialogText">{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(r) } }}</p>
-  }
-  <div dialog-footer class="rm__dialogFoot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{
-      'admin.gremiumRoles.delete' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="confirmDelete() ? ('admin.gremiumRoles.deleteConfirm' | t: { name: label(confirmDelete()!) }) : ''"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

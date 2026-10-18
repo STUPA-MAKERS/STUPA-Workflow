@@ -21,7 +21,7 @@
                 (click)="openCapture()"
               >
                 <span class="apps__btn"
-                  ><app-icon name="plus" [size]="16" />{{ 'applications.capture.title' | t }}</span
+                  ><app-icon name="plus" />{{ 'applications.capture.title' | t }}</span
                 >
               </app-button>
             }
@@ -35,7 +35,7 @@
                 [ariaLabel]="'applications.list.export' | t"
                 (click)="onExport()"
               >
-                <app-icon name="download" [size]="21" />
+                <app-icon name="download" />
               </app-button>
             }
             <app-row-menu
@@ -165,9 +165,9 @@
 
       <div class="apps__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
         @if (error()) {
-          <p class="apps__status apps__status--error" role="alert">
+          <app-note class="apps__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">
             {{ 'applications.list.error' | t }}
-          </p>
+          </app-note>
         } @else if (loading()) {
           <!-- The shape of the loaded list: a month heading and rows in the geometry of
                `app-list-item`, as many as fill the pane, so nothing moves when they arrive.
@@ -186,7 +186,7 @@
         } @else if (!rows().length) {
           <app-empty-state [heading]="'applications.list.empty' | t">
             @if (activeFilterCount() > 0) {
-              <app-button variant="tonal" size="sm" (click)="reset()">
+              <app-button variant="text" size="sm" (click)="reset()">
                 {{ 'applications.list.filter.reset' | t }}
               </app-button>
             }
@@ -262,13 +262,9 @@
           @if (hasMore()) {
             <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
             <div class="apps__more">
-              @if (loadingMore()) {
-                <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
-              } @else {
-                <app-button variant="text" size="sm" (click)="loadMore()">
-                  {{ 'applications.list.loadMore' | t }}
-                </app-button>
-              }
+              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                {{ 'applications.list.loadMore' | t }}
+              </app-button>
             </div>
           }
           <p class="apps__count" aria-live="polite">
@@ -409,17 +405,11 @@
   (done)="onForced()"
 />
 
-<app-dialog
+<app-confirm-dialog
   [open]="deleteFor() !== null"
   [title]="'applications.detail.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="deleteFor.set(null)"
->
-  <p>{{ 'applications.list.deleteConfirm' | t: { title: deleteFor() ? titleOf(deleteFor()!) : '' } }}</p>
-  <div dialog-footer>
-    <app-button variant="text" (click)="deleteFor.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="confirmDelete()">
-      {{ 'applications.detail.delete' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+  [body]="'applications.list.deleteConfirm' | t: { title: deleteFor() ? titleOf(deleteFor()!) : '' }"
+  [busy]="deleting()"
+  (confirm)="confirmDelete()"
+  (cancel)="deleteFor.set(null)"
+/>

@@ -1,7 +1,7 @@
 <section class="cdv">
   <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
     <app-button actions variant="fill" (click)="openCreate()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.cdVariants.add' | t }}
+      <app-icon name="plus" /> {{ 'admin.cdVariants.add' | t }}
     </app-button>
   </app-page-header>
 
@@ -107,7 +107,7 @@
                   <app-empty-state shape="file" rows="2" [heading]="'admin.cdVariants.noLogos' | t" />
                 }
                 <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
-                  <app-icon name="plus" [size]="16" /> {{ 'admin.cdVariants.addLogo' | t }}
+                  <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
                 </app-button>
               </div>
             }
@@ -200,7 +200,7 @@
           }
         </span>
         <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.click()">
-          <app-icon name="upload" [size]="16" />
+          <app-icon name="upload" />
           {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
         </app-button>
       </div>
@@ -231,20 +231,15 @@
   </div>
 </app-dialog>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.cdVariants.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(null)"
+  [body]="'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' }"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
 >
-  <p class="cdv__confirm">{{ 'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
   @if (deleteError(); as err) {
     <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
   }
-  <div dialog-footer class="cdv__foot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">
-      {{ 'admin.common.remove' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>

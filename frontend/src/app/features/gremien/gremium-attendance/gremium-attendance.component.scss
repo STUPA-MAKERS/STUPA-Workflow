@@ -20,9 +20,6 @@
 .gat__grow {
   flex: 1 1 auto;
 }
-.gat__status {
-  @include gremien-tab.status;
-}
 
 /* ------------------------------------------------------------------ matrix */
 /* The box scrolls in both directions; the head row and the first column stick. */

@@ -168,7 +168,7 @@ describe('GremiumMembersComponent', () => {
   });
 
   it('names a failed load and never shows an empty list for it', async () => {
-    await setup({
+    const { api, fixture } = await setup({
       api: makeApi({ listGremiumMemberships: jest.fn(() => throwError(() => ({ status: 403 }))) }),
     });
     expect(screen.getByRole('alert')).toHaveTextContent(
@@ -176,6 +176,9 @@ describe('GremiumMembersComponent', () => {
     );
     expect(screen.queryByText('Noch keine Mitglieder in diesem Gremium.')).toBeNull();
     expect(screen.queryByText(/\d Mitglieder$/)).toBeNull();
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    fixture.detectChanges();
+    expect(api.listGremiumMemberships).toHaveBeenCalledTimes(2);
   });
 
   it('says so for a gremium without members and survives failed side reads', async () => {

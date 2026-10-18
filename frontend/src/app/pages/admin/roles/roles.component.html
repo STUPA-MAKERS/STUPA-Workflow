@@ -1,7 +1,7 @@
 <section class="ar">
   <app-page-header [flush]="true" [title]="'admin.roles.title' | t">
     <app-button actions variant="fill" (click)="openAdd()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.roles.addGlobalRole' | t }}
+      <app-icon name="plus" /> {{ 'admin.roles.addGlobalRole' | t }}
     </app-button>
   </app-page-header>
 
@@ -73,7 +73,7 @@
                   />
                 </div>
                 <div class="ar__actions">
-                  <app-button size="sm" variant="tonal" (click)="renameRole(r)">{{ 'admin.roles.saveName' | t }}</app-button>
+                  <app-button size="sm" variant="fill" (click)="renameRole(r)">{{ 'admin.roles.saveName' | t }}</app-button>
                 </div>
 
                 @if (isLocked(r)) {
@@ -116,20 +116,13 @@
   }
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmRole()"
-  [title]="'admin.roles.deleteRole' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmRole.set(null)"
->
-  @if (confirmRole(); as r) {
-    <p class="ar__dialogText">{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
-  }
-  <div dialog-footer class="ar__dialogFoot">
-    <app-button variant="text" (click)="confirmRole.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
-  </div>
-</app-dialog>
+  [title]="'admin.roles.deleteTitle' | t"
+  [body]="confirmRole() ? ('admin.roles.deleteConfirm' | t: { role: roleLabel(confirmRole()!) }) : ''"
+  (confirm)="confirmDelete()"
+  (cancel)="confirmRole.set(null)"
+/>
 
 <app-dialog
   [open]="addOpen()"

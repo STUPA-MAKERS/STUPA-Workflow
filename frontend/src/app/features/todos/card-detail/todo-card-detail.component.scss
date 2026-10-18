@@ -26,10 +26,6 @@
 .cd__none {
   align-self: stretch;
 }
-.cd__error {
-  margin: 0;
-  color: var(--color-danger);
-}
 
 /* ------------------------------------------------------------------ head */
 .cd__head {
@@ -365,7 +361,7 @@ a.cd__linkTitle:hover {
   }
   .cd__linkRow:hover .cd__linkX,
   .cd__linkRow:focus-within .cd__linkX {
-    display: grid;
+    display: inline-flex;
   }
   .cd__linkRow:hover .cd__linkChev,
   .cd__linkRow:focus-within .cd__linkChev {

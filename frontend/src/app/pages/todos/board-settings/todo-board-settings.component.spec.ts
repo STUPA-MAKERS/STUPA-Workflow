@@ -1,6 +1,6 @@
 import type { CdkDragDrop } from '@angular/cdk/drag-drop';
 import { HttpErrorResponse } from '@angular/common/http';
-import { fireEvent, render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { TodosApiService, type TodoBoard } from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
@@ -163,11 +163,18 @@ describe('TodoBoardSettingsComponent', () => {
     expect(api.addColumn).toHaveBeenCalledTimes(1);
   });
 
-  it('deletes an empty column at once and asks where the cards of a full one go', async () => {
-    const { cmp, api, detect } = await setup();
+  it('asks before it deletes an empty column and asks where the cards of a full one go', async () => {
+    const { cmp, api, detect, changed } = await setup();
     const cols = cmp.columns();
     cmp.onColumnMenu(cols[1], 1, { id: 'delete', label: '' });
+    detect();
+    expect(api.deleteColumn).not.toHaveBeenCalled();
+    const ask = screen.getByRole('dialog', { name: 'Spalte löschen?' });
+    expect(ask).toHaveTextContent(`„${cols[1].name}“ wird gelöscht. Das lässt sich nicht rückgängig machen.`);
+    fireEvent.click(within(ask).getByRole('button', { name: 'Löschen' }));
     expect(api.deleteColumn).toHaveBeenCalledWith('b-1', 'c-2');
+    expect(cmp.confirmEmpty()).toBeNull();
+    expect(changed).toHaveBeenCalled();
     cmp.deleteColumn(cols[0]);
     detect();
     expect(screen.getByText('„Offen“ hat 2 Karten. Wohin sollen sie?')).toBeInTheDocument();
@@ -179,6 +186,18 @@ describe('TodoBoardSettingsComponent', () => {
     expect(cmp.deleting()).toBeNull();
     cmp.confirmDelete();
     expect(api.deleteColumn).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps an empty column when "Spalte löschen?" is cancelled', async () => {
+    const { cmp, api, detect } = await setup();
+    cmp.deleteColumn(cmp.columns()[1]);
+    detect();
+    fireEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+    detect();
+    expect(cmp.confirmEmpty()).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Spalte löschen?' })).toBeNull();
+    cmp.deleteEmptyColumn();
+    expect(api.deleteColumn).not.toHaveBeenCalled();
   });
 
   it('cannot delete the only column with cards without a target', async () => {
@@ -198,7 +217,9 @@ describe('TodoBoardSettingsComponent', () => {
     const col = cmp.columns()[1];
     api.deleteColumn.mockReturnValueOnce(refuse('column_not_empty'));
     cmp.deleteColumn(col);
+    cmp.deleteEmptyColumn();
     detect();
+    expect(cmp.confirmEmpty()).toBeNull();
     expect(toast.error).not.toHaveBeenCalled();
     expect(cmp.busy()).toBe(false);
     expect(cmp.deleting()).toBe(col);
@@ -298,6 +319,7 @@ describe('TodoBoardSettingsComponent', () => {
     ] as const) {
       api.deleteColumn.mockReturnValueOnce(refuse(code));
       cmp.deleteColumn(cmp.columns()[1]);
+      cmp.deleteEmptyColumn();
       expect(toast.error).toHaveBeenLastCalledWith(text);
     }
     api.addLabel.mockReturnValueOnce(refuse('label_exists') as never);

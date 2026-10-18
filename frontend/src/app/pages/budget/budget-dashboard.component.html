@@ -1,6 +1,6 @@
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-  <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
+  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'budget.error' | t }}</app-note>
 } @else if (loading()) {
   <!-- Never the empty state while loading. "There are no cost centres" and "they have
        not arrived yet" are different claims, and the first one is false during every
@@ -205,7 +205,7 @@
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="'budget.dash.appsLoading' | t" />
           } @else if (appsError()) {
-            <p class="bd__status bd__status--error" role="alert">{{ 'budget.dash.appsError' | t }}</p>
+            <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadApps()">{{ 'budget.dash.appsError' | t }}</app-note>
           } @else if (!appRows().length) {
             <app-empty-state rows="3" [heading]="'budget.dash.appsNone' | t" />
           } @else {
@@ -332,7 +332,7 @@
       <div class="bd__actions">
         @if (canExport()) {
           <app-button variant="outlined" [size]="wide() ? 'md' : 'sm'" (click)="onExport()" [loading]="exporting()">
-            <span class="bd__btn"><app-icon name="download" [size]="17" />{{ 'budget.dash.export' | t }}</span>
+            <span class="bd__btn"><app-icon name="download" />{{ 'budget.dash.export' | t }}</span>
           </app-button>
         }
         @if (canSeeBookings()) {

@@ -23,7 +23,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   MEDIA,
   SegmentedComponent,
@@ -82,6 +81,7 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
 import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
 import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
 import { TransferFormComponent } from './transfer-form/transfer-form.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -122,13 +122,13 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     PageHeaderComponent,
     BookingDetailComponent,
     BookingFormComponent,
     BulkPanelComponent,
     ButtonComponent,
     CostCentreTreeComponent,
-    DialogComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     FormsModule,

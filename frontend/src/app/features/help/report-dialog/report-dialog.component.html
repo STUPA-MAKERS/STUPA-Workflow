@@ -102,7 +102,7 @@
           }
           @if (!full()) {
             <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">
-              <app-icon name="clip" [size]="16" />
+              <app-icon name="clip" />
               {{ 'help.report.attach' | t }}
             </app-button>
           }
@@ -147,7 +147,7 @@
     <ng-container ngProjectAs="[dialog-footer]">
       <app-button variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
       <app-button variant="fill" [loading]="sending()" [disabled]="drafts.busy()" (click)="send()">
-        <app-icon name="send" [size]="16" />
+        <app-icon name="send" />
         {{ 'help.report.send' | t }}
       </app-button>
     </ng-container>

@@ -169,14 +169,9 @@
   border-radius: var(--radius-sm);
 }
 
-.tk__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.tk__status--error {
-  color: var(--color-danger);
+/* The note starts at the edge of the filters and the rows. */
+.tk__loadError {
+  margin: var(--space-4) 0;
 }
 .tk__more {
   display: flex;

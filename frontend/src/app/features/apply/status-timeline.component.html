@@ -1,6 +1,10 @@
 @switch (phase()) {
   @case ('loading') {
-    <p class="sp__loading" role="status">{{ 'status.loading' | t }}</p>
+    <!-- The shape of the page: the head lines, then the body. -->
+    <div class="sp">
+      <app-skeleton variant="lines" [count]="3" />
+      <app-skeleton variant="panel" [label]="'status.loading' | t" />
+    </div>
   }
 
   @case ('expired') {
@@ -38,7 +42,7 @@
             </p>
             <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
             <app-button variant="fill" [loading]="saving()" (click)="save()">
-              <app-icon name="check" [size]="16" />
+              <app-icon name="check" />
               {{ 'applications.detail.save' | t }}
             </app-button>
           </header>
@@ -206,18 +210,15 @@
         />
       </app-side-sheet>
 
-      <app-dialog
+      <app-confirm-dialog
         [open]="confirmErase()"
         [title]="'applications.detail.eraseTitle' | t"
-        [closeLabel]="'action.close' | t"
-        (closed)="confirmErase.set(false)"
-      >
-        <p class="sp__dialogText">{{ 'applications.detail.eraseConfirm' | t }}</p>
-        <div dialog-footer>
-          <app-button variant="text" (click)="confirmErase.set(false)">{{ 'action.cancel' | t }}</app-button>
-          <app-button variant="danger" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
-        </div>
-      </app-dialog>
+        [body]="'applications.detail.eraseConfirm' | t"
+        [confirmLabel]="'applications.detail.eraseRequest' | t"
+        [busy]="requestingErasure()"
+        (confirm)="doRequestErasure()"
+        (cancel)="confirmErase.set(false)"
+      />
     }
   }
 }

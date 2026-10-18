@@ -18,8 +18,3 @@
   }
 }
 
-.msd__confirm {
-  @include df.hint;
-  font-size: var(--fs-body);
-  color: var(--color-text);
-}

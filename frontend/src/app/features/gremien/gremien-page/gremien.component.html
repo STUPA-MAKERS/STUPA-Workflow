@@ -16,7 +16,7 @@
               [ariaLabel]="'gremien.list.subscribe' | t"
               [ariaPressed]="abo.isOpen()"
               (click)="abo.toggle($event.currentTarget)"
-            ><app-icon name="cal" [size]="21" /></app-button>
+            ><app-icon name="cal" /></app-button>
           }
           <app-calendar-subscribe #abo />
         </ng-container>
@@ -66,13 +66,7 @@
             />
           </div>
         } @else if (store.error()) {
-          <div class="grl__status" role="alert">
-            <span>{{ 'gremien.list.error' | t }}</span>
-            <app-button variant="text" size="sm" (click)="store.load()">
-              <app-icon name="repeat" [size]="15" />
-              {{ 'gremien.list.retry' | t }}
-            </app-button>
-          </div>
+          <app-note class="grl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="store.load()">{{ 'gremien.list.error' | t }}</app-note>
         } @else if (!mine().length && !others().length) {
           @if (query().trim()) {
             <app-empty-state [heading]="'gremien.list.noMatch' | t" />

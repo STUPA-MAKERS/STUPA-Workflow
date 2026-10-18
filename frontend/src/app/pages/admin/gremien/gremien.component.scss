@@ -17,11 +17,6 @@
   white-space: nowrap;
 }
 
-.grem__error {
-  margin: 0;
-  color: var(--color-danger);
-}
-
 .grem__list {
   margin: 0;
   padding: 0;
@@ -192,15 +187,6 @@
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
   user-select: text;
-}
-
-.grem__confirm {
-  margin: 0;
-}
-.grem__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 @container (max-width: 44rem) {

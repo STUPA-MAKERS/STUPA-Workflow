@@ -8,7 +8,7 @@
           <app-row-menu [label]="'admin.brand.moreActions' | t" [sections]="phoneMenu()" (selected)="activate()" />
         } @else {
           <app-button variant="fill" [disabled]="!canActivate()" (click)="activate()">
-            <app-icon name="check" [size]="18" /> {{ 'admin.brand.activate' | t }}
+            <app-icon name="check" /> {{ 'admin.brand.activate' | t }}
           </app-button>
         }
       </ng-container>
@@ -178,7 +178,7 @@
         <section class="br__sec" aria-labelledby="br-footer">
           <header class="br__secHead">
             <h2 class="sec br__secTitle" id="br-footer">{{ 'admin.brand.footer' | t }}</h2>
-            <app-button variant="text" size="sm" (click)="addColumn()"><app-icon name="plus" [size]="16" /> {{ 'admin.brand.addColumn' | t }}</app-button>
+            <app-button variant="text" size="sm" (click)="addColumn()"><app-icon name="plus" /> {{ 'admin.brand.addColumn' | t }}</app-button>
           </header>
           @for (col of d.footerColumns; track $index; let ci = $index; let last = $last) {
             <article class="br__column" [attr.aria-label]="'admin.brand.column' | t: { n: ci + 1 }">
@@ -221,7 +221,7 @@
                   }
                 </ul>
               }
-              <app-button class="br__add" variant="text" size="sm" (click)="addLink(col)"><app-icon name="plus" [size]="16" /> {{ 'admin.brand.addLink' | t }}</app-button>
+              <app-button class="br__add" variant="text" size="sm" (click)="addLink(col)"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
             </article>
           } @empty {
             <p class="br__hint">{{ 'admin.brand.noColumns' | t }}</p>
@@ -241,7 +241,7 @@
         <section class="br__sec" aria-labelledby="br-legal">
           <header class="br__secHead">
             <h2 class="sec br__secTitle" id="br-legal">{{ 'admin.brand.legal' | t }}</h2>
-            <app-button variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" [size]="16" /> {{ 'admin.brand.addLink' | t }}</app-button>
+            <app-button variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
           </header>
           @if (d.legalLinks.length) {
             <ul class="rowgroup br__links">
@@ -333,5 +333,11 @@
     </details>
 
     <app-version-history entityType="site_config" entityId="global" (restored)="loadConfig()" />
+  } @else {
+    <!-- The shape of the editor: the fields beside the preview. -->
+    <div class="br__cols">
+      <app-skeleton variant="lines" [count]="6" [label]="'common.loading' | t" />
+      <app-skeleton variant="panel" />
+    </div>
   }
 </section>

@@ -75,8 +75,7 @@
   background: var(--color-surface-2);
   color: var(--color-text);
 }
-.pub__icon:focus-visible,
-.pub__login:focus-visible {
+.pub__icon:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -84,23 +83,4 @@
 /* An outlined pill: signing in is offered, not pushed. */
 .pub__login {
   flex: none;
-  height: 40px;
-  padding: 0 var(--space-5);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.pub__login:hover {
-  background: var(--color-surface-2);
-}
-@include bp.phone {
-  .pub__login {
-    padding: 0 var(--space-4);
-  }
 }

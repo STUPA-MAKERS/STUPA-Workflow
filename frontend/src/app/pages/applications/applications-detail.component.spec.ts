@@ -650,6 +650,14 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.error()).toBe(true);
     expect(cmp.notFound()).toBe(false);
     expect(screen.getByText('Antrag konnte nicht geladen werden.')).toBeInTheDocument();
+    // "Erneut versuchen" reads the application again.
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    detectChanges();
+    expect(cmp.error()).toBe(false);
+    expect(cmp.loading()).toBe(true);
+    http.expectOne(url('')).flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
+    detectChanges();
+    expect(cmp.error()).toBe(true);
     flushTypes(http);
     http.verify();
   });

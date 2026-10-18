@@ -26,7 +26,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { liveSearch } from '@shared/live-search';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { LINK_ICON, linkSub, type Translate } from '../todos.util';
 
@@ -72,7 +72,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
   selector: 'app-todo-link-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, IconComponent, SideSheetComponent],
   templateUrl: './todo-link-picker.component.html',
   styleUrl: './todo-link-picker.component.scss',
 })

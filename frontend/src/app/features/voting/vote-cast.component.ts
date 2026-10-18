@@ -23,7 +23,6 @@ import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-m
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   MEDIA,
   ToastService,
@@ -38,6 +37,7 @@ import { VotingPageService } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -84,10 +84,10 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     SheetBarComponent,
     RouterLink,
     ButtonComponent,
-    DialogComponent,
     EmptyStateComponent,
     IconComponent,
     RowMenuComponent,
