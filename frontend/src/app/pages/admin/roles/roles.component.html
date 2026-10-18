@@ -116,20 +116,13 @@
   }
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmRole()"
-  [title]="'admin.roles.deleteRole' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmRole.set(null)"
->
-  @if (confirmRole(); as r) {
-    <p class="ar__dialogText">{{ 'admin.roles.deleteConfirm' | t: { role: roleLabel(r) } }}</p>
-  }
-  <div dialog-footer class="ar__dialogFoot">
-    <app-button variant="text" (click)="confirmRole.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="confirmDelete()">{{ 'admin.roles.deleteRole' | t }}</app-button>
-  </div>
-</app-dialog>
+  [title]="'admin.roles.deleteTitle' | t"
+  [body]="confirmRole() ? ('admin.roles.deleteConfirm' | t: { role: roleLabel(confirmRole()!) }) : ''"
+  (confirm)="confirmDelete()"
+  (cancel)="confirmRole.set(null)"
+/>
 
 <app-dialog
   [open]="addOpen()"

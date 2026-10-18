@@ -53,6 +53,7 @@ import {
   variantInitials,
 } from './cd-variants.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -127,6 +128,7 @@ function errorCode(err: unknown): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

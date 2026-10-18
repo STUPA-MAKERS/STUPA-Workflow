@@ -49,12 +49,13 @@ import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/c
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { mediaQuerySignal } from '../../layout/media-query';
-import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -92,6 +93,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     ReactiveFormsModule,
     RouterLink,
@@ -104,7 +106,6 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ChatComponent,
     StatusTextComponent,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     AttachmentsPanelComponent,
     TranslatePipe,

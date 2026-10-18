@@ -802,7 +802,7 @@ describe('BudgetTreeComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Löschen: Dezentrale Einrichtungen' }));
     fixture.detectChanges();
     expect(c.nodeDelete()).toBe(TREE[0].children[0]);
-    expect(screen.getByText('„Dezentrale Einrichtungen“ (VS-800) löschen?')).toBeInTheDocument();
+    expect(screen.getByText('„Dezentrale Einrichtungen“ (VS-800) wird gelöscht. Das lässt sich nicht rückgängig machen.')).toBeInTheDocument();
     c.deleteNode();
     http.expectOne((r) => r.url.endsWith('/budgets/b-800') && r.method === 'DELETE').flush(null);
     expect(toast.success).toHaveBeenCalled();

@@ -206,18 +206,15 @@
         />
       </app-side-sheet>
 
-      <app-dialog
+      <app-confirm-dialog
         [open]="confirmErase()"
         [title]="'applications.detail.eraseTitle' | t"
-        [closeLabel]="'applications.detail.cancel' | t"
-        (closed)="confirmErase.set(false)"
-      >
-        <p class="sp__dialogText">{{ 'applications.detail.eraseConfirm' | t }}</p>
-        <div dialog-footer>
-          <app-button variant="text" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
-          <app-button variant="danger" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
-        </div>
-      </app-dialog>
+        [body]="'applications.detail.eraseConfirm' | t"
+        [confirmLabel]="'applications.detail.eraseRequest' | t"
+        [busy]="requestingErasure()"
+        (confirm)="doRequestErasure()"
+        (cancel)="confirmErase.set(false)"
+      />
     }
   }
 }

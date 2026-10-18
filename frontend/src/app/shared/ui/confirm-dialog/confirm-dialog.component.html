@@ -1,0 +1,24 @@
+<app-dialog
+  [open]="open()"
+  [title]="title()"
+  [subtitle]="subtitle()"
+  [closeLabel]="'action.close' | t"
+  (closed)="cancel.emit()"
+>
+  <div class="cfd">
+    @if (body()) {
+      <p class="cfd__body">{{ body() }}</p>
+    }
+    <ng-content />
+  </div>
+  <app-button dialog-footer variant="text" (click)="cancel.emit()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    [variant]="danger() ? 'danger' : 'fill'"
+    [loading]="busy()"
+    [disabled]="disabled()"
+    (click)="onConfirm()"
+  >
+    {{ confirmLabel() || ('action.delete' | t) }}
+  </app-button>
+</app-dialog>

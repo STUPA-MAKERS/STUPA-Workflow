@@ -103,3 +103,12 @@
 @if (todoOpen()) {
   <app-todo-new-dialog [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }
+
+<app-confirm-dialog
+  [open]="removing() !== null"
+  [title]="'meetings.agenda.removeTitle' | t"
+  [body]="'meetings.agenda.removeConfirm' | t: { title: removing() ? title(removing()!) : '' }"
+  [confirmLabel]="'action.remove' | t"
+  (confirm)="confirmRemove()"
+  (cancel)="removing.set(null)"
+/>

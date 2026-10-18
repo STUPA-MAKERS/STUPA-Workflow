@@ -877,7 +877,7 @@ describe('ChatComponent', () => {
       trash.focus();
       fireEvent.click(trash);
       view.fixture.detectChanges();
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen' })).getByRole('button', { name: 'Löschen' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
       view.fixture.detectChanges();
       // The answer is still out: the message and its button stay.
       set('messages', own());
@@ -889,11 +889,11 @@ describe('ChatComponent', () => {
     it('deletes after a confirmation', async () => {
       const { del, view } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
-      const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen' });
-      fireEvent.click(within(dialog).getAllByRole('button', { name: 'Abbrechen' })[1]);
+      const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen?' });
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
       expect(del).not.toHaveBeenCalled();
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen' })).getByRole('button', { name: 'Löschen' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
       expect(del).toHaveBeenCalledWith({ id: 'm' });
       // A confirm without a message does nothing.
       (view.fixture.componentInstance as unknown as { confirmDelete(): void }).confirmDelete();
@@ -925,7 +925,7 @@ describe('ChatComponent', () => {
       });
       expect(screen.getAllByRole('button', { name: 'Nachricht bearbeiten' })).toHaveLength(1);
       fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
-      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen' })).getByRole('button', { name: 'Löschen' }));
+      fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).getByRole('button', { name: 'Löschen' }));
       expect(del).toHaveBeenCalledWith({ id: 'a' });
     });
   });
@@ -987,7 +987,7 @@ describe('ChatComponent', () => {
       view.fixture.detectChanges();
       fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Löschen' }));
       view.fixture.detectChanges();
-      expect(screen.getByRole('dialog', { name: 'Nachricht löschen' })).toBeInTheDocument();
+      expect(screen.getByRole('dialog', { name: 'Nachricht löschen?' })).toBeInTheDocument();
     });
 
     it('offers no copy for a message of files only', async () => {

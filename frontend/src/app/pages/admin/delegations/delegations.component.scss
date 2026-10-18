@@ -136,15 +136,6 @@
   outline-offset: 2px;
 }
 
-.dl__dialogText {
-  margin: 0;
-}
-.dl__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 @container (max-width: 48rem) {
   .dl__row {
     grid-template-columns: minmax(0, 1fr) auto;

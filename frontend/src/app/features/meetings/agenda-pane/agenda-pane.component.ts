@@ -31,6 +31,7 @@ import {
 } from '../../todos/new-dialog/todo-new-dialog.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
@@ -64,7 +65,8 @@ export interface AgendaMove {
  * swipe still scrolls the agenda; the menu moves without a pointer. Only a
  * planned or live meeting changes its agenda (O25); a closed meeting keeps the
  * non-public switch while the protocol is a draft (O22). An item with an open or
- * closed vote stays on the agenda, so its remove is disabled with the reason.
+ * closed vote stays on the agenda, so its remove is disabled with the reason. The remove
+ * asks first ("TOP entfernen?"), because the text of the item goes with it.
  *
  * "To-Do anlegen" (frame 5) is in the menu of every item for a person with `todo.write`
  * in the gremium of the meeting, also on a closed meeting: it opens "Neues To-Do" on the
@@ -75,6 +77,7 @@ export interface AgendaMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     CdkDrag,
     CdkDragPlaceholder,
@@ -132,6 +135,8 @@ export class AgendaPaneComponent {
   /** "Neues To-Do" from the menu of an item: open, and the links it starts with. */
   protected readonly todoOpen = signal(false);
   protected readonly todoLinks = signal<readonly NewTodoLink[]>([]);
+  /** The item that "TOP entfernen?" asks about. */
+  protected readonly removing = signal<AgendaItem | null>(null);
   /** The person may write To-Dos on the board of the gremium of the meeting. */
   protected readonly canCreateTodo = computed(() => {
     const gremiumId = this.meeting().gremiumId;
@@ -307,9 +312,16 @@ export class AgendaPaneComponent {
         this.setNonPublic.emit({ item, nonPublic: !item.nonPublic });
         break;
       case 'remove':
-        this.remove.emit(item.id);
+        this.removing.set(item);
         break;
     }
+  }
+
+  /** "Entfernen" in "TOP entfernen?": the page removes the item. */
+  protected confirmRemove(): void {
+    const item = this.removing();
+    this.removing.set(null);
+    if (item) this.remove.emit(item.id);
   }
 
   /**

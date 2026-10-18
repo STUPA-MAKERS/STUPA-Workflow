@@ -306,23 +306,18 @@
 </app-dialog>
 
 <!-- Delete a cost centre. A node with sub cost centres or allocations gives 409. -->
-<app-dialog
+<app-confirm-dialog
   [open]="!!nodeDelete()"
   [title]="'budget.tree.deleteTitle' | t"
-  [closeLabel]="'budget.tree.cancel' | t"
-  (closed)="closeDeleteNode()"
+  [body]="nodeDelete() ? ('budget.tree.deleteConfirm' | t: { name: nodeDelete()!.name, path: nodeDelete()!.pathKey }) : ''"
+  [disabled]="nodeDeleteBlocked()"
+  (confirm)="deleteNode()"
+  (cancel)="closeDeleteNode()"
 >
-  @if (nodeDelete(); as node) {
-    <p class="bt__confirm">{{ 'budget.tree.deleteConfirm' | t: { name: node.name, path: node.pathKey } }}</p>
-  }
   @if (nodeDeleteBlocked()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.deleteBlocked' | t }}</app-note>
   }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeDeleteNode()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="danger" [disabled]="nodeDeleteBlocked()" (click)="deleteNode()">{{ 'budget.tree.delete' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>
 
 <!-- Create a top budget. -->
 <app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeTop()">
@@ -439,18 +434,18 @@
 
 <!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
      applications still hang on the year. That reason stays visible in the dialog. -->
-<app-dialog [open]="!!fyDelete()" [title]="'budget.tree.fyDeleteTitle' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyDelete()">
-  @if (fyDelete(); as fy) {
-    <p class="bt__confirm">{{ 'budget.tree.fyDeleteConfirm' | t: { year: fy.display } }}</p>
-  }
+<app-confirm-dialog
+  [open]="!!fyDelete()"
+  [title]="'budget.tree.fyDeleteTitle' | t"
+  [body]="fyDelete() ? ('budget.tree.fyDeleteConfirm' | t: { year: fyDelete()!.display }) : ''"
+  [disabled]="!!fyDeleteBlocked()"
+  (confirm)="doFyDelete()"
+  (cancel)="closeFyDelete()"
+>
   @if (fyDeleteBlocked(); as reason) {
     <app-note kind="error" icon="alert" role="alert">{{ reason }}</app-note>
   }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFyDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="danger" [disabled]="!!fyDeleteBlocked()" (click)="doFyDelete()">{{ 'budget.tree.fyDelete' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>
 
 <!-- Set the fiscal-year cutoff of the selected budget. A field saves on change. -->
 <app-dialog

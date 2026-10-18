@@ -1,0 +1,10 @@
+/* The text and the content below it (a note, an error). */
+.cfd {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cfd__body {
+  margin: 0;
+}

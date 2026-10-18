@@ -19,7 +19,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   MEDIA,
   SegmentedComponent,
@@ -66,6 +65,7 @@ import {
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
 import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -108,9 +108,9 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
-    DialogComponent,
     EmptyStateComponent,
     FileDropZoneComponent,
     IconComponent,
