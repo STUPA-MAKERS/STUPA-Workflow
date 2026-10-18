@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { forkJoin, type Observable, of, switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -36,7 +37,9 @@ const FIXED_ROLES = new Set(['admin', 'member']);
  * The head of a row shows the name, "fest" for the fixed roles `admin` and `member`
  * (N40), the key and "n / total" of the catalogue. An open row renames the role (the
  * key never changes) and edits its rights in sections. The sections come from the
- * catalogue of the API (`GET /admin/permissions`), so a removed key never shows. The
+ * catalogue of the API (`GET /admin/permissions`), so a removed key never shows. While a
+ * name or the rights of a role differ from the server, the floating button is
+ * "Speichern" instead of "Rolle anlegen"; it saves every changed role. The
  * admin role always holds every right and is read-only here; the rights of `member`
  * can change. A dialog creates a role; the key must match `ROLE_KEY_PATTERN` (A10), and
  * the server answers 422 for any other key. This page lists global roles only; the
@@ -71,6 +74,9 @@ export class AdminRolesComponent {
   private readonly i18n = inject(I18nService);
 
   protected readonly roles = signal<Role[]>([]);
+  /** The roles as the server has them, by id. The dirty check compares against them. */
+  private readonly savedRoles = signal<ReadonlyMap<string, Role>>(new Map());
+  protected readonly savingRoles = signal(false);
   protected readonly permissions = signal<string[]>([]);
   protected readonly expanded = signal<Set<string>>(new Set());
   protected readonly addOpen = signal(false);
@@ -97,6 +103,7 @@ export class AdminRolesComponent {
     this.api.listRoles().subscribe({
       next: (r) => {
         this.roles.set(r);
+        this.keepSaved(r);
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -165,22 +172,80 @@ export class AdminRolesComponent {
     this.roles.update((list) => list.map((r) => (r.id === role.id ? { ...r, permissions } : r)));
   }
 
-  protected saveRole(role: Role): void {
-    // Only keys of the catalogue go out: a key the server removed would make it refuse
-    // the whole list. Without a catalogue the button is disabled.
-    const catalogue = new Set(this.permissions());
-    const permissions = role.permissions.filter((p) => catalogue.has(p));
-    this.api.saveRolePermissions(role.id, permissions).subscribe({
-      next: (saved) => {
-        this.roles.update((list) => list.map((r) => (r.id === saved.id ? saved : r)));
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+  // A rename changes the display name only. The key never changes.
+  private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
+
+  /** The rights of the role differ from the server. */
+  private permsChanged(role: Role): boolean {
+    const saved = this.savedRoles().get(role.id);
+    if (!saved || this.isLocked(role)) return false;
+    const now = new Set(role.permissions);
+    return now.size !== new Set(saved.permissions).size || saved.permissions.some((p) => !now.has(p));
+  }
+
+  /** The name draft of the role differs from the server. */
+  private nameChanged(role: Role): boolean {
+    const draft = this.nameDrafts()[role.id];
+    const saved = this.savedRoles().get(role.id);
+    if (!draft || !saved) return false;
+    return draft.de !== (saved.label['de'] ?? '') || draft.en !== (saved.label['en'] ?? '');
+  }
+
+  /** The roles with a name or rights that are not saved. */
+  private readonly dirtyRoles = computed(() =>
+    this.roles().filter((r) => this.permsChanged(r) || this.nameChanged(r)),
+  );
+  protected readonly rolesDirty = computed(() => this.dirtyRoles().length > 0);
+
+  private keepSaved(roles: Role[]): void {
+    this.savedRoles.update((m) => {
+      const next = new Map(m);
+      for (const r of roles) next.set(r.id, r);
+      return next;
     });
   }
 
-  // A rename changes the display name only. The key never changes.
-  private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
+  /**
+   * "Speichern": send the rights and the name of every changed role. Only keys of the
+   * catalogue go out, because a key the server removed would make it refuse the whole
+   * list. Without a catalogue the button is disabled.
+   */
+  protected saveRoles(): void {
+    const dirty = this.dirtyRoles();
+    if (!dirty.length || this.savingRoles() || !this.permissions().length) return;
+    const catalogue = new Set(this.permissions());
+    const jobs = dirty.map((role) => {
+      let job$: Observable<Role> = of(role);
+      if (this.permsChanged(role)) {
+        const permissions = role.permissions.filter((p) => catalogue.has(p));
+        job$ = this.api.saveRolePermissions(role.id, permissions);
+      }
+      if (this.nameChanged(role)) {
+        const d = this.nameDraft(role);
+        job$ = job$.pipe(switchMap(() => this.api.renameRole(role.id, { de: d.de, en: d.en })));
+      }
+      return job$;
+    });
+    this.savingRoles.set(true);
+    forkJoin(jobs).subscribe({
+      next: (saved) => {
+        this.savingRoles.set(false);
+        const byId = new Map(saved.map((r) => [r.id, r]));
+        this.roles.update((list) => list.map((r) => byId.get(r.id) ?? r));
+        this.keepSaved(saved);
+        this.nameDrafts.update((m) => {
+          const next = { ...m };
+          for (const r of saved) delete next[r.id];
+          return next;
+        });
+        this.toast.success(this.i18n.translate('admin.common.saved'));
+      },
+      error: () => {
+        this.savingRoles.set(false);
+        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+      },
+    });
+  }
   /** The current name draft. It starts from the current label. */
   protected nameDraft(role: Role): { de: string; en: string } {
     return (
@@ -193,16 +258,6 @@ export class AdminRolesComponent {
   protected patchName(role: Role, lang: 'de' | 'en', value: string): void {
     const cur = this.nameDraft(role);
     this.nameDrafts.update((m) => ({ ...m, [role.id]: { ...cur, [lang]: value } }));
-  }
-  protected renameRole(role: Role): void {
-    const d = this.nameDraft(role);
-    this.api.renameRole(role.id, { de: d.de, en: d.en }).subscribe({
-      next: (saved) => {
-        this.roles.update((list) => list.map((r) => (r.id === saved.id ? saved : r)));
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
-    });
   }
 
   protected openAdd(): void {
@@ -228,6 +283,7 @@ export class AdminRolesComponent {
       next: (role) => {
         this.creating.set(false);
         this.roles.update((list) => [...list, role]);
+        this.keepSaved([role]);
         this.expanded.update((set) => new Set(set).add(role.id));
         this.addOpen.set(false);
         this.toast.success(this.i18n.translate('admin.roles.created'));

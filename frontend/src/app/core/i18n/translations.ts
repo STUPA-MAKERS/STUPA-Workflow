@@ -711,7 +711,6 @@ export const de = {
   'applications.detail.notProvided': '—',
   'applications.detail.edit': 'Bearbeiten',
   'applications.detail.delete': 'Löschen',
-  'applications.detail.save': 'Speichern',
   'applications.detail.saved': 'Gespeichert.',
   'applications.detail.saveFailed': 'Speichern fehlgeschlagen.',
   'applications.detail.locked': 'In diesem Status nicht bearbeitbar.',
@@ -1574,8 +1573,6 @@ export const de = {
   'voting.beamer.votesOf': '{cast} von {eligible} Stimmen',
 
   'admin.home.title': 'Verwaltung',
-  'admin.brand.moreActions': 'Weitere Aktionen',
-  'admin.brand.nothingToActivate': 'Erst einen geänderten Entwurf speichern.',
   'admin.deadlines.dateCountOne': '1 Termin',
   'budget.tree.expendedTitle': 'Ausgegeben {amount}',
   'budget.tree.incomeTitle': 'Einnahmen {amount}',
@@ -1755,7 +1752,6 @@ export const de = {
   'admin.roles.fixed': 'fest',
   'admin.roles.fixedHint': 'Feste Rolle: lässt sich nicht löschen.',
   'admin.roles.countLabel': '{count} von {total} Rechten',
-  'admin.roles.saveName': 'Namen speichern',
   'admin.roles.section.applications': 'Anträge',
   'admin.roles.section.budget': 'Budget',
   'admin.roles.section.meetings': 'Sitzungen und Abstimmungen',
@@ -2199,7 +2195,6 @@ export const de = {
   'admin.flow.actionDesc.openVote':
     'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
-  'admin.flow.save': 'Speichern',
   'admin.flow.preset.simple': 'Einfach: Entwurf → Eingereicht → Entschieden',
   'admin.flow.preset.vote': 'Mit Abstimmung: Entwurf → Prüfung → Abstimmung → Entschieden',
   // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
@@ -2252,7 +2247,6 @@ export const de = {
   'admin.brand.submitted.external': 'Extern — Gast mit E-Mail-Bestätigung',
   'admin.brand.submitted.preview': 'Vorschau',
   'admin.brand.submitted.default': 'Standardtext',
-  'admin.brand.saveDraft': 'Entwurf speichern',
   'admin.brand.activate': 'Entwurf aktivieren',
   'admin.brand.activated': 'Branding aktiviert (Version {n}).',
   'admin.brand.badUrl': 'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
@@ -2805,7 +2799,6 @@ export const de = {
   'admin.forms.deactivated': 'Formular deaktiviert — keine neuen Anträge möglich.',
   'admin.forms.actionFailed': 'Aktion fehlgeschlagen.',
   'admin.forms.modeEdit': 'Bearbeiten',
-  'admin.forms.save': 'Speichern',
   'admin.forms.empty': 'Noch keine Fragen. Füge unten die erste hinzu.',
   'admin.forms.questionPlaceholder': 'Fragetext …',
   'admin.forms.addQuestion': 'Frage hinzufügen',

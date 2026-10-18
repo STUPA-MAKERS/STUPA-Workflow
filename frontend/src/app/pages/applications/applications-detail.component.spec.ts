@@ -1738,7 +1738,11 @@ describe('ApplicationsDetailComponent', () => {
     await new Promise((r) => setTimeout(r));
     detectChanges();
 
-    await userEvent.click(screen.getByRole('button', { name: /Speichern/ }));
+    // "Speichern" shows after the first change of a field.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole('textbox', { name: /Titel/ }), 'e');
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     http
       .expectOne((r) => r.method === 'PATCH' && r.url === '/api/applications/app-1')
       .flush(

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -110,7 +110,8 @@ function emptyDraft(): PolicyDraft {
  * Below the table, `app-meeting-window-settings` holds the open window of meetings (the
  * earliest open and the early open that asks first), and `app-guest-settings` holds the
  * settings for applications without an account (Z1): the discard window and the
- * lifetime of the personal link.
+ * lifetime of the personal link. While one of the two sections has changes, the floating
+ * button is "Speichern" for them instead of "Frist anlegen".
  */
 @Component({
   selector: 'app-admin-deadlines',
@@ -155,6 +156,16 @@ export class AdminDeadlinesComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly confirmDelete = signal<DeadlinePolicy | null>(null);
 
+  private readonly meetingWindow = viewChild(MeetingWindowSettingsComponent);
+  private readonly guestSettings = viewChild(GuestSettingsComponent);
+  /** The settings sections below the table that have changes that are not saved. */
+  private readonly dirtySections = computed(() =>
+    [this.meetingWindow(), this.guestSettings()].filter((s) => !!s && s.dirty()),
+  );
+  protected readonly settingsDirty = computed(() => this.dirtySections().length > 0);
+  protected readonly settingsSaving = computed(() => this.dirtySections().some((s) => s?.saving()));
+  protected readonly settingsValid = computed(() => this.dirtySections().every((s) => s?.valid()));
+
   protected readonly kindOptions: SelectOption[] = KINDS.map((k) => ({
     value: k,
     label: this.kindLabel(k),
@@ -189,6 +200,11 @@ export class AdminDeadlinesComponent {
   protected onRowMenu(policy: DeadlinePolicy, index: number, item: RowMenuItem): void {
     if (item.id === 'edit') this.openEdit(index);
     else if (item.id === 'remove') this.askDelete(policy);
+  }
+
+  /** "Speichern": send every settings section that has changes. */
+  protected saveSettings(): void {
+    for (const s of this.dirtySections()) s?.save();
   }
 
   constructor() {

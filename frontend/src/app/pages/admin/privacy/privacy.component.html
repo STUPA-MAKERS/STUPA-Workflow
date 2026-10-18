@@ -155,9 +155,18 @@
         (ngModelChange)="retentionMonths.set($event === '' || $event === null || $event === undefined ? null : +$event)"
         name="retentionMonths"
       />
-      <app-button type="submit" variant="fill" [disabled]="(retentionMonths() ?? 0) < 1">{{ 'action.save' | t }}</app-button>
     </form>
   </section>
+
+  @if (retentionDirty()) {
+    <app-fab
+      icon="check"
+      [label]="'action.save' | t"
+      [loading]="retentionSaving()"
+      [disabled]="(retentionMonths() ?? 0) < 1"
+      (activate)="saveRetention()"
+    />
+  }
 </section>
 
 <app-confirm-dialog

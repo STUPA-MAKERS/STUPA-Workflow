@@ -54,6 +54,7 @@ import {
   validateFormField,
 } from '../form-field.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -98,6 +99,7 @@ type QPos = QuestionPos;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     EmptyStateComponent,
+    FabComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -125,7 +127,7 @@ export class FormEditorComponent {
 
   /** Wide viewport: three columns that scroll on their own. */
   protected readonly wide = mediaQuerySignal(MEDIA.wide);
-  /** Phone: the header keeps "Speichern" and moves the other actions into a ⋮ menu. */
+  /** Phone: the header moves its actions into a ⋮ menu. */
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
 
   protected readonly typeId = signal<Uuid>('');
@@ -196,7 +198,7 @@ export class FormEditorComponent {
     return v === null ? null : this.i18n.translate('admin.forms.versionLabel', { n: v });
   });
 
-  /** The ⋮ menu of the header on a phone: the actions beside "Speichern". */
+  /** The ⋮ menu of the header on a phone: activate or deactivate, and the preview. */
   protected readonly headerMenu = computed<RowMenuSection[]>(() => {
     const items: RowMenuItem[] = [];
     if (this.hasVersion()) {
@@ -215,10 +217,35 @@ export class FormEditorComponent {
   });
 
   /** Original type state. A save patches the type only after a change. */
-  private originalTitle: I18nMap = { de: '', en: '' };
-  private originalHasBudget = false;
-  private originalCmpRequired = false;
-  private originalCmpMinCount = 2;
+  private readonly originalType = signal({
+    title: { de: '', en: '' } as I18nMap,
+    hasBudget: false,
+    cmpRequired: false,
+    cmpMinCount: 2,
+  });
+  /** The questions and the description as the server has them (JSON), for `dirty`. */
+  private readonly savedForm = signal<string | null>(null);
+  /** The questions and the description as the editor has them (JSON). */
+  private readonly formSnapshot = computed(() =>
+    JSON.stringify({ groups: this.groups(), description: this.description() }),
+  );
+  /** The type differs from the server: a save patches it before the new form version. */
+  private readonly typeChanged = computed(() => {
+    const o = this.originalType();
+    return (
+      this.title()['de'] !== o.title['de'] ||
+      this.title()['en'] !== o.title['en'] ||
+      this.hasBudget() !== o.hasBudget ||
+      this.cmpRequired() !== o.cmpRequired ||
+      this.cmpMinCount() !== o.cmpMinCount
+    );
+  });
+  /** The editor has changes that are not saved. Only then the page shows "Speichern". */
+  protected readonly dirty = computed(
+    () =>
+      !this.loading() &&
+      (this.typeChanged() || (this.savedForm() !== null && this.formSnapshot() !== this.savedForm())),
+  );
 
   protected readonly fieldTypes = FIELD_TYPES;
   protected readonly typeMenu = TYPE_MENU;
@@ -268,16 +295,13 @@ export class FormEditorComponent {
         const t = types.find((x) => x.id === id);
         if (t) {
           this.title.set({ de: t.name['de'] ?? '', en: t.name['en'] ?? '' });
-          this.originalTitle = { ...this.title() };
           this.hasBudget.set(t.hasBudget);
-          this.originalHasBudget = t.hasBudget;
           const co = t.comparisonOffers;
           this.cmpRequired.set(co?.required ?? false);
           this.cmpMinCount.set(co?.minCount ?? 2);
           this.cmpThreshold = co?.thresholdAmount ?? null;
           this.cmpAs = co?.as ?? 'file';
-          this.originalCmpRequired = this.cmpRequired();
-          this.originalCmpMinCount = this.cmpMinCount();
+          this.keepTypeAsSaved();
         }
       },
       error: () => undefined,
@@ -294,6 +318,7 @@ export class FormEditorComponent {
         this.active.set(draft.active ?? false);
         this.hasVersion.set(!!draft.formVersionId);
         this.formVersion.set(draft.version ?? null);
+        this.savedForm.set(this.formSnapshot());
         this.loading.set(false);
       },
       error: () => this.loading.set(false),
@@ -870,14 +895,14 @@ export class FormEditorComponent {
     return current ? JSON.stringify(current) : '';
   }
 
-  private typeChanged(): boolean {
-    return (
-      this.title()['de'] !== this.originalTitle['de'] ||
-      this.title()['en'] !== this.originalTitle['en'] ||
-      this.hasBudget() !== this.originalHasBudget ||
-      this.cmpRequired() !== this.originalCmpRequired ||
-      this.cmpMinCount() !== this.originalCmpMinCount
-    );
+  /** The type fields of the editor are now the state of the server. */
+  private keepTypeAsSaved(): void {
+    this.originalType.set({
+      title: { ...this.title() },
+      hasBudget: this.hasBudget(),
+      cmpRequired: this.cmpRequired(),
+      cmpMinCount: this.cmpMinCount(),
+    });
   }
 
   protected save(): void {
@@ -889,6 +914,7 @@ export class FormEditorComponent {
     const flat = groupsToFields(this.groups());
     const normalized = flat.map(normalizeFormField);
     const description: I18nMap = { ...this.description() };
+    const snapshot = this.formSnapshot();
     this.saving.set(true);
 
     const save$ = this.typeChanged()
@@ -909,10 +935,8 @@ export class FormEditorComponent {
     save$.subscribe({
       next: () => {
         this.saving.set(false);
-        this.originalTitle = { ...this.title() };
-        this.originalHasBudget = this.hasBudget();
-        this.originalCmpRequired = this.cmpRequired();
-        this.originalCmpMinCount = this.cmpMinCount();
+        this.keepTypeAsSaved();
+        this.savedForm.set(snapshot);
         // A save creates a new version, and that version is active.
         this.active.set(true);
         this.hasVersion.set(true);

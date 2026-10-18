@@ -68,9 +68,6 @@
                     [name]="r.id + '-nen'"
                   />
                 </div>
-                <div class="ar__actions">
-                  <app-button size="sm" variant="fill" (click)="renameRole(r)">{{ 'admin.roles.saveName' | t }}</app-button>
-                </div>
 
                 @if (isLocked(r)) {
                   <app-note icon="lock">{{ 'admin.roles.adminLocked' | t }}</app-note>
@@ -92,14 +89,6 @@
                     </div>
                   </fieldset>
                 }
-
-                @if (!isLocked(r)) {
-                  <div class="ar__actions">
-                    <app-button variant="fill" [disabled]="!permissions().length" (click)="saveRole(r)">{{
-                      'action.save' | t
-                    }}</app-button>
-                  </div>
-                }
               </div>
             }
           </li>
@@ -111,7 +100,17 @@
     <p class="ar__foot">{{ 'admin.roles.fixedFoot' | t }}</p>
   }
 
-  <app-fab [label]="'fab.role' | t" (activate)="openAdd()" />
+  @if (rolesDirty()) {
+    <app-fab
+      icon="check"
+      [label]="'action.save' | t"
+      [loading]="savingRoles()"
+      [disabled]="!permissions().length"
+      (activate)="saveRoles()"
+    />
+  } @else {
+    <app-fab [label]="'fab.role' | t" (activate)="openAdd()" />
+  }
 </section>
 
 <app-confirm-dialog

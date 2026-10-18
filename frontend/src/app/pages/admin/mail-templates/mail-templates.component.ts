@@ -20,10 +20,20 @@ import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
+
+/** The text fields of a template that the editor changes. */
+const TEXT_FIELDS = ['subjectI18n', 'bodyI18n', 'bodyHtmlI18n'] as const;
+
+/** Two i18n maps hold the same texts. A missing language is the same as an empty text. */
+function sameTexts(a: Record<string, string>, b: Record<string, string>): boolean {
+  const langs = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...langs].every((l) => (a[l] ?? '') === (b[l] ?? ''));
+}
 
 /**
  * Mail-template editor at `/admin/mail-templates` (board Admin-Mail-Vorlagen). Needs the
@@ -41,6 +51,7 @@ type Lang = (typeof LANGS)[number];
   imports: [
     SkeletonComponent,
     EmptyStateComponent,
+    FabComponent,
     ScrollFadeDirective,
     FormsModule,
     UpperCasePipe,
@@ -75,6 +86,13 @@ export class MailTemplatesComponent {
   readonly resetting = signal(false);
   readonly previewing = signal(false);
   readonly preview = signal<MailPreview | null>(null);
+
+  /** The open template has changes that are not saved. Only then the page shows "Speichern". */
+  readonly dirty = computed(() => {
+    const d = this.draft();
+    const saved = d && this.templates_().find((t) => t.key === d.key);
+    return !!saved && TEXT_FIELDS.some((f) => !sameTexts(d[f], saved[f]));
+  });
 
   /**
    * Localize a template key: `deadline_approaching` becomes "Deadline reminder".

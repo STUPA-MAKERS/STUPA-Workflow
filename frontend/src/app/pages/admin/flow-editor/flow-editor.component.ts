@@ -48,6 +48,7 @@ import {
   serializeFlowGraph,
   validateFlowGraph,
 } from '../flow-graph.util';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { FlowCanvasInteraction, type TempEdge } from './flow-canvas-interaction';
 import { createFlowCanvasView } from './flow-canvas-view';
@@ -110,6 +111,7 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
   imports: [
     SkeletonComponent,
     EmptyStateComponent,
+    FabComponent,
     TranslatePipe,
     ButtonComponent,
     VersionHistoryComponent,
@@ -142,7 +144,7 @@ export class FlowEditorComponent {
 
   /** Wide viewport: the canvas and the inspector fill the window side by side. */
   protected readonly wide = mediaQuerySignal(MEDIA.wide);
-  /** Phone: the header keeps "Speichern" and moves "Versionen" into a ⋮ menu. */
+  /** Phone: the header moves "Versionen" into a ⋮ menu. */
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
 
   /** The inspector shows the version history instead of the selection. */
@@ -241,6 +243,7 @@ export class FlowEditorComponent {
             this.applyingHistory = true;
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
+          this.savedJson.set(this.json());
           this.loaded.set(true);
           this.loading.set(false);
         },
@@ -297,6 +300,13 @@ export class FlowEditorComponent {
     this.validation().errors.map((e) => this.i18n.translate(e.key, e.params)),
   );
   protected readonly json = computed(() => serializeFlowGraph(this.graph()));
+  /** The flow as the server has it (`json`), or null before the first load settles. */
+  private readonly savedJson = signal<string | null>(null);
+  /** The flow has changes that are not saved. Only then the page shows "Speichern". */
+  protected readonly dirty = computed(() => {
+    const saved = this.savedJson();
+    return saved !== null && this.json() !== saved;
+  });
 
   /**
    * The view that fits the whole content. A flow smaller than the canvas box keeps its
@@ -853,10 +863,12 @@ export class FlowEditorComponent {
       return;
     }
     const graph = normalizeFlowGraph(autoLayout(this.graph()));
+    const json = this.json();
     this.saving.set(true);
     this.api.createGlobalFlowVersion(graph).subscribe({
       next: () => {
         this.saving.set(false);
+        this.savedJson.set(json);
         this.toast.success(this.i18n.translate('admin.common.saved'));
         this.versionHistory()?.reload();
       },
@@ -875,6 +887,7 @@ export class FlowEditorComponent {
           this.applyingHistory = true;
           this.graph.set(autoLayout(normalizeFlowGraph(graph)));
         }
+        this.savedJson.set(this.json());
       },
       error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
     });

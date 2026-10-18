@@ -172,6 +172,10 @@
 .sp__editText strong:focus {
   outline: none;
 }
+/* The end of the form keeps room for the floating "Speichern" (56px and 16px around it). */
+.sp__edit {
+  padding-bottom: calc(56px + 2 * var(--space-4));
+}
 .sp__edit ::ng-deep :is(input, textarea, select, button, [role='alert']) {
   scroll-margin-top: 5rem;
 }

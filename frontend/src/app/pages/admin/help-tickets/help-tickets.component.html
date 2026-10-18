@@ -1,27 +1,9 @@
 <section class="ht">
   <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
-    @if (loading()) {
-      <ng-container ngProjectAs="[actions]">
-        @if (!phone()) {
-          <span class="skel-box ht__skelButton ht__skelButton--text skel-in" aria-hidden="true"></span>
-        }
-        <span class="skel-box ht__skelButton skel-in" aria-hidden="true"></span>
-      </ng-container>
-    } @else if (loadState() === 'ok') {
-      <ng-container ngProjectAs="[actions]">
-        <!-- A phone keeps one action in the header; "Verwerfen" goes into the ⋮ menu. -->
-        @if (!phone()) {
-          <app-button variant="text" [disabled]="!dirty() || saving()" (click)="discard()">
-            {{ 'admin.helpTickets.discard' | t }}
-          </app-button>
-        }
-        <app-button variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
-          {{ 'action.save' | t }}
-        </app-button>
-        @if (phone() && dirty() && !saving()) {
-          <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
-        }
-      </ng-container>
+    @if (loadState() === 'ok' && !loading() && dirty()) {
+      <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
+        {{ 'admin.helpTickets.discard' | t }}
+      </app-button>
     }
   </app-page-header>
 
@@ -159,5 +141,9 @@
         }
       }
     </section>
+  }
+
+  @if (loadState() === 'ok' && !loading() && dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!!wikiError()" (activate)="save()" />
   }
 </section>

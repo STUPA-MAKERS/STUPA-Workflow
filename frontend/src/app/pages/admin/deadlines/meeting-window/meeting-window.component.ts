@@ -5,7 +5,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import { InputComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { MAX_LEAD_MINUTES, type MeetingSettings } from '../../admin.models';
 
@@ -47,7 +47,7 @@ function draftOf(s: MeetingSettings): Draft {
   selector: 'app-meeting-window-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, NoteComponent, SkeletonComponent],
+  imports: [FormsModule, TranslatePipe, InputComponent, NoteComponent, SkeletonComponent],
   templateUrl: './meeting-window.component.html',
   // The same section layout as the guest settings on this page.
   styleUrl: '../guest-settings/guest-settings.component.scss',
@@ -64,7 +64,7 @@ export class MeetingWindowSettingsComponent {
   protected readonly loading = signal(true);
   /** The read failed: `forbidden` hides the section, `error` names the failure. */
   protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
-  protected readonly saving = signal(false);
+  readonly saving = signal(false);
   /** The stored values; the draft compares against them. */
   private readonly saved = signal<MeetingSettings | null>(null);
   protected readonly draft = signal<Draft>({ open: '', confirm: '' });
@@ -89,7 +89,8 @@ export class MeetingWindowSettingsComponent {
     return { openLeadMinutes: open, confirmLeadMinutes: confirm };
   });
 
-  protected readonly dirty = computed(() => {
+  /** The section has changes that are not saved. The deadlines page then shows "Speichern". */
+  readonly dirty = computed(() => {
     const s = this.saved();
     const b = this.body();
     if (!s) return false;
@@ -97,7 +98,9 @@ export class MeetingWindowSettingsComponent {
     return b.openLeadMinutes !== s.openLeadMinutes || b.confirmLeadMinutes !== s.confirmLeadMinutes;
   });
 
-  protected readonly canSave = computed(() => this.dirty() && this.body() !== null && !this.saving());
+  /** Every field is valid, so a save can send the section. */
+  readonly valid = computed(() => this.body() !== null);
+  private readonly canSave = computed(() => this.dirty() && this.body() !== null && !this.saving());
 
   constructor() {
     if (!this.allowed()) {
@@ -125,7 +128,8 @@ export class MeetingWindowSettingsComponent {
     this.draft.update((d) => ({ ...d, ...change }));
   }
 
-  protected save(): void {
+  /** Send the section. The "Speichern" button of the deadlines page and the form submit call it. */
+  save(): void {
     const body = this.body();
     if (!body || !this.canSave()) return;
     this.saving.set(true);

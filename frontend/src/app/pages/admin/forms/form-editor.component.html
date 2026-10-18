@@ -12,9 +12,6 @@
     }
     <div actions class="fe__headTools">
       @if (phone()) {
-        <app-button variant="fill" size="sm" [disabled]="!formValid()" [loading]="saving()" (click)="save()">
-          <app-icon name="check" /> {{ 'admin.forms.save' | t }}
-        </app-button>
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
         @if (hasVersion()) {
@@ -25,9 +22,6 @@
         <app-button variant="outlined" (click)="preview.set(!preview())">
           <app-icon [name]="preview() ? 'edit' : 'eye'" />
           {{ (preview() ? 'admin.forms.modeEdit' : 'admin.forms.modeView') | t }}
-        </app-button>
-        <app-button variant="fill" [disabled]="!formValid()" [loading]="saving()" (click)="save()">
-          <app-icon name="check" /> {{ 'admin.forms.save' | t }}
         </app-button>
       }
     </div>
@@ -424,6 +418,10 @@
         }
       </aside>
     </div>
+  }
+
+  @if (dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!formValid()" (activate)="save()" />
   }
 </section>
 

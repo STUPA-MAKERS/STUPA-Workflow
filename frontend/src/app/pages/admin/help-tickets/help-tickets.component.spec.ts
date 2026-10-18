@@ -122,8 +122,9 @@ describe('HelpTicketsComponent', () => {
     expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
     expect(sw('Erledigte Meldungen anonymisieren')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /nach 12 Monaten/ })).toBeInTheDocument();
-    expect(save()).toBeDisabled();
-    expect(discard()).toBeDisabled();
+    // Nothing changed: neither "Speichern" nor "Verwerfen" shows.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
 
   it('saves the switches, the link and the months', async () => {
@@ -144,7 +145,7 @@ describe('HelpTicketsComponent', () => {
     });
     expect(toast.success).toHaveBeenCalledWith('Gespeichert.');
     fixture.detectChanges();
-    expect(save()).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('turns the anonymization off and on again with the last months', async () => {
@@ -201,7 +202,7 @@ describe('HelpTicketsComponent', () => {
     await userEvent.click(discard());
     fixture.detectChanges();
     expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
-    expect(discard()).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
 
   it('names a failed save and keeps the draft', async () => {

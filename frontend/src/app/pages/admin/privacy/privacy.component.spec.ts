@@ -425,6 +425,22 @@ describe('PrivacyComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it('shows "Speichern" only while the retention has a change', async () => {
+    const api = makeApi({
+      putPrivacySettings: jest.fn(() => of<PrivacySettings>({ defaultRetentionMonths: 36 })),
+    });
+    const { fixture } = await setup(api);
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    const field = screen.getByDisplayValue('24');
+    await userEvent.clear(field);
+    await userEvent.type(field, '36');
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(api.putPrivacySettings).toHaveBeenCalledWith({ defaultRetentionMonths: 36 });
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('toasts an error when saving the retention fails', async () => {
     const api = makeApi({ putPrivacySettings: jest.fn(() => throwError(() => new Error('x'))) });
     const { fixture, toast } = await setup(api);

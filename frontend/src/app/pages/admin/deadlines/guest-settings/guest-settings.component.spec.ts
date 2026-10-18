@@ -35,45 +35,47 @@ async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, j
 }
 
 const hoursField = (): HTMLInputElement => screen.getByLabelText('Unbestätigte Anträge verwerfen nach');
-const saveButton = (): HTMLButtonElement => screen.getByRole('button', { name: 'Speichern' });
 
 describe('GuestSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('shows the stored values: the hours and "Unbegrenzt" for a link without expiry', async () => {
-    const { api } = await setup();
+    const { api, c } = await setup();
     expect(api.getGuestSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Anträge ohne Konto' })).toBeInTheDocument();
     expect(hoursField().value).toBe('12');
     const select = screen.getByLabelText('Gültigkeit des persönlichen Links');
     expect(select).toHaveTextContent('Unbegrenzt');
     expect(screen.queryByLabelText('Gültig für')).not.toBeInTheDocument();
-    // Nothing changed yet: the save is off.
-    expect(saveButton()).toBeDisabled();
+    // Nothing changed yet. The section has no button of its own: the deadlines page
+    // shows "Speichern" while a section has changes.
+    expect(c.dirty()).toBe(false);
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('saves new hours and keeps "Unbegrenzt" as null', async () => {
-    const { api, toast } = await setup();
+    const { api, toast, c } = await setup();
     await userEvent.clear(hoursField());
     await userEvent.type(hoursField(), '48');
-    await userEvent.click(saveButton());
+    expect(c.dirty()).toBe(true);
+    c.save();
     expect(api.putGuestSettings).toHaveBeenCalledWith({ confirmTtlHours: 48, linkTtlDays: null });
     expect(toast.success).toHaveBeenCalled();
     // The saved values are the new baseline.
-    expect(saveButton()).toBeDisabled();
+    expect(c.dirty()).toBe(false);
   });
 
   it('refuses hours outside 1 to 720 and names the range', async () => {
-    const { api } = await setup();
+    const { api, c } = await setup();
     for (const bad of ['0', '721', '1.5', '']) {
       await userEvent.clear(hoursField());
       if (bad) await userEvent.type(hoursField(), bad);
       expect(screen.getByText('Eine ganze Zahl von 1 bis 720 Stunden.')).toBeInTheDocument();
-      expect(saveButton()).toBeDisabled();
+      expect(c.valid()).toBe(false);
     }
     await userEvent.clear(hoursField());
     await userEvent.type(hoursField(), '720');
-    expect(saveButton()).toBeEnabled();
+    expect(c.valid()).toBe(true);
     expect(api.putGuestSettings).not.toHaveBeenCalled();
   });
 
@@ -87,10 +89,10 @@ describe('GuestSettingsComponent', () => {
     await userEvent.clear(days);
     await userEvent.type(days, '3651');
     expect(screen.getByText('Eine ganze Zahl von 1 bis 3650 Tagen.')).toBeInTheDocument();
-    expect(saveButton()).toBeDisabled();
+    expect(c.valid()).toBe(false);
     await userEvent.clear(days);
     await userEvent.type(days, '90');
-    await userEvent.click(saveButton());
+    c.save();
     expect(api.putGuestSettings).toHaveBeenLastCalledWith({ confirmTtlHours: 12, linkTtlDays: 90 });
 
     // "Unbegrenzt" sends null again; a typed day count stays in the draft.
@@ -112,10 +114,11 @@ describe('GuestSettingsComponent', () => {
     const { toast, c } = await setup({ api });
     await userEvent.clear(hoursField());
     await userEvent.type(hoursField(), '24');
-    await userEvent.click(saveButton());
+    c.save();
     expect(toast.error).toHaveBeenCalled();
     expect(c.draft().hours).toBe('24');
-    expect(saveButton()).toBeEnabled();
+    expect(c.dirty()).toBe(true);
+    expect(c.saving()).toBe(false);
   });
 
   it('does nothing on save without a change or with an invalid field', async () => {

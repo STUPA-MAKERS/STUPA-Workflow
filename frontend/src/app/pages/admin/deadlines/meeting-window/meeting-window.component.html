@@ -4,11 +4,6 @@
       <div class="gs__text">
         <h2 class="gs__title" id="mw-title">{{ 'admin.meetingWindow.title' | t }}</h2>
       </div>
-      @if (loadState() === 'ok' && !loading()) {
-        <app-button variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
-          {{ 'action.save' | t }}
-        </app-button>
-      }
     </header>
 
     @if (loading()) {

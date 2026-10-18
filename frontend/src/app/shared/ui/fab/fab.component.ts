@@ -3,8 +3,11 @@ import { Router } from '@angular/router';
 import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
 
 /**
- * The floating "new" action of a page: one per page, at the bottom end of the content, on
- * every width (decision P6 "Neu überall bottom floating").
+ * The floating main action of a page: one per page, at the bottom end of the content, on
+ * every width (decision P6 "Neu überall bottom floating"). It is the "new" action, or
+ * "Speichern" (`icon="check"`, `[loading]` while the save runs) on an editor or a settings
+ * page. "Speichern" shows only while the page has unsaved changes, and it replaces the
+ * "new" action of the page then, so a page never shows two floating buttons.
  *
  * The look is the ui-kit button `variant="fab"`: 56px high, accent surface, the elevated
  * shadow, the icon and the label in one row. The label always shows, also on a phone,
@@ -36,7 +39,13 @@ import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-
     class: 'fab',
     '[class.fab--contained]': 'contained()',
   },
-  template: `<app-button variant="fab" [ariaLabel]="label()" (click)="onClick()">
+  template: `<app-button
+    variant="fab"
+    [ariaLabel]="label()"
+    [loading]="loading()"
+    [disabled]="disabled()"
+    (click)="onClick()"
+  >
     <app-icon [name]="icon()" />{{ label() }}
   </app-button>`,
   styleUrl: './fab.component.scss',
@@ -51,11 +60,16 @@ export class FabComponent {
   readonly link = input<string | null>(null);
   /** Absolute in the nearest positioned ancestor instead of fixed in the window. */
   readonly contained = input(false);
+  /** The action runs, for example a save: the button shows the spinner and takes no click. */
+  readonly loading = input(false);
+  /** The action cannot run now, for example a save of a form with an error. */
+  readonly disabled = input(false);
 
   /** The button was pressed and it has no `link`. */
   readonly activate = output<void>();
 
   protected onClick(): void {
+    if (this.loading() || this.disabled()) return;
     const link = this.link();
     if (link) void this.router.navigateByUrl(link);
     else this.activate.emit();
