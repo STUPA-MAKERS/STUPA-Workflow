@@ -50,9 +50,10 @@ export const LIVE_MAX_PAGES = 4;
  * The marks of the navigation: the number of open tasks and whether a meeting runs now.
  *
  * Sources:
- * - tasks: `GET /applications/tasks` (the length of the list) plus `dueSoonCount` of
- *   `GET /todos/mine` (my open To-Dos due within 7 days). A failed To-Do read counts 0;
- *   a failed task read gives no count;
+ * - tasks: `GET /applications/tasks` (the length of the list) plus the items of
+ *   `GET /todos/mine` (my open To-Dos: assigned to me, not done, not archived), the same
+ *   two groups as the "Aufgaben" page. A failed To-Do read counts 0; a failed task read
+ *   gives no count;
  * - tickets: `GET /tickets/counts` (the new tickets), only with `ticket.manage`;
  * - live: `GET /meetings/timeline?direction=upcoming`, where every live meeting is
  *   upcoming (backend `listing.py`), only if the principal sees the meetings entry. The
@@ -134,11 +135,11 @@ export class RailStatusService {
 
   private load(): Observable<{ tasks: number | null; tickets: number | null; live: boolean }> {
     const todos = this.todos.mine().pipe(
-      map((m) => m.dueSoonCount),
+      map((m) => m.items.length),
       catchError(() => of(0)),
     );
     const tasks = forkJoin({ items: this.api.listTasks(), todos }).pipe(
-      map(({ items, todos: due }) => items.length + due),
+      map(({ items, todos: open }) => items.length + open),
       catchError(() => of(null)),
     );
     const tickets = this.auth.can('ticket.manage')

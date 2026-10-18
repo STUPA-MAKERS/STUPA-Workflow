@@ -70,9 +70,11 @@ function signIn(env: ReturnType<typeof setup>, principal: Principal = MEMBER): v
   TestBed.tick();
 }
 
-/** Answer one round of the requests; `due` is the dueSoonCount of my To-Dos. */
-function answer(env: ReturnType<typeof setup>, tasks: number, status = 'planned', due = 0): void {
-  env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: due });
+/** Answer one round of the requests; `todos` is the number of my open To-Dos. */
+function answer(env: ReturnType<typeof setup>, tasks: number, status = 'planned', todos = 0): void {
+  env.http
+    .expectOne((r) => r.url === MINE)
+    .flush({ items: Array.from({ length: todos }, (_, i) => ({ id: `k${i}` })), dueSoonCount: 0 });
   env.http.expectOne((r) => r.url === TASKS).flush(Array.from({ length: tasks }, (_, i) => ({ id: `t${i}` })));
   env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [meeting(status)], nextCursor: null });
 }
@@ -270,12 +272,20 @@ describe('RailStatusService', () => {
     expect(env.svc.ticketCount()).toBeNull();
   });
 
-  it('adds my To-Dos due within 7 days to the task count; a failed read counts 0', () => {
+  it('adds all my open To-Dos to the task count, due or not; a failed read counts 0', () => {
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
     answer(env, 2, 'planned', 3);
     expect(env.svc.taskCount()).toBe(5);
+
+    // dueSoonCount plays no part: only the open items count.
+    env.svc.refresh();
+    jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
+    env.http.expectOne((r) => r.url === MINE).flush({ items: [{ id: 'k0' }], dueSoonCount: 4 });
+    env.http.expectOne((r) => r.url === TASKS).flush([]);
+    env.http.expectOne((r) => r.url === TIMELINE).flush({ items: [], nextCursor: null });
+    expect(env.svc.taskCount()).toBe(1);
 
     env.svc.refresh();
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
