@@ -608,49 +608,29 @@
   <app-sub-booking-dialog [sub]="sub" [saving]="saving()" />
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmDelete()"
   [title]="'expenses.delete.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="exp__confirm">
-    {{ 'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' } }}
-  </p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{
-      'expenses.delete.confirm' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' }"
+  [busy]="saving()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDeleteTransfer() !== null"
   [title]="'expenses.transfers.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="closeDeleteTransfer()"
->
-  <p class="exp__confirm">{{ 'expenses.transfers.deleteBody' | t }}</p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="closeDeleteTransfer()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="transferSaving()" (click)="doDeleteTransfer()">{{
-      'action.delete' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'expenses.transfers.deleteBody' | t"
+  [busy]="transferSaving()"
+  (confirm)="doDeleteTransfer()"
+  (cancel)="closeDeleteTransfer()"
+/>
 
-<app-dialog
+<app-confirm-dialog
   [open]="bulkConfirm() === 'delete'"
   [title]="'expenses.bulk.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="bulkConfirm.set(null)"
->
-  <p class="exp__confirm">{{ 'expenses.bulk.deleteBody' | t: { count: selectedCount() } }}</p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="bulkBusy()" (click)="runBulkDelete()">{{
-      'expenses.bulk.deleteConfirm' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'expenses.bulk.deleteBody' | t: { count: selectedCount() }"
+  [busy]="bulkBusy()"
+  (confirm)="runBulkDelete()"
+  (cancel)="bulkConfirm.set(null)"
+/>

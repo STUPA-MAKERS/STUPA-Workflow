@@ -30,6 +30,7 @@ import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
 export interface DeadlineValue {
@@ -115,6 +116,7 @@ function emptyDraft(): PolicyDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

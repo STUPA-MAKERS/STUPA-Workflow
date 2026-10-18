@@ -94,17 +94,11 @@
   }
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete()"
   [title]="'voting.delete.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(false)"
->
-  <p>{{ 'voting.delete.body' | t }}</p>
-  <div dialog-footer class="flex justify-end gap-3">
-    <app-button variant="text" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">
-      {{ 'voting.delete.action' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+  [body]="'voting.delete.body' | t"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(false)"
+/>

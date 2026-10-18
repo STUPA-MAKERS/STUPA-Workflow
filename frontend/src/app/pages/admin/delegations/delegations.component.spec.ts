@@ -140,7 +140,7 @@ describe('DelegationsComponent', () => {
     const api = makeApi();
     const { toast } = await setup(api);
     await userEvent.click(screen.getByRole('button', { name: 'Widerrufen: Alice → Bob' }));
-    const dialog = screen.getByRole('dialog', { name: 'Vertretung widerrufen' });
+    const dialog = screen.getByRole('dialog', { name: 'Vertretung widerrufen?' });
     expect(dialog).toHaveTextContent(
       'Die Vertretung von Alice durch Bob in „Sitzung A“ wird gelöscht.',
     );

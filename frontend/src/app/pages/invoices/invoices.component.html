@@ -282,17 +282,11 @@
   </app-side-sheet>
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmDelete()"
   [title]="'invoices.delete.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="inv__confirm">
-    {{ 'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' } }}
-  </p>
-  <div dialog-footer class="inv__footer">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' }"
+  [busy]="saving()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

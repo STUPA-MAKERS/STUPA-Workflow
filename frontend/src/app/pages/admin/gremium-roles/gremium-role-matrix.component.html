@@ -136,21 +136,11 @@
   (deleteRequested)="askDelete($event)"
 />
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremiumRoles.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(null)"
->
-  @if (confirmDelete(); as r) {
-    <p class="rm__dialogText">{{ 'admin.gremiumRoles.deleteConfirm' | t: { name: label(r) } }}</p>
-  }
-  <div dialog-footer class="rm__dialogFoot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{
-      'admin.gremiumRoles.delete' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="confirmDelete() ? ('admin.gremiumRoles.deleteConfirm' | t: { name: label(confirmDelete()!) }) : ''"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

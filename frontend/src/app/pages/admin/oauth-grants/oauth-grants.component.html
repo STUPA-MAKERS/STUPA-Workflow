@@ -91,25 +91,19 @@
   }
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmRevoke() !== null"
   [title]="'admin.oauthGrants.revokeTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmRevoke.set(null)"
+  [body]="
+    confirmRevoke()
+      ? ('admin.oauthGrants.revokeConfirm'
+        | t: { owner: ownerName(confirmRevoke()!), client: confirmRevoke()!.clientId, date: (confirmRevoke()!.createdAt | ldate: 'mediumDate') })
+      : ''
+  "
+  [confirmLabel]="'admin.oauthGrants.revoke' | t"
+  [busy]="revoking()"
+  (confirm)="doRevoke()"
+  (cancel)="confirmRevoke.set(null)"
 >
-  @if (confirmRevoke(); as g) {
-    <p class="og__dialogText">
-      {{
-        'admin.oauthGrants.revokeConfirm'
-          | t: { owner: ownerName(g), client: g.clientId, date: (g.createdAt | ldate: 'mediumDate') }
-      }}
-    </p>
-    <app-note kind="warn" icon="alert">{{ 'admin.oauthGrants.revokeWarning' | t }}</app-note>
-  }
-  <div dialog-footer class="og__dialogFoot">
-    <app-button variant="text" (click)="confirmRevoke.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="revoking()" (click)="doRevoke()">{{
-      'admin.oauthGrants.revoke' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  <app-note kind="warn" icon="alert">{{ 'admin.oauthGrants.revokeWarning' | t }}</app-note>
+</app-confirm-dialog>

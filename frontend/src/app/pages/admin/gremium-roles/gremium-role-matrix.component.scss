@@ -176,15 +176,6 @@
   gap: var(--space-1);
 }
 
-.rm__dialogText {
-  margin: 0;
-}
-.rm__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 /* A narrow container: no header; the role and its actions on the first line, the rights
    as chips with their names below (board Schmal-Verwaltung-Gremien). The matrix is about
    49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the first in

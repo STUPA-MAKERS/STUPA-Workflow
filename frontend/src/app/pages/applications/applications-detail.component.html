@@ -431,31 +431,24 @@
   </section>
 </ng-template>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete()"
   [title]="'applications.detail.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmDelete.set(false)"
->
-  <p>{{ 'applications.detail.deleteConfirm' | t }}</p>
-  <div dialog-footer>
-    <app-button variant="text" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'applications.detail.deleteConfirm' | t"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(false)"
+/>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmErase()"
   [title]="'applications.detail.eraseTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmErase.set(false)"
->
-  <p>{{ 'applications.detail.eraseConfirm' | t }}</p>
-  <div dialog-footer>
-    <app-button variant="text" (click)="confirmErase.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'applications.detail.eraseConfirm' | t"
+  [confirmLabel]="'applications.detail.eraseRequest' | t"
+  [busy]="requestingErasure()"
+  (confirm)="doRequestErasure()"
+  (cancel)="confirmErase.set(false)"
+/>
 
 <app-dialog
   [open]="budgetDialogOpen()"

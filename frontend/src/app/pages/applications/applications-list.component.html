@@ -409,17 +409,11 @@
   (done)="onForced()"
 />
 
-<app-dialog
+<app-confirm-dialog
   [open]="deleteFor() !== null"
   [title]="'applications.detail.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="deleteFor.set(null)"
->
-  <p>{{ 'applications.list.deleteConfirm' | t: { title: deleteFor() ? titleOf(deleteFor()!) : '' } }}</p>
-  <div dialog-footer>
-    <app-button variant="text" (click)="deleteFor.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="confirmDelete()">
-      {{ 'applications.detail.delete' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+  [body]="'applications.list.deleteConfirm' | t: { title: deleteFor() ? titleOf(deleteFor()!) : '' }"
+  [busy]="deleting()"
+  (confirm)="confirmDelete()"
+  (cancel)="deleteFor.set(null)"
+/>

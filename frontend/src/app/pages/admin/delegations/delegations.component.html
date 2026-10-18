@@ -101,26 +101,17 @@
   }
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmRevoke() !== null"
   [title]="'admin.deleg.revokeTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmRevoke.set(null)"
->
-  @if (confirmRevoke(); as d) {
-    <p class="dl__dialogText">
-      {{
-        'admin.deleg.revokeConfirm'
-          | t: { from: who(d, 'from'), to: who(d, 'to'), meeting: d.meetingTitle ?? '' }
-      }}
-    </p>
-  }
-  <div dialog-footer class="dl__dialogFoot">
-    <app-button variant="text" (click)="confirmRevoke.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button variant="danger" [loading]="busy()" (click)="revoke()">{{
-      'admin.deleg.revoke' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="
+    confirmRevoke()
+      ? ('admin.deleg.revokeConfirm'
+        | t: { from: who(confirmRevoke()!, 'from'), to: who(confirmRevoke()!, 'to'), meeting: confirmRevoke()!.meetingTitle ?? '' })
+      : ''
+  "
+  [confirmLabel]="'admin.deleg.revoke' | t"
+  [busy]="busy()"
+  (confirm)="revoke()"
+  (cancel)="confirmRevoke.set(null)"
+/>

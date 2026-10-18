@@ -203,10 +203,6 @@
 .wz__discardPhone {
   display: none;
 }
-.wz__dialogText {
-  margin: 0;
-}
-
 /* Narrow: a slimmer column. */
 @include bp.narrow {
   .wz {

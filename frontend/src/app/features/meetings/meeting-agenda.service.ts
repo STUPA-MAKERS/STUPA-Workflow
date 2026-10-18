@@ -106,6 +106,7 @@ export class MeetingAgendaService implements OnDestroy {
       next: (rows) => {
         this.savingAgenda.set(false);
         this.setRows(rows);
+        this.toast.success(this.i18n.translate('meetings.toast.agendaItemRemoved'));
       },
       error: (err: unknown) => {
         this.savingAgenda.set(false);

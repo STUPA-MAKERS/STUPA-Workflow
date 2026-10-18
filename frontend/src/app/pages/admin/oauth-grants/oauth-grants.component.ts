@@ -13,9 +13,10 @@ import {
   PageHeaderComponent,
   SkeletonComponent,
 } from '@shared/ui';
-import { ButtonComponent, DialogComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /* A token usually carries every scope. Showing all of them wrapped each row over three
    lines and set the height of the whole table, so the rest are counted instead. */
@@ -55,11 +56,11 @@ function errorStatus(err: unknown): number {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     TranslatePipe,
     LocalizedDatePipe,
     AvatarComponent,
     ButtonComponent,
-    DialogComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     NoteComponent,

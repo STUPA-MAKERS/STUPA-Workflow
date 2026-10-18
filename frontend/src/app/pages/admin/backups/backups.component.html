@@ -214,19 +214,12 @@
 
 <!-- Delete confirmation -->
 @if (confirmDelete(); as target) {
-  <app-dialog
+  <app-confirm-dialog
     [open]="true"
     [title]="'admin.backups.deleteTitle' | t"
-    [closeLabel]="'action.close' | t"
-    (closed)="confirmDelete.set(null)"
-  >
-    <p class="bk__dialogText">
-      {{ 'admin.backups.deleteWarning' | t }}
-      <strong class="mono">{{ target.createdAt | ldate: 'medium' }}</strong>
-    </p>
-    <div dialog-footer class="bk__dialogFoot">
-      <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-      <app-button variant="danger" [disabled]="busy()" (click)="doDelete()">{{ 'admin.common.delete' | t }}</app-button>
-    </div>
-  </app-dialog>
+    [body]="'admin.backups.deleteConfirm' | t: { date: (target.createdAt | ldate: 'medium') }"
+    [busy]="busy()"
+    (confirm)="doDelete()"
+    (cancel)="confirmDelete.set(null)"
+  />
 }

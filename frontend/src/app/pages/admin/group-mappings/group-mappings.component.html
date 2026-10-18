@@ -140,15 +140,10 @@
   </div>
 </app-dialog>
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirm()"
   [title]="'admin.groupMappings.deleteTitle' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirm.set(null)"
->
-  <p class="gm__dialogText">{{ confirmBody() | t }}</p>
-  <div dialog-footer class="gm__dialogFoot">
-    <app-button variant="text" (click)="confirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="remove()">{{ 'action.delete' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="confirmBody() | t"
+  (confirm)="remove()"
+  (cancel)="confirm.set(null)"
+/>

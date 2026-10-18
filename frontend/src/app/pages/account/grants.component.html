@@ -112,25 +112,12 @@
   </section>
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirm() !== null"
   [title]="(confirm()?.kind === 'all' ? 'account.grants.revokeAllTitle' : 'account.grants.revokeTitle') | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirm.set(null)"
->
-  @if (confirm(); as c) {
-    <p class="gr__dialogText">
-      @if (c.kind === 'one') {
-        {{ 'account.grants.revokeConfirm' | t: { scopes: scopeLabels(c.grant) } }}
-      } @else {
-        {{ 'account.grants.revokeAllConfirm' | t }}
-      }
-    </p>
-  }
-  <div dialog-footer class="gr__dialogFoot">
-    <app-button variant="text" (click)="confirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="revoking()" (click)="doRevoke()">
-      {{ (confirm()?.kind === 'all' ? 'account.grants.revokeAll' : 'account.grants.revoke') | t }}
-    </app-button>
-  </div>
-</app-dialog>
+  [body]="confirmText()"
+  [confirmLabel]="(confirm()?.kind === 'all' ? 'account.grants.revokeAll' : 'account.grants.revoke') | t"
+  [busy]="revoking()"
+  (confirm)="doRevoke()"
+  (cancel)="confirm.set(null)"
+/>
