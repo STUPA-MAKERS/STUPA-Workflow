@@ -274,7 +274,7 @@ export class AgendaPaneComponent {
           {
             id: 'remove',
             label: t('meetings.agenda.remove'),
-            icon: 'delete',
+            icon: 'trash',
             danger: true,
             disabledReason: blocked ? t(blocked) : null,
           },

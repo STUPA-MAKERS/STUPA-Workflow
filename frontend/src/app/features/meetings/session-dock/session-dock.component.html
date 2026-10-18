@@ -30,7 +30,7 @@
     </div>
   } @else {
     <div class="sd__nav">
-      <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="chevron-left" /></app-button>
+      <app-button variant="text" [iconOnly]="true" [disabled]="!hasPrev()" [ariaLabel]="'meetings.dock.prev' | t" (click)="step.emit(-1)"><app-icon name="left" /></app-button>
       <span class="sd__pos">
         <span class="sd__small">{{ 'meetings.dock.top' | t }}</span>
         <span class="sd__strong num">
@@ -41,7 +41,7 @@
           }
         </span>
       </span>
-      <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="chevron-right" /></app-button>
+      <app-button variant="text" [iconOnly]="true" [disabled]="!hasNext()" [ariaLabel]="'meetings.dock.next' | t" (click)="step.emit(1)"><app-icon name="right" /></app-button>
     </div>
     <span class="sd__vr" aria-hidden="true"></span>
     <div class="sd__mid">
@@ -120,7 +120,7 @@
       @if (m.plannedHandover) {
         <span class="sd__muted">· {{ 'meetings.handover.plannedShort' | t }}</span>
       }
-      <app-icon class="sd__chev" name="chevron-down" [size]="16" />
+      <app-icon class="sd__chev" name="down" [size]="16" />
     </button>
   } @else if (m.protokollantId) {
     <span class="sd__chip sd__chip--static" [title]="'meetings.dock.protokollantIs' | t: { name: m.protokollantName ?? '' }">

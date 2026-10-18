@@ -256,7 +256,7 @@
         (click)="remove.emit()"
       >
         <span class="ff__btn"
-          ><app-icon name="delete" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+          ><app-icon name="trash" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
         >
       </app-button>
     }
@@ -264,7 +264,7 @@
       <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
       @if (mode() === 'create') {
         <app-button [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="add" [size]="16" />{{
+          <span class="ff__btn"><app-icon name="plus" [size]="16" />{{
             (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
           }}</span>
         </app-button>

@@ -185,8 +185,8 @@
               <header class="br__columnHead">
                 <span class="cap">{{ 'admin.brand.column' | t: { n: ci + 1 } }}</span>
                 <span class="br__columnActions">
-                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="ci === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, -1)"><app-icon name="chevron-up" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, 1)"><app-icon name="chevron-down" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="ci === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, -1)"><app-icon name="up" /></app-button>
+                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, 1)"><app-icon name="down" /></app-button>
                   <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeColumn' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="removeColumn(ci)"><app-icon name="trash" /></app-button>
                 </span>
               </header>
@@ -281,7 +281,7 @@
          form stays the first thing on the page. -->
     <details class="br__preview">
       <summary class="br__previewSum">
-        <app-icon class="br__previewChev" name="chevron-right" [size]="16" />
+        <app-icon class="br__previewChev" name="right" [size]="16" />
         <span class="sec">{{ 'admin.brand.preview' | t }}</span>
       </summary>
       <div class="br__pv">
