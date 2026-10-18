@@ -71,7 +71,7 @@ export class EmptyStateComponent {
   /** No ghost rows: the look for everything that is not an empty list. */
   readonly plain = input(false, { transform: booleanAttribute });
   /** Muted glyph above the message of a `plain` state. A `code` takes its place. */
-  readonly icon = input<IconName>('document');
+  readonly icon = input<IconName>('file');
   /** The shape of the ghost rows, after the real rows of the list. */
   readonly shape = input<EmptyStateShape>('row');
   /** Number of ghost rows, 1 to 5. A small box (a dashboard tile) passes fewer. */

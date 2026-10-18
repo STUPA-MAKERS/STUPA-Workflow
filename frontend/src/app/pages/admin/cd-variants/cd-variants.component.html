@@ -77,10 +77,10 @@
                               <span class="cdv__moveGap" aria-hidden="true"></span>
                             } @else {
                               <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
-                                <app-icon name="chevron-up" />
+                                <app-icon name="up" />
                               </app-button>
                               <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
-                                <app-icon name="chevron-down" />
+                                <app-icon name="down" />
                               </app-button>
                             }
                             @if (logo.fileName) {

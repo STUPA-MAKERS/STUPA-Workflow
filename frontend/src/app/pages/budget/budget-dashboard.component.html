@@ -65,7 +65,7 @@
           >
             <app-icon name="pie" [size]="15" />
             <span class="ell">{{ pathLabel() }}</span>
-            <app-icon name="chevron-down" [size]="15" />
+            <app-icon name="down" [size]="15" />
           </button>
           <ng-container *ngTemplateOutlet="yearChip" />
           <!-- The page reaches the overview without the picker, as on the wide layout. -->
@@ -287,7 +287,7 @@
                 [disabled]="!!query().trim()"
                 (click)="toggle(row.node.id)"
               >
-                <app-icon [name]="row.expanded ? 'chevron-down' : 'chevron-right'" [size]="17" />
+                <app-icon [name]="row.expanded ? 'down' : 'right'" [size]="17" />
               </button>
             } @else {
               <span class="tn__chev" aria-hidden="true"></span>

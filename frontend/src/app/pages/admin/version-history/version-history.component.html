@@ -29,7 +29,7 @@
                 (click)="toggleDiff(rev)"
               >
                 {{ 'admin.config.history.viewDiff' | t }}
-                <app-icon [name]="openDiffId() === rev.id ? 'chevron-up' : 'chevron-down'" [size]="14" />
+                <app-icon [name]="openDiffId() === rev.id ? 'up' : 'down'" [size]="14" />
               </button>
               @if (!rev.isCurrent) {
                 <app-button

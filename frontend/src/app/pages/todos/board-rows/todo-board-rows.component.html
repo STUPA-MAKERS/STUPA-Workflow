@@ -11,7 +11,7 @@
           [attr.aria-controls]="isOpen(row) ? 'br-c-' + row.board.id : null"
           (click)="toggle(row)"
         >
-          <app-icon class="br__chev" [name]="isOpen(row) ? 'chevron-down' : 'chevron-right'" [size]="18" />
+          <app-icon class="br__chev" [name]="isOpen(row) ? 'down' : 'right'" [size]="18" />
           <app-icon class="br__kind" [name]="icon[row.board.kind]" [size]="16" />
           <span class="br__name ell">{{ row.board.name }}</span>
           <span class="br__count num">{{ row.count }}</span>
@@ -30,7 +30,7 @@
         [attr.aria-label]="'todos.rows.openBoard' | t: { name: row.board.name }"
         [title]="'todos.rows.openBoard' | t: { name: row.board.name }"
       >
-        <app-icon name="chevron-right" [size]="18" />
+        <app-icon name="right" [size]="18" />
       </a>
       }
     </header>
