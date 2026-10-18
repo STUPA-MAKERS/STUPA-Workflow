@@ -32,13 +32,27 @@
   color: var(--color-danger);
 }
 
-.note__text {
+/* The text and the retry button. The text keeps its one line while the button fits
+   beside it; when the text needs the room (a narrow column), the button wraps below it. */
+.note__body {
+  display: flex;
   flex: 1 1 0;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  column-gap: var(--space-3);
+  row-gap: var(--space-1);
+  min-width: 0;
+}
+.note__text {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
-/* The retry button sits at the end of the line, centred on the first text line. */
+/* The retry button is centred on a text line. It moves back by the start padding of a
+   text sm button (10px), so that below the text its label starts at the edge of the
+   text. */
 .note__action {
   flex: none;
   margin-block: calc((1.25rem - 2rem) / 2); /* a 32px sm button on a 20px text line */
+  margin-inline-start: -10px;
 }

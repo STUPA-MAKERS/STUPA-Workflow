@@ -241,8 +241,9 @@
   bottom: 0;
 }
 
+/* The note starts at the edge of the filters and the rows. */
 .apps__loadError {
-  margin: var(--space-4);
+  margin: var(--space-4) 0;
 }
 .apps__sentinel {
   height: 1px;

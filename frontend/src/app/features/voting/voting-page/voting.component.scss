@@ -163,8 +163,9 @@
   color: var(--color-text-muted);
 }
 
+/* The note starts at the edge of the filters and the rows. */
 .vl__loadError {
-  margin: var(--space-4);
+  margin: var(--space-4) 0;
 }
 .vl__more {
   display: flex;

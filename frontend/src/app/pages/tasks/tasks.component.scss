@@ -115,8 +115,9 @@
   color: var(--color-text-muted);
 }
 
+/* The note starts at the edge of the filters and the rows. */
 .tasks__loadError {
-  margin: var(--space-4);
+  margin: var(--space-4) 0;
 }
 
 /* ------------------------------------------------------------------ detail pane */

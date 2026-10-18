@@ -242,8 +242,9 @@
   color: var(--color-warning);
 }
 
+/* The note starts at the edge of the filters and the rows. */
 .dash__loadError {
-  margin: var(--space-4);
+  margin: var(--space-4) 0;
 }
 
 /* Empty tab: the empty state, and for a new user the card "Antrag stellen" beside it. */
