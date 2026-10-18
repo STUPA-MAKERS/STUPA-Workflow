@@ -1,4 +1,4 @@
-<section class="grem">
+<section class="grem admin-page">
   <app-page-header
     [flush]="true"
     [title]="'admin.gremien.title' | t"
@@ -36,10 +36,7 @@
                     <span class="grem__label ell" [title]="g.name">{{ g.name }}</span>
                     <span class="grem__slug mono">{{ g.slug }}</span>
                     @if (g.protocolsPublic) {
-                      <span class="grem__tag">
-                        <app-icon name="globe" [size]="13" />
-                        {{ 'admin.gremien.publicTag' | t }}
-                      </span>
+                      <app-status-text kind="accent">{{ 'admin.gremien.publicTag' | t }}</app-status-text>
                     }
                   </span>
                   @if (counts(g); as c) {
@@ -49,32 +46,11 @@
               </button>
             </h2>
             <span class="grem__actions">
-              <a
-                class="grem__link"
-                [routerLink]="['/admin/gremien', g.id, 'members']"
-                [attr.aria-label]="('admin.gremien.members' | t) + ': ' + g.name"
-                >{{ 'admin.gremien.members' | t }}</a
-              >
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="('admin.gremien.editAction' | t) + ': ' + g.name"
-                [title]="'admin.gremien.editAction' | t"
-                (click)="openEdit(g)"
-              >
-                <app-icon name="edit" />
-              </app-button>
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="('admin.gremien.deleteAction' | t) + ': ' + g.name"
-                [title]="'admin.gremien.deleteAction' | t"
-                (click)="askDelete(g)"
-              >
-                <app-icon name="trash" />
-              </app-button>
+              <app-row-menu
+                [sections]="rowMenu()"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
+                (selected)="onRowMenu($event, g)"
+              />
               <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
               <button
                 type="button"
@@ -97,7 +73,7 @@
           @if (isOpen(g)) {
             <div class="grem__body" [id]="'grem-body-' + g.id">
               <section class="grem__settings" [attr.aria-labelledby]="'grem-set-' + g.id">
-                <h3 class="cap grem__cap" [id]="'grem-set-' + g.id">
+                <h3 class="section-title" [id]="'grem-set-' + g.id">
                   {{ 'admin.gremien.settings' | t }}
                 </h3>
                 <dl class="grem__grid">

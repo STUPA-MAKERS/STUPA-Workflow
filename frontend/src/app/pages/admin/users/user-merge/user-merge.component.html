@@ -104,7 +104,7 @@
 
           @if (conflicts().length) {
             <section class="um__sec" aria-labelledby="um-conflicts">
-              <h3 class="sec um__secTitle" id="um-conflicts">{{ 'admin.users.merge.conflictsTitle' | t }}</h3>
+              <h3 class="section-title um__secTitle" id="um-conflicts">{{ 'admin.users.merge.conflictsTitle' | t }}</h3>
               <app-note kind="error" icon="alert">
                 <span>{{ 'admin.users.merge.conflictsLead' | t }}</span>
               </app-note>
@@ -124,7 +124,7 @@
 
           @if (p.extraPermissions?.length) {
             <section class="um__sec" aria-labelledby="um-rights">
-              <h3 class="sec um__secTitle" id="um-rights">{{ 'admin.users.merge.rightsTitle' | t }}</h3>
+              <h3 class="section-title um__secTitle" id="um-rights">{{ 'admin.users.merge.rightsTitle' | t }}</h3>
               <app-note [kind]="p.actorHoldsExtra === false ? 'error' : 'warn'" icon="shield">
                 <span>{{
                   (p.actorHoldsExtra === false ? 'admin.users.merge.rightsBlocked' : 'admin.users.merge.rightsLead')
@@ -140,7 +140,7 @@
           }
 
           <section class="um__sec" aria-labelledby="um-areas">
-            <h3 class="sec um__secTitle" id="um-areas">{{ 'admin.users.merge.areasTitle' | t }}</h3>
+            <h3 class="section-title um__secTitle" id="um-areas">{{ 'admin.users.merge.areasTitle' | t }}</h3>
             @if (previewAreas().length) {
               <ul class="rowgroup um__areas">
                 @for (a of previewAreas(); track a.area) {

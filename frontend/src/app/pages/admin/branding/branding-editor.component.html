@@ -1,5 +1,9 @@
-<section class="br">
-  <app-page-header [flush]="true" [title]="'admin.brand.title' | t">
+<section class="br admin-page">
+  <app-page-header
+    [flush]="true"
+    [title]="'admin.brand.title' | t"
+    [meta]="draft() ? ('admin.brand.version' | t: { n: version() }) : null"
+  >
     @if (draft()) {
       <app-button actions variant="fill" [disabled]="!canActivate()" (click)="activate()">
         <app-icon name="check" /> {{ 'admin.brand.activate' | t }}
@@ -10,9 +14,7 @@
   @if (draft(); as d) {
     <div class="br__meta">
       <p class="br__state">
-        <span class="mono">{{ 'admin.brand.version' | t: { n: version() } }}</span>
         @if (hasDraftChanges() || dirty()) {
-          <span class="br__dot" aria-hidden="true">·</span>
           <span class="br__dirty">{{ 'admin.brand.draftDirty' | t }}</span>
         }
       </p>
@@ -30,7 +32,7 @@
       <div class="br__col">
         <!-- The app name comes from the config. An empty value falls back to the i18n default. -->
         <section class="br__sec" aria-labelledby="br-name">
-          <h2 class="sec br__secTitle" id="br-name">{{ 'admin.brand.appName.group' | t }}</h2>
+          <h2 class="section-title br__secTitle" id="br-name">{{ 'admin.brand.appName.group' | t }}</h2>
           <div class="br__nameRow">
             <app-input
               [label]="'admin.brand.appName.full' | t"
@@ -51,7 +53,7 @@
 
         <!-- Gravatar images of the avatars, through the API proxy. Off = initials only. -->
         <section class="br__sec" aria-labelledby="br-avatars">
-          <h2 class="sec br__secTitle" id="br-avatars">{{ 'admin.brand.avatars.group' | t }}</h2>
+          <h2 class="section-title br__secTitle" id="br-avatars">{{ 'admin.brand.avatars.group' | t }}</h2>
           <app-switch
             name="gravatarEnabled"
             [ngModel]="d.gravatarEnabled !== false"
@@ -61,7 +63,7 @@
         </section>
 
         <section class="br__sec" aria-labelledby="br-logos">
-          <h2 class="sec br__secTitle" id="br-logos">{{ 'admin.brand.logos' | t }}</h2>
+          <h2 class="section-title br__secTitle" id="br-logos">{{ 'admin.brand.logos' | t }}</h2>
           <ul class="rowgroup br__logos">
             @for (slot of logoSlots; track slot) {
               <li
@@ -120,7 +122,7 @@
         </section>
 
         <section class="br__sec" aria-labelledby="br-texts">
-          <h2 class="sec br__secTitle" id="br-texts">{{ 'admin.brand.texts' | t }}</h2>
+          <h2 class="section-title br__secTitle" id="br-texts">{{ 'admin.brand.texts' | t }}</h2>
           @for (key of freetexts; track key) {
             <label class="br__area">
               <span class="br__areaLabel">{{ withLang(freetextLabel(key)) }}</span>
@@ -138,7 +140,7 @@
         <!-- The texts after the submission: one card per applicant kind, with the field
              in the picked language and a Markdown preview. Empty = built-in text. -->
         <section class="br__sec" aria-labelledby="br-submitted">
-          <h2 class="sec br__secTitle" id="br-submitted">{{ 'admin.brand.submitted.group' | t }}</h2>
+          <h2 class="section-title br__secTitle" id="br-submitted">{{ 'admin.brand.submitted.group' | t }}</h2>
           @for (kind of submittedKinds; track kind) {
             <article class="br__subm" [attr.aria-label]="submittedLabel(kind)" [attr.data-testid]="'submitted-' + kind">
               <label class="br__area">
@@ -169,7 +171,7 @@
       <div class="br__col">
         <section class="br__sec" aria-labelledby="br-footer">
           <header class="br__secHead">
-            <h2 class="sec br__secTitle" id="br-footer">{{ 'admin.brand.footer' | t }}</h2>
+            <h2 class="section-title br__secTitle" id="br-footer">{{ 'admin.brand.footer' | t }}</h2>
             <app-button variant="text" size="sm" (click)="addColumn()"><app-icon name="plus" /> {{ 'admin.brand.addColumn' | t }}</app-button>
           </header>
           @for (col of d.footerColumns; track $index; let ci = $index; let last = $last) {
@@ -232,7 +234,7 @@
 
         <section class="br__sec" aria-labelledby="br-legal">
           <header class="br__secHead">
-            <h2 class="sec br__secTitle" id="br-legal">{{ 'admin.brand.legal' | t }}</h2>
+            <h2 class="section-title br__secTitle" id="br-legal">{{ 'admin.brand.legal' | t }}</h2>
             <app-button variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
           </header>
           @if (d.legalLinks.length) {

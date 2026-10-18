@@ -15,13 +15,13 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import {
   ButtonComponent,
   CheckboxComponent,
   DialogComponent,
-  IconComponent,
   InputComponent,
   SwitchComponent,
   ToastService,
@@ -47,7 +47,8 @@ function emptyHook(): WebhookConfig {
  * Fehlgeschlagen, Läuft, Noch nie), the whole target URL, the real event keys as tags,
  * the "Aktiv" switch (it saves at once), "Zustellstatus" (the diagnosis below the card:
  * state, HTTP code, attempts, last attempt, failure class and the dead-letter note),
- * edit and delete.
+ * a click on the card opens the edit, and the ⋮ menu holds delete. An inactive webhook
+ * carries "Inaktiv" beside its name.
  *
  * Create and edit run in a dialog. The client validation asks for a valid http or https
  * URL. The event selection stays optional. Delete runs through a confirm dialog. Every
@@ -67,9 +68,9 @@ function emptyHook(): WebhookConfig {
     ButtonComponent,
     CheckboxComponent,
     DialogComponent,
-    IconComponent,
     InputComponent,
     PageHeaderComponent,
+    RowMenuComponent,
     SkeletonComponent,
     StatusTextComponent,
     SwitchComponent,
@@ -108,6 +109,10 @@ export class WebhooksComponent {
   /** `webhook.manage` as a front-end gate. The backend stays authoritative. The value
    *  is reactive, because the principal loads asynchronously. */
   protected readonly canManage = computed(() => this.auth.can('webhook.manage'));
+  /** The ⋮ menu of a webhook: delete is its only action. */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'delete', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true }] },
+  ]);
   /** The delivery status loads one time, as soon as the permission is known. */
   private statusRequested = false;
 

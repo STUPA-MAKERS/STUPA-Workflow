@@ -239,7 +239,7 @@ export class RowMenuComponent {
       // The timer runs only while the menu is open (close clears it), so it is rendered.
       const menu = this.menu()!.nativeElement;
       this.showPopover(menu);
-      this.flip(menu);
+      this.fit(menu);
       const items = this.items(menu);
       if (this.pendingFocus && items.length > 0) {
         (this.pendingFocus === 'first' ? items[0] : items[items.length - 1]).focus();
@@ -283,15 +283,37 @@ export class RowMenuComponent {
     this.placeBelow();
     // Right after the opening the menu is not rendered yet; the scheduled step flips it.
     const menu = this.menu()?.nativeElement;
-    if (menu) this.flip(menu);
+    if (menu) this.fit(menu);
   }
 
-  private flip(menu: HTMLElement): void {
+  /** Keep the rendered menu inside the viewport: flip it up, move it in from a side. */
+  private fit(menu: HTMLElement): void {
+    const { width, height } = menu.getBoundingClientRect();
+    this.flip(height);
+    this.clampX(width);
+  }
+
+  private flip(height: number): void {
     const pos = this.position();
-    const height = menu.getBoundingClientRect().height;
     if (pos.top + height <= window.innerHeight - EDGE) return;
     const above = this.trigger().nativeElement.getBoundingClientRect().top - GAP - height;
     if (above >= EDGE) this.position.set({ ...pos, top: above });
+  }
+
+  /**
+   * A menu at the end edge of a button near the start of the screen (the header menu of
+   * a page on a phone) would open past the start edge, and a menu at the start edge of a
+   * button near the end would open past the end edge. Such a menu moves in until it has
+   * `EDGE` to the edge of the viewport.
+   */
+  private clampX(width: number): void {
+    const pos = this.position();
+    const vw = window.innerWidth;
+    if (pos.right !== null && vw - pos.right - width < EDGE) {
+      this.position.set({ ...pos, left: EDGE, right: null });
+    } else if (pos.left !== null && pos.left + width > vw - EDGE) {
+      this.position.set({ ...pos, left: Math.max(EDGE, vw - EDGE - width) });
+    }
   }
 
   private items(menu: HTMLElement): HTMLElement[] {

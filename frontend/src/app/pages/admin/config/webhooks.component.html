@@ -1,4 +1,4 @@
-<section class="wh">
+<section class="wh admin-page">
   <app-page-header [flush]="true" [title]="'admin.webhook.title' | t" />
 
   @if (loading()) {
@@ -8,10 +8,24 @@
       @for (h of hooks(); track h.id; let i = $index) {
         @let s = statusOf(h.id);
         <li class="wh__hook">
-          <div class="wh__row">
+          <div class="wh__row" [class.hitrow]="canManage()">
             <div class="wh__main">
               <p class="wh__titleLine">
-                <strong class="wh__name">{{ h.name || h.url }}</strong>
+                @if (canManage()) {
+                  <button
+                    type="button"
+                    class="hitrow__open wh__name"
+                    [attr.aria-label]="('admin.common.edit' | t) + ': ' + (h.name || h.url)"
+                    (click)="openEdit(i)"
+                  >
+                    {{ h.name || h.url }}
+                  </button>
+                } @else {
+                  <strong class="wh__name">{{ h.name || h.url }}</strong>
+                }
+                @if (!h.active) {
+                  <app-status-text kind="muted">{{ 'common.inactive' | t }}</app-status-text>
+                }
                 @if (s) {
                   @let st = deliveryStatus(s.lastState);
                   <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
@@ -28,7 +42,7 @@
                 <p class="wh__noEvents">{{ 'admin.webhook.noEvents' | t }}</p>
               }
             </div>
-            <div class="wh__side">
+            <div class="wh__side hitrow__keep">
               <app-switch
                 [checked]="h.active"
                 [disabled]="!canManage() || isToggling(h.id)"
@@ -46,12 +60,11 @@
                 >
                   {{ 'admin.webhook.delivery.title' | t }}
                 </button>
-                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.edit' | t) + ': ' + (h.name || h.url)" [title]="'admin.common.edit' | t" (click)="openEdit(i)">
-                  <app-icon name="edit" />
-                </app-button>
-                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + (h.name || h.url)" [title]="'admin.common.remove' | t" (click)="askDelete(h)">
-                  <app-icon name="trash" />
-                </app-button>
+                <app-row-menu
+                  [sections]="rowMenu()"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
+                  (selected)="askDelete(h)"
+                />
               }
             </div>
           </div>
@@ -61,7 +74,7 @@
                attempt count. -->
           @if (statusDetail()?.id === h.id) {
             <section class="wh__status" [id]="'wh-status-' + h.id" [attr.aria-label]="'admin.webhook.delivery.title' | t">
-              <h3 class="cap wh__statusTitle">{{ 'admin.webhook.delivery.title' | t }}</h3>
+              <h3 class="section-title">{{ 'admin.webhook.delivery.title' | t }}</h3>
               @if (s) {
                 <dl class="wh__grid">
                   <div>
@@ -108,7 +121,7 @@
 
 <app-dialog
   [open]="draft() !== null"
-  [title]="(editingIndex() === null ? 'admin.webhook.add' : 'admin.webhook.edit') | t"
+  [title]="(editingIndex() === null ? 'admin.webhook.create' : 'admin.webhook.edit') | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -10,13 +10,13 @@ import {
   EmptyStateComponent,
   NoteComponent,
   PageHeaderComponent,
+  RowMenuComponent,
   SkeletonComponent,
+  StatusTextComponent,
+  type RowMenuItem,
+  type RowMenuSection,
 } from '@shared/ui';
-import {
-  ButtonComponent,
-  IconComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { errorCode } from '../../../features/meetings/meetings-display.util';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
@@ -68,12 +68,13 @@ interface Setting {
     ConfirmDialogComponent,
     RouterLink,
     TranslatePipe,
-    ButtonComponent,
     IconComponent,
     EmptyStateComponent,
     NoteComponent,
     PageHeaderComponent,
+    RowMenuComponent,
     SkeletonComponent,
+    StatusTextComponent,
     GremiumDialogComponent,
     GremiumRoleMatrixComponent,
   ],
@@ -85,6 +86,7 @@ export class AdminGremienComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   readonly gremien = signal<Gremium[]>([]);
   readonly loading = signal(true);
@@ -212,6 +214,30 @@ export class AdminGremienComponent {
   protected openCreate(): void {
     this.lastDialogGremium.set(null);
     this.dialogGremium.set(null);
+  }
+
+  /**
+   * The ⋮ menu of a gremium row. The row itself opens the details (settings and roles),
+   * so the edit of the base data is the first item here.
+   */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    {
+      items: [
+        { id: 'edit', label: this.i18n.translate('admin.gremien.editAction'), icon: 'edit' },
+        { id: 'members', label: this.i18n.translate('admin.gremien.members'), icon: 'users' },
+      ],
+    },
+    {
+      items: [
+        { id: 'delete', label: this.i18n.translate('admin.gremien.deleteAction'), icon: 'trash', danger: true },
+      ],
+    },
+  ]);
+
+  protected onRowMenu(item: RowMenuItem, g: Gremium): void {
+    if (item.id === 'edit') this.openEdit(g);
+    if (item.id === 'members') void this.router.navigate(['/admin/gremien', g.id, 'members']);
+    if (item.id === 'delete') this.askDelete(g);
   }
 
   protected openEdit(g: Gremium): void {

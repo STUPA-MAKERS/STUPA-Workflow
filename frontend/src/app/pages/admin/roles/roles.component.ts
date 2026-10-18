@@ -5,7 +5,15 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { NoteComponent, PageHeaderComponent, SkeletonComponent } from '@shared/ui';
+import {
+  NoteComponent,
+  PageHeaderComponent,
+  RowMenuComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  type RowMenuSection,
+} from '@shared/ui';
+import { keyParts } from '@shared/key-parts.util';
 import {
   ButtonComponent,
   CheckboxComponent,
@@ -63,7 +71,9 @@ const FIXED_ROLES = new Set(['admin', 'member']);
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
+    RowMenuComponent,
     SkeletonComponent,
+    StatusTextComponent,
   ],
   templateUrl: './roles.component.html',
   styleUrl: './roles.component.scss',
@@ -138,6 +148,18 @@ export class AdminRolesComponent {
   protected isOpen(role: Role): boolean {
     return this.expanded().has(role.id);
   }
+
+  /** The ⋮ menu of a role that is not fixed: delete is its only action. */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    {
+      items: [
+        { id: 'delete', label: this.i18n.translate('admin.roles.deleteRole'), icon: 'trash', danger: true },
+      ],
+    },
+  ]);
+
+  /** A permission key in parts that may break after a "." or a "_". */
+  protected readonly permParts = keyParts;
 
   protected askDelete(role: Role): void {
     this.confirmRole.set(role);

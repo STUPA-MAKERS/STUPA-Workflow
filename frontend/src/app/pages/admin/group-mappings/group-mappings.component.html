@@ -1,4 +1,4 @@
-<section class="gm">
+<section class="gm admin-page">
   <app-page-header
     [flush]="true"
     [title]="'admin.groupMappings.title' | t"
@@ -8,9 +8,9 @@
   @for (sec of sections(); track sec.kind) {
     <section class="gm__section" [attr.aria-labelledby]="'gm-' + sec.kind + '-title'">
       <header class="gm__head">
-        <h2 class="sec" [id]="'gm-' + sec.kind + '-title'">{{ key(sec.kind, 'title') | t }}</h2>
-        <app-button size="sm" variant="tonal" (click)="openAdd(sec.kind)">
-          <app-icon name="plus" /> {{ key(sec.kind, 'add') | t }}
+        <h2 class="section-title" [id]="'gm-' + sec.kind + '-title'">{{ key(sec.kind, 'title') | t }}</h2>
+        <app-button size="sm" variant="tonal" [ariaLabel]="key(sec.kind, 'create') | t" (click)="openAdd(sec.kind)">
+          <app-icon name="plus" /> {{ 'admin.groupMappings.create' | t }}
         </app-button>
       </header>
 
@@ -19,8 +19,15 @@
       } @else if (sec.rows.length) {
         <ul class="rowgroup gm__list">
           @for (r of sec.rows; track r.id) {
-            <li class="gm__row">
-              <code class="gm__group mono">{{ r.oidcGroup }}</code>
+            <li class="gm__row hitrow">
+              <button
+                type="button"
+                class="hitrow__open gm__group"
+                [attr.aria-label]="('action.edit' | t) + ': ' + r.oidcGroup"
+                (click)="openEdit(sec.kind, r.id)"
+              >
+                <code class="mono">{{ r.oidcGroup }}</code>
+              </button>
               <app-icon class="gm__arrow" name="arrow" [size]="16" />
               <span class="gm__target ell" [appTruncated]="r.role ? r.target + ' · ' + r.role : r.target" #cut="appTruncated" [attr.title]="cut.truncated() ? (r.role ? r.target + ' · ' + r.role : r.target) : null">
                 {{ r.target }}
@@ -28,27 +35,12 @@
                   · <strong class="gm__role">{{ r.role }}</strong>
                 }
               </span>
-              <span class="gm__actions">
-                <app-button
-                  variant="text"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="('action.edit' | t) + ': ' + r.oidcGroup"
-                  [title]="'action.edit' | t"
-                  (click)="openEdit(sec.kind, r.id)"
-                >
-                  <app-icon name="edit" />
-                </app-button>
-                <app-button
-                  variant="text"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="('action.delete' | t) + ': ' + r.oidcGroup"
-                  [title]="'action.delete' | t"
-                  (click)="askDelete(sec.kind, r.id)"
-                >
-                  <app-icon name="trash" />
-                </app-button>
+              <span class="gm__actions hitrow__keep">
+                <app-row-menu
+                  [sections]="rowMenu()"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + r.oidcGroup"
+                  (selected)="askDelete(sec.kind, r.id)"
+                />
               </span>
             </li>
           }

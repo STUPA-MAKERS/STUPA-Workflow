@@ -14,7 +14,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { SkeletonComponent } from '@shared/ui';
+import { RowMenuComponent, type RowMenuSection, SkeletonComponent, StatusTextComponent } from '@shared/ui';
 import {
   ButtonComponent,
   IconComponent,
@@ -65,7 +65,9 @@ let nextId = 0;
     CapitalizePipe,
     ButtonComponent,
     IconComponent,
+    RowMenuComponent,
     SkeletonComponent,
+    StatusTextComponent,
     GremiumRoleDialogComponent,
   ],
   templateUrl: './gremium-role-matrix.component.html',
@@ -239,6 +241,26 @@ export class GremiumRoleMatrixComponent implements OnInit {
     }
     this.dialogRole.set(undefined);
     this.toast.success(this.i18n.translate('admin.gremiumRoles.saved'));
+  }
+
+  /**
+   * The ⋮ menu of a role: delete is its only action. The row itself opens the edit. A
+   * required role (`forced`) cannot be deleted, and the item says why.
+   */
+  protected rowMenu(r: GremiumRole): RowMenuSection[] {
+    return [
+      {
+        items: [
+          {
+            id: 'delete',
+            label: this.i18n.translate('admin.gremiumRoles.delete'),
+            icon: 'trash',
+            danger: true,
+            disabledReason: r.forced ? this.i18n.translate('admin.gremiumRoles.forced') : null,
+          },
+        ],
+      },
+    ];
   }
 
   protected askDelete(r: GremiumRole): void {

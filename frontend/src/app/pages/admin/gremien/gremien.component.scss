@@ -5,9 +5,6 @@
 }
 
 .grem {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -88,19 +85,6 @@
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-.grem__tag {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: 4px;
-  align-self: center;
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-container);
-  color: var(--color-on-accent-container);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-}
 .grem__counts {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -111,16 +95,6 @@
   flex: none;
   align-items: center;
   gap: var(--space-1);
-}
-.grem__link {
-  margin-inline-end: var(--space-3);
-  font-weight: var(--fw-semibold);
-  color: var(--color-accent-text);
-  text-decoration: none;
-  white-space: nowrap;
-}
-.grem__link:hover {
-  text-decoration: underline;
 }
 .grem__chev {
   display: inline-grid;
@@ -152,8 +126,8 @@
   padding: 0 var(--space-4) var(--space-4);
 }
 
-.grem__cap {
-  margin: 0 0 var(--space-2);
+.grem__settings .section-title {
+  margin-bottom: var(--space-2);
 }
 
 .grem__grid {
@@ -196,26 +170,6 @@
 }
 
 @container (max-width: 34rem) {
-  .grem__head {
-    flex-wrap: wrap;
-  }
-  /* First line: the name and the toggle chevron. Second line: the link and the icons. */
-  .grem__h {
-    flex-basis: calc(100% - 3rem);
-  }
-  .grem__actions {
-    display: contents;
-  }
-  .grem__actions > * {
-    order: 2;
-  }
-  .grem__actions > .grem__chev {
-    order: 1;
-  }
-  .grem__link {
-    margin-inline-start: calc(20px + var(--space-7));
-    margin-inline-end: auto;
-  }
   .grem__grid {
     grid-template-columns: minmax(0, 1fr);
   }

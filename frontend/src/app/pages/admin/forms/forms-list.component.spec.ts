@@ -61,6 +61,12 @@ describe('FormsListComponent', () => {
     expect(screen.getByRole('link', { name: 'Förderantrag' })).toBeInTheDocument();
   });
 
+  it('opens the editor on a click on the row', async () => {
+    const { router } = await setup();
+    await userEvent.click(screen.getByText('StuPa'));
+    expect(router.navigate).toHaveBeenCalledWith(['/admin/forms', 'f1']);
+  });
+
   it('creates a type via the dialog with an auto key', async () => {
     const { createApplicationType } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Formular anlegen' }));
@@ -68,9 +74,7 @@ describe('FormsListComponent', () => {
     const nameDe = screen.getByLabelText(/Titel \(DE\)/);
     await userEvent.type(nameDe, 'Härtefall Antrag');
 
-    const add = screen.getAllByRole('button', { name: 'Formular anlegen' });
-    // The add button in the dialog footer is the enabled one.
-    await userEvent.click(add[add.length - 1]);
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
 
     expect(createApplicationType).toHaveBeenCalledTimes(1);
     const body = createApplicationType.mock.calls[0][0];
@@ -164,9 +168,9 @@ describe('FormsListComponent — display helpers', () => {
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('v7')).toBeInTheDocument();
     expect(c.versionLabel(rows[1])).toBe('—');
-    // Each row action names its type.
-    expect(screen.getByRole('link', { name: 'Bearbeiten: Förderantrag' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Antragsart löschen: Raumantrag' })).toBeInTheDocument();
+    // The name links to the editor, and each row menu names its type.
+    expect(screen.getByRole('link', { name: 'Förderantrag' })).toHaveAttribute('href', '/admin/forms/f1');
+    expect(screen.getByRole('button', { name: 'Aktionen: Raumantrag' })).toBeInTheDocument();
   });
 });
 

@@ -150,7 +150,7 @@ describe('GremiumRoleMatrixComponent', () => {
     const api = makeApi();
     await setup({ api, perms: [] });
     for (const box of screen.getAllByRole('checkbox')) expect(box).toBeDisabled();
-    expect(screen.queryByRole('button', { name: /Gremium-Rolle hinzufügen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Gremium-Rolle anlegen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bearbeiten:/ })).toBeNull();
     expect(screen.queryByText('stupa-vorstand, stupa-sprecher')).toBeNull();
     expect(api.listRoleMappings).not.toHaveBeenCalled();
@@ -159,7 +159,7 @@ describe('GremiumRoleMatrixComponent', () => {
   it('moves the add action to the floating button on the roles page', async () => {
     const { container } = await setup({ inputs: { heading: false, fab: true } });
     expect(container.querySelector('.rm__head')).toBeNull();
-    expect(screen.queryByRole('button', { name: /Gremium-Rolle hinzufügen/ })).toBeNull();
+    expect(screen.getAllByRole('button', { name: /Gremium-Rolle anlegen/ })).toHaveLength(1);
     await userEvent.click(screen.getByRole('button', { name: 'Gremium-Rolle anlegen' }));
     expect(screen.getByRole('textbox', { name: /Schlüssel/ })).toBeInTheDocument();
   });
@@ -171,14 +171,23 @@ describe('GremiumRoleMatrixComponent', () => {
 
   it('keeps the delete of a forced role disabled', async () => {
     await setup();
-    expect(screen.getByRole('button', { name: 'Rolle löschen: Vorstand' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Vorstand' }));
+    expect(await screen.findByRole('menuitem', { name: 'Rolle löschen' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Protokoll' }));
+    expect(await screen.findByRole('menuitem', { name: 'Rolle löschen' })).not.toHaveAttribute(
+      'aria-disabled',
+    );
   });
 
   it('deletes an own role after the confirmation', async () => {
     const api = makeApi();
     const { counts } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Protokoll' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rolle löschen' }));
     const dialog = screen.getByRole('dialog', { name: 'Gremium-Rolle löschen?' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
     expect(api.deleteGremiumRole).toHaveBeenCalledWith('gr-p');
@@ -189,7 +198,8 @@ describe('GremiumRoleMatrixComponent', () => {
   it('names a role in use when the server answers 409', async () => {
     const api = makeApi({ deleteGremiumRole: jest.fn(() => throwError(() => ({ status: 409 }))) });
     const { toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Protokoll' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rolle löschen' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Löschen' }));
     expect(toast.error).toHaveBeenCalledWith(
       'Eine Mitgliedschaft oder eine Gruppen-Zuordnung verwendet die Rolle noch.',
@@ -199,7 +209,7 @@ describe('GremiumRoleMatrixComponent', () => {
   it('adds a role through the dialog and edits one', async () => {
     const api = makeApi();
     const { counts, toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: /Gremium-Rolle hinzufügen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Gremium-Rolle anlegen/ }));
     await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'beisitz');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.createGremiumRole).toHaveBeenCalledWith(

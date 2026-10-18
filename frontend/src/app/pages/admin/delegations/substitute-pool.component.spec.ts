@@ -177,7 +177,8 @@ describe('SubstitutePoolComponent', () => {
 
   it('removes an entry at once', async () => {
     const { delegations, toast } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Eintrag entfernen: Sam' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Sam' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Eintrag entfernen' }));
     expect(delegations.removeSubstitute).toHaveBeenCalledWith('s-2');
     expect(screen.queryByText('Sam')).toBeNull();
     expect(toast.success).toHaveBeenCalledWith('Eintrag entfernt.');
@@ -188,7 +189,8 @@ describe('SubstitutePoolComponent', () => {
       removeSubstitute: jest.fn(() => throwError(() => ({ status: 403 }))),
     });
     const { toast } = await setup({ delegations });
-    await userEvent.click(screen.getByRole('button', { name: 'Eintrag entfernen: Sam' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Sam' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Eintrag entfernen' }));
     expect(screen.getByText('Sam')).toBeInTheDocument();
     expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });

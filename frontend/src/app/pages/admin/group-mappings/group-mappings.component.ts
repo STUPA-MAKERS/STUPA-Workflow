@@ -7,7 +7,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import { PageHeaderComponent, SkeletonComponent } from '@shared/ui';
+import { PageHeaderComponent, RowMenuComponent, SkeletonComponent, type RowMenuSection } from '@shared/ui';
 import {
   ButtonComponent,
   DialogComponent,
@@ -99,6 +99,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
     RouterLink,
     TranslatePipe,
     PageHeaderComponent,
+    RowMenuComponent,
     SkeletonComponent,
     ButtonComponent,
     InputComponent,
@@ -326,17 +327,22 @@ export class GroupMappingsComponent {
     return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
   }
 
-  /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.add`. */
+  /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.create`. */
   protected key(
     kind: MappingKind,
-    suffix: 'title' | 'add' | 'empty' | 'editTitle' | 'deleteBody',
+    suffix: 'title' | 'create' | 'empty' | 'editTitle' | 'deleteBody',
   ): TranslationKey {
     return `admin.groupMappings.${kind}.${suffix}` as TranslationKey;
   }
 
+  /** The ⋮ menu of a mapping row. The row itself opens the edit. */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }] },
+  ]);
+
   protected readonly dialogTitle = computed<TranslationKey>(() => {
     const kind = this.dialog();
-    return kind ? this.key(kind, this.editId() ? 'editTitle' : 'add') : 'admin.groupMappings.title';
+    return kind ? this.key(kind, this.editId() ? 'editTitle' : 'create') : 'admin.groupMappings.title';
   });
 
   protected readonly confirmBody = computed<TranslationKey>(() => {

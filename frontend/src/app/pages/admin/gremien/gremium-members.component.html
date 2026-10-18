@@ -1,12 +1,9 @@
-<section class="gmm">
+<section class="gmm admin-page">
   <app-page-header
     [flush]="true"
     [title]="('admin.gremien.membersOf' | t) + ': ' + (gremium()?.name ?? '…')"
-  >
-    @if (!loading() && !failed()) {
-      <span actions class="gmm__total">{{ countLabel(members().length) }}</span>
-    }
-  </app-page-header>
+    [meta]="!loading() && !failed() ? countLabel(members().length) : null"
+  />
 
   @if (canManageMappings()) {
     <app-note>
@@ -19,7 +16,7 @@
   <!-- Read-only. The OIDC group sync writes the memberships, not the admin. -->
   <section class="gmm__section" aria-labelledby="gmm-members-title">
     <header class="gmm__head">
-      <h2 class="sec" id="gmm-members-title">{{ 'admin.gremien.members' | t }}</h2>
+      <h2 class="section-title" id="gmm-members-title">{{ 'admin.gremien.members' | t }}</h2>
       @if (!loading() && members().length > preview) {
         <span class="gmm__shown">{{
           'admin.gremien.shownOf' | t: { shown: visible().length, total: members().length }

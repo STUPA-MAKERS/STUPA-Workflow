@@ -1,4 +1,4 @@
-<section class="ar">
+<section class="ar admin-page">
   <app-page-header [flush]="true" [title]="'admin.roles.title' | t" />
 
   @if (loading()) {
@@ -20,9 +20,7 @@
                 <span class="ar__name ell" [title]="roleLabel(r) | capitalize">{{ roleLabel(r) | capitalize }}</span>
               </button>
               @if (isFixed(r)) {
-                <span class="ar__fixed" [title]="'admin.roles.fixedHint' | t">
-                  <app-icon name="lock" [size]="14" />{{ 'admin.roles.fixed' | t }}
-                </span>
+                <app-status-text kind="muted" [title]="'admin.roles.fixedHint' | t">{{ 'admin.roles.fixed' | t }}</app-status-text>
               }
               <span class="ar__key mono">{{ r.key }}</span>
               <span class="ar__count mono" [title]="'admin.roles.countLabel' | t: { count: count(r), total: permissions().length }"
@@ -30,16 +28,11 @@
               >
               <span class="ar__del">
                 @if (!isFixed(r)) {
-                  <app-button
-                    variant="text"
-                    size="sm"
-                    [iconOnly]="true"
-                    [ariaLabel]="('admin.roles.deleteRole' | t) + ': ' + (roleLabel(r) | capitalize)"
-                    [title]="'admin.roles.deleteRole' | t"
-                    (click)="askDelete(r)"
-                  >
-                    <app-icon name="trash" />
-                  </app-button>
+                  <app-row-menu
+                    [sections]="rowMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + (roleLabel(r) | capitalize)"
+                    (selected)="askDelete(r)"
+                  />
                 }
               </span>
             </div>
@@ -83,7 +76,11 @@
                           [disabled]="isLocked(r)"
                           (ngModelChange)="togglePerm(r, perm, $event)"
                           [name]="r.id + '-' + perm"
-                          ><span class="ar__perm mono" [title]="perm">{{ perm }}</span></app-checkbox
+                          ><span class="ar__perm mono" [title]="perm"
+                            ><!-- The parts carry a <wbr> each; the whole key is the name. -->
+                            <span aria-hidden="true">@for (part of permParts(perm); track $index) {{{ part }}<wbr />}</span
+                            ><span class="sr-only">{{ perm }}</span></span
+                          ></app-checkbox
                         >
                       }
                     </div>
@@ -123,7 +120,7 @@
 
 <app-dialog
   [open]="addOpen()"
-  [title]="'admin.roles.addGlobalRole' | t"
+  [title]="'admin.roles.create' | t"
   [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
 >
@@ -154,7 +151,7 @@
   <div dialog-footer class="ar__dialogFoot">
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!keyValid()" [loading]="creating()" (click)="createRole()">{{
-      'admin.roles.add' | t
+      'admin.common.create' | t
     }}</app-button>
   </div>
 </app-dialog>

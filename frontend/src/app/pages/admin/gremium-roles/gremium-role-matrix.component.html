@@ -6,13 +6,13 @@
   @if (heading() || (canEdit() && !fab())) {
     <header class="rm__head">
       @if (heading()) {
-        <h3 class="cap rm__title" [id]="uid + '-title'">
+        <h3 class="section-title" [id]="uid + '-title'">
           {{ 'admin.gremiumRoles.matrixTitle' | t }}
         </h3>
       }
       @if (canEdit() && !fab()) {
         <app-button class="rm__add" size="sm" variant="tonal" (click)="openAdd()">
-          <app-icon name="plus" /> {{ 'admin.gremiumRoles.add' | t }}
+          <app-icon name="plus" /> {{ 'admin.gremiumRoles.create' | t }}
         </app-button>
       }
     </header>
@@ -51,16 +51,28 @@
       </div>
 
       @for (r of sorted(); track r.id) {
-        <div class="rm__row" role="row">
+        <div class="rm__row" [class.hitrow]="canEdit()" role="row">
           <div class="rm__role" role="rowheader">
             <span class="rm__nameLine">
-              <span class="rm__name ell" [title]="label(r) | capitalize">{{
-                label(r) | capitalize
-              }}</span>
-              @if (r.forced) {
-                <span class="rm__forced" [title]="'admin.gremiumRoles.forced' | t">{{
-                  'admin.gremiumRoles.forcedTag' | t
+              @if (canEdit()) {
+                <button
+                  type="button"
+                  class="hitrow__open rm__name ell"
+                  [title]="label(r) | capitalize"
+                  [attr.aria-label]="('action.edit' | t) + ': ' + (label(r) | capitalize)"
+                  (click)="openEdit(r)"
+                >
+                  {{ label(r) | capitalize }}
+                </button>
+              } @else {
+                <span class="rm__name ell" [title]="label(r) | capitalize">{{
+                  label(r) | capitalize
                 }}</span>
+              }
+              @if (r.forced) {
+                <app-status-text kind="muted" [title]="'admin.gremiumRoles.forced' | t">{{
+                  'admin.gremiumRoles.forcedTag' | t
+                }}</app-status-text>
               }
             </span>
             @if (canGroups()) {
@@ -76,7 +88,7 @@
             }
           </div>
           @for (p of permissions; track p) {
-            <div class="rm__cell" role="cell">
+            <div class="rm__cell hitrow__keep" role="cell">
               <label
                 class="rm__chip"
                 [class.rm__chip--on]="has(r, p)"
@@ -94,31 +106,13 @@
               </label>
             </div>
           }
-          <div class="rm__act" role="cell">
+          <div class="rm__act hitrow__keep" role="cell">
             @if (canEdit()) {
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="('action.edit' | t) + ': ' + (label(r) | capitalize)"
-                [title]="'action.edit' | t"
-                (click)="openEdit(r)"
-              >
-                <app-icon name="edit" />
-              </app-button>
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [disabled]="!!r.forced"
-                [ariaLabel]="('admin.gremiumRoles.delete' | t) + ': ' + (label(r) | capitalize)"
-                [title]="
-                  r.forced ? ('admin.gremiumRoles.forced' | t) : ('admin.gremiumRoles.delete' | t)
-                "
-                (click)="askDelete(r)"
-              >
-                <app-icon name="trash" />
-              </app-button>
+              <app-row-menu
+                [sections]="rowMenu(r)"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + (label(r) | capitalize)"
+                (selected)="askDelete(r)"
+              />
             }
           </div>
         </div>

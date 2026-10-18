@@ -4,12 +4,6 @@
   display: block;
 }
 
-.bt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
 /* The budget chip and the fiscal years on one line; the years wrap below on a narrow sheet. */
 .bt__pickers {
   display: flex;
@@ -91,13 +85,22 @@
   width: 0;
   min-width: 0;
 }
-/* A long name ends in an ellipsis (its title holds the full name). */
-.bt__name {
-  max-width: 100%;
-  font-weight: var(--fw-semibold);
+/* The name and its status ("Inaktiv") share a line. A long name wraps at a word and is
+   never cut. */
+.bt__nameLine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  min-width: 0;
 }
-.bt__name--inactive {
-  color: var(--color-text-muted);
+.bt__nameLine app-status-text {
+  font-size: var(--fs-sm);
+}
+.bt__name {
+  min-width: 0;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: break-word;
 }
 /* A path keeps every key; it wraps at a dash instead of being cut. */
 .bt__path {
@@ -182,9 +185,9 @@
     flex: 1 1 auto;
     width: auto;
   }
-  .bt__name {
-    max-width: none;
-    white-space: normal;
+  /* A card has no fold column: the title starts on the edge of the card. */
+  .bt__foldGap {
+    display: none;
   }
 }
 
@@ -204,9 +207,6 @@
 }
 .bt__keyField ::ng-deep input {
   font-family: var(--font-mono);
-}
-.bt__muted {
-  color: var(--color-text-muted);
 }
 .bt__colors {
   display: flex;

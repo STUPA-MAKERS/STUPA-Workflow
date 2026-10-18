@@ -22,6 +22,7 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 
 const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
@@ -62,6 +63,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     InputComponent,
     PageHeaderComponent,
     SegmentedComponent,
+    StatusTextComponent,
   ],
   templateUrl: './mail-templates.component.html',
   styleUrl: './mail-templates.component.scss',

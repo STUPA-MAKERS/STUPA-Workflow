@@ -108,7 +108,7 @@ export class GremiumRoleDialogComponent {
   });
 
   protected readonly title = computed<TranslationKey>(() =>
-    this.isNew() ? 'admin.gremiumRoles.add' : 'admin.gremiumRoles.edit',
+    this.isNew() ? 'admin.gremiumRoles.create' : 'admin.gremiumRoles.edit',
   );
 
   constructor() {

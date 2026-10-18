@@ -1,4 +1,4 @@
-<section class="fl">
+<section class="fl admin-page">
   <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t" />
 
   @if (loadError()) {
@@ -12,9 +12,18 @@
         [columns]="columns()"
         [rows]="types()"
         [rowKey]="rowId"
+        [clickable]="true"
+        (rowClick)="open($any($event))"
       >
         <ng-template appCell="name" let-t>
-          <a class="fl__name ell" [routerLink]="['/admin/forms', $any(t).id]" [title]="name($any(t))">{{ name($any(t)) }}</a>
+          <a
+            class="fl__name ell"
+            [routerLink]="['/admin/forms', $any(t).id]"
+            [title]="name($any(t))"
+            (click)="$event.stopPropagation()"
+            (keydown.enter)="$event.stopPropagation()"
+            >{{ name($any(t)) }}</a
+          >
         </ng-template>
         <ng-template appCell="gremium" let-t>
           <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
@@ -33,33 +42,14 @@
           <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
         </ng-template>
         <ng-template appCell="actions" let-t>
-          @if (phone()) {
-            <app-row-menu
-              [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
-              [sections]="rowMenu()"
-              (selected)="onRowMenu($any(t), $event)"
-            />
-          } @else {
-            <span class="fl__actions">
-              <a
-                class="fl__iconLink"
-                [routerLink]="['/admin/forms', $any(t).id]"
-                [attr.aria-label]="('admin.forms.edit' | t) + ': ' + name($any(t))"
-                [attr.title]="'admin.forms.edit' | t"
-                ><app-icon name="edit" [size]="18"
-              /></a>
-              @if (canDelete()) {
-                <app-button
-                  variant="text"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="('admin.forms.delete' | t) + ': ' + name($any(t))"
-                  [title]="'admin.forms.delete' | t"
-                  (click)="askDelete($any(t))"
-                >
-                  <app-icon name="trash" />
-                </app-button>
-              }
+          <!-- The row opens the editor; the menu keeps its clicks and keys to itself. -->
+          @if (canDelete()) {
+            <span class="fl__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+              <app-row-menu
+                [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
+                [sections]="rowMenu()"
+                (selected)="askDelete($any(t))"
+              />
             </span>
           }
         </ng-template>
@@ -107,7 +97,7 @@
   <div dialog-footer class="fl__foot">
     <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
-      {{ 'admin.forms.add' | t }}
+      {{ 'admin.common.create' | t }}
     </app-button>
   </div>
 </app-dialog>

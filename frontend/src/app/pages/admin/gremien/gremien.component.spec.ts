@@ -1,4 +1,4 @@
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
@@ -105,6 +105,12 @@ async function setup(opts: { api?: ReturnType<typeof makeApi>; perms?: string[] 
 const item = (name: string) =>
   screen.getByRole('button', { name: new RegExp(`^${name}`) }).closest('li') as HTMLElement;
 
+/** Choose an item of the ⋮ menu of one gremium row. */
+async function pick(name: string, label: string): Promise<void> {
+  await userEvent.click(screen.getByRole('button', { name: `Weitere Aktionen: ${name}` }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: label }));
+}
+
 describe('AdminGremienComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
@@ -115,9 +121,9 @@ describe('AdminGremienComponent', () => {
     expect(within(first).getByText('23 Mitglieder · 4 Rollen')).toBeInTheDocument();
     expect(within(item('AStA')).getByText('1 Mitglied · 1 Rolle')).toBeInTheDocument();
     expect(within(item('Ohne Zahlen')).queryByText(/Rolle/)).toBeNull();
-    expect(
-      within(first).getByRole('link', { name: 'Mitglieder: Studierendenparlament' }),
-    ).toHaveAttribute('href', '/admin/gremien/g-1/members');
+    // The row has no inline link or icons: the ⋮ menu holds edit, members and delete.
+    expect(within(first).queryByRole('link')).toBeNull();
+    expect(within(first).getByRole('button', { name: 'Weitere Aktionen: Studierendenparlament' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /^Studierendenparlament/ })).toHaveAttribute(
       'aria-expanded',
       'true',
@@ -127,12 +133,19 @@ describe('AdminGremienComponent', () => {
     expect(api.listGremiumRoles).not.toHaveBeenCalledWith('g-2', expect.anything());
   });
 
+  it('opens the members page from the ⋮ menu of a row', async () => {
+    const { fixture } = await setup();
+    const nav = jest.spyOn(fixture.debugElement.injector.get(Router), 'navigate').mockResolvedValue(true);
+    await pick('AStA', 'Mitglieder');
+    expect(nav).toHaveBeenCalledWith(['/admin/gremien', 'g-2', 'members']);
+  });
+
   it('tags a gremium that publishes its protocols and names the setting', async () => {
     await setup();
     expect(
-      within(item('Studierendenparlament')).getByText('Öffentlich', { selector: '.grem__tag' }),
+      within(item('Studierendenparlament')).getByText('Öffentlich', { selector: 'app-status-text' }),
     ).toBeInTheDocument();
-    expect(within(item('AStA')).queryByText('Öffentlich', { selector: '.grem__tag' })).toBeNull();
+    expect(within(item('AStA')).queryByText('Öffentlich', { selector: 'app-status-text' })).toBeNull();
     const first = item('Studierendenparlament');
     const dt = within(first).getByText('Öffentlich', { selector: 'dt' });
     expect(dt.nextElementSibling).toHaveTextContent('Ja');
@@ -195,9 +208,7 @@ describe('AdminGremienComponent', () => {
 
   it('edits a gremium in the dialog and reloads the list', async () => {
     const { api, toast } = await setup();
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Bearbeiten: Studierendenparlament' }),
-    );
+    await pick('Studierendenparlament', 'Bearbeiten');
     const dialog = screen.getByRole('dialog', { name: 'Gremium bearbeiten' });
     await waitFor(() =>
       expect(within(dialog).getByRole('textbox', { name: /Name/ })).toHaveValue(
@@ -252,7 +263,7 @@ describe('AdminGremienComponent', () => {
       setGremiumMailRecipients: jest.fn(() => throwError(() => ({ status: 422 }))),
     });
     await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: AStA' }));
+    await pick('AStA', 'Bearbeiten');
     const dialog = screen.getByRole('dialog', { name: 'Gremium bearbeiten' });
     const name = within(dialog).getByRole('textbox', { name: /Name/ });
     await waitFor(() => expect(name).toHaveValue('AStA'));
@@ -292,7 +303,7 @@ describe('AdminGremienComponent', () => {
   it('deletes a gremium after the confirmation', async () => {
     const api = makeApi();
     const { toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await pick('AStA', 'Löschen');
     const dialog = screen.getByRole('dialog', { name: 'Gremium löschen?' });
     expect(dialog).toHaveTextContent('„AStA“');
     await userEvent.click(within(dialog).getByText('Löschen'));
@@ -312,7 +323,7 @@ describe('AdminGremienComponent', () => {
   ])('names the reason of a refused delete (%o)', async (err, message) => {
     const api = makeApi({ deleteGremium: jest.fn(() => throwError(() => err)) });
     const { toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await pick('AStA', 'Löschen');
     await userEvent.click(within(screen.getByRole('dialog')).getByText('Löschen'));
     expect(toast.error).toHaveBeenCalledWith(message);
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -325,7 +336,7 @@ describe('AdminGremienComponent', () => {
       ),
     });
     const { toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await pick('AStA', 'Löschen');
     await userEvent.click(within(screen.getByRole('dialog')).getByText('Löschen'));
     expect(toast.error).toHaveBeenCalledWith('Das Gremium konnte nicht gelöscht werden.');
   });
@@ -333,7 +344,7 @@ describe('AdminGremienComponent', () => {
   it('names a failed delete and keeps the dialog', async () => {
     const api = makeApi({ deleteGremium: jest.fn(() => throwError(() => ({ status: 500 }))) });
     const { toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
+    await pick('AStA', 'Löschen');
     await userEvent.click(within(screen.getByRole('dialog')).getByText('Löschen'));
     expect(toast.error).toHaveBeenCalledWith('Das Gremium konnte nicht gelöscht werden.');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
@@ -345,8 +356,8 @@ describe('AdminGremienComponent', () => {
     const api = makeApi();
     await setup({ api });
     const first = item('Studierendenparlament');
-    await userEvent.click(within(first).getByRole('button', { name: /Gremium-Rolle hinzufügen/ }));
-    const dialog = screen.getByRole('dialog', { name: /Gremium-Rolle hinzufügen/ });
+    await userEvent.click(within(first).getByRole('button', { name: /Gremium-Rolle anlegen/ }));
+    const dialog = screen.getByRole('dialog', { name: /Gremium-Rolle anlegen/ });
     await userEvent.type(within(dialog).getByRole('textbox', { name: /Schlüssel/ }), 'kasse');
     await userEvent.click(within(dialog).getByText('Speichern'));
     expect(api.createGremiumRole).toHaveBeenCalledWith(

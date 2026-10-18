@@ -3,9 +3,6 @@
 }
 
 .cdv {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -163,31 +160,6 @@
   align-items: center;
   gap: 2px;
 }
-/* The place of the two move buttons in the square row, so the columns line up. */
-.cdv__moveGap {
-  display: inline-block;
-  width: 4.5rem;
-}
-.cdv__iconLink,
-.cdv__iconGap {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-}
-.cdv__iconLink {
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-}
-.cdv__iconLink:hover {
-  background: var(--color-surface-4);
-  color: var(--color-text);
-}
-.cdv__iconLink:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 0;
-}
 .cdv__add {
   align-self: flex-start;
 }
@@ -287,7 +259,7 @@
   gap: var(--space-2);
 }
 
-/* A narrow sheet: the actions go below the name, the logo actions below the logo. */
+/* A narrow sheet: the actions go below the name. */
 @container (max-width: 34rem) {
   .cdv__head {
     display: grid;
@@ -296,16 +268,6 @@
   }
   .cdv__actions {
     grid-column: 1 / -1;
-    justify-content: flex-end;
-  }
-  .cdv__logo {
-    flex-wrap: wrap;
-  }
-  .cdv__logoText {
-    flex-basis: calc(100% - 3.25rem);
-  }
-  .cdv__logoActions {
-    width: 100%;
     justify-content: flex-end;
   }
 }

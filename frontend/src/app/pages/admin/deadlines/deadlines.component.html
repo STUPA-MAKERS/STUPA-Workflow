@@ -1,4 +1,4 @@
-<section class="dl">
+<section class="dl admin-page">
   <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t" />
 
   @if (loading() || policies().length) {
@@ -9,6 +9,8 @@
       [columns]="columns()"
       [rows]="policies()"
       [rowKey]="rowId"
+      [clickable]="true"
+      (rowClick)="openEdit(policies().indexOf($any($event)))"
     >
       <ng-template appCell="label" let-r>
         <span class="dl__name">{{ label($any(r)) }}</span>
@@ -19,37 +21,15 @@
         @let v = valueOf($any(r));
         <span class="dl__value" [class.dl__muted]="v.muted" [title]="v.title">{{ v.text }}</span>
       </ng-template>
-      <ng-template appCell="actions" let-r let-i="index">
-        @if (phone()) {
+      <ng-template appCell="actions" let-r>
+        <!-- The row opens the edit; the menu keeps its clicks and keys to itself. -->
+        <span class="dl__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
           <app-row-menu
             [label]="('admin.common.actions' | t) + ': ' + label($any(r))"
             [sections]="rowMenu()"
-            (selected)="onRowMenu($any(r), i, $event)"
+            (selected)="askDelete($any(r))"
           />
-        } @else {
-          <span class="dl__actions">
-            <app-button
-              variant="text"
-              size="sm"
-              [iconOnly]="true"
-              [ariaLabel]="('admin.common.edit' | t) + ': ' + label($any(r))"
-              [title]="'admin.common.edit' | t"
-              (click)="openEdit(i)"
-            >
-              <app-icon name="edit" />
-            </app-button>
-            <app-button
-              variant="text"
-              size="sm"
-              [iconOnly]="true"
-              [ariaLabel]="('admin.common.remove' | t) + ': ' + label($any(r))"
-              [title]="'admin.common.remove' | t"
-              (click)="askDelete($any(r))"
-            >
-              <app-icon name="trash" />
-            </app-button>
-          </span>
-        }
+        </span>
       </ng-template>
     </app-data-table>
   } @else {
@@ -75,7 +55,7 @@
 
 <app-dialog
   [open]="draft() !== null"
-  [title]="(editingId() === null ? 'admin.deadlines.add' : 'admin.deadlines.edit') | t"
+  [title]="(editingId() === null ? 'admin.deadlines.create' : 'admin.deadlines.edit') | t"
   [closeLabel]="'action.close' | t"
   (closed)="close()"
 >

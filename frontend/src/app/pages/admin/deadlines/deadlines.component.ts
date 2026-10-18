@@ -14,7 +14,6 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  MEDIA,
   type SelectOption,
   TimeInputComponent,
   ToastService,
@@ -22,10 +21,8 @@ import {
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   RowMenuComponent,
-  type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
@@ -181,26 +178,15 @@ export class AdminDeadlinesComponent {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '6rem',
+      width: '3.5rem',
       card: 'actions',
     },
   ]);
   protected readonly rowId = (r: unknown): string => (r as DeadlinePolicy).id;
-  /** A phone shows cards: the actions of a policy go into the ⋮ menu of its card. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  /** The ⋮ menu of a policy: remove is its only action. The row itself opens the edit. */
   protected readonly rowMenu = computed<RowMenuSection[]>(() => [
-    {
-      items: [
-        { id: 'edit', label: this.i18n.translate('admin.common.edit'), icon: 'edit' },
-        { id: 'remove', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true },
-      ],
-    },
+    { items: [{ id: 'remove', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true }] },
   ]);
-
-  protected onRowMenu(policy: DeadlinePolicy, index: number, item: RowMenuItem): void {
-    if (item.id === 'edit') this.openEdit(index);
-    else if (item.id === 'remove') this.askDelete(policy);
-  }
 
   /** "Speichern": send every settings section that has changes. */
   protected saveSettings(): void {

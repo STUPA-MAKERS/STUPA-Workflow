@@ -1,4 +1,4 @@
-<section class="ns">
+<section class="ns admin-page">
   <app-page-header [flush]="true" [title]="'admin.notifications.title' | t" />
 
   @if (error()) {
@@ -13,7 +13,7 @@
       <div class="ns__body">
         <div class="ns__head">
           <div class="ns__text">
-            <h2 class="ns__title" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
+            <h2 class="section-title" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
           </div>
           <app-switch [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
             {{ 'admin.notifications.enabled' | t }}

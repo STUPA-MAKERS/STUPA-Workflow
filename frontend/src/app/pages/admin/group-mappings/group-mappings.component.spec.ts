@@ -202,8 +202,8 @@ describe('GroupMappingsComponent', () => {
 
   it('the global dialog has a role select and no gremium field', async () => {
     await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Globale Rolle zuordnen' }));
-    const dialog = screen.getByRole('dialog', { name: 'Globale Rolle zuordnen' });
+    await userEvent.click(screen.getByRole('button', { name: 'Zuordnung zu globaler Rolle anlegen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Zuordnung zu globaler Rolle anlegen' });
     expect(within(dialog).getByLabelText(/OIDC-Gruppe/)).toBeInTheDocument();
     expect(within(dialog).getByText('Rolle')).toBeInTheDocument();
     expect(within(dialog).queryByText('Gremium')).toBeNull();
@@ -211,16 +211,16 @@ describe('GroupMappingsComponent', () => {
 
   it('the membership dialog has a gremium select and no role field', async () => {
     await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Mitgliedschaft zuordnen' }));
-    const dialog = screen.getByRole('dialog', { name: 'Mitgliedschaft zuordnen' });
+    await userEvent.click(screen.getByRole('button', { name: 'Zuordnung zu Mitgliedschaft anlegen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Zuordnung zu Mitgliedschaft anlegen' });
     expect(within(dialog).getByText('Gremium')).toBeInTheDocument();
     expect(within(dialog).queryByText('Rolle')).toBeNull();
   });
 
   it('the role dialog has a gremium filter, and a gremium role select', async () => {
     await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Gremien-Rolle zuordnen' }));
-    const dialog = screen.getByRole('dialog', { name: 'Gremien-Rolle zuordnen' });
+    await userEvent.click(screen.getByRole('button', { name: 'Zuordnung zu Gremien-Rolle anlegen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Zuordnung zu Gremien-Rolle anlegen' });
     expect(within(dialog).getByText('Gremium')).toBeInTheDocument();
     expect(within(dialog).getByText('Gremien-Rolle')).toBeInTheDocument();
   });
@@ -236,7 +236,7 @@ describe('GroupMappingsComponent', () => {
     expect(c.dialog()).toBe('membership');
     expect(c.editId()).toBeNull();
     expect([c.oidcGroup(), c.roleId(), c.gremiumId(), c.gremiumRoleId()]).toEqual(['', '', '', '']);
-    expect(c.dialogTitle()).toBe('admin.groupMappings.membership.add');
+    expect(c.dialogTitle()).toBe('admin.groupMappings.membership.create');
   });
 
   it('openEdit seeds each kind of dialog', async () => {
@@ -449,12 +449,16 @@ describe('GroupMappingsComponent', () => {
     expect(c.confirm()).toEqual({ kind: 'role', id: 'rm1' });
   });
 
-  it('the row controls open the edit dialog and the delete confirmation', async () => {
+  it('a click on the row opens the edit dialog, the ⋮ menu the delete confirmation', async () => {
     const { c } = await setup();
+    // The add buttons all read "Zuordnung anlegen"; the section heading names the kind.
+    expect(screen.getAllByText('Zuordnung anlegen')).toHaveLength(3);
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: stupa-praesidium' }));
     expect(screen.getByRole('dialog', { name: 'Gremien-Rolle bearbeiten' })).toBeInTheDocument();
     c.closeDialog();
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen: stupa-mitglieder' }));
+    expect(screen.queryByRole('button', { name: /^Löschen: / })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: stupa-mitglieder' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Löschen' }));
     expect(c.confirm()).toEqual({ kind: 'membership', id: 'mm1' });
   });
 });

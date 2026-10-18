@@ -13,7 +13,6 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
@@ -22,7 +21,6 @@ import {
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
 import { downloadBlob } from '@shared/download.util';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { formatBytes } from '../admin-health/admin-health.util';
 import type { Backup, BackupKind } from '../admin.models';
@@ -85,8 +83,6 @@ export class BackupsComponent implements OnDestroy {
   private readonly toast = inject(ToastService);
 
   protected readonly rows = signal<Backup[]>([]);
-  /** A phone shows cards: the actions of an archive go into the ⋮ menu of its card. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
   /** False without an age recipient: this installation cannot create an archive. */
   protected readonly enabled = signal(true);
   /** False without the private key: it cannot read one either, so no restore, no import. */
@@ -128,7 +124,7 @@ export class BackupsComponent implements OnDestroy {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '9rem',
+      width: '3.5rem',
       card: 'actions',
     },
   ]);
@@ -239,7 +235,7 @@ export class BackupsComponent implements OnDestroy {
    * the object store sits on the internal Docker network, so such a URL names a host the
    * browser cannot resolve.
    */
-  /** The ⋮ menu of a finished archive on a phone: the same actions as the icon buttons. */
+  /** The ⋮ menu of a finished archive. */
   protected rowMenu(row: Backup): RowMenuSection[] {
     const t = (key: TranslationKey): string => this.i18n.translate(key);
     const items: RowMenuItem[] = [

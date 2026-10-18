@@ -3,9 +3,6 @@
 }
 
 .ar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -55,13 +52,8 @@
   font-weight: var(--fw-semibold);
 }
 
-.ar__fixed {
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-1);
+.ar__head app-status-text {
   font-size: var(--fs-sm);
-  color: var(--color-text-muted);
 }
 
 .ar__key {
@@ -81,7 +73,7 @@
   font-size: var(--fs-sm);
 }
 
-/* The delete slot keeps its width, so the counts of all rows line up. */
+/* The menu slot keeps its width, so the counts of all rows line up. */
 .ar__del {
   display: flex;
   flex: none;
@@ -130,9 +122,11 @@
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: var(--space-2) var(--space-4);
 }
+/* A key breaks only after a "." or a "_" (the <wbr> in the template), never inside a
+   word. Only a single part wider than the column breaks inside itself. */
 .ar__perm {
   font-size: var(--fs-sm);
-  overflow-wrap: anywhere;
+  overflow-wrap: break-word;
 }
 
 .ar__foot {
