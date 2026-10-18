@@ -1935,7 +1935,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.form.type.iban': 'IBAN',
   'admin.form.type.daterange': 'Date range',
   'admin.form.type.checkbox': 'Checkbox',
-  'admin.form.type.file': 'File upload',
+  'admin.form.type.file': 'File attachment',
   'admin.form.type.table': 'Table',
   'admin.form.type.markdown': 'Info text (Markdown)',
   'admin.form.type.computed': 'Computed field',

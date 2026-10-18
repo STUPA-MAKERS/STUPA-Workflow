@@ -1970,7 +1970,7 @@ export const de = {
   'admin.form.type.iban': 'IBAN',
   'admin.form.type.daterange': 'Zeitraum',
   'admin.form.type.checkbox': 'Kontrollkästchen',
-  'admin.form.type.file': 'Datei hochladen',
+  'admin.form.type.file': 'Datei-Anhang',
   'admin.form.type.table': 'Tabelle',
   'admin.form.type.markdown': 'Hinweistext (Markdown)',
   'admin.form.type.computed': 'Berechnetes Feld',
