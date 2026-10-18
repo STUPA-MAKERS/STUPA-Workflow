@@ -10,7 +10,7 @@
       <header class="gm__head">
         <h2 class="sec" [id]="'gm-' + sec.kind + '-title'">{{ key(sec.kind, 'title') | t }}</h2>
         <app-button size="sm" variant="tonal" (click)="openAdd(sec.kind)">
-          <app-icon name="plus" [size]="16" /> {{ key(sec.kind, 'add') | t }}
+          <app-icon name="plus" /> {{ key(sec.kind, 'add') | t }}
         </app-button>
       </header>
 

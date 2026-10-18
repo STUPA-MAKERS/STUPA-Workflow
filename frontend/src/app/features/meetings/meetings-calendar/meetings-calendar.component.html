@@ -5,7 +5,7 @@
     <ng-container ngProjectAs="[actions]">
       @if (canCreate()) {
         <app-button class="cal__new" variant="fill" (click)="create.emit()">
-          <app-icon name="plus" [size]="17" />
+          <app-icon name="plus" />
           {{ 'meetings.list.new' | t }}
         </app-button>
       }
@@ -16,7 +16,7 @@
         [ariaLabel]="'meetings.overview.subscribe' | t"
         [ariaPressed]="abo.isOpen()"
         (click)="abo.toggle($event.currentTarget)"
-      ><app-icon name="cal" [size]="21" /></app-button>
+      ><app-icon name="cal" /></app-button>
       <app-calendar-subscribe #abo />
     </ng-container>
   </app-page-header>
@@ -29,7 +29,7 @@
         [ariaLabel]="'meetings.overview.prevMonth' | t"
         [title]="'meetings.overview.prevMonth' | t"
         (click)="prevMonth()"
-      ><app-icon name="left" [size]="20" /></app-button>
+      ><app-icon name="left" /></app-button>
       <h2 class="cal__month" aria-live="polite">{{ monthText() }}</h2>
       <app-button
         variant="text"
@@ -37,7 +37,7 @@
         [ariaLabel]="'meetings.overview.nextMonth' | t"
         [title]="'meetings.overview.nextMonth' | t"
         (click)="nextMonth()"
-      ><app-icon name="right" [size]="20" /></app-button>
+      ><app-icon name="right" /></app-button>
       <app-button variant="outlined" size="sm" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
     </div>
     <div class="cal__filters">
@@ -157,12 +157,12 @@
             </p>
             <div class="cal__actions">
               <app-button variant="fill" size="sm" (click)="open(c.meeting)">
-                <app-icon name="arrow" [size]="16" />
+                <app-icon name="arrow" />
                 {{ 'meetings.overview.open' | t }}
               </app-button>
               @if (c.meeting.canManage && c.meeting.status !== 'closed') {
                 <app-button variant="tonal" size="sm" (click)="beamer(c.meeting)">
-                  <app-icon name="monitor" [size]="16" />
+                  <app-icon name="monitor" />
                   {{ 'meetings.overview.beamerShort' | t }}
                 </app-button>
               }

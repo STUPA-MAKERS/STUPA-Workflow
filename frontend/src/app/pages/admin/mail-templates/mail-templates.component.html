@@ -102,10 +102,10 @@
           }
           <span class="mt__actionsEnd">
             <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
-              <app-icon name="eye" [size]="18" /> {{ 'admin.mailTemplates.preview' | t }}
+              <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
             </app-button>
             <app-button variant="fill" [loading]="saving()" (click)="save()">
-              <app-icon name="check" [size]="18" /> {{ 'action.save' | t }}
+              <app-icon name="check" /> {{ 'action.save' | t }}
             </app-button>
           </span>
         </div>

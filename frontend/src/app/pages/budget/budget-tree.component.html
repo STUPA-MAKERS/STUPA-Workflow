@@ -3,7 +3,7 @@
     <ng-container ngProjectAs="[actions]">
       @if (phone()) {
         <app-button variant="fill" (click)="openTop()">
-          <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTopShort' | t }}
+          <app-icon name="plus" /> {{ 'budget.tree.createTopShort' | t }}
         </app-button>
         <app-row-menu [label]="'budget.tree.moreActions' | t" [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
@@ -14,10 +14,10 @@
           {{ 'budget.tree.stichtagTitle' | t }}
         </app-button>
         <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
-          <app-icon name="cal" [size]="16" /> {{ 'budget.tree.fyTitle' | t }}
+          <app-icon name="cal" /> {{ 'budget.tree.fyTitle' | t }}
         </app-button>
         <app-button variant="fill" (click)="openTop()">
-          <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTop' | t }}
+          <app-icon name="plus" /> {{ 'budget.tree.createTop' | t }}
         </app-button>
       }
     </ng-container>

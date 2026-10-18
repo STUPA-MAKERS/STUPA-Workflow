@@ -18,7 +18,7 @@
       <div class="bs__secHead">
         <h3 id="bs-cols" class="sec bs__title">{{ 'todos.settings.columns' | t }}</h3>
         <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addColumn' | t" (click)="newColumn.set('')">
-          <app-icon name="plus" [size]="15" />
+          <app-icon name="plus" />
           {{ 'todos.settings.addColumnShort' | t }}
         </app-button>
       </div>
@@ -95,7 +95,7 @@
       <div class="bs__secHead">
         <h3 id="bs-labels" class="sec bs__title">{{ 'todos.settings.labels' | t }}</h3>
         <app-button variant="text" size="sm" [ariaLabel]="'todos.settings.addLabel' | t" (click)="editLabel(null)">
-          <app-icon name="plus" [size]="15" />
+          <app-icon name="plus" />
           {{ 'todos.settings.addLabelShort' | t }}
         </app-button>
       </div>

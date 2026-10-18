@@ -19,7 +19,7 @@
         }
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" [size]="20" />
+        <app-icon name="x" />
       </app-button>
     </header>
   }
@@ -221,18 +221,18 @@
         (click)="remove.emit()"
       >
         <span class="ff__btn"
-          ><app-icon name="trash" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
         >
       </app-button>
     }
     <div class="ff__footEnd">
       <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
       @if (mode() === 'create') {
-        <app-button [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="repeat" [size]="16" />{{ 'expenses.transferConfirm' | t }}</span>
+        <app-button variant="fill" [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
+          <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.transferConfirm' | t }}</span>
         </app-button>
       } @else {
-        <app-button [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
+        <app-button variant="fill" [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
           'action.save' | t
         }}</app-button>
       }

@@ -16,7 +16,7 @@
               [ariaLabel]="'gremien.list.subscribe' | t"
               [ariaPressed]="abo.isOpen()"
               (click)="abo.toggle($event.currentTarget)"
-            ><app-icon name="cal" [size]="21" /></app-button>
+            ><app-icon name="cal" /></app-button>
           }
           <app-calendar-subscribe #abo />
         </ng-container>

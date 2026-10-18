@@ -74,7 +74,7 @@
         } @else if (!hasRows()) {
           @if (activeFilterCount() > 0) {
             <app-empty-state [heading]="'tickets.list.noMatch' | t">
-              <app-button variant="tonal" size="sm" (click)="reset()">
+              <app-button variant="text" size="sm" (click)="reset()">
                 {{ 'tickets.list.filter.reset' | t }}
               </app-button>
             </app-empty-state>

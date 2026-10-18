@@ -3,7 +3,7 @@
   <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t">
     @if (canCreate()) {
       <app-button actions variant="fill" (click)="openCreate()">
-        <app-icon name="plus" [size]="18" /> {{ 'admin.forms.add' | t }}
+        <app-icon name="plus" /> {{ 'admin.forms.add' | t }}
       </app-button>
     }
   </app-page-header>

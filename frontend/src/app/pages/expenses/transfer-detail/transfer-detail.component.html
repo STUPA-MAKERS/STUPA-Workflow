@@ -5,7 +5,7 @@
       @if (canManage()) {
         @if (phone()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">
-            <span class="fd__btn"><app-icon name="edit" [size]="16" />{{ 'action.edit' | t }}</span>
+            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
           </app-button>
         } @else {
           <app-button
@@ -14,7 +14,7 @@
             [ariaLabel]="'expenses.transfers.editTitle' | t"
             [title]="'expenses.transfers.editTitle' | t"
             (click)="edit.emit()"
-          ><app-icon name="edit" [size]="19" /></app-button>
+          ><app-icon name="edit" /></app-button>
         }
       }
       @if (menu().length) {

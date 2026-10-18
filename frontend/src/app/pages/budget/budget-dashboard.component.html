@@ -332,7 +332,7 @@
       <div class="bd__actions">
         @if (canExport()) {
           <app-button variant="outlined" [size]="wide() ? 'md' : 'sm'" (click)="onExport()" [loading]="exporting()">
-            <span class="bd__btn"><app-icon name="download" [size]="17" />{{ 'budget.dash.export' | t }}</span>
+            <span class="bd__btn"><app-icon name="download" />{{ 'budget.dash.export' | t }}</span>
           </app-button>
         }
         @if (canSeeBookings()) {

@@ -15,7 +15,7 @@
         <span class="ge__combText">{{ combinatorText() }}</span>
         @if (op() !== 'not') {
           <app-button variant="text" size="sm" (click)="addChild()">
-            <app-icon name="plus" [size]="14" /> {{ 'admin.flow.guardAddChild' | t }}
+            <app-icon name="plus" /> {{ 'admin.flow.guardAddChild' | t }}
           </app-button>
         }
       </div>

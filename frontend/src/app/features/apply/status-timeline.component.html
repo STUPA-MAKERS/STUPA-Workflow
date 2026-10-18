@@ -42,7 +42,7 @@
             </p>
             <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
             <app-button variant="fill" [loading]="saving()" (click)="save()">
-              <app-icon name="check" [size]="16" />
+              <app-icon name="check" />
               {{ 'applications.detail.save' | t }}
             </app-button>
           </header>

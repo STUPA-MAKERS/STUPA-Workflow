@@ -163,7 +163,7 @@
   }
 
   <app-button class="pos__add" variant="tonal" (click)="addPosition()">
-    <app-icon name="plus" [size]="16" />
+    <app-icon name="plus" />
     {{ t('apply.positions.add') }}
   </app-button>
   @if (showError && positions.length < minPositions) {

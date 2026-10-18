@@ -15,9 +15,16 @@
       (keydown.enter)="search.flush()"
     />
     @if (!phone()) {
-      <button type="button" class="lp__x" [attr.aria-label]="'action.close' | t" (click)="close()">
-        <app-icon name="x" [size]="16" />
-      </button>
+      <app-button
+        class="lp__x"
+        variant="text"
+        size="sm"
+        [iconOnly]="true"
+        [ariaLabel]="'action.close' | t"
+        (click)="close()"
+      >
+        <app-icon name="x" />
+      </app-button>
     }
   </div>
   <div class="lp__chips" role="group" [attr.aria-label]="'todos.picker.kind' | t">

@@ -82,9 +82,9 @@
   @if (v.status === 'open' && canManage()) {
     <div class="vc__actions">
       @if (canRun()) {
-        <app-button variant="fill" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
+        <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
       }
-      <app-button variant="danger" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+      <app-button variant="text" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
     </div>
   }
 
@@ -128,7 +128,7 @@
   } @else if (v.status === 'closed' && canInsert()) {
     <div class="vc__actions">
       <app-button variant="tonal" [block]="true" (click)="insertResult.emit(v)">
-        <app-icon name="fileplus" [size]="16" />
+        <app-icon name="fileplus" />
         {{ 'meetings.dock.insertResult' | t }}
       </app-button>
     </div>

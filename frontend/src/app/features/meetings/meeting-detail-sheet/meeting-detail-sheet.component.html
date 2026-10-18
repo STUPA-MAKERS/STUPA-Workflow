@@ -9,7 +9,7 @@
           [ariaLabel]="('meetings.settings.title' | t) + ': ' + m.title"
           [title]="'meetings.settings.title' | t"
           (click)="edit.emit(m)"
-        ><app-icon name="edit" [size]="19" /></app-button>
+        ><app-icon name="edit" /></app-button>
       }
       @if (menu().length) {
         <app-row-menu
@@ -41,18 +41,18 @@
 
     <div class="ms__actions">
       <app-button variant="fill" [class.ms__grow]="phone()" (click)="open()">
-        <app-icon name="arrow" [size]="17" />
+        <app-icon name="arrow" />
         {{ 'meetings.overview.open' | t }}
       </app-button>
       @if (canBeamer() && !phone()) {
         <app-button variant="tonal" (click)="beamer.emit(m)">
-          <app-icon name="monitor" [size]="17" />
+          <app-icon name="monitor" />
           {{ 'meetings.beamer.enter' | t }}
         </app-button>
       }
       @if (keeperMissing() && m.canManage) {
         <app-button variant="tonal" (click)="edit.emit(m)">
-          <app-icon name="user" [size]="17" />
+          <app-icon name="user" />
           {{ 'meetings.overview.setKeeper' | t }}
         </app-button>
       }

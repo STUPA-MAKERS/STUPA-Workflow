@@ -17,7 +17,7 @@
         }
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" [size]="20" />
+        <app-icon name="x" />
       </app-button>
     </header>
   }
@@ -282,7 +282,7 @@
               </div>
             }
             <app-button variant="text" size="sm" (click)="addSub.emit()">
-              <span class="ff__btn"><app-icon name="plus" [size]="16" />{{ 'expenses.sub.add' | t }}</span>
+              <span class="ff__btn"><app-icon name="plus" />{{ 'expenses.sub.add' | t }}</span>
             </app-button>
           </fieldset>
         }
@@ -432,20 +432,20 @@
         (click)="remove.emit()"
       >
         <span class="ff__btn"
-          ><app-icon name="trash" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
         >
       </app-button>
     }
     <div class="ff__footEnd">
       <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
       @if (mode() === 'create') {
-        <app-button [disabled]="!s.canSubmitCreate()" [loading]="saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="plus" [size]="16" />{{
+        <app-button variant="fill" [disabled]="!s.canSubmitCreate()" [loading]="saving()" (click)="submit($event)">
+          <span class="ff__btn"><app-icon name="plus" />{{
             (layout() === 'sheet' ? 'expenses.form.addShort' : 'expenses.add') | t
           }}</span>
         </app-button>
       } @else {
-        <app-button [loading]="saving()" (click)="submit($event)">{{ 'action.save' | t }}</app-button>
+        <app-button variant="fill" [loading]="saving()" (click)="submit($event)">{{ 'action.save' | t }}</app-button>
       }
     </div>
   </footer>
