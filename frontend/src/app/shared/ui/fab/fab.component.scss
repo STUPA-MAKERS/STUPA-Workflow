@@ -3,17 +3,19 @@
    rail) is half the free width plus the gutter from the window edge; a wide page ends at
    its gutter. The foot is the gap that a pane page keeps above the window edge
    (`--pane-foot-gap`), so on a sheet that reaches down to it (the admin pages) the button
-   stands inside the sheet and not on its round corner. A phone keeps it 16px from the
-   screen edge and 16px above the bottom bar (`--app-bottom-inset` holds the bar and the
-   safe area). */
+   stands inside the sheet and not on its round corner. A sheet with a side padding of its
+   own sets `--fab-inset` to that padding, so the end of the button lines up with the end
+   of the content and clears the round corner. A phone keeps it 16px from the screen edge
+   (the gutter of the content) and 16px above the bottom bar (`--app-bottom-inset` holds
+   the bar and the safe area). */
 :host {
   --fab-end: calc(
     max(
         var(--layout-gutter),
         calc((100vw - var(--rail-width, 0px) - var(--layout-max-width)) / 2 + var(--layout-gutter))
-      ) + var(--space-4)
+      ) + var(--fab-inset, var(--space-4))
   );
-  --fab-foot: calc(var(--pane-foot-gap, var(--layout-gutter)) + var(--space-4));
+  --fab-foot: calc(var(--pane-foot-gap, var(--layout-gutter)) + var(--fab-inset, var(--space-4)));
   position: fixed;
   right: var(--fab-end);
   bottom: calc(var(--app-bottom-inset, 0px) + var(--fab-foot));
@@ -21,7 +23,7 @@
   display: block;
 }
 :host-context(.main--wide) {
-  --fab-end: calc(var(--layout-gutter) + var(--space-4));
+  --fab-end: calc(var(--layout-gutter) + var(--fab-inset, var(--space-4)));
 }
 :host-context(.frame--phone) {
   --fab-end: var(--space-4);

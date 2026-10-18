@@ -272,6 +272,15 @@
 .af .af__pageBody:has(app-fab) {
   padding-bottom: calc(56px + 2 * var(--space-4));
 }
+/* On the sheet the button stands at the side padding of the body (`--fab-inset`), so its
+   end lines up with the end of the content and it clears the round corner of the sheet.
+   The body ends with the button, its inset and 16px above it. */
+.af--split {
+  --fab-inset: var(--space-6);
+}
+.af--split .af__pageBody:has(app-fab) {
+  padding-bottom: calc(56px + var(--space-6) + var(--space-4));
+}
 
 /* Wide, a full-width page with columns of its own (`adminPane`): the frame passes the
    free height down, and the page scrolls only inside its columns. */
