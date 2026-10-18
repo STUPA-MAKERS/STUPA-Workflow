@@ -1,4 +1,5 @@
 import { Injectable, computed, signal } from '@angular/core';
+import { withViewTransition } from '@core/motion/motion';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
@@ -60,7 +61,8 @@ export class ThemeService {
   setPreference(pref: ThemePreference): void {
     this._preference.set(pref);
     this.persist(pref);
-    this.apply();
+    // The whole page cross-fades once instead of each surface changing on its own.
+    withViewTransition(() => this.apply());
   }
 
   /**

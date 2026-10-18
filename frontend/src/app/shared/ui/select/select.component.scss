@@ -90,6 +90,7 @@
 // The popover. It stays invisible until it has its place, so it never shows at 0/0.
 .sel__menu {
   @include om.menu;
+  @include om.motion;
   max-width: min(32rem, calc(100vw - 16px));
   visibility: hidden;
 }

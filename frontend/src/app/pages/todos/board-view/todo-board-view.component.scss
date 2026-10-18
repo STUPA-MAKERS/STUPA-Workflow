@@ -160,10 +160,10 @@
   visibility: hidden;
 }
 .bv__cards.cdk-drop-list-dragging .bv__item:not(.cdk-drag-placeholder) {
-  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 .cdk-drag-animating {
-  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 @media (prefers-reduced-motion: reduce) {
   .bv__cards.cdk-drop-list-dragging .bv__item,
