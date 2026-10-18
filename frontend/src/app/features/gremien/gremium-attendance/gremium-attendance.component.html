@@ -180,7 +180,7 @@
                     }
                   </button>
                 } @else if (c.view.kind === 'none') {
-                  <span class="gat__cell gat__cell--none" role="img" [attr.aria-label]="c.label">–</span>
+                  <span class="gat__cell gat__cell--none" role="img" [attr.aria-label]="c.label">—</span>
                 } @else {
                   <span class="gat__cell gat__cell--na" role="img" [attr.aria-label]="c.label"></span>
                 }
@@ -188,7 +188,7 @@
             }
             <td class="gat__td gat__td--total">
               <span class="mono">{{ m.totals.present }}/{{ m.totals.held }}</span>
-              <span class="gat__pct">{{ m.totals.pct === null ? '–' : m.totals.pct + ' %' }}</span>
+              <span class="gat__pct">{{ m.totals.pct === null ? '—' : m.totals.pct + ' %' }}</span>
             </td>
           </tr>
         }

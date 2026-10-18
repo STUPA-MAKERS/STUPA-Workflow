@@ -256,7 +256,7 @@ export class AdminCdVariantsComponent {
     return logo.vendoredName ?? logo.fileName ?? '—';
   }
 
-  /** "Basis: Protokoll · genutzt von StuPa, AStA" for the card of a variant. */
+  /** "Basis: Protokoll · genutzt von STUPA, AStA" for the card of a variant. */
   usage(variant: CdVariant): string {
     const base = this.i18n.translate('admin.cdVariants.baseLine', { base: this.baseLabel(variant.baseVariant) });
     const names = this.usedBy().get(variant.id) ?? [];

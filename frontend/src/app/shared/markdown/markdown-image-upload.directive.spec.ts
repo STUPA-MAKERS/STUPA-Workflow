@@ -149,7 +149,7 @@ describe('MarkdownImageUploadDirective', () => {
     expect(host.text()).toBe('Dokument B');
     calls[1].error(null);
     expect(host.text()).toBe('Dokument B');
-    expect(error).toHaveBeenCalledWith('Bild-Upload fehlgeschlagen.');
+    expect(error).toHaveBeenCalledWith('Das Bild konnte nicht hochgeladen werden.');
     expect(dir.uploading()).toBe(0);
   });
 

@@ -129,7 +129,7 @@ describe('AdminCdVariantsComponent', () => {
     await setup();
     await screen.findByText('StuPa');
     const hint =
-      'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in einen normalen Upload um.';
+      'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in eine normal hochgeladene Datei um.';
     // Two bundled logos (HSRT, STUPA), none for the upload.
     const lines = screen.getAllByText(hint).filter((el) => el.classList.contains('cdv__logoHint'));
     expect(lines).toHaveLength(2);
@@ -329,7 +329,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.deleting()).toBe(false);
     expect(c.confirmDelete()).not.toBeNull(); // the dialog keeps the message
     expect(toast.error).toHaveBeenCalledWith(
-      'Diese Variante ist noch einem Gremium zugewiesen. Ändern Sie zuerst das Gremium.',
+      'Diese Variante ist noch einem Gremium zugewiesen. Ändere zuerst das Gremium.',
     );
   });
 

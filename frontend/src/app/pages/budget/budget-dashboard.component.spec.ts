@@ -628,7 +628,7 @@ describe('BudgetDashboardComponent', () => {
       expect(list.getByText('25 %')).toBeTruthy();
       expect(list.getByText(/^-50\s€$/).classList).toContain('bd__neg');
       // No requested amount reads as a dash.
-      expect(list.getAllByText('–').length).toBeGreaterThan(0);
+      expect(list.getAllByText('—').length).toBeGreaterThan(0);
     });
 
     it('shows the cost centre itself when it has no sub cost centres', async () => {
@@ -1047,7 +1047,7 @@ describe('BudgetDashboardComponent', () => {
     expect(c.appRows()[0]).toEqual(expect.objectContaining({ statusLabel: null, costCentre: null }));
     const row = view.container.querySelector('[aria-labelledby="bd-apps"] app-list-item') as HTMLElement;
     expect(row.querySelector('app-status-text')).toBeNull();
-    expect(row.textContent).toContain('–');
+    expect(row.textContent).toContain('—');
     // An empty label map gives no status either.
     c.apps.set([app({ applicationId: 'a-2', stateLabel: {} })]);
     expect(c.appRows()[0].statusLabel).toBeNull();
