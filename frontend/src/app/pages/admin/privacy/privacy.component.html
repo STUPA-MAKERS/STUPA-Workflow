@@ -164,7 +164,7 @@
   [open]="confirmExecute() !== null"
   [title]="'admin.privacy.executeTitle' | t"
   [subtitle]="confirmExecute()?.email ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmExecute.set(null)"
 >
   <p class="pv__dialogText">{{ 'admin.privacy.executeConfirm' | t }}</p>
@@ -178,7 +178,7 @@
   [open]="rejecting() !== null"
   [title]="'admin.privacy.rejectTitle' | t"
   [subtitle]="rejecting()?.email ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="rejecting.set(null)"
 >
   <label class="pv__reason">
@@ -199,7 +199,7 @@
 <app-dialog
   [open]="confirmPrincipal()"
   [title]="'admin.privacy.principalTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmPrincipal.set(false)"
 >
   <p class="pv__dialogText">{{ 'admin.privacy.principalConfirm' | t }}</p>

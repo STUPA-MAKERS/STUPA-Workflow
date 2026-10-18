@@ -54,7 +54,7 @@
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.substitutes.add' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
 >
   <form class="sp__form" (submit)="$event.preventDefault(); add()">

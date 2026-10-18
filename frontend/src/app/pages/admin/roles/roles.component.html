@@ -119,7 +119,7 @@
 <app-dialog
   [open]="!!confirmRole()"
   [title]="'admin.roles.deleteRole' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRole.set(null)"
 >
   @if (confirmRole(); as r) {
@@ -134,7 +134,7 @@
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.roles.addGlobalRole' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
 >
   <form class="ar__form" (submit)="$event.preventDefault(); createRole()">

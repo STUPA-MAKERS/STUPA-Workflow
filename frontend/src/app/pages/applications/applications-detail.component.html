@@ -63,7 +63,7 @@
           <app-button
             variant="text"
             [iconOnly]="true"
-            [ariaLabel]="'applications.detail.cancel' | t"
+            [ariaLabel]="'action.cancel' | t"
             (click)="cancelEdit()"
           ><app-icon name="x" [size]="19" /></app-button>
         } @else {
@@ -73,7 +73,7 @@
           <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
         </p>
         @if (!phone()) {
-          <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+          <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
         }
         <app-button variant="fill" [loading]="savingEdit()" (click)="saveEdit()">
           <app-icon name="check" [size]="16" />
@@ -434,33 +434,33 @@
 <app-dialog
   [open]="confirmDelete()"
   [title]="'applications.detail.deleteTitle' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmDelete.set(false)"
 >
   <p>{{ 'applications.detail.deleteConfirm' | t }}</p>
   <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="confirmDelete.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
-    <app-button variant="danger" size="sm" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
+    <app-button variant="text" (click)="confirmDelete.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{ 'applications.detail.delete' | t }}</app-button>
   </div>
 </app-dialog>
 
 <app-dialog
   [open]="confirmErase()"
   [title]="'applications.detail.eraseTitle' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmErase.set(false)"
 >
   <p>{{ 'applications.detail.eraseConfirm' | t }}</p>
   <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
-    <app-button variant="danger" size="sm" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
+    <app-button variant="text" (click)="confirmErase.set(false)">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="danger" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
   </div>
 </app-dialog>
 
 <app-dialog
   [open]="budgetDialogOpen()"
   [title]="'applications.budget.title' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
   <div class="ad__ccTree" appScrollFade="y">
@@ -482,10 +482,9 @@
     />
   }
   <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="budgetDialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button
       variant="fill"
-      size="sm"
       [loading]="assigningBudget()"
       [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
       (click)="assignBudget()"

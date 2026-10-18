@@ -104,7 +104,7 @@
 <app-dialog
   [open]="confirmRevoke() !== null"
   [title]="'admin.deleg.revokeTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRevoke.set(null)"
 >
   @if (confirmRevoke(); as d) {

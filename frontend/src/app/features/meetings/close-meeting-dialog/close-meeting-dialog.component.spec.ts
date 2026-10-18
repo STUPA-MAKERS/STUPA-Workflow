@@ -124,7 +124,8 @@ describe('CloseMeetingDialogComponent', () => {
     const { http, cmp, closed } = await setup({ ...LIVE, status: 'planned' } as Meeting);
     cmp.confirm();
     http.verify();
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
   });

@@ -115,7 +115,7 @@
 <app-dialog
   [open]="confirm() !== null"
   [title]="(confirm()?.kind === 'all' ? 'account.grants.revokeAllTitle' : 'account.grants.revokeTitle') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirm.set(null)"
 >
   @if (confirm(); as c) {

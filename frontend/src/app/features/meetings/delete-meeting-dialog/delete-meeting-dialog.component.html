@@ -1,7 +1,7 @@
 <app-dialog
   [open]="meeting() !== null"
   [title]="'meetings.delete.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancel()"
 >
   <p class="dmd__body">{{ bodyKey() | t: { name: meeting()?.title ?? '' } }}</p>

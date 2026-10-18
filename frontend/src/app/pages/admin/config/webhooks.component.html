@@ -111,7 +111,7 @@
 <app-dialog
   [open]="draft() !== null"
   [title]="(editingIndex() === null ? 'admin.webhook.add' : 'admin.webhook.edit') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   @if (draft(); as d) {
@@ -148,7 +148,7 @@
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.webhook.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmDelete.set(null)"
 >
   <p class="wh__confirm">{{ 'admin.webhook.deleteConfirm' | t: { name: confirmDelete()?.name || confirmDelete()?.url || '' } }}</p>

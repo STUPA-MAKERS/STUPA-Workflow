@@ -36,7 +36,7 @@
               <!-- The title takes the focus when the edit mode opens. -->
               <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
             </p>
-            <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+            <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
             <app-button variant="fill" [loading]="saving()" (click)="save()">
               <app-icon name="check" [size]="16" />
               {{ 'applications.detail.save' | t }}
@@ -209,12 +209,12 @@
       <app-dialog
         [open]="confirmErase()"
         [title]="'applications.detail.eraseTitle' | t"
-        [closeLabel]="'applications.detail.cancel' | t"
+        [closeLabel]="'action.close' | t"
         (closed)="confirmErase.set(false)"
       >
         <p class="sp__dialogText">{{ 'applications.detail.eraseConfirm' | t }}</p>
         <div dialog-footer>
-          <app-button variant="text" (click)="confirmErase.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+          <app-button variant="text" (click)="confirmErase.set(false)">{{ 'action.cancel' | t }}</app-button>
           <app-button variant="danger" [loading]="requestingErasure()" (click)="doRequestErasure()">{{ 'applications.detail.eraseRequest' | t }}</app-button>
         </div>
       </app-dialog>

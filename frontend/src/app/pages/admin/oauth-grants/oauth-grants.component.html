@@ -94,7 +94,7 @@
 <app-dialog
   [open]="confirmRevoke() !== null"
   [title]="'admin.oauthGrants.revokeTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRevoke.set(null)"
 >
   @if (confirmRevoke(); as g) {

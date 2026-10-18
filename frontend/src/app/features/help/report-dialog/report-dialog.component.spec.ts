@@ -187,7 +187,7 @@ describe('ReportDialogComponent', () => {
     await userEvent.click(sendButton());
     fixture.detectChanges();
     // "Schließen" after the send.
-    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Schließen' }).at(-1)!);
     await open();
     expect(c.title()).toBe('');
     expect(c.body()).toBe('');

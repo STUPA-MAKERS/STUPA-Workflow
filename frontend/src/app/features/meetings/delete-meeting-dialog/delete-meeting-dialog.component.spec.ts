@@ -125,7 +125,8 @@ describe('DeleteMeetingDialogComponent', () => {
 
   it('closes on cancel', async () => {
     const { closed } = await setup();
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
   });

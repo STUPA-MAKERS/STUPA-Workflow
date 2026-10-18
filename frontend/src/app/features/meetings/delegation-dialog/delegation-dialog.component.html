@@ -4,7 +4,7 @@
   [open]="open()"
   [title]="'delegation.dialog.title' | t"
   [subtitle]="subtitle()"
-  [closeLabel]="'delegation.dialog.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closed.emit()"
 >
   <div class="dd">
@@ -67,7 +67,7 @@
   </div>
 
   <div dialog-footer class="dd__foot">
-    <app-button variant="text" (click)="closed.emit()">{{ 'delegation.dialog.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!canSubmit()" [loading]="busy()" (click)="submit()">
       <app-icon name="repeat" [size]="16" />
       {{ 'delegation.dialog.submit' | t }}

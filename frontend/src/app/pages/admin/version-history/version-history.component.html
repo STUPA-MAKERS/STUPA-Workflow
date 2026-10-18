@@ -62,7 +62,7 @@
 <app-dialog
   [open]="!!confirmRestore()"
   [title]="'admin.config.restore.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRestore.set(null)"
 >
   @if (confirmRestore(); as rev) {

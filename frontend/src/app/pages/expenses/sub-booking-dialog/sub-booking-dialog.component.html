@@ -3,7 +3,7 @@
   [open]="!!s.subParent()"
   [title]="'expenses.sub.addTitle' | t"
   [subtitle]="s.subParent() ? ('expenses.sub.inherits' | t: { parent: s.subParent()!.description }) : ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="s.closeCreateSub()"
 >
   @if (s.subParent()) {
@@ -41,7 +41,7 @@
   }
   <div dialog-footer class="sd-form__footer">
     <app-button variant="text" (click)="s.closeCreateSub()">{{ 'action.cancel' | t }}</app-button>
-    <app-button [disabled]="!s.canSubmitSub()" [loading]="saving()" (click)="s.createSub($event)">{{
+    <app-button variant="fill" [disabled]="!s.canSubmitSub()" [loading]="saving()" (click)="s.createSub($event)">{{
       'expenses.sub.add' | t
     }}</app-button>
   </div>

@@ -181,7 +181,7 @@
     [open]="true"
     [title]="'admin.backups.restoreTitle' | t"
     [subtitle]="restoreSubtitle(target)"
-    [closeLabel]="'action.cancel' | t"
+    [closeLabel]="'action.close' | t"
     (closed)="confirmRestore.set(null)"
   >
     <form class="bk__restore" (submit)="$event.preventDefault(); doRestore()">
@@ -217,7 +217,7 @@
   <app-dialog
     [open]="true"
     [title]="'admin.backups.deleteTitle' | t"
-    [closeLabel]="'action.cancel' | t"
+    [closeLabel]="'action.close' | t"
     (closed)="confirmDelete.set(null)"
   >
     <p class="bk__dialogText">
