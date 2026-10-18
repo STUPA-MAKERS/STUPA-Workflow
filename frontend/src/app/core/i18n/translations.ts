@@ -2476,7 +2476,7 @@ export const de = {
   'admin.backups.unpin': 'Lösen',
   'admin.backups.pinnedHint':
     'Angeheftet: wird nicht automatisch gelöscht. Zum Löschen zuerst lösen.',
-  'admin.backups.restore': 'Zurücksetzen',
+  'admin.backups.restore': 'Wiederherstellen',
   'admin.backups.restoreTitle': 'Plattform zurücksetzen',
   'admin.backups.restoreWarning':
     'Dieser Vorgang ersetzt die gesamte Plattform durch den Stand dieser Sicherung.',

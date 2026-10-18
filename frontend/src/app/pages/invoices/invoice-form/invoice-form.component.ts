@@ -21,6 +21,7 @@ import {
   type SegmentedOption,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
+import { formatBytes } from '@shared/format-bytes';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import type { FinanceFormLayout } from '../../expenses/booking-form/booking-form.component';
@@ -150,10 +151,7 @@ export class InvoiceFormComponent {
   protected readonly fileSize = computed(() => {
     const bytes = this.host().importFileSize();
     if (!bytes) return '';
-    const kb = Math.max(1, Math.round(bytes / 1024));
-    return kb >= 1024
-      ? `${(kb / 1024).toLocaleString(this.i18n.formatLocale(), { maximumFractionDigits: 1 })} MB`
-      : `${kb} KB`;
+    return formatBytes(bytes, this.i18n.formatLocale(), 'file');
   });
 
   protected setStatus(value: string | null): void {

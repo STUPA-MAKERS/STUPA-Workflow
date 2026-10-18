@@ -1,5 +1,6 @@
 import type { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
+import { formatBytes as formatBytesIn } from '@shared/format-bytes';
 import type { AuditVerification, AuditVerificationTrigger } from '../admin.models';
 
 /** The trigger of a stored chain check as words ("nächtliche Prüfung"). */
@@ -49,18 +50,5 @@ export function checkedAt(v: AuditVerification): string {
  * so bytes help nobody. One decimal below 10, else whole numbers.
  */
 export function formatBytes(bytes: number | null | undefined, i18n: I18nService): string {
-  if (bytes == null) return '—';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let value = bytes;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit += 1;
-  }
-  const digits = unit > 0 && value < 10 ? 1 : 0;
-  const text = new Intl.NumberFormat(i18n.formatLocale(), {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(value);
-  return `${text} ${units[unit]}`;
+  return formatBytesIn(bytes, i18n.formatLocale(), 'storage');
 }
