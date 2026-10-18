@@ -210,7 +210,7 @@ describe('RailStatusService', () => {
     const env = setup();
     signIn(env);
     jest.advanceTimersByTime(RAIL_STATUS_DEBOUNCE_MS);
-    env.http.expectOne((r) => r.url === MINE).flush({ items: [], dueSoonCount: 1 });
+    env.http.expectOne((r) => r.url === MINE).flush({ items: [{ id: 'k0' }], dueSoonCount: 0 });
     env.http.expectOne((r) => r.url === TASKS).flush(null, { status: 500, statusText: 'Error' });
     env.http.expectOne((r) => r.url === TIMELINE).flush(null, { status: 500, statusText: 'Error' });
     expect(env.svc.taskCount()).toBeNull();
