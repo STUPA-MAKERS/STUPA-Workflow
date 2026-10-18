@@ -966,13 +966,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       if (i.status === 'open') {
         items.push({ id: 'paid', label: this.i18n.translate('invoices.markPaid'), icon: 'check' });
       }
-      items.push({ id: 'book', label: this.i18n.translate('invoices.createBooking'), icon: 'add' });
+      items.push({ id: 'book', label: this.i18n.translate('invoices.createBooking'), icon: 'plus' });
     }
     if (i.hasFile) items.push({ id: 'file', label: this.i18n.translate('invoices.openFile'), icon: 'file' });
     const sections: RowMenuSection[] = items.length ? [{ items }] : [];
     if (this.canManage()) {
       sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
     }
     return sections;

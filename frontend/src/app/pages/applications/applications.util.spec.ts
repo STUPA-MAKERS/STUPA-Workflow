@@ -104,27 +104,28 @@ describe('formatDateRangeValue', () => {
 });
 
 describe('formatBytes', () => {
-  it('formats bytes/KB/MB with a binary base', () => {
-    expect(formatBytes(0)).toBe('0 B');
-    expect(formatBytes(512)).toBe('512 B');
-    expect(formatBytes(1024)).toBe('1.0 KB');
-    expect(formatBytes(1536)).toBe('1.5 KB');
-    expect(formatBytes(1048576)).toBe('1.0 MB');
+  it('formats bytes/KB/MB with a binary base in the locale', () => {
+    expect(formatBytes(0, 'de')).toBe('0 B');
+    expect(formatBytes(512, 'de')).toBe('512 B');
+    expect(formatBytes(1024, 'de')).toBe('1,0 KB');
+    expect(formatBytes(1536, 'de')).toBe('1,5 KB');
+    expect(formatBytes(1536, 'en')).toBe('1.5 KB');
+    expect(formatBytes(1048576, 'de')).toBe('1,0 MB');
   });
 
   it('climbs through GB and TB units (loop body)', () => {
     // 1 GiB is 1024^3, so the unit index walks KB to MB to GB.
-    expect(formatBytes(1024 ** 3)).toBe('1.0 GB');
+    expect(formatBytes(1024 ** 3, 'de')).toBe('1,0 GB');
     // 1 TiB is 1024^4, so the loop walks to the last unit.
-    expect(formatBytes(1024 ** 4)).toBe('1.0 TB');
+    expect(formatBytes(1024 ** 4, 'de')).toBe('1,0 TB');
     // Above TB the unit stays at TB, because of the `unit < units.length - 1` guard.
-    expect(formatBytes(1024 ** 5)).toBe('1024.0 TB');
+    expect(formatBytes(1024 ** 5, 'de')).toBe('1.024,0 TB');
   });
 
   it('returns a dash for invalid sizes', () => {
-    expect(formatBytes(-1)).toBe('—');
-    expect(formatBytes(NaN)).toBe('—');
-    expect(formatBytes(Infinity)).toBe('—');
+    expect(formatBytes(-1, 'de')).toBe('—');
+    expect(formatBytes(NaN, 'de')).toBe('—');
+    expect(formatBytes(Infinity, 'de')).toBe('—');
   });
 });
 

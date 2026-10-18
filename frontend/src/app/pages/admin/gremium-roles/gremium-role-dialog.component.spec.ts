@@ -106,7 +106,7 @@ describe('GremiumRoleDialogComponent', () => {
     await setup(FORCED, makeApi(), { groups: ['stupa-mitglieder'] });
     expect(screen.queryByRole('button', { name: 'Rolle löschen' })).toBeNull();
     expect(
-      screen.getByText(/Pflichtrolle: Sie ist in jedem Gremium vorhanden/),
+      screen.getByText(/Pflichtrolle: Die Rolle ist in jedem Gremium vorhanden/),
     ).toBeInTheDocument();
     expect(screen.getByText('Mitgliedschaft über')).toBeInTheDocument();
   });

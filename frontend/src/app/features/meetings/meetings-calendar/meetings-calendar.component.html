@@ -29,7 +29,7 @@
         [ariaLabel]="'meetings.overview.prevMonth' | t"
         [title]="'meetings.overview.prevMonth' | t"
         (click)="prevMonth()"
-      ><app-icon name="chevron-left" [size]="20" /></app-button>
+      ><app-icon name="left" [size]="20" /></app-button>
       <h2 class="cal__month" aria-live="polite">{{ monthText() }}</h2>
       <app-button
         variant="text"
@@ -37,7 +37,7 @@
         [ariaLabel]="'meetings.overview.nextMonth' | t"
         [title]="'meetings.overview.nextMonth' | t"
         (click)="nextMonth()"
-      ><app-icon name="chevron-right" [size]="20" /></app-button>
+      ><app-icon name="right" [size]="20" /></app-button>
       <app-button variant="outlined" size="sm" (click)="goToday()">{{ 'meetings.overview.today' | t }}</app-button>
     </div>
     <div class="cal__filters">

@@ -425,7 +425,7 @@ export class ApplicationsListComponent implements OnDestroy {
     const sections: RowMenuSection[] = [];
     if (this.canCapture()) {
       sections.push({
-        items: [{ id: 'capture', label: this.i18n.translate('applications.capture.title'), icon: 'add' }],
+        items: [{ id: 'capture', label: this.i18n.translate('applications.capture.title'), icon: 'plus' }],
       });
     }
     sections.push(...this.sortSections());

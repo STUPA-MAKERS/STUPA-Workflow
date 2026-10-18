@@ -834,7 +834,7 @@ describe('VoteCastComponent', () => {
       const { sessions, fixture } = await setup();
       sessions[0].connection.set('reconnecting');
       fixture.detectChanges();
-      expect(screen.getByText('Verbindung verloren – verbinde neu …')).toBeInTheDocument();
+      expect(screen.getByText('Verbindung verloren — verbinde neu …')).toBeInTheDocument();
     });
 
     it('does not follow a closed vote', async () => {

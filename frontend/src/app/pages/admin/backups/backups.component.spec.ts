@@ -101,7 +101,7 @@ describe('BackupsComponent', () => {
   it('hides restore when the platform cannot decrypt its own archives', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ restoreEnabled: false }))) });
     await setup(api);
-    expect(screen.queryByRole('button', { name: /^Zurücksetzen/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Wiederherstellen/ })).not.toBeInTheDocument();
   });
 
   it('says why the import is dead rather than leaving a greyed-out button', async () => {
@@ -147,7 +147,7 @@ describe('BackupsComponent', () => {
   it('names the archive in each row button and draws a pin, not a paperclip', async () => {
     const { container } = await setup();
     const labels = screen
-      .getAllByRole('button', { name: /^(Herunterladen|Anheften|Lösen|Zurücksetzen|Löschen): / })
+      .getAllByRole('button', { name: /^(Herunterladen|Anheften|Lösen|Wiederherstellen|Löschen): / })
       .map((b) => b.getAttribute('aria-label'));
     // Every label names its archive by date, so the rows differ.
     expect(labels.every((l) => /: \d{2}\.\d{2}\.\d{4}/.test(l ?? ''))).toBe(true);
@@ -165,24 +165,24 @@ describe('BackupsComponent', () => {
   describe('restore', () => {
     it('stays disabled until the confirmation word is typed', async () => {
       await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Zurücksetzen: / })[0]);
-      const confirm = screen.getAllByRole('button', { name: 'Zurücksetzen' }).at(-1)!;
+      await userEvent.click(screen.getAllByRole('button', { name: /^Wiederherstellen: / })[0]);
+      const confirm = screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!;
       expect(confirm).toBeDisabled();
     });
 
     it('does not fire on a near miss', async () => {
       const { api } = await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Zurücksetzen: / })[0]);
+      await userEvent.click(screen.getAllByRole('button', { name: /^Wiederherstellen: / })[0]);
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'restor');
-      expect(screen.getAllByRole('button', { name: 'Zurücksetzen' }).at(-1)!).toBeDisabled();
+      expect(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!).toBeDisabled();
       expect(api.restoreBackup).not.toHaveBeenCalled();
     });
 
     it('fires once the word matches, and warns that the session ends', async () => {
       const { api, toast } = await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Zurücksetzen: / })[0]);
+      await userEvent.click(screen.getAllByRole('button', { name: /^Wiederherstellen: / })[0]);
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'RESTORE');
-      await userEvent.click(screen.getAllByRole('button', { name: 'Zurücksetzen' }).at(-1)!);
+      await userEvent.click(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!);
       expect(api.restoreBackup).toHaveBeenCalledWith('b-1');
       expect(toast.show).toHaveBeenCalledWith(expect.stringMatching(/abgemeldet/i), 'warning');
     });

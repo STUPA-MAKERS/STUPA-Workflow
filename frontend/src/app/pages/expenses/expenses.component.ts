@@ -911,7 +911,7 @@ export class ExpensesComponent implements OnDestroy {
     const main: RowMenuItem[] = [];
     if (this.canManage()) {
       main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
-      main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'add' });
+      main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
     if (e.invoiceId) {
       main.push({
@@ -923,7 +923,7 @@ export class ExpensesComponent implements OnDestroy {
     const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
     if (this.canManage()) {
       sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
     }
     return sections;
@@ -940,7 +940,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly transferMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
     {
-      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
     },
   ]);
 

@@ -83,7 +83,7 @@
             </h3>
             @if (canManage() && !e.parentExpenseId) {
               <app-button variant="text" size="sm" (click)="addSub.emit()">
-                <span class="fd__btn"><app-icon name="add" [size]="16" />{{
+                <span class="fd__btn"><app-icon name="plus" [size]="16" />{{
                   (phone() ? 'expenses.sub.addShort' : 'expenses.sub.add') | t
                 }}</span>
               </app-button>
@@ -179,7 +179,7 @@
                 @if (a.amount) {
                   <span class="mono fd__linkAmount">{{ a.amount }}</span>
                 }
-                <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+                <app-icon class="fd__chev" name="right" [size]="17" />
               </a>
             }
             @if (inv(); as i) {
@@ -202,7 +202,7 @@
                 @if (i.loaded; as loaded) {
                   <span class="mono fd__linkAmount">{{ money(loaded.grossAmount) }}</span>
                 }
-                <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+                <app-icon class="fd__chev" name="right" [size]="17" />
               </a>
               @if (i.booked; as b) {
                 <div class="fd__booked">

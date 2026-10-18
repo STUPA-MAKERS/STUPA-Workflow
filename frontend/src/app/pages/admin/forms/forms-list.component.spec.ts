@@ -163,7 +163,7 @@ describe('FormsListComponent — display helpers', () => {
     expect(screen.getByText('Aktiv')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.getByText('v7')).toBeInTheDocument();
-    expect(c.versionLabel(rows[1])).toBe('–');
+    expect(c.versionLabel(rows[1])).toBe('—');
     // Each row action names its type.
     expect(screen.getByRole('link', { name: 'Bearbeiten: Förderantrag' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Antragsart löschen: Raumantrag' })).toBeInTheDocument();

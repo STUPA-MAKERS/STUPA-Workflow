@@ -36,7 +36,7 @@
               <div class="ff__box">
                 <span class="ff__label" [id]="'tf-' + which">{{
                   (which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t
-                }} *</span>
+                }} <span class="text-danger" aria-hidden="true">*</span></span>
                 <button
                   type="button"
                   class="ff__pick"
@@ -56,7 +56,7 @@
                       'expenses.field.costCentrePlaceholder' | t
                     }}</span>
                   }
-                  <app-icon [name]="picking() === which ? 'chevron-up' : 'chevron-down'" [size]="18" />
+                  <app-icon [name]="picking() === which ? 'up' : 'down'" [size]="18" />
                 </button>
               </div>
               @if (picking() === which) {
@@ -221,7 +221,7 @@
         (click)="remove.emit()"
       >
         <span class="ff__btn"
-          ><app-icon name="delete" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+          ><app-icon name="trash" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
         >
       </app-button>
     }

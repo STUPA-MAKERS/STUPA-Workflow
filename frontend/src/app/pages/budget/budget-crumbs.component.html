@@ -17,7 +17,7 @@
         [sections]="menuSections(item.nodes)"
         (selected)="choose($event.id)"
       />
-      <app-icon class="bd__crumbSep" name="chevron-right" [size]="sepIcon" />
+      <app-icon class="bd__crumbSep" name="right" [size]="sepIcon" />
     } @else if (item.current) {
       <span
         #current
@@ -47,7 +47,7 @@
       >
         {{ item.node.name }}
       </button>
-      <app-icon class="bd__crumbSep" name="chevron-right" [size]="sepIcon" />
+      <app-icon class="bd__crumbSep" name="right" [size]="sepIcon" />
     }
   }
   <!-- The natural widths, for the fit. The names are drawn from an attribute, so neither

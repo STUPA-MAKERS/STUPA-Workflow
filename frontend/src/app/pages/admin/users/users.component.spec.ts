@@ -157,7 +157,7 @@ describe('UsersComponent', () => {
 
   it('shows the OIDC groups of each user, or a placeholder', async () => {
     await setup();
-    expect(screen.getAllByText('SSO-Gruppen (letzter Login)')).toHaveLength(2);
+    expect(screen.getAllByText('SSO-Gruppen (letzte Anmeldung)')).toHaveLength(2);
     expect(screen.getByText('stupa-referat')).toBeInTheDocument();
     expect(screen.getByText('unmapped')).toBeInTheDocument();
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
@@ -443,11 +443,11 @@ describe('UsersComponent', () => {
     it('the chips filter the list on the server', async () => {
       const { api, inst } = await setup(makeApi(), revokeAuth());
       expect(screen.getByRole('group', { name: 'Personen filtern' })).toBeInTheDocument();
-      expect(inst.lastLoginText()).toBe('Letzter Login');
+      expect(inst.lastLoginText()).toBe('Letzte Anmeldung');
       api.listPrincipals.mockClear();
       inst.setLastLoginFilter('never');
       expect(api.listPrincipals).toHaveBeenLastCalledWith('', { includeNever: true });
-      expect(inst.lastLoginText()).toBe('Letzter Login: nie');
+      expect(inst.lastLoginText()).toBe('Letzte Anmeldung: nie');
       inst.setGroupFilter('yes');
       expect(api.listPrincipals).toHaveBeenLastCalledWith('', { includeNever: true, hasGroups: true });
       expect(inst.groupText()).toBe('Hat SSO-Gruppen: Ja');

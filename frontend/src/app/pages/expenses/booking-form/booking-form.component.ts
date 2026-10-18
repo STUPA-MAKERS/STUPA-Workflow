@@ -196,7 +196,7 @@ export class BookingFormComponent {
   protected readonly subMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
     {
-      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
     },
   ]);
 

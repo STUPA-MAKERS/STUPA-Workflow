@@ -93,7 +93,7 @@ describe('AttachmentsPanelComponent', () => {
     detectChanges();
 
     expect(screen.getByText('plan.pdf')).toBeInTheDocument();
-    expect(screen.getByText('2.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('2,0 KB')).toBeInTheDocument();
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Herunterladen' })).toBeDisabled();
     expect(success).toHaveBeenCalled();
@@ -218,17 +218,17 @@ describe('AttachmentsPanelComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
     http.expectOne(dlUrl('att-1')).flush({ title: 'Gone' }, { status: 410, statusText: 'Gone' });
 
-    expect(error).toHaveBeenCalledWith('Download-Link abgelaufen. Bitte erneut versuchen.');
+    expect(error).toHaveBeenCalledWith('Der Link zum Herunterladen ist abgelaufen. Versuche es noch einmal.');
     http.verify();
   });
 
   it.each([
     [413, 'Datei zu groß (max. 10 MB).'],
     [415, 'Dateityp nicht erlaubt.'],
-    [429, 'Zu viele Uploads. Bitte später erneut versuchen.'],
+    [429, 'Zu viele Dateien hochgeladen. Versuche es später noch einmal.'],
     [503, 'Speicher derzeit nicht verfügbar.'],
-    [500, 'Upload fehlgeschlagen.'],
-    [undefined, 'Upload fehlgeschlagen.'],
+    [500, 'Hochladen fehlgeschlagen.'],
+    [undefined, 'Hochladen fehlgeschlagen.'],
   ])('maps upload error %s to its toast', async (status, message) => {
     const { http, toast } = await setup();
     const error = jest.spyOn(toast, 'error');
@@ -355,7 +355,7 @@ describe('AttachmentsPanelComponent', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Herunterladen' }));
     http.expectOne(dlUrl('att-1')).flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
-    expect(error).toHaveBeenCalledWith('Download fehlgeschlagen.');
+    expect(error).toHaveBeenCalledWith('Herunterladen fehlgeschlagen.');
     http.verify();
   });
 
@@ -421,7 +421,7 @@ describe('AttachmentsPanelComponent', () => {
   it('formats size and shows the scan state as status text', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance;
-    expect(cmp.size(wire({ size: 2048 }) as never)).toBe('2.0 KB');
+    expect(cmp.size(wire({ size: 2048 }) as never)).toBe('2,0 KB');
     expect(cmp.scan('clean')).toEqual({ kind: 'neutral', key: 'applications.attachments.scan.clean' });
     expect(cmp.scan('quarantined').kind).toBe('error');
   });

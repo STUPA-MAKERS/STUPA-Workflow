@@ -17,7 +17,7 @@
           @if (canManage()) {
             @if (phone()) {
               <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
-                <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
+                <span class="inv__btn"><app-icon name="plus" [size]="16" />{{ 'invoices.addShort' | t }}</span>
               </app-button>
               <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
             } @else {
@@ -155,7 +155,7 @@
                         <span class="inv__menuSlot">
                           @if (!split()) {
                             <span class="inv__chev" aria-hidden="true">
-                              <app-icon name="chevron-right" [size]="17" />
+                              <app-icon name="right" [size]="17" />
                             </span>
                           }
                           @if (menu.length) {

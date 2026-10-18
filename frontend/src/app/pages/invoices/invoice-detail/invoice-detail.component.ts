@@ -129,7 +129,7 @@ export class InvoiceDetailComponent {
     const sections: RowMenuSection[] = items.length ? [{ items }] : [];
     if (this.canManage()) {
       sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
     }
     return sections;
