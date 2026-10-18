@@ -127,7 +127,7 @@
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.roles.addGlobalRole' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
 >
   <form class="ar__form" (submit)="$event.preventDefault(); createRole()">

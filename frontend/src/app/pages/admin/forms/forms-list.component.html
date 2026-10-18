@@ -80,7 +80,7 @@
 <app-dialog
   [open]="dialogOpen()"
   [title]="'admin.forms.create' | t"
-  [closeLabel]="'admin.common.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
 >
   <form id="fl-form" class="fl__form" (submit)="submit($event)">
@@ -107,7 +107,7 @@
     >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
   </form>
   <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
       {{ 'admin.forms.add' | t }}
     </app-button>

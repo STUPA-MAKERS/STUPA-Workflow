@@ -168,7 +168,7 @@
                 <app-button type="submit" variant="fill" size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()">
                   {{ 'budget.tree.add' | t }}
                 </app-button>
-                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'action.cancel' | t }}</app-button>
               </span>
             </form>
           }
@@ -185,7 +185,7 @@
   [open]="!!limitNode()"
   [title]="'budget.tree.limitTitle' | t"
   [subtitle]="limitNode() ? limitNode()!.pathKey + ' · ' + limitNode()!.name : ''"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeLimit()"
 >
   @if (limitNode()) {
@@ -199,7 +199,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeLimit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
   </div>
 </app-dialog>
@@ -209,7 +209,7 @@
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
   [subtitle]="editNode()?.pathKey ?? ''"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeEditNode()"
 >
   @if (editNode()) {
@@ -298,7 +298,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeEditNode()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!editKey().trim() || !editName().trim() || editColorInvalid()" (click)="saveEditNode()">{{
       'budget.tree.save' | t
     }}</app-button>
@@ -320,7 +320,7 @@
 </app-confirm-dialog>
 
 <!-- Create a top budget. -->
-<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeTop()">
+<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'action.close' | t" (closed)="closeTop()">
   <form id="bt-top-form" class="bt__form" (submit)="createTop($event)">
     <div class="bt__pair">
       <app-input
@@ -351,7 +351,7 @@
     </div>
   </form>
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeTop()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{
       'budget.tree.add' | t
     }}</app-button>
@@ -363,7 +363,7 @@
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeFy()"
 >
   <form id="bt-fy-form" class="bt__form" (submit)="createFiscalYear($event)">
@@ -410,14 +410,14 @@
   </section>
 
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeFy()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Correct a fiscal year. Only the year and the active flag change. The server derives
      the start and the end date again from the budget cutoff. -->
-<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyEdit()">
+<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'action.close' | t" (closed)="closeFyEdit()">
   @if (fyEdit()) {
     <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
       <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" />
@@ -427,7 +427,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFyEdit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeFyEdit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
@@ -452,7 +452,7 @@
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeStichtag()"
 >
   <form id="bt-stichtag-form" class="bt__form" (submit)="$event.preventDefault()">
@@ -493,7 +493,7 @@
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeStateConfig()"
 >
   @if (stateOptions().length) {

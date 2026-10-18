@@ -111,7 +111,7 @@
 <app-dialog
   [open]="draft() !== null"
   [title]="(editingIndex() === null ? 'admin.webhook.add' : 'admin.webhook.edit') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   @if (draft(); as d) {

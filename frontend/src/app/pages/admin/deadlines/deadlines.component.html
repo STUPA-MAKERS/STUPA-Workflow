@@ -68,7 +68,7 @@
 <app-dialog
   [open]="draft() !== null"
   [title]="(editingId() === null ? 'admin.deadlines.add' : 'admin.deadlines.edit') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   @if (draft(); as d) {

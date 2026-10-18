@@ -2,7 +2,7 @@
   [open]="meeting() !== null"
   [title]="'meetings.settings.title' | t"
   [subtitle]="meeting()?.gremiumName ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancel()"
 >
   <form class="msd" (submit)="$event.preventDefault(); save()">

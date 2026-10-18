@@ -174,7 +174,7 @@
   [open]="rejecting() !== null"
   [title]="'admin.privacy.rejectTitle' | t"
   [subtitle]="rejecting()?.email ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="rejecting.set(null)"
 >
   <label class="pv__reason">

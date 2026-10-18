@@ -2,7 +2,7 @@
 <app-dialog
   [open]="open()"
   [title]="'applications.detail.forceStatusTitle' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   <p class="fsd__lead">{{ 'applications.detail.forceStatusLead' | t }}</p>
@@ -24,10 +24,9 @@
     ></textarea>
   </label>
   <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="close()">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
     <app-button
       variant="danger"
-      size="sm"
       [loading]="saving()"
       [disabled]="!choice() || !note().trim()"
       (click)="submit()"

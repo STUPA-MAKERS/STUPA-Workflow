@@ -63,7 +63,7 @@
           <app-button
             variant="text"
             [iconOnly]="true"
-            [ariaLabel]="'applications.detail.cancel' | t"
+            [ariaLabel]="'action.cancel' | t"
             (click)="cancelEdit()"
           ><app-icon name="x" [size]="19" /></app-button>
         } @else {
@@ -73,7 +73,7 @@
           <strong id="ad-edit-title">{{ 'applications.edit.title' | t }}</strong>
         </p>
         @if (!phone()) {
-          <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
+          <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
         }
         <app-button variant="fill" [loading]="savingEdit()" (click)="saveEdit()">
           <app-icon name="check" [size]="16" />
@@ -453,7 +453,7 @@
 <app-dialog
   [open]="budgetDialogOpen()"
   [title]="'applications.budget.title' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
   <div class="ad__ccTree" appScrollFade="y">
@@ -475,10 +475,9 @@
     />
   }
   <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="budgetDialogOpen.set(false)">{{ 'applications.detail.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="budgetDialogOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button
       variant="fill"
-      size="sm"
       [loading]="assigningBudget()"
       [disabled]="budgetChoice() === (app()?.budgetId ?? '') && fiscalChoice() === (app()?.fiscalYearId ?? '')"
       (click)="assignBudget()"

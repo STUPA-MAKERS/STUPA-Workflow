@@ -30,7 +30,7 @@
 <app-dialog
   [open]="renaming() !== null"
   [title]="'guests.list.renameTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="renaming.set(null)"
 >
   <form class="g__form" (submit)="$event.preventDefault(); saveRename()">
