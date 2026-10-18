@@ -93,7 +93,7 @@ describe('AttachmentsPanelComponent', () => {
     detectChanges();
 
     expect(screen.getByText('plan.pdf')).toBeInTheDocument();
-    expect(screen.getByText('2.0 KB')).toBeInTheDocument();
+    expect(screen.getByText('2,0 KB')).toBeInTheDocument();
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Herunterladen' })).toBeDisabled();
     expect(success).toHaveBeenCalled();
@@ -421,7 +421,7 @@ describe('AttachmentsPanelComponent', () => {
   it('formats size and shows the scan state as status text', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance;
-    expect(cmp.size(wire({ size: 2048 }) as never)).toBe('2.0 KB');
+    expect(cmp.size(wire({ size: 2048 }) as never)).toBe('2,0 KB');
     expect(cmp.scan('clean')).toEqual({ kind: 'neutral', key: 'applications.attachments.scan.clean' });
     expect(cmp.scan('quarantined').kind).toBe('error');
   });

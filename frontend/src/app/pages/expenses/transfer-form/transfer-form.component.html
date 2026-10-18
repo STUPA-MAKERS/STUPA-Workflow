@@ -36,7 +36,7 @@
               <div class="ff__box">
                 <span class="ff__label" [id]="'tf-' + which">{{
                   (which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t
-                }} *</span>
+                }} <span class="text-danger" aria-hidden="true">*</span></span>
                 <button
                   type="button"
                   class="ff__pick"
