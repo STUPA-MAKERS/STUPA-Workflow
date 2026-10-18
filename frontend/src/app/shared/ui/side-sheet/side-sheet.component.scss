@@ -50,7 +50,7 @@
   max-height: 85dvh;
   padding-bottom: env(safe-area-inset-bottom);
   border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
-  transition: transform var(--motion-fast) ease-out;
+  transition: transform var(--motion-fast) var(--ease-standard);
 }
 .ss--dragging {
   transition: none;
@@ -161,4 +161,49 @@
     #000 calc(100% - var(--space-5)),
     transparent
   );
+}
+
+/* Motion. A sheet comes in from the edge it lives at and goes back there, faster on the
+   way out. The scrim fades with it. Leaving parts take --motion-base. */
+.ss__scrim--entering {
+  animation: ss-fade-in var(--motion-base) var(--ease-standard);
+}
+.ss__scrim--leaving {
+  animation: ss-fade-out var(--motion-base) var(--ease-exit) forwards;
+}
+.ss--entering {
+  animation: ss-in var(--motion-slow) var(--ease-enter);
+}
+.ss--leaving {
+  pointer-events: none;
+  animation: ss-out var(--motion-base) var(--ease-exit) forwards;
+}
+.ss--end {
+  --ss-from: translateX(calc(100% + 12px));
+}
+.ss--start {
+  --ss-from: translateX(calc(-100% - 12px));
+}
+.ss--bottom {
+  --ss-from: translateY(100%);
+}
+@keyframes ss-in {
+  from {
+    transform: var(--ss-from);
+  }
+}
+@keyframes ss-out {
+  to {
+    transform: var(--ss-from);
+  }
+}
+@keyframes ss-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ss-fade-out {
+  to {
+    opacity: 0;
+  }
 }

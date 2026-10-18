@@ -51,6 +51,8 @@
     <div
       #panel
       class="am am--popover"
+      animate.enter="motion-pop-in"
+      animate.leave="motion-pop-out"
       role="region"
       [id]="panelId"
       [attr.aria-label]="'shell.account.region' | t"

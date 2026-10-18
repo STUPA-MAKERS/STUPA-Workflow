@@ -24,6 +24,33 @@
   }
 }
 
+// The motion of the popover: it grows from its top edge and fades in, it fades out faster
+// without moving. Bind `animate.enter="om--entering"` and `animate.leave="om--leaving"`.
+@mixin motion {
+  transform-origin: top center;
+
+  &.om--entering {
+    animation: om-in var(--motion-fast) var(--ease-enter);
+  }
+  &.om--leaving {
+    pointer-events: none;
+    animation: om-out var(--motion-xs) var(--ease-exit) forwards;
+  }
+  @at-root {
+    @keyframes om-in {
+      from {
+        opacity: 0;
+        transform: translateY(calc(var(--motion-shift-sm) / -2)) scale(var(--motion-scale-in));
+      }
+    }
+    @keyframes om-out {
+      to {
+        opacity: 0;
+      }
+    }
+  }
+}
+
 // The top-layer box of the phone sheet: no box of its own. The scrim and the sheet inside
 // are fixed to the viewport.
 @mixin layer {

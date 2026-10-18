@@ -273,7 +273,7 @@
 }
 @media (prefers-reduced-motion: no-preference) {
   .td__drawer {
-    animation: td-in 180ms ease-out;
+    animation: td-in var(--motion-base) var(--ease-enter);
   }
 }
 @keyframes td-in {

@@ -115,6 +115,8 @@
   <div
     #menu
     class="sel__menu"
+    animate.enter="om--entering"
+    animate.leave="om--leaving"
     popover="manual"
     [class.sel__menu--placed]="placed()"
     [style.top.px]="position().top"

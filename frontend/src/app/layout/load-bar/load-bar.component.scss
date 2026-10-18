@@ -9,7 +9,7 @@
   overflow: hidden;
   background: color-mix(in srgb, var(--color-accent) 25%, transparent);
   pointer-events: none;
-  animation: lb-in 150ms var(--ease-standard, ease) both;
+  animation: lb-in var(--motion-fast) var(--ease-standard) both;
 }
 .lb::after {
   content: '';

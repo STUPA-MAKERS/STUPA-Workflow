@@ -1,3 +1,4 @@
+@use '../option-menu' as om;
 :host {
   display: inline-flex;
   flex: none;
@@ -41,6 +42,7 @@
 /* Fixed to the viewport, below the trigger and aligned to its end. In the top layer
    (popover) the UA styles would centre it, so the reset comes first. */
 .rm__menu {
+  @include om.motion;
   position: fixed;
   inset: auto;
   z-index: var(--z-dropdown);

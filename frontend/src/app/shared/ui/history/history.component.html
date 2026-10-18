@@ -63,7 +63,12 @@
                           {{ (open ? 'ui.history.hideValues' : 'ui.history.showValues') | t }}
                         </button>
                         @if (open) {
-                          <div class="hist__values" [id]="valuesId">
+                          <div
+                            class="hist__values"
+                            [id]="valuesId"
+                            animate.enter="motion-expand-in"
+                            animate.leave="motion-expand-out"
+                          >
                             @if (has(detail.old)) {
                               <span class="hist__valuesCap">{{ 'ui.history.before' | t }}</span>
                               <del class="hist__block">

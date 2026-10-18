@@ -2,7 +2,7 @@
   display: block;
   /* Nothing shows for the first 300ms, so a fast answer draws no placeholder at all
      (the delay of `.skel-in`). */
-  animation: skel-in 150ms var(--ease-standard, ease) 300ms both;
+  animation: skel-in var(--motion-fast) var(--ease-standard) var(--skeleton-delay) both;
 }
 .sk {
   display: flex;
