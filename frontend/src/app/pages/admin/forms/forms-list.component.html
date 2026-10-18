@@ -1,12 +1,5 @@
 <section class="fl">
-  <!-- Create posts an application type, so the button needs admin.types. -->
-  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t">
-    @if (canCreate()) {
-      <app-button actions variant="fill" (click)="openCreate()">
-        <app-icon name="plus" /> {{ 'admin.forms.add' | t }}
-      </app-button>
-    }
-  </app-page-header>
+  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t" />
 
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.forms.overviewError' | t }}</app-note>
@@ -74,6 +67,11 @@
     } @else {
       <app-empty-state shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
     }
+  }
+
+  <!-- Create posts an application type, so the button needs admin.types. -->
+  @if (canCreate()) {
+    <app-fab [label]="'fab.form' | t" (activate)="openCreate()" />
   }
 </section>
 

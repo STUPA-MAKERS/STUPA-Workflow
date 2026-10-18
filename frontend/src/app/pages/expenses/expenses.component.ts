@@ -31,6 +31,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import {
   EmptyStateComponent,
+  FabComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   ListDetailLayoutComponent,
@@ -130,6 +131,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
     ButtonComponent,
     CostCentreTreeComponent,
     EmptyStateComponent,
+    FabComponent,
     FilterSelectComponent,
     FormsModule,
     IconComponent,

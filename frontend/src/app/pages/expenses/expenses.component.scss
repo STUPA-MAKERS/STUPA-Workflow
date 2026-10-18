@@ -50,11 +50,6 @@
   font-size: var(--fs-lg);
   font-weight: var(--fw-semibold);
 }
-.exp__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
 .exp__chips {
   display: flex;
   flex-wrap: wrap;
@@ -306,41 +301,6 @@
   margin-top: var(--space-3);
 }
 
-/* "Buchung hinzufügen": at the end of the list pane side by side, else fixed at the end
-   of the screen. */
-.exp__fab {
-  position: fixed;
-  right: var(--space-4);
-  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font: inherit;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  box-shadow: var(--shadow-elevated);
-  cursor: pointer;
-}
-.exp__fab:hover {
-  filter: brightness(1.08);
-}
-.exp__fab:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.exp--split .exp__fab {
-  position: absolute;
-  right: var(--space-4);
-  bottom: var(--space-4);
-}
-
 /* ------------------------------------------------------------------ detail pane */
 .exp__detail {
   display: flex;
@@ -440,8 +400,5 @@
   }
   .exp__month {
     padding-inline: var(--space-1);
-  }
-  .exp__scroll {
-    padding-bottom: var(--space-6);
   }
 }

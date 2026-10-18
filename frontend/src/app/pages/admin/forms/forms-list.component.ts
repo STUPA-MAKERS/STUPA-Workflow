@@ -6,7 +6,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { NoteComponent, PageHeaderComponent, StatusTextComponent } from '@shared/ui';
+import { FabComponent, NoteComponent, PageHeaderComponent, StatusTextComponent } from '@shared/ui';
 import {
   ButtonComponent,
   CellDirective,
@@ -56,6 +56,7 @@ function emptyForm(): NewForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,

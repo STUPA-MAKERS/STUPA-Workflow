@@ -961,9 +961,11 @@ describe('ApplicationsListComponent', () => {
       expect(router.url).toBe('/applications/app-1?type=t1');
     });
 
-    it('links "Antrag stellen" to the wizard', async () => {
-      await start();
-      expect(screen.getByRole('link', { name: 'Antrag stellen' })).toHaveAttribute('href', '/apply');
+    it('opens the wizard from the floating "Antrag stellen"', async () => {
+      const { router } = await start();
+      const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      await userEvent.click(screen.getByRole('button', { name: 'Antrag stellen' }));
+      expect(nav).toHaveBeenCalledWith('/apply');
     });
 
     it('keeps every loaded page when the detail changes an application', async () => {

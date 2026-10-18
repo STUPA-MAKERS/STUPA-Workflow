@@ -96,13 +96,13 @@ describe('MeetingsOverviewComponent', () => {
 
   it('opens the create dialog from the list, with the right to create only', async () => {
     const { http } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
     expect(screen.getByRole('dialog', { name: 'Sitzung anlegen' })).toBeInTheDocument();
     http.match('/api/gremien').forEach((r) => r.flush([]));
   });
 
   it('offers no create without the right', async () => {
     await setup({ managed: [] });
-    expect(screen.queryByRole('button', { name: 'Neue Sitzung' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sitzung anlegen' })).toBeNull();
   });
 });

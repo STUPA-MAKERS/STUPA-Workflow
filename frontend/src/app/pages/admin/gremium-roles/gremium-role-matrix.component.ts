@@ -31,6 +31,7 @@ import {
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
@@ -59,6 +60,7 @@ let nextId = 0;
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
+    FabComponent,
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
@@ -79,6 +81,8 @@ export class GremiumRoleMatrixComponent implements OnInit {
   readonly gremiumName = input('');
   /** Show the section heading (the gremien page). The roles page has its own title. */
   readonly heading = input(true);
+  /** The add action is the floating button of the page (the roles page), not a header button. */
+  readonly fab = input(false);
   /** The row surface: 2 on a page, 3 inside a gremium row on surface 2. */
   readonly surface = input<2 | 3>(2);
   /** The number of roles after a create or a delete. */

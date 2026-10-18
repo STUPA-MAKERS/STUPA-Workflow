@@ -218,41 +218,6 @@
   margin-top: var(--space-3);
 }
 
-/* "Rechnung hinzufügen": at the end of the list pane side by side, else fixed at the end
-   of the screen. */
-.inv__fab {
-  position: fixed;
-  right: var(--space-4);
-  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font: inherit;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  box-shadow: var(--shadow-elevated);
-  cursor: pointer;
-}
-.inv__fab:hover {
-  filter: brightness(1.08);
-}
-.inv__fab:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.inv--split .inv__fab {
-  position: absolute;
-  right: var(--space-4);
-  bottom: var(--space-4);
-}
-
 /* ------------------------------------------------------------------ detail pane */
 .inv__detail {
   display: flex;
@@ -402,13 +367,4 @@
   .inv__month {
     padding-inline: var(--space-1);
   }
-  .inv__scroll {
-    padding-bottom: var(--space-6);
-  }
-}
-
-.inv__btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
 }

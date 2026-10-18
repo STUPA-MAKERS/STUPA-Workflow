@@ -2,9 +2,6 @@
   <app-page-header [flush]="true" [title]="'budget.tree.title' | t">
     <ng-container ngProjectAs="[actions]">
       @if (phone()) {
-        <app-button variant="fill" (click)="openTop()">
-          <app-icon name="plus" /> {{ 'budget.tree.createTopShort' | t }}
-        </app-button>
         <app-row-menu [label]="'budget.tree.moreActions' | t" [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
         <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStateConfig()">
@@ -15,9 +12,6 @@
         </app-button>
         <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
           <app-icon name="cal" /> {{ 'budget.tree.fyTitle' | t }}
-        </app-button>
-        <app-button variant="fill" (click)="openTop()">
-          <app-icon name="plus" /> {{ 'budget.tree.createTop' | t }}
         </app-button>
       }
     </ng-container>
@@ -178,6 +172,8 @@
       <app-empty-state shape="table" [heading]="'budget.tree.pickHint' | t" />
     }
   }
+
+  <app-fab [label]="'fab.budget' | t" (activate)="openTop()" />
 </section>
 
 <!-- Set the allocation of one cost centre for the selected fiscal year. -->

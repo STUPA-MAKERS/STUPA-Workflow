@@ -340,10 +340,7 @@
 </ng-template>
 
 @if (phone()) {
-  <a class="dash__fab" routerLink="/apply">
-    <app-icon name="plus" [size]="22" />
-    {{ 'dashboard.apply.short' | t }}
-  </a>
+  <app-fab [label]="'fab.application' | t" link="/apply" />
 
   <app-side-sheet side="bottom" [heading]="'shell.account.region' | t" [(open)]="accountOpen">
     <app-account-menu variant="sheet" (navigated)="closeAccount()" />

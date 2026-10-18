@@ -23,6 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
 import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.component';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import type { RowMenuItem, RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
@@ -106,6 +107,7 @@ interface DayCard {
   imports: [
     NoteComponent,
     EmptyStateComponent,
+    FabComponent,
     SheetBarComponent,
     PageHeaderComponent,
     TranslatePipe,

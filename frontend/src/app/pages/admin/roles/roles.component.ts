@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { NoteComponent, PageHeaderComponent, SkeletonComponent } from '@shared/ui';
 import {
   ButtonComponent,
@@ -46,6 +47,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,

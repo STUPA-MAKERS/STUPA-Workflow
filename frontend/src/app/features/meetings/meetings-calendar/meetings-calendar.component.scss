@@ -267,6 +267,11 @@
   overscroll-behavior: contain;
   @include fade.fade-y(var(--cal-fade));
 }
+/* "Sitzung anlegen" floats over the end of the panel: room to scroll the last row above
+   it. */
+.cal__panelScroll--fab {
+  padding-bottom: calc(56px + 2 * var(--space-4));
+}
 .cal__daySec {
   display: flex;
   flex-direction: column;

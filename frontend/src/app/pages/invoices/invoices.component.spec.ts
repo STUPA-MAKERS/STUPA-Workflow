@@ -1602,11 +1602,12 @@ describe('InvoicesComponent (list/detail)', () => {
     expect(click).toHaveBeenCalled();
     c.onHeaderMenu({ id: 'other', label: '' });
     expect(click).toHaveBeenCalledTimes(1);
-    // The phone has the form in a bottom sheet.
-    expect(screen.getByRole('button', { name: 'Rechnung' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Rechnung' }));
+    // The phone has the floating "Rechnung anlegen" and the form in a bottom sheet; the
+    // button hides while the form is open.
+    await userEvent.click(screen.getByRole('button', { name: 'Rechnung anlegen' }));
     expect(screen.getByRole('dialog', { name: 'Rechnung hinzufügen' }).classList.contains('ss--bottom')).toBe(true);
     expect(c.detailView()).toBe('none');
+    expect(screen.queryByRole('button', { name: 'Rechnung anlegen' })).toBeNull();
   });
 
   it('shows the whole page as the drop target while a PDF is dragged over it', async () => {

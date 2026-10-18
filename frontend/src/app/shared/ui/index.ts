@@ -32,6 +32,7 @@ export type {
 export { ConfirmDialogComponent } from './confirm-dialog/confirm-dialog.component';
 export { DateBlockComponent } from './date-block/date-block.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
+export { FabComponent } from './fab/fab.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';
 export { FileDropZoneComponent, acceptsFile } from './file-drop-zone/file-drop-zone.component';
 export { FilterSelectComponent } from './filter-select/filter-select.component';

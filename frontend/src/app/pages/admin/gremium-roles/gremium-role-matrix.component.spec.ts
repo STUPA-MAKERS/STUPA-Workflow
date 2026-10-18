@@ -156,6 +156,19 @@ describe('GremiumRoleMatrixComponent', () => {
     expect(api.listRoleMappings).not.toHaveBeenCalled();
   });
 
+  it('moves the add action to the floating button on the roles page', async () => {
+    const { container } = await setup({ inputs: { heading: false, fab: true } });
+    expect(container.querySelector('.rm__head')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Gremium-Rolle hinzufügen/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium-Rolle anlegen' }));
+    expect(screen.getByRole('textbox', { name: /Schlüssel/ })).toBeInTheDocument();
+  });
+
+  it('shows no floating button without admin.gremium_roles', async () => {
+    await setup({ perms: [], inputs: { heading: false, fab: true } });
+    expect(screen.queryByRole('button', { name: 'Gremium-Rolle anlegen' })).toBeNull();
+  });
+
   it('keeps the delete of a forced role disabled', async () => {
     await setup();
     expect(screen.getByRole('button', { name: 'Rolle löschen: Vorstand' })).toBeDisabled();

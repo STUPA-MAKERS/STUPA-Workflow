@@ -36,6 +36,7 @@ import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { liveSearch } from '@shared/live-search';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   FilterSelectComponent,
   type FilterSelectOption,
@@ -149,6 +150,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TranslatePipe,
     ButtonComponent,
     EmptyStateComponent,
+    FabComponent,
     FilterSelectComponent,
     IconComponent,
     PageHeaderComponent,

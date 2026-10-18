@@ -249,12 +249,9 @@
     }
   </div>
 
-  <!-- "+ To-Do" on every width, for a board the person writes and for "Alle". -->
+  <!-- "To-Do anlegen" on every width, for a board the person writes and for "Alle". -->
   @if (canAdd()) {
-    <button type="button" class="td__fab" data-testid="td-fab" (click)="newCard()">
-      <app-icon name="plus" [size]="22" />
-      {{ 'todos.new.short' | t }}
-    </button>
+    <app-fab data-testid="td-fab" [label]="'fab.todo' | t" (activate)="newCard()" />
   }
 </div>
 

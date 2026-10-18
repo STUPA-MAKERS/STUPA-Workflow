@@ -3,19 +3,22 @@
   [class.rm--bg3]="surface() === 3"
   [attr.aria-labelledby]="heading() ? uid + '-title' : null"
 >
-  @if (heading() || canEdit()) {
+  @if (heading() || (canEdit() && !fab())) {
     <header class="rm__head">
       @if (heading()) {
         <h3 class="cap rm__title" [id]="uid + '-title'">
           {{ 'admin.gremiumRoles.matrixTitle' | t }}
         </h3>
       }
-      @if (canEdit()) {
+      @if (canEdit() && !fab()) {
         <app-button class="rm__add" size="sm" variant="tonal" (click)="openAdd()">
           <app-icon name="plus" /> {{ 'admin.gremiumRoles.add' | t }}
         </app-button>
       }
     </header>
+  }
+  @if (canEdit() && fab()) {
+    <app-fab [label]="'fab.gremiumRole' | t" (activate)="openAdd()" />
   }
 
   @if (loading()) {

@@ -28,6 +28,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import {
   EmptyStateComponent,
+  FabComponent,
   FileDropZoneComponent,
   ListDetailLayoutComponent,
   PageHeaderComponent,
@@ -112,6 +113,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
     PageHeaderComponent,
     ButtonComponent,
     EmptyStateComponent,
+    FabComponent,
     FileDropZoneComponent,
     IconComponent,
     InvoiceDetailComponent,
