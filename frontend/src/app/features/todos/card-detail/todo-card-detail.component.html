@@ -17,7 +17,7 @@
         <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         @if (mode() === 'drawer' && !phone()) {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
-            <app-icon name="x" [size]="20" />
+            <app-icon name="x" />
           </app-button>
         }
       </app-sheet-bar>
@@ -50,7 +50,7 @@
   <div class="cd cd--state">
     <app-empty-state plain icon="circleok" class="cd__none" [heading]="'todos.card.notFound' | t">
       @if (mode() === 'drawer') {
-        <app-button variant="tonal" size="sm" (click)="closed.emit()">{{ 'todos.card.back' | t }}</app-button>
+        <app-button variant="text" size="sm" (click)="closed.emit()">{{ 'todos.card.back' | t }}</app-button>
       }
     </app-empty-state>
   </div>
@@ -82,7 +82,7 @@
         }
         @if (!phone() && mode() === 'drawer') {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.copyLink' | t" (click)="copyLink()">
-            <app-icon name="link" [size]="19" />
+            <app-icon name="link" />
           </app-button>
         }
         @if (menuSections().length) {
@@ -90,7 +90,7 @@
         }
         @if (mode() === 'drawer' && !phone()) {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
-            <app-icon name="x" [size]="20" />
+            <app-icon name="x" />
           </app-button>
         }
       </app-sheet-bar>
@@ -161,11 +161,11 @@
       @if (canWrite() && tab() === 'details') {
         <div class="cd__bar">
           <app-button class="btn-block" variant="tonal" [disabled]="busy()" (click)="moveOpen.set(true)">
-            <app-icon name="swap" [size]="17" />
+            <app-icon name="swap" />
             {{ 'todos.card.move' | t }}
           </app-button>
           <app-button class="btn-block" variant="fill" [disabled]="busy()" (click)="toggleDone()">
-            <app-icon [name]="isDone() ? 'undo' : 'check'" [size]="17" />
+            <app-icon [name]="isDone() ? 'undo' : 'check'" />
             {{ (isDone() ? 'todos.card.reopen' : 'todos.card.done') | t }}
           </app-button>
         </div>
@@ -331,7 +331,7 @@
         <h3 id="cd-links" class="cd__secTitle">{{ 'todos.card.links' | t }}</h3>
         @if (canWrite()) {
           <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-            <app-icon name="plus" [size]="16" />
+            <app-icon name="plus" />
             {{ 'todos.card.link' | t }}
           </app-button>
         }
@@ -353,14 +353,16 @@
                 <app-icon class="cd__linkChev" name="chevron-right" [size]="16" />
               }
               @if (canWrite()) {
-                <button
-                  type="button"
-                  class="cd__x cd__linkX"
-                  [attr.aria-label]="'todos.card.unlink' | t: { title: linkTitle(link) }"
+                <app-button
+                  class="cd__linkX"
+                  variant="text"
+                  size="sm"
+                  [iconOnly]="true"
+                  [ariaLabel]="'todos.card.unlink' | t: { title: linkTitle(link) }"
                   (click)="removeLink(link)"
                 >
-                  <app-icon name="x" [size]="14" />
-                </button>
+                  <app-icon name="x" />
+                </app-button>
               }
             </li>
           }
@@ -383,7 +385,7 @@
             [ariaLabel]="'todos.card.editDescription' | t"
             (click)="startDesc()"
           >
-            <app-icon name="edit" [size]="18" />
+            <app-icon name="edit" />
           </app-button>
         }
       </div>
@@ -411,7 +413,7 @@
             [loading]="descImages.uploading() > 0"
             (click)="descImages.pick()"
           >
-            <app-icon name="image" [size]="18" />
+            <app-icon name="image" />
           </app-button>
           <app-button variant="text" (click)="cancelDesc()">{{ 'action.cancel' | t }}</app-button>
           <app-button variant="fill" [loading]="busy()" [disabled]="descImages.uploading() > 0" (click)="saveDesc()">{{ 'action.save' | t }}</app-button>
@@ -508,18 +510,25 @@
       </button>
       @if (canWrite()) {
         <span class="cd__itemActions">
-          <button
-            type="button"
-            class="cd__x"
+          <app-button
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
             [attr.data-rename]="item.id"
-            [attr.aria-label]="'todos.card.renameItem' | t: { text: item.text }"
+            [ariaLabel]="'todos.card.renameItem' | t: { text: item.text }"
             (click)="startItem(item)"
           >
-            <app-icon name="edit" [size]="15" />
-          </button>
-          <button type="button" class="cd__x" [attr.aria-label]="'todos.card.deleteItem' | t: { text: item.text }" (click)="deleteItem(item)">
-            <app-icon name="trash" [size]="15" />
-          </button>
+            <app-icon name="edit" />
+          </app-button>
+          <app-button
+            variant="text"
+            size="sm"
+            [iconOnly]="true"
+            [ariaLabel]="'todos.card.deleteItem' | t: { text: item.text }"
+            (click)="deleteItem(item)"
+          >
+            <app-icon name="trash" />
+          </app-button>
         </span>
       }
     }

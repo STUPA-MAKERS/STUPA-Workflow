@@ -83,7 +83,7 @@
         } @else if (!rows().length) {
           @if (activeFilterCount() > 0) {
             <app-empty-state [heading]="'voting.list.noMatch' | t">
-              <app-button variant="tonal" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
+              <app-button variant="text" size="sm" (click)="reset()">{{ 'voting.list.filter.reset' | t }}</app-button>
             </app-empty-state>
           } @else if (split()) {
             <!-- Side by side the detail pane carries the text; the list keeps its ghost rows. -->

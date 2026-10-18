@@ -114,24 +114,24 @@
             @if (vote.status === 'open' && canVote()) {
               <div class="mtg__voteActions">
                 @for (opt of voteOptionsFor(vote); track opt) {
-                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'primary' : 'secondary'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)"><span>{{ voteOptionLabel(opt) }}</span>@if (myChoice(vote.id) === opt) { <app-icon name="check" [size]="13" /> }</app-button>
+                  <app-button size="sm" [variant]="myChoice(vote.id) === opt ? 'fill' : 'tonal'" [loading]="casting() === vote.id" (click)="cast(vote.id, opt)"><span>{{ voteOptionLabel(opt) }}</span>@if (myChoice(vote.id) === opt) { <app-icon name="check" /> }</app-button>
                 }
               </div>
             }
             @if (m.canManageVotes) {
               <div class="mtg__voteActions">
                 @if (vote.applicationId) {
-                  <app-button variant="ghost" size="sm" [disabled]="vote.applicationId === m.activeApplicationId" (click)="setActive(vote.applicationId)">{{ 'meetings.vote.setActive' | t }}</app-button>
+                  <app-button variant="text" size="sm" [disabled]="vote.applicationId === m.activeApplicationId" (click)="setActive(vote.applicationId)">{{ 'meetings.vote.setActive' | t }}</app-button>
                 }
                 @if (vote.status !== 'open') {
                   @if (m.isProtokollant) {
-                    <app-button variant="primary" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
+                    <app-button variant="fill" size="sm" [disabled]="vote.status === 'closed'" (click)="openVote(vote.id)">{{ 'meetings.vote.open' | t }}</app-button>
                   }
                 } @else {
                   @if (m.isProtokollant) {
                     <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
                   }
-                  <app-button variant="ghost" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+                  <app-button variant="text" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                 }
               </div>
             }

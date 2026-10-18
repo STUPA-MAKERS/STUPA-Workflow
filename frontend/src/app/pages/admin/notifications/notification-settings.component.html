@@ -2,7 +2,7 @@
   <app-page-header [flush]="true" [title]="'admin.notifications.title' | t">
     @if (settings()) {
       <app-button actions variant="fill" [disabled]="!dirty() || !valid()" [loading]="saving()" (click)="save()">
-        <app-icon name="check" [size]="18" /> {{ 'action.save' | t }}
+        <app-icon name="check" /> {{ 'action.save' | t }}
       </app-button>
     }
   </app-page-header>

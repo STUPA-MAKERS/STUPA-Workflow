@@ -43,8 +43,8 @@
         } @else {
           <app-sheet-bar class="vc__bar" [kicker]="sheetMeta()">
             @if (beamerLink()) {
-              <app-button variant="outlined" size="sm" (click)="goBeamer()">
-                <app-icon name="monitor" [size]="16" />
+              <app-button variant="tonal" size="sm" (click)="goBeamer()">
+                <app-icon name="monitor" />
                 {{ 'voting.live.toBeamer' | t }}
               </app-button>
             }

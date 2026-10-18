@@ -16,7 +16,7 @@
           <h2 class="gr__h2" id="gr-mcp-title">{{ 'account.mcp.title' | t }}</h2>
         </div>
         <app-button class="gr__download" variant="fill" [loading]="downloading()" (click)="downloadPackage()">
-          <app-icon name="download" [size]="16" />
+          <app-icon name="download" />
           {{ 'account.mcp.download' | t }}
         </app-button>
       </div>
@@ -40,7 +40,7 @@
               [ariaLabel]="(copied() ? 'account.mcp.copied' : 'account.mcp.copyConfig') | t"
               (click)="copySetup()"
             >
-              <app-icon [name]="copied() ? 'check' : 'copy'" [size]="14" />
+              <app-icon [name]="copied() ? 'check' : 'copy'" />
               {{ (copied() ? 'account.mcp.copied' : 'action.copy') | t }}
             </app-button>
           </div>

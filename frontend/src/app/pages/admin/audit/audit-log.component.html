@@ -21,7 +21,7 @@
     </div>
     @if (canVerify()) {
       <app-button variant="tonal" size="sm" [loading]="verifying()" (click)="runVerify()">
-        <app-icon name="shieldok" [size]="16" /> {{ 'admin.audit.verify.now' | t }}
+        <app-icon name="shieldok" /> {{ 'admin.audit.verify.now' | t }}
       </app-button>
     }
   </div>
@@ -144,7 +144,7 @@
   } @else if (!loading() && !loadError()) {
     <app-empty-state shape="table" [heading]="'admin.audit.empty' | t">
       @if (activeFilterCount()) {
-        <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
+        <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'admin.audit.filter.reset' | t }}</app-button>
       }
     </app-empty-state>
   }

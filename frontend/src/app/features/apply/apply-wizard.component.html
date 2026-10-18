@@ -164,7 +164,7 @@
       }
       <span class="wz__navGap"></span>
       @if (activeIndex() > 0) {
-        <app-button variant="outlined" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
+        <app-button variant="text" [block]="phone()" (click)="prev()">{{ 'apply.nav.back' | t }}</app-button>
       }
       @if (currentStep() === 'review') {
         <app-button

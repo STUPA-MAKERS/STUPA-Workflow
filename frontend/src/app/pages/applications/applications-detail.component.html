@@ -65,7 +65,7 @@
             [iconOnly]="true"
             [ariaLabel]="'applications.detail.cancel' | t"
             (click)="cancelEdit()"
-          ><app-icon name="x" [size]="19" /></app-button>
+          ><app-icon name="x" /></app-button>
         } @else {
           <app-icon class="ad__editIcon" name="edit" [size]="18" />
         }
@@ -76,7 +76,7 @@
           <app-button variant="text" (click)="cancelEdit()">{{ 'applications.detail.cancel' | t }}</app-button>
         }
         <app-button variant="fill" [loading]="savingEdit()" (click)="saveEdit()">
-          <app-icon name="check" [size]="16" />
+          <app-icon name="check" />
           {{ 'applications.detail.save' | t }}
         </app-button>
         <span class="ad__editFade" aria-hidden="true"></span>
@@ -114,7 +114,7 @@
             data-testid="ad-comments-open"
             (click)="commentsOpen.set(true)"
           >
-            <app-icon name="chat" [size]="19" />
+            <app-icon name="chat" />
             @if (!phone()) {
               {{ 'applications.comments.title' | t }}
             }
@@ -131,7 +131,7 @@
                 [iconOnly]="true"
                 [ariaLabel]="'applications.row.share' | t"
                 (click)="openShareDialog()"
-              ><app-icon name="link" [size]="19" /></app-button>
+              ><app-icon name="link" /></app-button>
             }
             @if (canEditData()) {
               <app-button
@@ -139,7 +139,7 @@
                 [iconOnly]="true"
                 [ariaLabel]="'applications.detail.edit' | t"
                 (click)="startEdit(application)"
-              ><app-icon name="edit" [size]="19" /></app-button>
+              ><app-icon name="edit" /></app-button>
             }
             <!-- `application.archive` is its own right. No confirmation: the same button
                  brings the application back. -->
@@ -150,7 +150,7 @@
                 [loading]="archiving()"
                 [ariaLabel]="(application.archivedAt ? 'applications.row.unarchive' : 'applications.row.archive') | t"
                 (click)="toggleArchived()"
-              ><app-icon name="archive" [size]="19" /></app-button>
+              ><app-icon name="archive" /></app-button>
             }
           }
           @if (menuSections().length) {
@@ -211,7 +211,7 @@
                 (click)="fire(t)"
               >
                 @if (t.addsToAgenda) {
-                  <app-icon name="cal" [size]="17" />
+                  <app-icon name="cal" />
                 }
                 {{ t.label || ('applications.transitions.fallback' | t) }}
               </app-button>

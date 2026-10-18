@@ -1,7 +1,7 @@
 <section class="cdv">
   <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
     <app-button actions variant="fill" (click)="openCreate()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.cdVariants.add' | t }}
+      <app-icon name="plus" /> {{ 'admin.cdVariants.add' | t }}
     </app-button>
   </app-page-header>
 
@@ -107,7 +107,7 @@
                   <app-empty-state shape="file" rows="2" [heading]="'admin.cdVariants.noLogos' | t" />
                 }
                 <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
-                  <app-icon name="plus" [size]="16" /> {{ 'admin.cdVariants.addLogo' | t }}
+                  <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
                 </app-button>
               </div>
             }
@@ -200,7 +200,7 @@
           }
         </span>
         <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.click()">
-          <app-icon name="upload" [size]="16" />
+          <app-icon name="upload" />
           {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
         </app-button>
       </div>

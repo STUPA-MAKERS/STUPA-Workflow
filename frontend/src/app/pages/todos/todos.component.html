@@ -8,7 +8,7 @@
           data-testid="td-search-toggle"
           [ariaLabel]="'todos.search.label' | t"
           (click)="searchOpen.set(!searchOpen())"
-        ><app-icon name="search" [size]="21" /></app-button>
+        ><app-icon name="search" /></app-button>
         @if (board()) {
           <app-row-menu [label]="'todos.menu' | t" [sections]="phoneMenu()" (selected)="onPhoneMenu($event)" />
         } @else if (loading()) {
@@ -34,7 +34,7 @@
             [ariaLabel]="'todos.archive.title' | t"
             [title]="'todos.archive.title' | t"
             (click)="archiveOpen.set(true)"
-          ><app-icon name="archive" [size]="21" /></app-button>
+          ><app-icon name="archive" /></app-button>
         } @else if (loading()) {
           <span class="td__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         }
@@ -46,7 +46,7 @@
             [ariaLabel]="'todos.settings.title' | t"
             [title]="'todos.settings.title' | t"
             (click)="settingsOpen.set(true)"
-          ><app-icon name="tune" [size]="21" /></app-button>
+          ><app-icon name="tune" /></app-button>
         } @else if (!board() && loading() && summary()?.canConfigure) {
           <span class="td__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         }
@@ -163,7 +163,7 @@
         <app-empty-state shape="card" fill [heading]="'todos.all.empty' | t" />
       } @else if (noMatch()) {
         <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t">
-          <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
         </app-empty-state>
       }
       <app-todo-board-rows
@@ -198,7 +198,7 @@
     } @else if (board(); as b) {
       @if (noMatch()) {
         <app-empty-state shape="card" fill [heading]="'todos.noMatch' | t">
-          <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
+          <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'todos.filter.reset' | t }}</app-button>
         </app-empty-state>
       } @else if (view() === 'list') {
         <app-todo-list-view

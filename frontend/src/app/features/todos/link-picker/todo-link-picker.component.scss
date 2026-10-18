@@ -50,19 +50,7 @@
   font: inherit;
 }
 .lp__x {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-}
-.lp__x:hover {
-  color: var(--color-text);
+  flex: none;
 }
 
 .lp__chips {

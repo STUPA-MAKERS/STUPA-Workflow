@@ -45,8 +45,8 @@
 
   <!-- The beamer route and its stream need session.manage in the gremium (canManage). -->
   @if (wide() && m.status !== 'closed' && m.canManage) {
-    <app-button class="mp__beamer" variant="outlined" (click)="toggleBeamer.emit()">
-      <app-icon name="monitor" [size]="18" />
+    <app-button class="mp__beamer" variant="tonal" (click)="toggleBeamer.emit()">
+      <app-icon name="monitor" />
       {{ 'meetings.beamer.enter' | t }}
     </app-button>
   }
@@ -63,7 +63,7 @@
           <span class="mp__blocked">{{ opensAtText() }}</span>
         }
         <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="startSession.emit()">
-          <app-icon name="play" [size]="16" />
+          <app-icon name="play" />
           {{ 'meetings.control.open' | t }}
         </app-button>
       }
@@ -90,7 +90,7 @@
     </section>
   } @else {
     <app-button class="mp__agendaBtn" variant="tonal" size="sm" [title]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">
-      <app-icon name="list" [size]="18" />
+      <app-icon name="list" />
       {{ 'meetings.agenda.title' | t }}
       <span class="mp__muted">· {{ agenda().length }}</span>
     </app-button>
@@ -123,7 +123,7 @@
       }
       @if (canAddVote() && top(); as t) {
         <app-button class="mp__addVote" variant="tonal" [block]="true" (click)="voteDialog.emit(t)">
-          <app-icon name="plus" [size]="18" />
+          <app-icon name="plus" />
           {{ (t.applicationId ? addVoteKey() : 'meetings.vote.addQuestion') | t }}
         </app-button>
       }
@@ -146,7 +146,7 @@
     } @else {
       @if (canBackToPrep()) {
         <app-button class="mp__prepBack" variant="text" size="sm" (click)="prepItem.set(false)">
-          <app-icon name="back" [size]="16" />
+          <app-icon name="back" />
           {{ 'meetings.prep.back' | t }}
         </app-button>
       }
@@ -197,7 +197,7 @@
   <app-side-sheet [side]="phone() ? 'bottom' : 'start'" [heading]="'meetings.agenda.title' | t" [(open)]="agendaOpen">
     @if (canAddTop()) {
       <app-button sheet-actions variant="text" [iconOnly]="true" [ariaLabel]="'meetings.agenda.dialogTitle' | t" (click)="addTop.emit()">
-        <app-icon name="plus" [size]="20" />
+        <app-icon name="plus" />
       </app-button>
     }
     @if (agendaOpen()) {

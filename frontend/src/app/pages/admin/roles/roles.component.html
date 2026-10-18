@@ -1,7 +1,7 @@
 <section class="ar">
   <app-page-header [flush]="true" [title]="'admin.roles.title' | t">
     <app-button actions variant="fill" (click)="openAdd()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.roles.addGlobalRole' | t }}
+      <app-icon name="plus" /> {{ 'admin.roles.addGlobalRole' | t }}
     </app-button>
   </app-page-header>
 
@@ -73,7 +73,7 @@
                   />
                 </div>
                 <div class="ar__actions">
-                  <app-button size="sm" variant="tonal" (click)="renameRole(r)">{{ 'admin.roles.saveName' | t }}</app-button>
+                  <app-button size="sm" variant="fill" (click)="renameRole(r)">{{ 'admin.roles.saveName' | t }}</app-button>
                 </div>
 
                 @if (isLocked(r)) {

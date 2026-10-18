@@ -16,7 +16,7 @@
               [ariaLabel]="'gremien.list.subscribe' | t"
               [ariaPressed]="abo.isOpen()"
               (click)="abo.toggle($event.currentTarget)"
-            ><app-icon name="cal" [size]="21" /></app-button>
+            ><app-icon name="cal" /></app-button>
           }
           <app-calendar-subscribe #abo />
         </ng-container>
@@ -69,7 +69,7 @@
           <div class="grl__status" role="alert">
             <span>{{ 'gremien.list.error' | t }}</span>
             <app-button variant="text" size="sm" (click)="store.load()">
-              <app-icon name="repeat" [size]="15" />
+              <app-icon name="repeat" />
               {{ 'gremien.list.retry' | t }}
             </app-button>
           </div>

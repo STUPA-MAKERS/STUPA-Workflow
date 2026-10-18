@@ -7,7 +7,7 @@
             <!-- Phone: the title, one main action and one menu (DECISIONS: phone headers). -->
             @if (canCreate()) {
               <app-button variant="fill" size="sm" (click)="create.emit()">
-                <app-icon name="plus" [size]="16" />
+                <app-icon name="plus" />
                 {{ 'meetings.overview.newShort' | t }}
               </app-button>
             }
@@ -28,7 +28,7 @@
               [ariaLabel]="'meetings.overview.subscribe' | t"
               [ariaPressed]="abo.isOpen()"
               (click)="abo.toggle($event.currentTarget)"
-            ><app-icon name="cal" [size]="21" /></app-button>
+            ><app-icon name="cal" /></app-button>
           }
           <app-calendar-subscribe #abo />
         </ng-container>
@@ -99,7 +99,7 @@
           @if (timeline.searchHasMore() || timeline.loadingSearch()) {
             <div class="mtl__more">
               <app-button variant="text" size="sm" [loading]="timeline.loadingSearch()" (click)="timeline.loadMoreSearch()">
-                <app-icon name="down" [size]="15" />
+                <app-icon name="down" />
                 {{ 'meetings.list.loadMore' | t }}
               </app-button>
             </div>
@@ -129,7 +129,7 @@
             @if (g.kind !== 'past' && timeline.upcomingHasMore() && ($last || groups()[$index + 1].kind === 'past')) {
               <div class="mtl__more">
                 <app-button variant="text" size="sm" [loading]="timeline.loadingUpcoming()" (click)="timeline.loadMoreUpcoming()">
-                  <app-icon name="down" [size]="15" />
+                  <app-icon name="down" />
                   {{ 'meetings.list.loadMore' | t }}
                 </app-button>
               </div>
@@ -176,7 +176,7 @@
                 [body]="'meetings.overview.selFailedBody' | t"
               >
                 <app-button variant="tonal" size="sm" (click)="retrySelected()">
-                  <app-icon name="repeat" [size]="16" />
+                  <app-icon name="repeat" />
                   {{ 'meetings.overview.selRetry' | t }}
                 </app-button>
               </app-empty-state>
@@ -195,7 +195,7 @@
 <ng-template #loadPast>
   <div class="mtl__more mtl__more--start">
     <app-button variant="text" size="sm" [loading]="timeline.loadingPast()" (click)="timeline.loadMorePast()">
-      <app-icon name="history" [size]="15" />
+      <app-icon name="history" />
       {{ 'meetings.list.loadPast' | t }}
     </app-button>
   </div>

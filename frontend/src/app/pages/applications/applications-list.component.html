@@ -21,7 +21,7 @@
                 (click)="openCapture()"
               >
                 <span class="apps__btn"
-                  ><app-icon name="add" [size]="16" />{{ 'applications.capture.title' | t }}</span
+                  ><app-icon name="add" />{{ 'applications.capture.title' | t }}</span
                 >
               </app-button>
             }
@@ -35,7 +35,7 @@
                 [ariaLabel]="'applications.list.export' | t"
                 (click)="onExport()"
               >
-                <app-icon name="download" [size]="21" />
+                <app-icon name="download" />
               </app-button>
             }
             <app-row-menu
@@ -186,7 +186,7 @@
         } @else if (!rows().length) {
           <app-empty-state [heading]="'applications.list.empty' | t">
             @if (activeFilterCount() > 0) {
-              <app-button variant="tonal" size="sm" (click)="reset()">
+              <app-button variant="text" size="sm" (click)="reset()">
                 {{ 'applications.list.filter.reset' | t }}
               </app-button>
             }
