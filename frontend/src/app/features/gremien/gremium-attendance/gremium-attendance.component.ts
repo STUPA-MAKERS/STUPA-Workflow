@@ -225,7 +225,7 @@ export class GremiumAttendanceComponent {
   readonly averages = computed(() => {
     const locale = this.i18n.locale();
     const avg = monthAverages(this.rows().map((r) => r.row), this.months());
-    const fmt = (v: number | null) => (v === null ? '–' : oneDecimal(v, locale));
+    const fmt = (v: number | null) => (v === null ? '—' : oneDecimal(v, locale));
     return { months: avg.months.map(fmt), total: fmt(avg.total) };
   });
 

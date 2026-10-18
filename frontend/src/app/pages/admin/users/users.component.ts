@@ -25,7 +25,7 @@ import type { FilterSelectOption, RowMenuItem, RowMenuSection } from '@shared/ui
 import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 
-/** The choices of the chip "Letzter Login" (F3): older than n days, or never. */
+/** The choices of the chip "Letzte Anmeldung" (F3): older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
 export type LastLoginFilter = (typeof LAST_LOGIN_FILTERS)[number];
 /** The choices of the chip "Hat SSO-Gruppen". */
@@ -140,7 +140,7 @@ export class UsersComponent {
   /** The person of the open revoke dialog. Null: the dialog is closed. */
   protected readonly revokeSource = signal<AdminPrincipal | null>(null);
 
-  /** The chip "Letzter Login". */
+  /** The chip "Letzte Anmeldung". */
   protected readonly lastLoginFilter = signal<LastLoginFilter>('');
   /** The chip "Hat SSO-Gruppen". */
   protected readonly groupFilter = signal<GroupFilter>('');
@@ -156,7 +156,7 @@ export class UsersComponent {
       label: this.i18n.translate(`admin.users.filter.groups.${value || 'all'}`),
     })),
   );
-  /** The chip text: "Letzter Login: über 90 Tage", or only the name while it is off. */
+  /** The chip text: "Letzte Anmeldung: über 90 Tage", or only the name while it is off. */
   protected readonly lastLoginText = computed(() => this.chipText('admin.users.filter.lastLogin', this.lastLoginFilter(), this.lastLoginOptions()));
   protected readonly groupText = computed(() => this.chipText('admin.users.filter.groups', this.groupFilter(), this.groupOptions()));
 

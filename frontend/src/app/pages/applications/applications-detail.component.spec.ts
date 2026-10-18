@@ -724,7 +724,7 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [403, 'Sie dürfen diesen Übergang nicht ausführen.'],
+    [403, 'Du darfst diesen Übergang nicht ausführen.'],
     [409, 'Statuswechsel nicht möglich (Status hat sich geändert oder Bedingung nicht erfüllt).'],
     [500, 'Statuswechsel fehlgeschlagen.'],
   ])('maps a failed transition %s to its toast (and refreshes)', async (status, message) => {
@@ -939,8 +939,8 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [422, 'Zuordnung nicht möglich – Kostenstelle/Haushaltsjahr prüfen.'],
-    [403, 'Sie dürfen diesen Übergang nicht ausführen.'],
+    [422, 'Zuordnung nicht möglich — Kostenstelle/Haushaltsjahr prüfen.'],
+    [403, 'Du darfst diesen Übergang nicht ausführen.'],
     [500, 'Statuswechsel fehlgeschlagen.'],
   ])('maps a failed budget assignment %s to its toast', async (status, message) => {
     const { http, detectChanges, cmp, toast } = await setup();
