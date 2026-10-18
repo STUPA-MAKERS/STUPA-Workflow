@@ -5,6 +5,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   EmptyStateComponent,
   NoteComponent,
@@ -63,6 +64,7 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
     RouterLink,
     TranslatePipe,
     ButtonComponent,

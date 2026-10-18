@@ -166,7 +166,7 @@ describe('AdminRolesComponent', () => {
 
   it('creates a role from the dialog', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: /Globale Rolle hinzufügen/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rolle anlegen' }));
     await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'kultur');
     await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
     expect(api.createRole).toHaveBeenCalledWith({ key: 'kultur', label: {}, permissions: [] });

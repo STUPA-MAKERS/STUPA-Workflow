@@ -1,9 +1,5 @@
 <section class="ar">
-  <app-page-header [flush]="true" [title]="'admin.roles.title' | t">
-    <app-button actions variant="fill" (click)="openAdd()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.roles.addGlobalRole' | t }}
-    </app-button>
-  </app-page-header>
+  <app-page-header [flush]="true" [title]="'admin.roles.title' | t" />
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="5" [label]="'admin.roles.loading' | t" />
@@ -114,6 +110,8 @@
     }
     <p class="ar__foot">{{ 'admin.roles.fixedFoot' | t }}</p>
   }
+
+  <app-fab [label]="'fab.role' | t" (activate)="openAdd()" />
 </section>
 
 <app-dialog

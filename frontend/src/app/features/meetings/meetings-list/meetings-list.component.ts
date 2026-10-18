@@ -23,6 +23,7 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
 import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.component';
 import { ListDetailLayoutComponent } from '@shared/ui/list-detail/list-detail-layout.component';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
@@ -77,6 +78,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
     IconComponent,
     DateBlockComponent,
     EmptyStateComponent,
+    FabComponent,
     FilterSelectComponent,
     ListDetailLayoutComponent,
     ListItemComponent,

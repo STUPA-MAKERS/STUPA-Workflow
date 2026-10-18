@@ -239,7 +239,7 @@ describe('MeetingsListComponent', () => {
     view.timeline.pastItems.set([]);
     view.fixture.detectChanges();
     expect(screen.getByText('Noch keine Sitzungen')).toBeInTheDocument();
-    expect(screen.getByText('Lege mit „Neue Sitzung“ die erste Sitzung an.')).toBeInTheDocument();
+    expect(screen.getByText('Lege mit „Sitzung anlegen“ die erste Sitzung an.')).toBeInTheDocument();
     view.fixture.componentRef.setInput('canCreate', false);
     view.timeline.pastHasMore.set(true);
     view.fixture.detectChanges();
@@ -455,13 +455,13 @@ describe('MeetingsListComponent', () => {
       view.http.expectOne('/api/calendar/me').flush({ url: 'https://x/api/calendar/T.ics' });
       view.fixture.detectChanges();
       expect(screen.getByRole('dialog', { name: 'Kalender-Abo' })).toHaveTextContent('https://x/api/calendar/T.ics');
-      await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
       expect(view.on.create).toHaveBeenCalled();
       view.fixture.componentRef.setInput('showSwitch', false);
       view.fixture.componentRef.setInput('canCreate', false);
       view.fixture.detectChanges();
       expect(screen.queryByRole('radiogroup')).toBeNull();
-      expect(screen.queryByRole('button', { name: 'Neue Sitzung' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Sitzung anlegen' })).toBeNull();
     });
   });
 
@@ -497,12 +497,12 @@ describe('MeetingsListComponent', () => {
   });
 
   describe('phone', () => {
-    it('has the title, "+ Sitzung" and a menu with the calendar subscription', async () => {
+    it('has the title, the floating "Sitzung anlegen" and a menu with the calendar subscription', async () => {
       const view = await setup({ media: [MEDIA.phone] });
       load(view);
       expect(screen.queryByRole('radiogroup')).toBeNull();
-      expect(view.container.querySelector('.mtl__fab')).toBeNull();
-      await userEvent.click(screen.getByRole('button', { name: 'Sitzung' }));
+      expect(view.container.querySelector('app-page-header app-fab, app-page-header .btn--fill')).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
       expect(view.on.create).toHaveBeenCalled();
       await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
       await userEvent.click(within(await screen.findByRole('menu')).getByRole('menuitem', { name: 'Kalender-Abo' }));

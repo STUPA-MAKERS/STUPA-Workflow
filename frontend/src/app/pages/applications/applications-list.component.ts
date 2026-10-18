@@ -16,7 +16,6 @@ import {
   ActivatedRoute,
   NavigationEnd,
   Router,
-  RouterLink,
   RouterOutlet,
   type ParamMap,
 } from '@angular/router';
@@ -43,6 +42,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
+  FabComponent,
   FilterSelectComponent,
   ListDetailLayoutComponent,
   PageHeaderComponent,
@@ -147,7 +147,6 @@ type FilterSheet = 'budget' | 'more' | null;
   imports: [
     PageHeaderComponent,
     FormsModule,
-    RouterLink,
     RouterOutlet,
     TranslatePipe,
     ButtonComponent,
@@ -155,6 +154,7 @@ type FilterSheet = 'budget' | 'more' | null;
     DatepickerComponent,
     DialogComponent,
     EmptyStateComponent,
+    FabComponent,
     FilterSelectComponent,
     IconComponent,
     ListDetailLayoutComponent,

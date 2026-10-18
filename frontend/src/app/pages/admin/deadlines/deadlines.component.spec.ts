@@ -47,7 +47,7 @@ describe('AdminDeadlinesComponent', () => {
 
   it('creates a relative policy via the dialog', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Frist hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Frist anlegen' }));
     // A key, a relative kind and an offset enable the save.
     await userEvent.type(screen.getByLabelText('Schlüssel'), 'mahnung');
     await pickOption(screen.getByRole('combobox', { name: 'Art' }), 'Einreichung + X Tage');

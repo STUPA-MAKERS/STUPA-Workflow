@@ -265,39 +265,6 @@
   text-align: center;
 }
 
-/* "Antrag stellen": at the end of the list pane side by side, else fixed at the end of
-   the screen (above the bottom bar on a phone). */
-.apps__fab {
-  position: fixed;
-  right: var(--space-4);
-  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-  box-shadow: var(--shadow-elevated);
-}
-.apps__fab:hover {
-  filter: brightness(1.08);
-}
-.apps__fab:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.apps--split .apps__fab {
-  position: absolute;
-  right: var(--space-4);
-  bottom: var(--space-4);
-}
-
 /* ------------------------------------------------------------------ detail pane */
 .apps__detail {
   display: flex;

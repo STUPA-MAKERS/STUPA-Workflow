@@ -808,7 +808,10 @@ describe('DashboardComponent', () => {
   describe('phone', () => {
     it('gives the compact head with the account sheet and the floating button', async () => {
       const { fixture } = await setup(MEMBER, { phone: true });
-      expect(screen.getByRole('link', { name: /^Antrag$/ })).toHaveAttribute('href', '/apply');
+      const router = fixture.debugElement.injector.get(Router);
+      const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      screen.getByRole('button', { name: 'Antrag stellen' }).click();
+      expect(nav).toHaveBeenCalledWith('/apply');
       const me = screen.getByRole('button', { name: /Konto/ });
       expect(me).toHaveAttribute('aria-expanded', 'false');
       cmp(fixture).openAccount();

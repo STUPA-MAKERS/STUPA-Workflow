@@ -1,9 +1,5 @@
 <section class="cdv">
-  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
-    <app-button actions variant="fill" (click)="openCreate()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.cdVariants.add' | t }}
-    </app-button>
-  </app-page-header>
+  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t" />
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'admin.cdVariants.loading' | t" />
@@ -118,6 +114,8 @@
       <app-empty-state [heading]="'admin.cdVariants.empty' | t" />
     }
   }
+
+  <app-fab [label]="'fab.cdVariant' | t" (activate)="openCreate()" />
 </section>
 
 <app-dialog

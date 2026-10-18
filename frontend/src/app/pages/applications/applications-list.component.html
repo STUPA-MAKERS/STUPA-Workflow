@@ -277,10 +277,7 @@
         }
       </div>
 
-      <a class="apps__fab" routerLink="/apply">
-        <app-icon name="plus" [size]="22" />
-        {{ 'applications.list.create' | t }}
-      </a>
+      <app-fab [label]="'fab.application' | t" link="/apply" [contained]="split()" />
     </section>
 
     <!-- While "Antrag erfassen" is open, the form replaces the routed detail (side by

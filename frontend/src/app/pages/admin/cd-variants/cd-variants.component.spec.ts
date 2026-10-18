@@ -204,7 +204,7 @@ describe('AdminCdVariantsComponent', () => {
 
   it('creates a variant through the dialog and generates the key from the name', async () => {
     const { api, c, toast } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Variante hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Variante anlegen' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
     expect(c.form().key).toBe('asta-vorstand');
     await pickOption(screen.getByLabelText(/Basis-Variante/), 'Protokoll');

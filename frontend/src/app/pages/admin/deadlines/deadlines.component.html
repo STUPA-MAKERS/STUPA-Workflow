@@ -1,9 +1,5 @@
 <section class="dl">
-  <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t">
-    <app-button actions variant="fill" (click)="openAdd()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.deadlines.add' | t }}
-    </app-button>
-  </app-page-header>
+  <app-page-header [flush]="true" [title]="'admin.deadlines.title' | t" />
 
   @if (loading() || policies().length) {
     <app-data-table
@@ -63,6 +59,8 @@
   <app-meeting-window-settings />
 
   <app-guest-settings />
+
+  <app-fab [label]="'fab.deadline' | t" (activate)="openAdd()" />
 </section>
 
 <app-dialog

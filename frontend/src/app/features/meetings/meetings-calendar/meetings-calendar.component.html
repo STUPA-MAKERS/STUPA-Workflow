@@ -3,12 +3,6 @@
        in both views, so they keep their order when the view changes. -->
   <app-page-header [pane]="true" [title]="'meetings.title' | t">
     <ng-container ngProjectAs="[actions]">
-      @if (canCreate()) {
-        <app-button class="cal__new" variant="fill" (click)="create.emit()">
-          <app-icon name="plus" [size]="17" />
-          {{ 'meetings.list.new' | t }}
-        </app-button>
-      }
       <app-meetings-view-switch value="calendar" (valueChange)="viewChange.emit($event)" />
       <app-button
         variant="text"
@@ -123,7 +117,7 @@
          detail sheet. It stays fixed; only the content below it scrolls. The person picks
          the day, so only the meetings of the day are a live region (one region). -->
     <app-sheet-bar class="cal__dayHead" kickerId="cal-day" [kicker]="dayHeading()" />
-    <div class="cal__panelScroll" appScrollFade="y">
+    <div class="cal__panelScroll" [class.cal__panelScroll--fab]="canCreate()" appScrollFade="y">
       <section class="cal__daySec" aria-labelledby="cal-day" aria-live="polite">
         @if (error()) {
           <p class="cal__note cal__note--error" role="alert">{{ 'meetings.overview.calendarError' | t }}</p>
@@ -224,4 +218,8 @@
       }
     </div>
   </aside>
+
+  @if (canCreate()) {
+    <app-fab [label]="'fab.meeting' | t" (activate)="create.emit()" />
+  }
 </div>

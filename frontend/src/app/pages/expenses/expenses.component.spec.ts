@@ -3136,7 +3136,7 @@ describe('ExpensesComponent (list/detail)', () => {
   it('opens the form of a phone as a bottom sheet', async () => {
     setViewport(PHONE);
     const { fixture } = await setup({ page: page([EXPENSE]) });
-    await userEvent.click(screen.getByRole('button', { name: 'Buchung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Buchung anlegen' }));
     fixture.detectChanges();
     const sheet = screen.getByRole('dialog', { name: 'Buchung hinzufügen' });
     expect(sheet.classList.contains('ss--bottom')).toBe(true);

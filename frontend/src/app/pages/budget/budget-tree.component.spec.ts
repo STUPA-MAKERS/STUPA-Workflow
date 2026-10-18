@@ -1362,10 +1362,10 @@ describe('BudgetTreeComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
-    it('keeps one primary action in the header and puts the row actions in a menu', async () => {
+    it('floats "Budget anlegen" and puts the header and row actions in menus', async () => {
       const { fixture } = await setup();
       expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Budget$/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Budget anlegen' }).closest('app-fab')).not.toBeNull();
       expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Aktionen: VS-Mittel' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Kostenstelle bearbeiten: VS-Mittel' })).not.toBeInTheDocument();

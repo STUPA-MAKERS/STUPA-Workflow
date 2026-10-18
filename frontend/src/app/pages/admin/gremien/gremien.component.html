@@ -2,11 +2,7 @@
   <app-page-header
     [flush]="true"
     [title]="'admin.gremien.title' | t"
-  >
-    <app-button actions variant="fill" (click)="openCreate()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.gremien.create' | t }}
-    </app-button>
-  </app-page-header>
+  />
 
   @if (canMappings()) {
     <app-note>
@@ -128,6 +124,8 @@
   } @else {
     <app-empty-state [heading]="'admin.gremien.empty' | t" />
   }
+
+  <app-fab [label]="'fab.gremium' | t" (activate)="openCreate()" />
 </section>
 
 <app-gremium-dialog

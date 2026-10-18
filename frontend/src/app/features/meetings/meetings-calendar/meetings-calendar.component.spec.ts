@@ -411,7 +411,7 @@ describe('MeetingsCalendarComponent', () => {
     expect(view.fixture.nativeElement).toHaveClass('cal--wide');
     await userEvent.click(screen.getByRole('radio', { name: 'Liste' }));
     expect(view.on.viewChange).toHaveBeenCalledWith('list');
-    await userEvent.click(screen.getByRole('button', { name: 'Neue Sitzung' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Sitzung anlegen' }));
     expect(view.on.create).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Kalender-Abo' }));
     view.http.expectOne('/api/calendar/me').flush({ url: null });
@@ -420,6 +420,6 @@ describe('MeetingsCalendarComponent', () => {
     expect(screen.getByRole('button', { name: 'Kalender-Abo' })).toHaveAttribute('aria-pressed', 'true');
     view.fixture.componentRef.setInput('canCreate', false);
     view.fixture.detectChanges();
-    expect(screen.queryByRole('button', { name: 'Neue Sitzung' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sitzung anlegen' })).toBeNull();
   });
 });

@@ -260,6 +260,18 @@
 .af--split .af__pageBody:has(.dialog__backdrop, .ss__scrim) {
   mask-image: none !important;
 }
+/* A page with a floating "new" button (`app-fab`): the button is fixed in the window, at
+   the foot of the sheet. The mask would make the body its containing block, so it would
+   scroll away with the page and fade at the end; the body has no fade then. The page
+   ends with room for the button, so its last row scrolls above it (the 56px button, 16px
+   below and above it). One column the page scrolls as a whole and the body ends with the
+   same room. */
+.af--split .af__pageBody:has(app-fab) {
+  mask-image: none !important;
+}
+.af .af__pageBody:has(app-fab) {
+  padding-bottom: calc(56px + 2 * var(--space-4));
+}
 
 /* Wide, a full-width page with columns of its own (`adminPane`): the frame passes the
    free height down, and the page scrolls only inside its columns. */

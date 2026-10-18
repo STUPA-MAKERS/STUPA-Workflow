@@ -158,7 +158,7 @@
 .td__body--rows > app-todo-board-rows {
   flex: none;
 }
-/* The floating "+ To-Do" (56px high, --space-6 from the bottom) floats over the board, so
+/* The floating "To-Do anlegen" (`app-fab`, 56px high) floats over the board, so
    the columns keep their full height. Only a body that scrolls as a whole (the rows) gets
    room at its end, because there the room scrolls away and the last row clears the button. */
 .td__body--rows.td__body--fab {
@@ -194,41 +194,6 @@
 .td--phone .td__chips {
   flex-basis: 100%;
   max-width: none;
-}
-/* "+ To-Do" floats at the bottom right on every width, under the card drawer and its
-   scrim (--z-sticky is below --z-dialog). A phone keeps it above the bottom bar. */
-.td__fab {
-  position: fixed;
-  right: var(--space-6);
-  bottom: var(--space-6);
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  box-shadow: var(--shadow-md);
-  color: var(--color-on-accent);
-  font: inherit;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  cursor: pointer;
-}
-.td__fab:hover {
-  filter: brightness(1.08);
-}
-.td__fab:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-@include bp.phone {
-  .td__fab {
-    right: var(--space-4);
-    bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
-  }
 }
 
 /* ------------------------------------------------------------------ drawer */

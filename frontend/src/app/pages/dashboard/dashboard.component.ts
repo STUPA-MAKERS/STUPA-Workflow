@@ -33,6 +33,7 @@ import {
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
@@ -175,6 +176,7 @@ type Loaded<T> = T | null | undefined;
     AvatarComponent,
     DateBlockComponent,
     EmptyStateComponent,
+    FabComponent,
     ListItemComponent,
     PageHeaderComponent,
     SearchPillComponent,

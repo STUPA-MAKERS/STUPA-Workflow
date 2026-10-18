@@ -20,17 +20,7 @@
       } @else {
         <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
           <ng-container ngProjectAs="[actions]">
-            @if (phone()) {
-              @if (canManage()) {
-                <app-button size="sm" data-testid="exp-add" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
-                  <span class="exp__btn"
-                    ><app-icon name="add" [size]="16" />{{
-                      (tab() === 'transfers' ? 'expenses.transferShort' : 'expenses.addShort') | t
-                    }}</span
-                  >
-                </app-button>
-              }
-            } @else {
+            @if (!phone()) {
               @if (canExport() && tab() === 'bookings') {
                 <app-button
                   variant="text"
@@ -369,11 +359,12 @@
         }
       </div>
 
-      @if (canManage() && !phone() && !selecting() && formMode() === null) {
-        <button type="button" class="exp__fab" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
-          <app-icon [name]="tab() === 'transfers' ? 'repeat' : 'plus'" [size]="22" />
-          {{ (tab() === 'transfers' ? 'expenses.transferNew' : 'expenses.add') | t }}
-        </button>
+      @if (canManage() && !selecting() && formMode() === null) {
+        <app-fab
+          [label]="(tab() === 'transfers' ? 'fab.transfer' : 'fab.expense') | t"
+          [contained]="split()"
+          (activate)="tab() === 'transfers' ? openTransfer() : openCreate()"
+        />
       }
     </section>
 
