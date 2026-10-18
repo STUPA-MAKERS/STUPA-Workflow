@@ -30,7 +30,7 @@
 <app-dialog
   [open]="renaming() !== null"
   [title]="'guests.list.renameTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="renaming.set(null)"
 >
   <form class="g__form" (submit)="$event.preventDefault(); saveRename()">
@@ -51,7 +51,7 @@
 <app-dialog
   [open]="removing() !== null"
   [title]="'guests.list.removeTitle' | t: { name: removing() ? nameOf(removing()!) : '' }"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="removing.set(null)"
 >
   <app-button dialog-footer variant="text" (click)="removing.set(null)">{{ 'action.cancel' | t }}</app-button>

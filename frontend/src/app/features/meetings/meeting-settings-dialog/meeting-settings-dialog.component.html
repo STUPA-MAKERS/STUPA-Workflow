@@ -2,7 +2,7 @@
   [open]="meeting() !== null"
   [title]="'meetings.settings.title' | t"
   [subtitle]="meeting()?.gremiumName ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancel()"
 >
   <form class="msd" (submit)="$event.preventDefault(); save()">
@@ -88,7 +88,7 @@
 <app-dialog
   [open]="confirmOff()"
   [title]="'guests.off.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="keepPublic()"
 >
   <p class="msd__confirm">{{ 'guests.off.text' | t: { pending: offCounts().pending, admitted: offCounts().admitted } }}</p>

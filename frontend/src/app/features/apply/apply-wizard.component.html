@@ -200,12 +200,12 @@
 <app-dialog
   [open]="confirmDiscard()"
   [title]="'apply.discard.title' | t"
-  [closeLabel]="'apply.discard.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmDiscard.set(false)"
 >
   <p class="wz__dialogText">{{ 'apply.discard.body' | t }}</p>
   <div dialog-footer>
-    <app-button variant="text" (click)="confirmDiscard.set(false)">{{ 'apply.discard.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="confirmDiscard.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="danger" (click)="discardDraft()">{{ 'apply.nav.discard' | t }}</app-button>
   </div>
 </app-dialog>

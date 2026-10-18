@@ -2,7 +2,7 @@
   [open]="item() !== null"
   [title]="(canOpen() ? 'meetings.vote.dialogTitle' : 'meetings.vote.prepareTitle') | t"
   [subtitle]="subtitle()"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancel()"
 >
   <form class="vod" (submit)="$event.preventDefault(); submit()">

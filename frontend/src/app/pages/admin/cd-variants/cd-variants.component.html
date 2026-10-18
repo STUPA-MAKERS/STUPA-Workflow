@@ -123,7 +123,7 @@
 <app-dialog
   [open]="dialogOpen()"
   [title]="(editingId() ? 'admin.cdVariants.edit' : 'admin.cdVariants.create') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
 >
   <form id="cdv-form" class="cdv__form" (submit)="submit($event)">
@@ -166,7 +166,7 @@
   [open]="logoDraft() !== null"
   [title]="'admin.cdVariants.addLogo' | t"
   [subtitle]="logoDraft() ? ('admin.cdVariants.variantOf' | t: { name: logoDraft()?.variantName ?? '' }) : ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeLogoDialog()"
 >
   @if (logoDraft(); as draft) {
@@ -234,7 +234,7 @@
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.cdVariants.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmDelete.set(null)"
 >
   <p class="cdv__confirm">{{ 'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>

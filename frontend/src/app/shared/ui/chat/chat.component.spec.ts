@@ -890,7 +890,7 @@ describe('ChatComponent', () => {
       const { del, view } = await setup({ messages: own() });
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
       const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen' });
-      fireEvent.click(within(dialog).getAllByRole('button', { name: 'Abbrechen' })[1]);
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Abbrechen' }));
       expect(del).not.toHaveBeenCalled();
       fireEvent.click(screen.getAllByRole('button', { name: 'Nachricht löschen' })[0]);
       fireEvent.click(within(screen.getByRole('dialog', { name: 'Nachricht löschen' })).getByRole('button', { name: 'Löschen' }));

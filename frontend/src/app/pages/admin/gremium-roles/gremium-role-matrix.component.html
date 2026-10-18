@@ -139,7 +139,7 @@
 <app-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremiumRoles.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmDelete.set(null)"
 >
   @if (confirmDelete(); as r) {

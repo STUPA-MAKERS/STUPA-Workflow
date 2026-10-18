@@ -197,7 +197,8 @@ describe('MeetingSettingsDialogComponent', () => {
     http.expectOne('/api/meetings/m-1/attendance').flush(null, { status: 500, statusText: 'e' });
     fixture.detectChanges();
     expect(cmp.roster()).toEqual([]);
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
   });
