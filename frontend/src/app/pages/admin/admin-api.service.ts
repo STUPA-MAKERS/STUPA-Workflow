@@ -1627,7 +1627,7 @@ const MOCK_OAUTH_GRANTS: OAuthGrantAdmin[] = [
 
 /** CD-variant stubs for mock mode — the real list comes from the backend. */
 const MOCK_CD_VARIANT_OPTIONS: CdVariantOption[] = [
-  { id: 'cd-stupa', key: 'stupa', name: 'StuPa' },
+  { id: 'cd-stupa', key: 'stupa', name: 'STUPA' },
   { id: 'cd-asta', key: 'asta', name: 'AStA' },
 ];
 

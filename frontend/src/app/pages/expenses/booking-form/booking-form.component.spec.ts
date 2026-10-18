@@ -156,7 +156,7 @@ describe('BookingFormComponent', () => {
     await user.click(screen.getByRole('radio', { name: 'Ausgabe' }));
     expect(dialogs.newKind()).toBe('expense');
 
-    const pick = screen.getByRole('button', { name: /Kostenstelle \*.*Kostenstelle wählen/ });
+    const pick = screen.getByRole('button', { name: /^Kostenstelle Kostenstelle wählen/ });
     await user.click(pick);
     expect(pick.getAttribute('aria-expanded')).toBe('true');
     await user.click(screen.getByRole('button', { name: /Maschinenbau/ }));
@@ -231,7 +231,7 @@ describe('BookingFormComponent', () => {
   it('moves a standalone booking to another cost centre in the edit', async () => {
     const { dialogs, user, form } = await setup('edit', { expense: { ...EXPENSE, actorName: null } });
     expect(screen.getByText(/Lastenrad Anzahlung · /)).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /Kostenstelle \*.*Maschinenbau/ }));
+    await user.click(screen.getByRole('button', { name: /^Kostenstelle .*Maschinenbau/ }));
     await user.click(screen.getByRole('button', { name: /Gesamthaushalt/ }));
     expect(dialogs.editBudgetId()).toBe('top');
     await user.click(screen.getByRole('radio', { name: 'Karte' }));

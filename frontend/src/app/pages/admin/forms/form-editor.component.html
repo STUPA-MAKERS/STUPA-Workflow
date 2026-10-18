@@ -275,7 +275,7 @@
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
                         <app-input label="DE" [ariaLabel]="'admin.common.labelDe' | t" [(ngModel)]="opt.label['de']" (ngModelChange)="touch()" />
                         <app-input label="EN" [ariaLabel]="'admin.common.labelEn' | t" [(ngModel)]="opt.label['en']" (ngModelChange)="touch()" />
-                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="x" /></app-button>
+                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
                       </div>
                     }
                     <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addOption(pos)">

@@ -20,7 +20,7 @@
                 [attr.aria-controls]="'ar-body-' + r.id"
                 (click)="toggle(r.id)"
               >
-                <app-icon class="ar__chev" [name]="isOpen(r) ? 'chevron-up' : 'chevron-down'" [size]="16" />
+                <app-icon class="ar__chev" [name]="isOpen(r) ? 'up' : 'down'" [size]="16" />
                 <span class="ar__name ell" [title]="roleLabel(r) | capitalize">{{ roleLabel(r) | capitalize }}</span>
               </button>
               @if (isFixed(r)) {

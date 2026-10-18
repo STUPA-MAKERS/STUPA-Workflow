@@ -167,7 +167,7 @@ export class FormsListComponent {
 
   /** "v7" for the active form version, a dash while the type is a draft. */
   protected versionLabel(t: ApplicationTypeFull): string {
-    return t.activeFormVersion ? `v${t.activeFormVersion}` : '–';
+    return t.activeFormVersion ? `v${t.activeFormVersion}` : '—';
   }
 
   protected gremiumName(id?: Uuid | null): string {

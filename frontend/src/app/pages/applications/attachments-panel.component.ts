@@ -157,7 +157,7 @@ export class AttachmentsPanelComponent {
   }
 
   size(att: Attachment): string {
-    return formatBytes(att.size);
+    return formatBytes(att.size, this.i18n.locale());
   }
 
   onFileSelected(event: Event): void {

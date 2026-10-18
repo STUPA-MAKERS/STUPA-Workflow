@@ -116,10 +116,12 @@
 }
 
 /* The grip shows on hover and while a control of the row has the focus. It sits in the
-   gutter before the number, so the row does not move when it appears. */
+   gutter before the number, so the row does not move when it appears. Its box ends at the
+   number, because the dots fill only the middle of the box and the scrolling list clips
+   anything left of the row's own padding. */
 .ap__grip {
   position: absolute;
-  inset-inline-end: calc(100% + 2px);
+  inset-inline-end: 100%;
   top: 50%;
   display: grid;
   place-items: center;

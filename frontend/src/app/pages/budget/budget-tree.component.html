@@ -76,7 +76,7 @@
                 [attr.aria-label]="('budget.tree.fold' | t) + ': ' + n.name"
                 (click)="toggleCollapse(n.id)"
               >
-                <app-icon [name]="isCollapsed(n.id) ? 'chevron-right' : 'chevron-down'" [size]="16" />
+                <app-icon [name]="isCollapsed(n.id) ? 'right' : 'down'" [size]="16" />
               </button>
             } @else {
               <span class="bt__foldGap" aria-hidden="true"></span>

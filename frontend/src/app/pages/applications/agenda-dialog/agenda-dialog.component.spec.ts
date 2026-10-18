@@ -191,7 +191,7 @@ describe('AgendaDialogComponent', () => {
   });
 
   it.each([
-    [403, 'Sie dürfen diesen Übergang nicht ausführen.'],
+    [403, 'Du darfst diesen Übergang nicht ausführen.'],
     [422, 'Statuswechsel fehlgeschlagen.'],
     [500, 'Statuswechsel fehlgeschlagen.'],
   ])('toasts a %s and stays open', async (status, message) => {

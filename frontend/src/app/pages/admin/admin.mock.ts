@@ -299,7 +299,7 @@ export const MOCK_FORM_DRAFTS: Record<string, FormDraft> = {
     version: 3,
     active: true,
     description: {
-      de: 'Bitte beschreibe dein Förderprojekt möglichst genau.\n\nAnträge werden im StuPa beraten.',
+      de: 'Bitte beschreibe dein Förderprojekt möglichst genau.\n\nAnträge werden im STUPA beraten.',
       en: 'Please describe your funding project as precisely as possible.',
     },
     // Two steps with one field of each family that has its own options: choice options,
@@ -407,7 +407,7 @@ export const MOCK_CD_VARIANTS: CdVariant[] = [
   {
     id: 'cd-stupa',
     key: 'stupa',
-    name: 'StuPa',
+    name: 'STUPA',
     baseVariant: 'protocol',
     logos: [
       { id: 'cdl-1', slot: 'title', position: 0, vendoredName: 'HSRT' },
@@ -687,7 +687,7 @@ export const MOCK_AUDIT_ENTRIES: AuditEntry[] = [
 
 /**
  * The global flow of mock mode: a review step, a request for more details that comes
- * back automatically, and a vote of the StuPa with its pass and fail branches. The
+ * back automatically, and a vote of the STUPA with its pass and fail branches. The
  * positions put it on the grid of the board Admin-Flow-Editor.
  */
 export const MOCK_FLOW: FlowGraph = {
@@ -759,7 +759,7 @@ export const MOCK_FLOW: FlowGraph = {
     {
       from: 'gremium_abstimmung',
       to: 'tagesordnung',
-      label: { de: 'An das StuPa abgeben', en: 'Hand over to the StuPa' },
+      label: { de: 'An das STUPA abgeben', en: 'Hand over to the STUPA' },
       guard: { isInVoteGremium: true },
     },
     { from: 'gremium_abstimmung', to: 'bewilligt', branch: 'pass' },
@@ -823,7 +823,7 @@ export function mockMergePreview(
     sourceId === 'p-old-1' && targetId === 'p-1'
       ? [
           { kind: 'ballot_same_vote', label: 'Haushalt 2026 beschließen' },
-          { kind: 'delegation_same_meeting', label: 'StuPa-Sitzung 12. Mai' },
+          { kind: 'delegation_same_meeting', label: 'STUPA-Sitzung 12. Mai' },
           { kind: 'erasure_open', label: null },
         ]
       : [];
@@ -838,7 +838,7 @@ export function mockMergePreview(
     // Sam Neu lacks two rights of the old account; the demo admin holds them.
     extraPermissions:
       targetId === 'p-3'
-        ? [{ key: 'vote.cast', gremium: 'StuPa' }, { key: 'budget.view', gremium: null }]
+        ? [{ key: 'vote.cast', gremium: 'STUPA' }, { key: 'budget.view', gremium: null }]
         : [],
     actorHoldsExtra: true,
     canMerge: conflicts.length === 0,

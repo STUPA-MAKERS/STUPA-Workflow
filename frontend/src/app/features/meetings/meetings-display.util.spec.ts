@@ -93,7 +93,7 @@ describe('meetings-display.util', () => {
     expect(attendanceButtonVariant('absent')).toBe('danger');
     expect(attendanceIcon('present')).toBe('check');
     expect(attendanceIcon('excused')).toBe('half');
-    expect(attendanceIcon('absent')).toBe('remove');
+    expect(attendanceIcon('absent')).toBe('x');
     expect(attendanceBadgeVariant('present')).toBe('success');
     expect(attendanceBadgeVariant('excused')).toBe('warning');
     expect(attendanceBadgeVariant('absent')).toBe('danger');

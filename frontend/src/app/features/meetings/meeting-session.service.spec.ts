@@ -61,7 +61,7 @@ describe('MeetingSessionService', () => {
     session.meeting.set(M({ protokollantId: null }));
     session.startMeeting();
     http.verify();
-    expect(toasts()).toContain('Bitte zuerst einen Protokollanten zuweisen, dann die Sitzung starten.');
+    expect(toasts()).toContain('Bitte zuerst die Protokollführung zuweisen, dann die Sitzung starten.');
   });
 
   it('refuses an open before the window and asks before an early open', () => {

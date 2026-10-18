@@ -6,7 +6,7 @@
     <header class="cd__head">
       @if (phone() && mode() === 'drawer') {
         <button type="button" class="cd__back" (click)="closed.emit()">
-          <app-icon name="chevron-left" [size]="18" />
+          <app-icon name="back" [size]="18" />
           {{ 'todos.card.back' | t }}
         </button>
       }
@@ -64,7 +64,7 @@
     <header class="cd__head">
       @if (phone() && mode() === 'drawer') {
         <button type="button" class="cd__back" (click)="closed.emit()">
-          <app-icon name="chevron-left" [size]="18" />
+          <app-icon name="back" [size]="18" />
           {{ 'todos.card.back' | t }}
         </button>
       }
@@ -350,7 +350,7 @@
                 <span class="cd__linkSub">{{ linkSub(link) }}</span>
               </span>
               @if (link.url) {
-                <app-icon class="cd__linkChev" name="chevron-right" [size]="16" />
+                <app-icon class="cd__linkChev" name="right" [size]="16" />
               }
               @if (canWrite()) {
                 <button

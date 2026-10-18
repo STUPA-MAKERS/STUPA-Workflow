@@ -317,13 +317,13 @@ export class MeetingPageComponent {
       danger.push({
         id: 'close',
         label: t('meetings.control.closeSession'),
-        icon: 'stop',
+        icon: 'square',
         danger: true,
         disabledReason: this.anyOpenVote() ? t('meetings.page.closeBlocked') : null,
       });
     }
     if (m.canManage) {
-      danger.push({ id: 'delete', label: t('meetings.delete.title'), icon: 'delete', danger: true });
+      danger.push({ id: 'delete', label: t('meetings.delete.title'), icon: 'trash', danger: true });
     }
     sections.push({ items: danger });
     return sections;
