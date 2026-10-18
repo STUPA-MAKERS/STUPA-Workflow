@@ -3011,6 +3011,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.users.merge.area.sessions': 'Logins and API access',
   'admin.users.merge.area.memberships': 'Committee memberships',
   'admin.users.merge.area.calendar': 'Calendar subscription',
+  'admin.users.merge.area.tickets': 'Tickets',
   'admin.users.merge.area.todos': 'To-dos (boards, cards, comments)',
   'admin.users.merge.count.rewritten': '{n} moved',
   'admin.users.merge.count.combined': '{n} combined',

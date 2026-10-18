@@ -3065,6 +3065,7 @@ export const de = {
   'admin.users.merge.area.sessions': 'Anmeldungen und API-Zugriffe',
   'admin.users.merge.area.memberships': 'Gremienmitgliedschaften',
   'admin.users.merge.area.calendar': 'Kalender-Abo',
+  'admin.users.merge.area.tickets': 'Tickets',
   'admin.users.merge.area.todos': 'To-Dos (Boards, Karten, Kommentare)',
   'admin.users.merge.count.rewritten': '{n} übertragen',
   'admin.users.merge.count.combined': '{n} zusammengefasst',
