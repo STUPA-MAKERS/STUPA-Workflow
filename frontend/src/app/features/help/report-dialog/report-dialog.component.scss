@@ -83,10 +83,6 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-/* Wider than the shared `md` dialog, like the mockup. */
-:host ::ng-deep .dialog {
-  max-width: 40rem;
-}
 .rd__chips {
   display: flex;
   flex-wrap: wrap;

@@ -1,5 +1,6 @@
 import type { ApplicationListItem, Transition } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
+import { formatBytes as formatBytesIn } from '@shared/format-bytes';
 import { flowColorKind } from '@shared/status-kind.util';
 
 /**
@@ -25,18 +26,12 @@ export function applicationTitle(
 // and the apply wizard use them too. The re-export keeps the imports of this page.
 export { formatDateRangeValue, formatFieldValue, formatIsoDate } from '@shared/forms/answer-format';
 
-/** Human-readable bytes, binary base, one decimal from KB up. An invalid size gives "—". */
-export function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '—';
-  if (bytes < 1024) return `${bytes} B`;
-  const units = ['KB', 'MB', 'GB', 'TB'];
-  let value = bytes / 1024;
-  let unit = 0;
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024;
-    unit++;
-  }
-  return `${value.toFixed(1)} ${units[unit]}`;
+/**
+ * Human-readable bytes in the UI locale ("1,5 MB"), binary base, one decimal from KB up.
+ * An invalid size gives "—".
+ */
+export function formatBytes(bytes: number, locale: string): string {
+  return formatBytesIn(bytes, toFormatLocale(locale), 'fixed');
 }
 
 /** One month of the list: a heading and the rows submitted in that month. */

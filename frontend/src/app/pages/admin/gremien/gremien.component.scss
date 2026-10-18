@@ -189,15 +189,6 @@
   user-select: text;
 }
 
-.grem__confirm {
-  margin: 0;
-}
-.grem__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 @container (max-width: 44rem) {
   .grem__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));

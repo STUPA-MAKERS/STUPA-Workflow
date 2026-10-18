@@ -13,7 +13,6 @@ import {
 } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -22,6 +21,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
@@ -63,10 +63,10 @@ interface Setting {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     RouterLink,
     TranslatePipe,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     EmptyStateComponent,
     NoteComponent,

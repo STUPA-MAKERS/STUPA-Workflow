@@ -18,7 +18,7 @@
           } @else {
             <span class="ell ff__placeholder" id="bp-ccv">{{ 'expenses.bulk.keepValue' | t }}</span>
           }
-          <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="18" />
+          <app-icon [name]="treeOpen() ? 'up' : 'down'" [size]="18" />
         </button>
       </div>
       <app-input
@@ -126,7 +126,7 @@
           <div class="bp__action">
             <span>{{ deleteReason() ?? ('expenses.bulk.deleteLimit' | t: { max: deleteMax() }) }}</span>
             <app-button variant="danger" size="sm" [disabled]="busy() || deleteReason() !== null" (click)="remove.emit()">
-              <span class="ff__btn"><app-icon name="delete" [size]="16" />{{
+              <span class="ff__btn"><app-icon name="trash" [size]="16" />{{
                 'expenses.bulk.deleteCount' | t: { count: rows().length }
               }}</span>
             </app-button>

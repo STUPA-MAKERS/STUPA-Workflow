@@ -29,6 +29,7 @@ export type {
   ChatSend,
   ChatVisibility,
 } from './chat/chat.models';
+export { ConfirmDialogComponent } from './confirm-dialog/confirm-dialog.component';
 export { DateBlockComponent } from './date-block/date-block.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';

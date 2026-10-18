@@ -190,11 +190,37 @@ describe('AgendaPaneComponent', () => {
       expect(within(menu).queryByRole('menuitem', { name: 'TOP umbenennen' })).toBeNull();
     });
 
-    it('removes an item without votes', async () => {
-      const { on } = await setup();
+    it('removes an item without votes after "TOP entfernen?"', async () => {
+      const { on, fixture } = await setup();
       const menu = await openMenu(1);
       await userEvent.click(within(menu).getByRole('menuitem', { name: 'TOP entfernen' }));
+      fixture.detectChanges();
+      const dialog = screen.getByRole('dialog', { name: 'TOP entfernen?' });
+      expect(dialog).toHaveTextContent(
+        `„${AGENDA[1].title}“ wird mit seinem Text von der Tagesordnung entfernt. Das lässt sich nicht rückgängig machen.`,
+      );
+      expect(on.remove).not.toHaveBeenCalled();
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Entfernen' }));
       expect(on.remove).toHaveBeenCalledWith('t-2');
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('keeps the item when "TOP entfernen?" is cancelled', async () => {
+      const { on, fixture } = await setup();
+      const menu = await openMenu(1);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'TOP entfernen' }));
+      fixture.detectChanges();
+      await userEvent.click(screen.getByRole('button', { name: 'Abbrechen' }));
+      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(on.remove).not.toHaveBeenCalled();
+    });
+
+    it('names an untitled item in "TOP entfernen?"', async () => {
+      const { fixture } = await setup({ agenda: [item({ id: 't-9', title: '' })] });
+      const menu = await openMenu(0);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'TOP entfernen' }));
+      fixture.detectChanges();
+      expect(screen.getByRole('dialog', { name: 'TOP entfernen?' })).toHaveTextContent('„Unbenannter TOP“');
     });
 
     it('disables the remove of an item with an open or closed vote and says why (O25)', async () => {

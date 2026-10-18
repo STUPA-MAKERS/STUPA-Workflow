@@ -77,10 +77,10 @@
                               <span class="cdv__moveGap" aria-hidden="true"></span>
                             } @else {
                               <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
-                                <app-icon name="chevron-up" />
+                                <app-icon name="up" />
                               </app-button>
                               <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
-                                <app-icon name="chevron-down" />
+                                <app-icon name="down" />
                               </app-button>
                             }
                             @if (logo.fileName) {
@@ -123,7 +123,7 @@
 <app-dialog
   [open]="dialogOpen()"
   [title]="(editingId() ? 'admin.cdVariants.edit' : 'admin.cdVariants.create') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
 >
   <form id="cdv-form" class="cdv__form" (submit)="submit($event)">
@@ -166,7 +166,7 @@
   [open]="logoDraft() !== null"
   [title]="'admin.cdVariants.addLogo' | t"
   [subtitle]="logoDraft() ? ('admin.cdVariants.variantOf' | t: { name: logoDraft()?.variantName ?? '' }) : ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeLogoDialog()"
 >
   @if (logoDraft(); as draft) {
@@ -231,20 +231,15 @@
   </div>
 </app-dialog>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.cdVariants.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
+  [body]="'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' }"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
 >
-  <p class="cdv__confirm">{{ 'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
   @if (deleteError(); as err) {
     <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
   }
-  <div dialog-footer class="cdv__foot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">
-      {{ 'admin.common.remove' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>

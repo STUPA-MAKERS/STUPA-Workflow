@@ -110,15 +110,6 @@
   color: var(--color-text-muted);
 }
 
-.og__dialogText {
-  margin: 0 0 var(--space-4);
-}
-.og__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 @container (max-width: 56.5rem) {
   .og__row {
     grid-template-columns: 2rem minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;

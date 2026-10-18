@@ -774,7 +774,7 @@ describe('AuditLogComponent', () => {
   });
 
   it.each([
-    [409, 'Es läuft schon eine Prüfung. Versuche es gleich noch einmal.'],
+    [409, 'Es läuft schon eine Prüfung. Versuche es später noch einmal.'],
     [429, 'Die nächste Prüfung ist erst in einigen Minuten möglich.'],
     [500, 'Die Prüfung ist fehlgeschlagen.'],
   ])('names the reason when "Jetzt prüfen" answers %s', async (status, text) => {

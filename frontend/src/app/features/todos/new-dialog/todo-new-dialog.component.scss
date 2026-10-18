@@ -3,11 +3,6 @@
 :host {
   display: contents;
 }
-/* The dialog is wider than the shared `md` size, so two fields fit side by side. */
-:host ::ng-deep .dialog {
-  max-width: 39rem;
-}
-
 .tn {
   display: flex;
   flex-direction: column;

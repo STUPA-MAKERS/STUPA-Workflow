@@ -2,7 +2,7 @@
   size="lg"
   [open]="open()"
   [title]="(confirmPublic() ? 'admin.gremien.publicConfirm.title' : isNew() ? 'admin.gremien.create' : 'admin.gremien.edit') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   @if (confirmPublic()) {

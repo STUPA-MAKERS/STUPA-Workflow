@@ -17,7 +17,7 @@
           @if (canManage()) {
             @if (phone()) {
               <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
-                <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
+                <span class="inv__btn"><app-icon name="plus" [size]="16" />{{ 'invoices.addShort' | t }}</span>
               </app-button>
               <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
             } @else {
@@ -155,7 +155,7 @@
                         <span class="inv__menuSlot">
                           @if (!split()) {
                             <span class="inv__chev" aria-hidden="true">
-                              <app-icon name="chevron-right" [size]="17" />
+                              <app-icon name="right" [size]="17" />
                             </span>
                           }
                           @if (menu.length) {
@@ -282,17 +282,11 @@
   </app-side-sheet>
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmDelete()"
   [title]="'invoices.delete.title' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="inv__confirm">
-    {{ 'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' } }}
-  </p>
-  <div dialog-footer class="inv__footer">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' }"
+  [busy]="saving()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

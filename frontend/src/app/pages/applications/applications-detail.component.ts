@@ -110,6 +110,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -157,6 +158,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     SheetBarComponent,
     SheetBarKickerDirective,
     NgTemplateOutlet,

@@ -18,8 +18,9 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, DialogComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { scopeLabel } from './scope-labels';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** What the confirmation dialog asks: revoke one grant, or all of them. */
 type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };
@@ -42,8 +43,8 @@ const COPIED_MS = 2000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     ButtonComponent,
-    DialogComponent,
     EmptyStateComponent,
     IconComponent,
     LocalizedDatePipe,
@@ -74,6 +75,14 @@ export class AccountGrantsComponent {
 
   /** The open confirmation, or null. */
   readonly confirm = signal<Confirm | null>(null);
+  /** The text of the revoke confirmation: the scopes of one grant, or all grants. */
+  readonly confirmText = computed(() => {
+    const c = this.confirm();
+    if (!c) return '';
+    return c.kind === 'one'
+      ? this.i18n.translate('account.grants.revokeConfirm', { scopes: this.scopeLabels(c.grant) })
+      : this.i18n.translate('account.grants.revokeAllConfirm');
+  });
   readonly revoking = signal(false);
 
   /** The MCP download and setup need `mcp.use`. An admin always holds it. */

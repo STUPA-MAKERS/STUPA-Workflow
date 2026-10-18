@@ -74,7 +74,7 @@
             <span class="al__action ell" [title]="actionLabel(e.action)">{{ actionLabel(e.action) }}</span>
             <span class="al__actor ell" [title]="actorLabel(e)">{{ actorLabel(e) }}</span>
             <span class="al__target ell" [title]="targetText(e)">{{ targetText(e) }}</span>
-            <app-icon class="al__chev" [name]="isOpen(e.id) ? 'chevron-up' : 'chevron-down'" [size]="16" />
+            <app-icon class="al__chev" [name]="isOpen(e.id) ? 'up' : 'down'" [size]="16" />
           </button>
           @if (isOpen(e.id)) {
             <div class="al__details" [id]="'al-detail-' + e.id">
@@ -163,7 +163,7 @@
 <app-dialog
   [open]="!!confirmRevert()"
   [title]="'admin.audit.revert.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRevert.set(null)"
 >
   <p class="al__dialogText">{{ 'admin.audit.revert.confirm' | t }}</p>

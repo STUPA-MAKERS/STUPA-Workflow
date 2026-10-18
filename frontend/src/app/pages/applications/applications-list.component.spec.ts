@@ -1201,8 +1201,8 @@ describe('ApplicationsListComponent', () => {
       await userEvent.click(del);
       harness.detectChanges();
       http.verify();
-      const dialog = screen.getByRole('dialog', { name: 'Antrag löschen' });
-      expect(dialog).toHaveTextContent('„Flyer für die Hochschulgruppen-Messe“ endgültig löschen?');
+      const dialog = screen.getByRole('dialog', { name: 'Antrag löschen?' });
+      expect(dialog).toHaveTextContent('„Flyer für die Hochschulgruppen-Messe“ wird gelöscht.');
       const confirm = within(dialog).getAllByRole('button', { name: 'Löschen' }).pop()!;
       await userEvent.click(confirm);
       cmp.confirmDelete();

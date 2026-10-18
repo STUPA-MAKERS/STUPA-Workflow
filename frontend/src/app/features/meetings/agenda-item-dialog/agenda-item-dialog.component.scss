@@ -4,13 +4,6 @@
 
 @include df.host;
 
-/* Wider than the shared `md` size (35rem), so a long application title has room. */
-@include bp.not-phone {
-  :host ::ng-deep .dialog {
-    max-width: 40rem;
-  }
-}
-
 /* Every block of the body shares the same left and right edges: no block pads itself. */
 .aid {
   @include df.form;

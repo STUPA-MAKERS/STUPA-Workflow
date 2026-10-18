@@ -37,7 +37,6 @@ import {
   ButtonComponent,
   CurrencyInputComponent,
   DatepickerComponent,
-  DialogComponent,
   IconComponent,
   MEDIA,
   ToastService,
@@ -79,6 +78,7 @@ import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dial
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
 import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * One filter of the list.
@@ -147,6 +147,7 @@ type FilterSheet = 'budget' | 'more' | null;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NoteComponent,
+    ConfirmDialogComponent,
     PageHeaderComponent,
     FormsModule,
     RouterLink,
@@ -155,7 +156,6 @@ type FilterSheet = 'budget' | 'more' | null;
     ButtonComponent,
     CurrencyInputComponent,
     DatepickerComponent,
-    DialogComponent,
     EmptyStateComponent,
     FilterSelectComponent,
     IconComponent,
@@ -427,7 +427,7 @@ export class ApplicationsListComponent implements OnDestroy {
     const sections: RowMenuSection[] = [];
     if (this.canCapture()) {
       sections.push({
-        items: [{ id: 'capture', label: this.i18n.translate('applications.capture.title'), icon: 'add' }],
+        items: [{ id: 'capture', label: this.i18n.translate('applications.capture.title'), icon: 'plus' }],
       });
     }
     sections.push(...this.sortSections());

@@ -496,7 +496,7 @@ describe('VoteCastComponent', () => {
       const router = fixture.debugElement.injector.get(Router);
       const navigate = jest.spyOn(router, 'navigate');
       await openDelete();
-      await userEvent.click(screen.getByRole('button', { name: 'Abstimmung löschen' }));
+      await userEvent.click(within(screen.getByRole('dialog', { name: 'Abstimmung löschen?' })).getByRole('button', { name: 'Löschen' }));
       expect(deleteVote).toHaveBeenCalledWith('v1');
       expect(toast.success).toHaveBeenCalledWith('Abstimmung gelöscht.');
       expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'deleted' });
@@ -834,7 +834,7 @@ describe('VoteCastComponent', () => {
       const { sessions, fixture } = await setup();
       sessions[0].connection.set('reconnecting');
       fixture.detectChanges();
-      expect(screen.getByText('Verbindung verloren – verbinde neu …')).toBeInTheDocument();
+      expect(screen.getByText('Verbindung verloren — verbinde neu …')).toBeInTheDocument();
     });
 
     it('does not follow a closed vote', async () => {

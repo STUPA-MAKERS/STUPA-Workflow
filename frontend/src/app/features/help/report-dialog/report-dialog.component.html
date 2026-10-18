@@ -1,7 +1,8 @@
 <app-dialog
   [open]="help.reportOpen()"
   [title]="(sentNumber() ? 'help.report.sentTitle' : 'help.report.title') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
+  size="form"
   (closed)="cancel()"
 >
   @if (sentNumber(); as number) {

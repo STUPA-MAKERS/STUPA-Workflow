@@ -360,7 +360,7 @@
 <app-dialog
   [open]="closing() !== null"
   [title]="(closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancelClose()"
 >
   <div class="td__closeBox">
@@ -387,7 +387,7 @@
 <app-dialog
   [open]="duplicateOpen()"
   [title]="'tickets.duplicate.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="duplicateOpen.set(false)"
 >
   <div class="td__dup">

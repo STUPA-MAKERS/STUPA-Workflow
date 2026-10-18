@@ -67,7 +67,7 @@ describe('LeadSubstituteDialogComponent', () => {
   it('lists the pool of the member and enters the pick with the vote', async () => {
     const { dialog, submit, answer, http, created } = await setup();
     expect(within(dialog()).getByText('für Fritz Fehlend')).toBeInTheDocument();
-    expect(within(dialog()).getByText('Lädt …')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Wird geladen …')).toBeInTheDocument();
     answer();
     const group = within(dialog()).getByRole('radiogroup', { name: 'Stellvertretung aus dem Pool' });
     expect(within(group).getAllByRole('radio')).toHaveLength(2);
@@ -170,7 +170,7 @@ describe('LeadSubstituteDialogComponent', () => {
     staleContext.flush(null, { status: 500, statusText: 'Error' });
     fixture.detectChanges();
     expect(within(dialog()).queryByText('Der Pool konnte nicht geladen werden.')).toBeNull();
-    expect(within(dialog()).getByText('Lädt …')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Wird geladen …')).toBeInTheDocument();
     pool.flush(POOL);
     context.flush(CTX);
     fixture.detectChanges();

@@ -14,7 +14,6 @@ import {
 } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -23,6 +22,7 @@ import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
 export function localToday(now = new Date()): string {
@@ -48,13 +48,13 @@ export function localToday(now = new Date()): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     NoteComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,

@@ -47,7 +47,7 @@ describe('DateBlockComponent', () => {
       const block = container.querySelector('.db');
       expect(block).toHaveClass('db--none');
       expect(block).toHaveAttribute('aria-hidden', 'true');
-      expect(block).toHaveTextContent('–');
+      expect(block).toHaveTextContent('—');
       expect(await runAxe(container)).toHaveNoViolations();
     },
   );
