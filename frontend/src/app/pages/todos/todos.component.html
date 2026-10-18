@@ -191,9 +191,8 @@
     } @else if (notFound()) {
       <app-empty-state plain icon="circleok" fill [heading]="'todos.notFound' | t" />
     } @else if (error()) {
-      <div class="td__state" role="alert">
-        <p class="td__error">{{ 'todos.error.load' | t }}</p>
-        <app-button variant="tonal" size="sm" data-testid="td-retry" (click)="reload()">{{ 'todos.card.retry' | t }}</app-button>
+      <div class="td__state">
+        <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'todos.error.load' | t }}</app-note>
       </div>
     } @else if (board(); as b) {
       @if (noMatch()) {
@@ -253,7 +252,7 @@
   <!-- "+ To-Do" on every width, for a board the person writes and for "Alle". -->
   @if (canAdd()) {
     <button type="button" class="td__fab" data-testid="td-fab" (click)="newCard()">
-      <app-icon name="add" [size]="22" />
+      <app-icon name="plus" [size]="22" />
       {{ 'todos.new.short' | t }}
     </button>
   }

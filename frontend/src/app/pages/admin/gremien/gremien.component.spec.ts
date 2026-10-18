@@ -293,8 +293,8 @@ describe('AdminGremienComponent', () => {
     const api = makeApi();
     const { toast } = await setup({ api });
     await userEvent.click(screen.getByRole('button', { name: 'Löschen: AStA' }));
-    const dialog = screen.getByRole('dialog', { name: 'Gremium löschen' });
-    expect(dialog).toHaveTextContent('„AStA"');
+    const dialog = screen.getByRole('dialog', { name: 'Gremium löschen?' });
+    expect(dialog).toHaveTextContent('„AStA“');
     await userEvent.click(within(dialog).getByText('Löschen'));
     expect(api.deleteGremium).toHaveBeenCalledWith('g-2');
     expect(toast.success).toHaveBeenCalledWith('Gremium gelöscht.');

@@ -1,7 +1,8 @@
 <app-dialog
   [open]="open()"
   [title]="'meetings.agenda.dialogTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
+  size="form"
   (closed)="cancel()"
 >
   <form class="aid" (submit)="$event.preventDefault(); submit()">

@@ -89,7 +89,7 @@ describe('ApplyConfirmationComponent', () => {
 
   it('keeps the anonymous copy and shows no record link when nobody is signed in', async () => {
     await setup(false);
-    expect(screen.getByText(/Fast geschafft – E\u2011Mail bestätigen/)).toBeInTheDocument();
+    expect(screen.getByText(/Fast geschafft — E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.getByText('Bestätigung ausstehend')).toBeInTheDocument();
     expect(screen.getByText(/nach 12 Stunden automatisch verworfen/)).toBeInTheDocument();
     expect(screen.queryByText('Antrag eingereicht')).not.toBeInTheDocument();
@@ -202,7 +202,7 @@ describe('ApplyConfirmationComponent', () => {
 
   it('hides the reference line when the query has no id', async () => {
     await setup(false, null);
-    expect(screen.getByText(/Fast geschafft – E\u2011Mail bestätigen/)).toBeInTheDocument();
+    expect(screen.getByText(/Fast geschafft — E\u2011Mail bestätigen/)).toBeInTheDocument();
     expect(screen.queryByText(/Vorgangsnummer/)).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,6 @@
 @if (error()) {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-  <p class="bd__status bd__status--error" role="alert">{{ 'budget.error' | t }}</p>
+  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'budget.error' | t }}</app-note>
 } @else if (loading()) {
   <!-- Never the empty state while loading. "There are no cost centres" and "they have
        not arrived yet" are different claims, and the first one is false during every
@@ -65,7 +65,7 @@
           >
             <app-icon name="pie" [size]="15" />
             <span class="ell">{{ pathLabel() }}</span>
-            <app-icon name="chevron-down" [size]="15" />
+            <app-icon name="down" [size]="15" />
           </button>
           <ng-container *ngTemplateOutlet="yearChip" />
           <!-- The page reaches the overview without the picker, as on the wide layout. -->
@@ -172,16 +172,16 @@
                            below the name there. CSS shows exactly one of the two. -->
                       <span class="bd__ureq">
                         {{ 'budget.dash.fig.requested' | t }}:
-                        <span class="mono">{{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '–' }}</span>
+                        <span class="mono">{{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '—' }}</span>
                       </span>
                     </div>
                     <span class="bd__c1 mono">
                       <span class="sr-only">{{ 'budget.dash.fig.requested' | t }}:</span>
-                      {{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '–' }}
+                      {{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '—' }}
                     </span>
                     <span class="bd__c2 mono">
                       <span class="sr-only">{{ 'budget.usage.bar' | t }}:</span>
-                      {{ row.percent === null ? '–' : row.percent + ' %' }}
+                      {{ row.percent === null ? '—' : row.percent + ' %' }}
                     </span>
                     <span class="bd__c3 mono" [class.bd__neg]="row.figures.available < 0">
                       <span class="sr-only">{{ 'budget.dash.fig.available' | t }}:</span>
@@ -205,7 +205,7 @@
           @if (apps() === null) {
             <app-skeleton variant="rows" [count]="3" [label]="'budget.dash.appsLoading' | t" />
           } @else if (appsError()) {
-            <p class="bd__status bd__status--error" role="alert">{{ 'budget.dash.appsError' | t }}</p>
+            <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadApps()">{{ 'budget.dash.appsError' | t }}</app-note>
           } @else if (!appRows().length) {
             <app-empty-state rows="3" [heading]="'budget.dash.appsNone' | t" />
           } @else {
@@ -224,7 +224,7 @@
                       <span class="bd__appKs">{{ r.costCentre }}</span>
                     }
                   </span>
-                  <span trail class="mono bd__amount">{{ r.app.amount === null ? '–' : money(r.app.amount, r.app.currency ?? 'EUR') }}</span>
+                  <span trail class="mono bd__amount">{{ r.app.amount === null ? '—' : money(r.app.amount, r.app.currency ?? 'EUR') }}</span>
                 </app-list-item>
               }
             </div>
@@ -287,7 +287,7 @@
                 [disabled]="!!query().trim()"
                 (click)="toggle(row.node.id)"
               >
-                <app-icon [name]="row.expanded ? 'chevron-down' : 'chevron-right'" [size]="17" />
+                <app-icon [name]="row.expanded ? 'down' : 'right'" [size]="17" />
               </button>
             } @else {
               <span class="tn__chev" aria-hidden="true"></span>

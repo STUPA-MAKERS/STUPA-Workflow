@@ -55,7 +55,7 @@
           </app-button>
         }
         <app-button variant="tonal" (click)="createBooking.emit()">
-          <span class="fd__btn"><app-icon name="add" />{{ 'invoices.createBooking' | t }}</span>
+          <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
         </app-button>
       </div>
     }
@@ -146,7 +146,7 @@
             </h3>
             @if (canManage()) {
               <app-button variant="tonal" size="sm" (click)="createBooking.emit()">
-                <span class="fd__btn"><app-icon name="add" />{{ 'invoices.createBooking' | t }}</span>
+                <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
               </app-button>
             }
           </div>
@@ -172,7 +172,7 @@
                     </span>
                   </span>
                   <span class="mono fd__linkAmount">{{ signed(b) }}</span>
-                  <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+                  <app-icon class="fd__chev" name="right" [size]="17" />
                 </a>
               }
               @if (bookings().length && booked(); as bk) {

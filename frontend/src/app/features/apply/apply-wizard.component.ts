@@ -41,7 +41,6 @@ import { renderMarkdown } from '../meetings/meetings.util';
 import {
   BadgeComponent,
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   InputComponent,
   MEDIA,
@@ -56,6 +55,7 @@ import { DraftFilesComponent } from './draft-files/draft-files.component';
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The steps of the wizard. `contact` drops out for a signed-in user without PII fields. */
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
@@ -127,6 +127,7 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     SkeletonComponent,
     ReactiveFormsModule,
@@ -136,7 +137,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     FieldRowComponent,
     BadgeComponent,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     InputComponent,
     StepperComponent,

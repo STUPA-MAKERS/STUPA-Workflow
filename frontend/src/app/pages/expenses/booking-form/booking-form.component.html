@@ -197,7 +197,7 @@
                 <!-- The cost centre: the tree of the applications page opens below the
                      field. -->
                 <div class="ff__box">
-                  <span class="ff__label" [id]="'bf-cc-' + mode()">{{ 'expenses.field.costCentre' | t }} *</span>
+                  <span class="ff__label" [id]="'bf-cc-' + mode()">{{ 'expenses.field.costCentre' | t }} <span class="text-danger" aria-hidden="true">*</span></span>
                   <button
                     type="button"
                     class="ff__pick"
@@ -215,7 +215,7 @@
                         'expenses.field.costCentrePlaceholder' | t
                       }}</span>
                     }
-                    <app-icon [name]="treeOpen() ? 'chevron-up' : 'chevron-down'" [size]="18" />
+                    <app-icon [name]="treeOpen() ? 'up' : 'down'" [size]="18" />
                   </button>
                 </div>
                 @if (mode() === 'create') {
@@ -282,7 +282,7 @@
               </div>
             }
             <app-button variant="text" size="sm" (click)="addSub.emit()">
-              <span class="ff__btn"><app-icon name="add" />{{ 'expenses.sub.add' | t }}</span>
+              <span class="ff__btn"><app-icon name="plus" />{{ 'expenses.sub.add' | t }}</span>
             </app-button>
           </fieldset>
         }
@@ -432,7 +432,7 @@
         (click)="remove.emit()"
       >
         <span class="ff__btn"
-          ><app-icon name="delete" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
         >
       </app-button>
     }
@@ -440,7 +440,7 @@
       <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
       @if (mode() === 'create') {
         <app-button variant="fill" [disabled]="!s.canSubmitCreate()" [loading]="saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="add" />{{
+          <span class="ff__btn"><app-icon name="plus" />{{
             (layout() === 'sheet' ? 'expenses.form.addShort' : 'expenses.add') | t
           }}</span>
         </app-button>

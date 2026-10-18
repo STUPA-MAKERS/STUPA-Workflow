@@ -252,7 +252,7 @@ describe('MeetingDetailSheetComponent', () => {
     flush(http, 'm-2', { protocol: false });
     fixture.detectChanges();
     expect(screen.getByText('Noch keines')).toBeInTheDocument();
-    expect(screen.getByText('–')).toBeInTheDocument();
+    expect(screen.getByText('—')).toBeInTheDocument();
   });
 
   it('says which part failed and keeps the others', async () => {

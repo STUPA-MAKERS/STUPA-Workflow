@@ -54,6 +54,7 @@ import {
   voteStatusVariant,
 } from './meetings-display.util';
 import { beamerUrl } from '../voting/beamer-link.util';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /**
  * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or
@@ -75,6 +76,7 @@ import { beamerUrl } from '../voting/beamer-link.util';
     MeetingDialogsService,
   ],
   imports: [
+    NoteComponent,
     TranslatePipe,
     BadgeComponent,
     ButtonComponent,
@@ -164,9 +166,13 @@ export class MeetingsComponent {
     return it ? this.agenda().findIndex((a) => a.id === it.id) + 1 : 0;
   });
 
+  /** The meeting id of the route, `null` on the list. */
+  private routeId: string | null = null;
+
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       const id = pm.get('id');
+      this.routeId = id;
       this.detailMode.set(!!id);
       if (id) {
         this.session.loadMeeting(id);
@@ -260,6 +266,11 @@ export class MeetingsComponent {
 
   closeVote(voteId: Uuid): void {
     this.session.closeVote(voteId);
+  }
+
+  /** Load the meeting of the route again after a failed load. */
+  retryMeeting(): void {
+    if (this.routeId) this.session.loadMeeting(this.routeId);
   }
 
   /** The lot of an election was drawn, or its runoff opened (F2). */

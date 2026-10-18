@@ -1,4 +1,4 @@
-<app-dialog [open]="open()" [title]="'todos.settings.title' | t" [closeLabel]="'action.close' | t" (closed)="open.set(false)">
+<app-dialog [open]="open()" size="form" [title]="'todos.settings.title' | t" [closeLabel]="'action.close' | t" (closed)="open.set(false)">
   <div class="bs">
     <section class="bs__sec" aria-labelledby="bs-general">
       <div class="bs__secHead">
@@ -191,3 +191,12 @@
   </div>
   <app-button dialog-footer variant="fill" (click)="open.set(false)">{{ 'todos.settings.done' | t }}</app-button>
 </app-dialog>
+
+<app-confirm-dialog
+  [open]="confirmEmpty() !== null"
+  [title]="'todos.settings.deleteColumnTitle' | t"
+  [body]="'todos.settings.deleteColumnConfirm' | t: { name: confirmEmpty()?.name ?? '' }"
+  [busy]="busy()"
+  (confirm)="deleteEmptyColumn()"
+  (cancel)="confirmEmpty.set(null)"
+/>

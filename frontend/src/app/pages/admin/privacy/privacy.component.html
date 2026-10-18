@@ -160,25 +160,21 @@
   </section>
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmExecute() !== null"
   [title]="'admin.privacy.executeTitle' | t"
   [subtitle]="confirmExecute()?.email ?? ''"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmExecute.set(null)"
->
-  <p class="pv__dialogText">{{ 'admin.privacy.executeConfirm' | t }}</p>
-  <div dialog-footer class="pv__dialogFoot">
-    <app-button variant="text" (click)="confirmExecute.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doExecute()">{{ 'admin.privacy.execute' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'admin.privacy.executeConfirm' | t"
+  [confirmLabel]="'admin.privacy.execute' | t"
+  (confirm)="doExecute()"
+  (cancel)="confirmExecute.set(null)"
+/>
 
 <app-dialog
   [open]="rejecting() !== null"
   [title]="'admin.privacy.rejectTitle' | t"
   [subtitle]="rejecting()?.email ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="rejecting.set(null)"
 >
   <label class="pv__reason">
@@ -196,13 +192,14 @@
   </div>
 </app-dialog>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmPrincipal()"
   [title]="'admin.privacy.principalTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmPrincipal.set(false)"
+  [body]="'admin.privacy.principalConfirm' | t"
+  [confirmLabel]="'admin.privacy.principalErase' | t"
+  (confirm)="doPrincipalErase()"
+  (cancel)="confirmPrincipal.set(false)"
 >
-  <p class="pv__dialogText">{{ 'admin.privacy.principalConfirm' | t }}</p>
   @if (person(); as p) {
     <p class="pv__dialogText pv__confirmWho">
       <strong>{{ personName(p) }}</strong>
@@ -211,8 +208,4 @@
       }
     </p>
   }
-  <div dialog-footer class="pv__dialogFoot">
-    <app-button variant="text" (click)="confirmPrincipal.set(false)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doPrincipalErase()">{{ 'admin.privacy.principalErase' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>

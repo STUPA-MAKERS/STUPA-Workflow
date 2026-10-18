@@ -31,10 +31,7 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="4" [label]="'gremien.meetings.loading' | t" />
 } @else if (error()) {
-  <div class="gmt__status" role="alert">
-    <span>{{ 'gremien.meetings.error' | t }}</span>
-    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
-  </div>
+  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.meetings.error' | t }}</app-note>
 } @else if (!groups().length) {
   @if (filterActive()) {
     <app-empty-state shape="date" rows="3" [heading]="'gremien.meetings.noMatch' | t" />
@@ -82,7 +79,7 @@
                   }
                 </span>
               }
-              <app-icon class="gmt__chev" name="chevron-right" [size]="17" />
+              <app-icon class="gmt__chev" name="right" [size]="17" />
             </span>
           </app-list-item>
         }

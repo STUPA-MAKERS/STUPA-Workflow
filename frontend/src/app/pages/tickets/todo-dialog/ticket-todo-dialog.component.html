@@ -1,7 +1,8 @@
 <app-dialog
   [open]="open()"
   [title]="'tickets.todo.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
+  size="form"
   (closed)="cancel()"
 >
   <form class="ttd" (submit)="$event.preventDefault(); save()">

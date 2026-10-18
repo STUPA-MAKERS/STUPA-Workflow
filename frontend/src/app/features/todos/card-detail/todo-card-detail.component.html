@@ -6,7 +6,7 @@
     <header class="cd__head">
       @if (phone() && mode() === 'drawer') {
         <button type="button" class="cd__back" (click)="closed.emit()">
-          <app-icon name="chevron-left" [size]="18" />
+          <app-icon name="back" [size]="18" />
           {{ 'todos.card.back' | t }}
         </button>
       }
@@ -56,15 +56,14 @@
   </div>
 } @else if (error()) {
   <div class="cd cd--state">
-    <p class="cd__error" role="alert">{{ 'todos.card.error' | t }}</p>
-    <app-button variant="tonal" (click)="reload()">{{ 'todos.card.retry' | t }}</app-button>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'todos.card.error' | t }}</app-note>
   </div>
 } @else if (card(); as card) {
   <article class="cd" aria-labelledby="cd-title">
     <header class="cd__head">
       @if (phone() && mode() === 'drawer') {
         <button type="button" class="cd__back" (click)="closed.emit()">
-          <app-icon name="chevron-left" [size]="18" />
+          <app-icon name="back" [size]="18" />
           {{ 'todos.card.back' | t }}
         </button>
       }
@@ -350,7 +349,7 @@
                 <span class="cd__linkSub">{{ linkSub(link) }}</span>
               </span>
               @if (link.url) {
-                <app-icon class="cd__linkChev" name="chevron-right" [size]="16" />
+                <app-icon class="cd__linkChev" name="right" [size]="16" />
               }
               @if (canWrite()) {
                 <app-button

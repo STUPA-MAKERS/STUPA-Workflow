@@ -187,7 +187,7 @@ describe('ReportDialogComponent', () => {
     await userEvent.click(sendButton());
     fixture.detectChanges();
     // "Schließen" after the send.
-    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Schließen' }).at(-1)!);
     await open();
     expect(c.title()).toBe('');
     expect(c.body()).toBe('');
@@ -259,7 +259,7 @@ describe('ReportDialogComponent', () => {
     [httpError(400, { code: 'altcha_failed' }), 'Die Prüfung „Kein Roboter“ ist abgelaufen. Bitte noch einmal bestätigen.'],
     [httpError(403), 'Meldungen ohne Konto sind ausgeschaltet. Bitte melde dich an.'],
     [httpError(413), 'Die Meldung ist zu groß. Bitte Anhänge entfernen.'],
-    [httpError(429), 'Zu viele Meldungen. Bitte später noch einmal versuchen.'],
+    [httpError(429), 'Zu viele Meldungen. Versuche es später noch einmal.'],
     [httpError(422, { code: 'validation_error' }), 'Bitte die Angaben prüfen.'],
     [httpError(400), 'Die Meldung konnte nicht gesendet werden.'],
     [new Error('offline'), 'Die Meldung konnte nicht gesendet werden.'],

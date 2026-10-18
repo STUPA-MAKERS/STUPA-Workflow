@@ -19,7 +19,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
   } @else if (loadError()) {
-    <p class="grem__error" role="alert">{{ 'admin.gremien.error' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload(true)">{{ 'admin.gremien.error' | t }}</app-note>
   } @else if (gremien().length) {
     <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
       @for (g of gremien(); track g.id) {
@@ -93,7 +93,7 @@
                 [attr.aria-controls]="'grem-body-' + g.id"
                 (click)="toggle(g)"
               >
-                <app-icon [name]="isOpen(g) ? 'chevron-up' : 'chevron-down'" [size]="20" />
+                <app-icon [name]="isOpen(g) ? 'up' : 'down'" [size]="20" />
               </button>
             </span>
           </div>
@@ -139,21 +139,11 @@
   (baseSaved)="onBaseSaved($event)"
 />
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremien.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="grem__confirm">
-    {{ 'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}
-  </p>
-  <div dialog-footer class="grem__dialogFoot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{
-      'admin.gremien.deleteAction' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' }"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

@@ -477,6 +477,18 @@ describe('DashboardComponent', () => {
       expect(screen.queryByRole('link', { name: 'Alle Aufgaben öffnen' })).not.toBeInTheDocument();
     });
 
+    it('sends the request of the open tab again on "Erneut versuchen"', async () => {
+      const { fixture, http } = await setup(MEMBER, { url: '/?tab=votes', votes: 'error' });
+      fixture.detectChanges();
+      screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+      fixture.detectChanges();
+      expect(cmp(fixture).tabLoading()).toBe(true);
+      http.expectOne((r) => r.url.endsWith('/api/votes')).flush(VOTES);
+      fixture.detectChanges();
+      expect(cmp(fixture).tabError()).toBe(false);
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
     it('counts nothing while every list failed', async () => {
       const { fixture } = await setup(MEMBER, { tasks: 'error', mine: 'error', votes: 'error' });
       expect(cmp(fixture).taskRows()).toEqual([]);

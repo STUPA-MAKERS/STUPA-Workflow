@@ -25,10 +25,8 @@
   border-radius: var(--radius-2xl);
   background: var(--color-surface-1);
 }
-.td__error {
-  margin: 0;
-  padding: var(--space-5) 0;
-  color: var(--color-danger);
+.td__loadError {
+  margin: var(--space-5) 0;
 }
 .td__backLink {
   display: inline-flex;

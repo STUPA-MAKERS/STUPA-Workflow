@@ -12,6 +12,9 @@
       />
     } @else {
       <nav class="mt__list" appScrollFade="y" [attr.aria-label]="'admin.mailTemplates.title' | t">
+        @if (loading()) {
+          <app-skeleton variant="lines" [count]="8" />
+        }
         @for (tpl of templates(); track tpl.key) {
           <button
             type="button"
@@ -27,7 +30,9 @@
             }
           </button>
         } @empty {
-          <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
+          @if (!loading()) {
+            <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
+          }
         }
       </nav>
     }
@@ -105,6 +110,12 @@
           </span>
         </div>
       </section>
+    } @else if (loading()) {
+      <!-- The shape of the editor: the head, the subject, the texts. -->
+      <div class="mt__editor">
+        <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+        <app-skeleton variant="panel" />
+      </div>
     } @else {
       <app-empty-state plain icon="mail" fill [heading]="'admin.mailTemplates.selectHint' | t" />
     }

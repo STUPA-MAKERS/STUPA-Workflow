@@ -38,6 +38,7 @@ import { electionStatus } from '../../voting/election.util';
 import { GREMIEN_NOW } from '../gremien.store';
 import { dayMonth, euro, monthKey, monthLabel, shiftMonth } from '../gremien.util';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 export type DecisionsResult = '' | GremiumDecisionResultFilter;
 export type DecisionsKind = '' | GremiumDecisionKind;
@@ -85,6 +86,7 @@ const NO_RESULT: StatusView = { kind: 'muted', key: 'gremien.decisions.noResult'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     StickyBarComponent,
     TranslatePipe,
     ButtonComponent,

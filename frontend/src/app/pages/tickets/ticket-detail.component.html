@@ -53,7 +53,7 @@
   </div>
 } @else if (error()) {
   <div class="td">
-    <p class="td__error" role="alert">{{ 'tickets.detail.error.load' | t }}</p>
+    <app-note class="td__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.detail.error.load' | t }}</app-note>
   </div>
 } @else if (ticket(); as ticket) {
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
@@ -360,7 +360,7 @@
 <app-dialog
   [open]="closing() !== null"
   [title]="(closing() === 'rejected' ? 'tickets.close.rejectTitle' : 'tickets.close.doneTitle') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancelClose()"
 >
   <div class="td__closeBox">
@@ -387,7 +387,7 @@
 <app-dialog
   [open]="duplicateOpen()"
   [title]="'tickets.duplicate.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="duplicateOpen.set(false)"
 >
   <div class="td__dup">

@@ -38,7 +38,7 @@ describe('PrepChecklistComponent', () => {
 
   it('marks a missing minute-taker and keeps the opening disabled until one is set', async () => {
     const { container } = await setup({ protokollantId: null, protokollantName: null });
-    expect(screen.getByText('Noch nicht zugewiesen – nötig zum Eröffnen')).toBeInTheDocument();
+    expect(screen.getByText('Noch nicht zugewiesen — nötig zum Eröffnen')).toBeInTheDocument();
     expect(container.querySelector('.pc__card--todo')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Zuweisen' })).toBeInTheDocument();
     const start = screen.getByRole('button', { name: 'Sitzung eröffnen' });

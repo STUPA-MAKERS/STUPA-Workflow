@@ -57,7 +57,7 @@
         <nav class="fe__crumbs" [attr.aria-label]="'admin.flow.group.inspector' | t">
           <button type="button" class="fe__crumb" (click)="navigateTo(null)">{{ 'admin.flow.group.rootCrumb' | t }}</button>
           @for (c of breadcrumbs(); track c.id; let last = $last) {
-            <span class="fe__crumbSep" aria-hidden="true">›</span>
+            <app-icon class="fe__crumbSep" name="right" [size]="13" />
             @if (last) {
               <span class="fe__crumb fe__crumb--current" aria-current="page">{{ c.name }}</span>
             } @else {
@@ -82,6 +82,7 @@
         <svg
           #canvas
           class="fe__canvas"
+          [class.fe__canvas--loading]="loading()"
           [attr.viewBox]="viewBox()"
           width="100%"
           height="100%"
@@ -210,6 +211,9 @@
             </g>
           }
         </svg>
+        @if (loading()) {
+          <app-skeleton class="fe__canvasSkel" variant="panel" [label]="'common.loading' | t" />
+        }
 
         <p class="fe__legend">
           <span class="fe__legendItem"><span class="fe__legendDot" aria-hidden="true"></span>{{ 'admin.flow.initial' | t }}</span>

@@ -161,7 +161,8 @@ describe('VoteOpenDialogComponent', () => {
     empty.http.verify();
     empty.fixture.componentRef.setInput('item', APP_TOP);
     empty.fixture.detectChanges();
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(empty.closed).toHaveBeenCalled();
   });

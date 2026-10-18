@@ -19,6 +19,7 @@ type Cmp = AuditLogComponent & {
   setRange(v: { from: string; to: string }): void;
   resetFilters(): void;
   loadMore(): void;
+  retry(): void;
   toggle(id: number): void;
   isOpen(id: number): boolean;
   actionLabel(action: string): string;
@@ -462,6 +463,26 @@ describe('AuditLogComponent', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
+  it('"Erneut versuchen" loads the first page again, or the next page after a failed one', async () => {
+    const listAuditLog = jest
+      .fn()
+      .mockReturnValueOnce(throwError(() => new Error('nope')))
+      .mockReturnValueOnce(of<AuditPage>({ items: [entry(1)], nextCursor: 1, hasMore: true }))
+      .mockReturnValueOnce(throwError(() => new Error('nope')))
+      .mockReturnValueOnce(of<AuditPage>({ items: [entry(2)], nextCursor: null, hasMore: false }));
+    const { cmp, fixture } = await setup({ listAuditLog });
+    fixture.detectChanges();
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ before: undefined }));
+    expect(cmp.entries().map((e) => e.id)).toEqual([1]);
+    cmp.loadMore();
+    expect(cmp.loadError()).toBe(true);
+    cmp.retry();
+    expect(listAuditLog).toHaveBeenLastCalledWith(expect.objectContaining({ before: 1 }));
+    expect(cmp.entries().map((e) => e.id)).toEqual([1, 2]);
+    expect(cmp.loadError()).toBe(false);
+  });
+
   it('toggle opens then closes a single entry', async () => {
     const { cmp } = await setup();
     expect(cmp.isOpen(1)).toBe(false);
@@ -753,7 +774,7 @@ describe('AuditLogComponent', () => {
   });
 
   it.each([
-    [409, 'Es läuft schon eine Prüfung. Versuche es gleich noch einmal.'],
+    [409, 'Es läuft schon eine Prüfung. Versuche es später noch einmal.'],
     [429, 'Die nächste Prüfung ist erst in einigen Minuten möglich.'],
     [500, 'Die Prüfung ist fehlgeschlagen.'],
   ])('names the reason when "Jetzt prüfen" answers %s', async (status, text) => {

@@ -17,7 +17,6 @@ import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { SkeletonComponent } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -32,6 +31,8 @@ import {
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 let nextId = 0;
 
@@ -55,11 +56,12 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     SkeletonComponent,
     GremiumRoleDialogComponent,
@@ -108,7 +110,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
     this.load();
   }
 
-  private load(): void {
+  protected load(): void {
     const id = this.gremiumId();
     this.loading.set(true);
     this.failed.set(false);

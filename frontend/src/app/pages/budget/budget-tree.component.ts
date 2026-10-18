@@ -43,6 +43,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** A visible tree row: a node, its depth and whether it has children. */
 interface Row {
@@ -100,6 +101,7 @@ const MAX_CUTOFF_DAY = 28;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,

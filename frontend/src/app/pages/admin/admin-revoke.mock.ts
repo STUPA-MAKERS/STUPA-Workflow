@@ -99,7 +99,7 @@ export function mockRevokeExtras(): { pool: PoolFact[]; delegations: DelegationF
         id: 'md-1',
         gremiumId: MOCK_GREMIUM_STUPA_ID,
         meetingId: 'd0000000-0000-0000-0000-000000000002',
-        meetingTitle: 'StuPa-Sitzung Oktober',
+        meetingTitle: 'STUPA-Sitzung Oktober',
         meetingDate: '2026-10-17',
         live: false,
         delegatorId: 'p-2',

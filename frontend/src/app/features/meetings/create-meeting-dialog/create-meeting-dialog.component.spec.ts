@@ -274,7 +274,8 @@ describe('CreateMeetingDialogComponent', () => {
     const { http, closed, fixture } = await setup();
     flushGremien(http, fixture);
     // The footer button; the round close button of the dialog has the same name.
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
     http.verify();

@@ -382,6 +382,12 @@ describe('MeetingsCalendarComponent', () => {
     view.fixture.detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent('Die Sitzungen des Monats konnten nicht geladen werden.');
     expect(screen.getByRole('button', { name: 'Gremium: Alle Gremien' })).toBeInTheDocument();
+    // "Erneut versuchen" reads the month again with the same filter.
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    const again = monthReq(view.http);
+    expect(again.request.params.get('gremiumId')).toBe('g-gone');
+    again.flush(null, { status: 500, statusText: 'e' });
+    view.fixture.detectChanges();
     view.timeline.gremiumFilter.set('');
     view.fixture.detectChanges();
     const third = monthReq(view.http);

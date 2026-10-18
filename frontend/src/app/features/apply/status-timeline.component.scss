@@ -4,11 +4,6 @@
   display: block;
 }
 
-.sp__loading {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
 /* The page: header, then rows + answers beside the history (wide), else stacked. */
 .sp {
   display: flex;
@@ -194,10 +189,6 @@
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
-.sp__dialogText {
-  margin: 0;
-}
-
 /* The end states (expired link, not found): one card in the free space. */
 .sp__end {
   display: flex;

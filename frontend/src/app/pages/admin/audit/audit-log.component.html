@@ -56,7 +56,7 @@
   </div>
 
   @if (loadError()) {
-    <p class="al__error" role="alert">{{ 'admin.audit.error' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.audit.error' | t }}</app-note>
   }
 
   @if (entries().length) {
@@ -74,7 +74,7 @@
             <span class="al__action ell" [title]="actionLabel(e.action)">{{ actionLabel(e.action) }}</span>
             <span class="al__actor ell" [title]="actorLabel(e)">{{ actorLabel(e) }}</span>
             <span class="al__target ell" [title]="targetText(e)">{{ targetText(e) }}</span>
-            <app-icon class="al__chev" [name]="isOpen(e.id) ? 'chevron-up' : 'chevron-down'" [size]="16" />
+            <app-icon class="al__chev" [name]="isOpen(e.id) ? 'up' : 'down'" [size]="16" />
           </button>
           @if (isOpen(e.id)) {
             <div class="al__details" [id]="'al-detail-' + e.id">
@@ -151,11 +151,11 @@
 
   <div #sentinel class="al__sentinel" aria-hidden="true"></div>
 
-  @if (loading()) {
+  @if (loading() && !entries().length) {
     <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />
   } @else if (hasMore()) {
     <div class="al__more">
-      <app-button variant="tonal" (click)="loadMore()">{{ 'admin.audit.loadMore' | t }}</app-button>
+      <app-button variant="text" size="sm" [loading]="loading()" (click)="loadMore()">{{ 'admin.audit.loadMore' | t }}</app-button>
     </div>
   }
 </section>
@@ -163,7 +163,7 @@
 <app-dialog
   [open]="!!confirmRevert()"
   [title]="'admin.audit.revert.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRevert.set(null)"
 >
   <p class="al__dialogText">{{ 'admin.audit.revert.confirm' | t }}</p>

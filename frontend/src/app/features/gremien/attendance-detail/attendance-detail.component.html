@@ -2,10 +2,7 @@
   @if (loading()) {
     <app-skeleton variant="lines" [count]="2" [label]="'gremien.attendance.detailLoading' | t" />
   } @else if (error()) {
-    <div class="gad__status" role="alert">
-      <span>{{ 'gremien.attendance.detailError' | t }}</span>
-      <app-button variant="text" size="sm" (click)="retry()">{{ 'gremien.list.retry' | t }}</app-button>
-    </div>
+    <app-note class="gad__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'gremien.attendance.detailError' | t }}</app-note>
   } @else if (empty()) {
     <app-empty-state rows="3" [heading]="'gremien.attendance.detailEmpty' | t" />
   } @else {

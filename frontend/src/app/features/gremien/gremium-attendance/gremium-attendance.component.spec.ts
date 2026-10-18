@@ -66,14 +66,14 @@ describe('GremiumAttendanceComponent', () => {
     expect(cell.querySelector('.gat__ex:not(.gat__ex--dv)')?.textContent).toBe('1');
     expect(cell.querySelector('.gat__ex--dv')?.textContent).toBe('1V');
     expect(screen.getByRole('button', { name: /^Anna Berg, September 2026/ }).classList.contains('gat__cell--full')).toBe(true);
-    expect(screen.getByRole('img', { name: 'Finn Schulze, Oktober 2026: keine Sitzung' })).toHaveTextContent('–');
+    expect(screen.getByRole('img', { name: 'Finn Schulze, Oktober 2026: keine Sitzung' })).toHaveTextContent('—');
     expect(screen.getByRole('img', { name: 'Kai Meier, September 2026: nicht Mitglied' })).toBeTruthy();
 
     const rows = within(table).getAllByRole('row');
     expect(rows[1]).toHaveTextContent('50 %');
     expect(rows[3]).toHaveTextContent('0/0');
-    expect(rows[3]).toHaveTextContent('–');
-    expect([...rows[4].querySelectorAll('td')].map((c) => c.textContent?.trim())).toEqual(['1,5', '–', '1,5']);
+    expect(rows[3]).toHaveTextContent('—');
+    expect([...rows[4].querySelectorAll('td')].map((c) => c.textContent?.trim())).toEqual(['1,5', '—', '1,5']);
     expect(screen.getByRole('list', { name: 'Legende' })).toHaveTextContent('Stimme übertragen');
     expect(await runAxe(view.container)).toHaveNoViolations();
   });

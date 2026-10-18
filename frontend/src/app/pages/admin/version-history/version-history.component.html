@@ -29,7 +29,7 @@
                 (click)="toggleDiff(rev)"
               >
                 {{ 'admin.config.history.viewDiff' | t }}
-                <app-icon [name]="openDiffId() === rev.id ? 'chevron-up' : 'chevron-down'" [size]="14" />
+                <app-icon [name]="openDiffId() === rev.id ? 'up' : 'down'" [size]="14" />
               </button>
               @if (!rev.isCurrent) {
                 <app-button
@@ -49,7 +49,7 @@
               @if (diff(); as d) {
                 <app-config-diff [diff]="d.diff" />
               } @else {
-                <p class="vh__empty">{{ 'common.loading' | t }}</p>
+                <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
               }
             </div>
           }
@@ -62,7 +62,7 @@
 <app-dialog
   [open]="!!confirmRestore()"
   [title]="'admin.config.restore.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="confirmRestore.set(null)"
 >
   @if (confirmRestore(); as rev) {
