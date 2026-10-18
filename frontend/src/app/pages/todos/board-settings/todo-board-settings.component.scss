@@ -5,10 +5,6 @@
 :host {
   display: contents;
 }
-/* Wider than the shared `md` dialog, so the labels fit in one row. */
-:host ::ng-deep .dialog {
-  max-width: 40rem;
-}
 /* Four sections (Allgemein, Spalten, Labels, Archiv), each an accent heading over a row
    group, as on the admin settings pages. The row group draws the separators. */
 .bs {

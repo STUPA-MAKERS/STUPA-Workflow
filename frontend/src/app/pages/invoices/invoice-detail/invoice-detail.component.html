@@ -5,7 +5,7 @@
       @if (phone()) {
         @if (canManage()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">
-            <span class="fd__btn"><app-icon name="edit" [size]="16" />{{ 'action.edit' | t }}</span>
+            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
           </app-button>
         }
       } @else {
@@ -16,7 +16,7 @@
             [ariaLabel]="'invoices.openFile' | t"
             [title]="'invoices.openFile' | t"
             (click)="openFile.emit()"
-          ><app-icon name="download" [size]="19" /></app-button>
+          ><app-icon name="download" /></app-button>
         }
         @if (canManage()) {
           <app-button
@@ -25,7 +25,7 @@
             [ariaLabel]="'invoices.edit' | t"
             [title]="'invoices.edit' | t"
             (click)="edit.emit()"
-          ><app-icon name="edit" [size]="19" /></app-button>
+          ><app-icon name="edit" /></app-button>
         }
       }
       @if (menu().length) {
@@ -51,11 +51,11 @@
       <div class="fd__actions">
         @if (i.status === 'open') {
           <app-button variant="fill" [loading]="markingPaid()" (click)="markPaid.emit()">
-            <span class="fd__btn"><app-icon name="check" [size]="17" />{{ 'invoices.markPaid' | t }}</span>
+            <span class="fd__btn"><app-icon name="check" />{{ 'invoices.markPaid' | t }}</span>
           </app-button>
         }
         <app-button variant="tonal" (click)="createBooking.emit()">
-          <span class="fd__btn"><app-icon name="add" [size]="17" />{{ 'invoices.createBooking' | t }}</span>
+          <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
         </app-button>
       </div>
     }
@@ -145,8 +145,8 @@
               <span class="fd__count">{{ bookings().length }}</span>
             </h3>
             @if (canManage()) {
-              <app-button variant="text" size="sm" (click)="createBooking.emit()">
-                <span class="fd__btn"><app-icon name="add" [size]="16" />{{ 'invoices.createBooking' | t }}</span>
+              <app-button variant="tonal" size="sm" (click)="createBooking.emit()">
+                <span class="fd__btn"><app-icon name="plus" />{{ 'invoices.createBooking' | t }}</span>
               </app-button>
             }
           </div>
@@ -172,7 +172,7 @@
                     </span>
                   </span>
                   <span class="mono fd__linkAmount">{{ signed(b) }}</span>
-                  <app-icon class="fd__chev" name="chevron-right" [size]="17" />
+                  <app-icon class="fd__chev" name="right" [size]="17" />
                 </a>
               }
               @if (bookings().length && booked(); as bk) {

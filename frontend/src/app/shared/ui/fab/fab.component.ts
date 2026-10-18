@@ -37,7 +37,7 @@ import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-
     '[class.fab--contained]': 'contained()',
   },
   template: `<app-button variant="fab" [ariaLabel]="label()" (click)="onClick()">
-    <app-icon [name]="icon()" [size]="22" />{{ label() }}
+    <app-icon [name]="icon()" />{{ label() }}
   </app-button>`,
   styleUrl: './fab.component.scss',
 })

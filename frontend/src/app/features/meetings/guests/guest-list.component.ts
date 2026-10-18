@@ -13,6 +13,7 @@ import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clockTime } from '../meetings-display.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 interface GuestRow {
   g: MeetingGuest;
@@ -34,6 +35,7 @@ interface GuestRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     EmptyStateComponent,
     TruncatedDirective,
     FormsModule,

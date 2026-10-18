@@ -28,6 +28,7 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Edit state of the create dialog: title in DE and EN, Gremium, and budget flag. */
 interface NewForm {
@@ -56,6 +57,7 @@ function emptyForm(): NewForm {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     RouterLink,
@@ -168,7 +170,7 @@ export class FormsListComponent {
 
   /** "v7" for the active form version, a dash while the type is a draft. */
   protected versionLabel(t: ApplicationTypeFull): string {
-    return t.activeFormVersion ? `v${t.activeFormVersion}` : '–';
+    return t.activeFormVersion ? `v${t.activeFormVersion}` : '—';
   }
 
   protected gremiumName(id?: Uuid | null): string {

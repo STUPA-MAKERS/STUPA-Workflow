@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, distinctUntilChanged, forkJoin, map, of, switchMap, type Observable } from 'rxjs';
+import { catchError, distinctUntilChanged, forkJoin, map, of, startWith, Subject, switchMap, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -59,6 +59,7 @@ import {
   BudgetTreeApi,
   type FiscalYear,
 } from '../budget/budget-tree.api';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
 const ROWS = 25;
@@ -166,6 +167,7 @@ type Loaded<T> = T | null | undefined;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     NgTemplateOutlet,
     RouterLink,
     IconComponent,
@@ -218,6 +220,8 @@ export class DashboardComponent {
 
   // ---------------------------------------------------------------- data
 
+  /** The "load again" trigger of each request that `load` made, by its signal. */
+  private readonly reloads = new Map<() => unknown, () => void>();
   private readonly tasks = this.load(this.api.listTasks());
   /** The own applications (`mine=true`), newest status change first: the date the rows
    *  show. `mine` forces the owner filter, also for a reader with `application.read`. */
@@ -695,11 +699,33 @@ export class DashboardComponent {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   }
 
-  /** A request as a signal: `undefined` while it runs, `null` when it failed. */
+  /** Send the request of the open tab again after it failed. */
+  retryTab(): void {
+    const tab = this.tab();
+    const source = tab === 'mine' ? this.mine : tab === 'votes' ? this.votes : this.tasks;
+    this.reloads.get(source)?.();
+  }
+
+  /**
+   * A request as a signal: `undefined` while it runs, `null` when it failed. The trigger
+   * in `reloads` sends it again, and the signal is `undefined` until the answer arrives.
+   */
   private load<T>(source: Observable<T>) {
-    return toSignal(source.pipe(catchError(() => of(null))), {
-      initialValue: undefined,
-    }) as () => Loaded<T>;
+    const again = new Subject<void>();
+    const value = toSignal(
+      again.pipe(
+        startWith(undefined),
+        switchMap(() =>
+          source.pipe(
+            catchError(() => of(null)),
+            startWith(undefined),
+          ),
+        ),
+      ),
+      { initialValue: undefined },
+    ) as () => Loaded<T>;
+    this.reloads.set(value, () => again.next());
+    return value;
   }
 
   // ---------------------------------------------------------------- phone

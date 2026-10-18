@@ -67,7 +67,7 @@ describe('LeadSubstituteDialogComponent', () => {
   it('lists the pool of the member and enters the pick with the vote', async () => {
     const { dialog, submit, answer, http, created } = await setup();
     expect(within(dialog()).getByText('für Fritz Fehlend')).toBeInTheDocument();
-    expect(within(dialog()).getByText('Lädt …')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Wird geladen …')).toBeInTheDocument();
     answer();
     const group = within(dialog()).getByRole('radiogroup', { name: 'Stellvertretung aus dem Pool' });
     expect(within(group).getAllByRole('radio')).toHaveLength(2);
@@ -131,6 +131,13 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(dialog()).getByText('Der Pool konnte nicht geladen werden.')).toBeInTheDocument();
     // Without the context the vote transfer counts as off.
     expect(within(dialog()).queryByRole('switch')).toBeNull();
+    // "Erneut versuchen" reads the pool of the member again.
+    within(dialog()).getByRole('button', { name: 'Erneut versuchen' }).click();
+    fixture.detectChanges();
+    http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-9`).flush([]);
+    http.match(CONTEXT_URL);
+    fixture.detectChanges();
+    expect(within(dialog()).queryByText('Der Pool konnte nicht geladen werden.')).toBeNull();
   });
 
   it('ignores a pool answer for a member who is no longer picked', async () => {
@@ -163,7 +170,7 @@ describe('LeadSubstituteDialogComponent', () => {
     staleContext.flush(null, { status: 500, statusText: 'Error' });
     fixture.detectChanges();
     expect(within(dialog()).queryByText('Der Pool konnte nicht geladen werden.')).toBeNull();
-    expect(within(dialog()).getByText('Lädt …')).toBeInTheDocument();
+    expect(within(dialog()).getByText('Wird geladen …')).toBeInTheDocument();
     pool.flush(POOL);
     context.flush(CTX);
     fixture.detectChanges();

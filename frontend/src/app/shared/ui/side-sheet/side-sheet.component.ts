@@ -11,7 +11,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /**
@@ -70,7 +70,7 @@ const NO_DRAG = 'button, a, input, select, textarea';
   selector: 'app-side-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, TranslatePipe],
+  imports: [ButtonComponent, IconComponent, TranslatePipe],
   templateUrl: './side-sheet.component.html',
   styleUrl: './side-sheet.component.scss',
 })

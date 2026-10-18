@@ -27,11 +27,6 @@
   margin-inline-start: auto;
 }
 
-.rm__error {
-  margin: 0;
-  color: var(--color-danger);
-}
-
 /* The matrix: the role column, one column per right of the catalogue, the actions. All
    rows use the same columns, so the boxes line up under their header. */
 .rm__table {
@@ -174,15 +169,6 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-1);
-}
-
-.rm__dialogText {
-  margin: 0;
-}
-.rm__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 /* A narrow container: no header; the role and its actions on the first line, the rights

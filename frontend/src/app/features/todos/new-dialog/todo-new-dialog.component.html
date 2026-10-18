@@ -1,7 +1,8 @@
 <app-dialog
   [open]="open()"
   [title]="'todos.new.title' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
+  size="form"
   (closed)="cancel()"
 >
   <form class="tn" (submit)="$event.preventDefault(); save()">
@@ -68,7 +69,7 @@
       }
       <div class="tn__add">
         <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
-          <app-icon name="plus" [size]="15" />
+          <app-icon name="plus" />
           {{ 'todos.new.link' | t }}
         </app-button>
       </div>

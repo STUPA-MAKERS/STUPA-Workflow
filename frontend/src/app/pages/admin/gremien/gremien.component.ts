@@ -14,7 +14,6 @@ import {
 } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -23,6 +22,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
@@ -65,10 +65,10 @@ interface Setting {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FabComponent,
+    ConfirmDialogComponent,
     RouterLink,
     TranslatePipe,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     EmptyStateComponent,
     NoteComponent,
@@ -284,7 +284,7 @@ export class AdminGremienComponent {
   }
 
   /** `first`: the first load opens the first row, as on the board. */
-  private reload(first: boolean): void {
+  protected reload(first: boolean): void {
     if (first) this.loading.set(true);
     this.loadError.set(false);
     this.api.listGremien({ quiet: true }).subscribe({

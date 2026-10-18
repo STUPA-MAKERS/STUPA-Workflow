@@ -187,7 +187,7 @@ export class UserMergeComponent {
     return `admin.users.merge.error.${code}`;
   }
 
-  /** "session.manage (StuPa)", or the admin role as "Administration (alle Rechte)". */
+  /** "session.manage (STUPA)", or the admin role as "Administration (alle Rechte)". */
   protected permissionLabel(p: MergePermission): string {
     const key = p.key === 'admin' ? this.i18n.translate('admin.users.merge.adminRole') : p.key;
     return p.gremium ? `${key} (${p.gremium})` : key;

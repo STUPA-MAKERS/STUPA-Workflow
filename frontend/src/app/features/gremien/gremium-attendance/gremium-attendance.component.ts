@@ -51,6 +51,7 @@ import {
   toCsv,
 } from '../gremien.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
@@ -110,6 +111,7 @@ export interface RowModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gat-host--fill]': 'fill()' },
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
@@ -225,7 +227,7 @@ export class GremiumAttendanceComponent {
   readonly averages = computed(() => {
     const locale = this.i18n.locale();
     const avg = monthAverages(this.rows().map((r) => r.row), this.months());
-    const fmt = (v: number | null) => (v === null ? '–' : oneDecimal(v, locale));
+    const fmt = (v: number | null) => (v === null ? '—' : oneDecimal(v, locale));
     return { months: avg.months.map(fmt), total: fmt(avg.total) };
   });
 

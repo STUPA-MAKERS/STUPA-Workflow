@@ -7,7 +7,7 @@
     <span class="sp__actions">
       <ng-content select="[poolActions]" />
       <app-button variant="text" size="sm" (click)="openAdd()">
-        <app-icon name="plus" [size]="16" /> {{ 'admin.substitutes.add' | t }}
+        <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
       </app-button>
     </span>
   </header>
@@ -15,7 +15,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
   } @else if (failed()) {
-    <p class="sp__error" role="alert">{{ 'admin.substitutes.loadFailed' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.substitutes.loadFailed' | t }}</app-note>
   } @else if (entries().length) {
     <ul class="rowgroup sp__list" aria-labelledby="sp-title">
       @for (s of entries(); track s.id) {
@@ -54,7 +54,7 @@
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.substitutes.add' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
 >
   <form class="sp__form" (submit)="$event.preventDefault(); add()">

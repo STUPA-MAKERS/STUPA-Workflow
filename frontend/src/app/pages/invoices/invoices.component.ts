@@ -19,7 +19,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   MEDIA,
   SegmentedComponent,
@@ -67,6 +66,7 @@ import {
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
 import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -109,9 +109,9 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
-    DialogComponent,
     EmptyStateComponent,
     FabComponent,
     FileDropZoneComponent,
@@ -968,13 +968,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       if (i.status === 'open') {
         items.push({ id: 'paid', label: this.i18n.translate('invoices.markPaid'), icon: 'check' });
       }
-      items.push({ id: 'book', label: this.i18n.translate('invoices.createBooking'), icon: 'add' });
+      items.push({ id: 'book', label: this.i18n.translate('invoices.createBooking'), icon: 'plus' });
     }
     if (i.hasFile) items.push({ id: 'file', label: this.i18n.translate('invoices.openFile'), icon: 'file' });
     const sections: RowMenuSection[] = items.length ? [{ items }] : [];
     if (this.canManage()) {
       sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
     }
     return sections;

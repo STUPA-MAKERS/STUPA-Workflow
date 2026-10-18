@@ -16,14 +16,14 @@
             [ariaLabel]="'gremien.detail.subscribe' | t"
             [ariaPressed]="abo.isOpen()"
             (click)="abo.toggle($event.currentTarget)"
-          ><app-icon name="cal" [size]="20" /></app-button>
+          ><app-icon name="cal" /></app-button>
           @if (canAdmin()) {
             <app-button
               variant="text"
               [iconOnly]="true"
               [ariaLabel]="'gremien.detail.admin' | t"
               (click)="openAdmin()"
-            ><app-icon name="shield" [size]="20" /></app-button>
+            ><app-icon name="shield" /></app-button>
           }
         }
         <app-row-menu
@@ -52,7 +52,7 @@
         <div class="gd__actions">
           @if (canPlan()) {
             <app-button variant="fill" [class.gd__grow]="phone()" (click)="createOpen.set(true)">
-              <app-icon name="plus" [size]="17" />
+              <app-icon name="plus" />
               {{ 'gremien.detail.plan' | t }}
             </app-button>
           }

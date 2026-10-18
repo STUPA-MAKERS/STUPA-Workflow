@@ -35,6 +35,7 @@ import {
   type WebhookDeliveryStatus,
 } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 function emptyHook(): WebhookConfig {
   return { id: '', name: '', url: '', events: [], active: true };
@@ -58,6 +59,7 @@ function emptyHook(): WebhookConfig {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

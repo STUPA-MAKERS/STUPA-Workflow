@@ -96,7 +96,7 @@
             <app-note kind="error" icon="alert" role="alert">{{ e | t }}</app-note>
           }
           <app-button variant="fill" size="lg" [block]="true" [loading]="guest.joining()" [disabled]="!nameValid()" (click)="join()">
-            <app-icon name="arrow" [size]="18" />
+            <app-icon name="arrow" />
             {{ 'guests.join.submit' | t }}
           </app-button>
           <button type="submit" hidden></button>
@@ -130,7 +130,7 @@
         } @else {
           <div class="pm__row">
             <app-button variant="outlined" (click)="renaming.set(true)">
-              <app-icon name="edit" [size]="16" />
+              <app-icon name="edit" />
               {{ 'guests.page.rename' | t }}
             </app-button>
             <app-button variant="text" class="pm__danger" [loading]="guest.saving()" (click)="guest.leave()">{{ 'guests.page.withdraw' | t }}</app-button>
@@ -178,7 +178,7 @@
     <ng-container *ngTemplateOutlet="meetingCard" />
     <div class="pm__retry">
       <app-button variant="tonal" [disabled]="waitSeconds() > 0" [loading]="guest.joining()" (click)="retry()">
-        <app-icon name="repeat" [size]="16" />
+        <app-icon name="repeat" />
         {{ 'guests.page.retry' | t }}
       </app-button>
       @if (waitSeconds() > 0) {

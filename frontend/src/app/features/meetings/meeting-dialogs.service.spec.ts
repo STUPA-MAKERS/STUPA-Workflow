@@ -108,7 +108,7 @@ describe('MeetingDialogsService', () => {
     const req = http.expectOne('/api/meetings/m-1');
     expect(req.request.body).toEqual({ protokollantId: 'p-1' });
     req.flush(WIRE);
-    expect(toasts()).toContain('Protokollant gesetzt.');
+    expect(toasts()).toContain('Protokollführung gesetzt.');
     svc.setProtokollant(M({ status: 'planned' }), 'p-2');
     http.expectOne('/api/meetings/m-1').flush({ code: 'protokollant_needs_protocol_write' }, { status: 422, statusText: 'x' });
     expect(toasts()).toContain('Diese Person hat im Gremium kein Protokollrecht.');

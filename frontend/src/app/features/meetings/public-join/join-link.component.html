@@ -20,12 +20,12 @@
       } @else {
         <div class="jl__actions">
           <app-button size="sm" variant="text" (click)="copy()">
-            <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16" />
+            <app-icon [name]="copied() ? 'check' : 'copy'" />
             {{ (copied() ? 'guests.link.copied' : 'guests.link.copy') | t }}
           </app-button>
           @if (canRotate()) {
             <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
-              <app-icon name="repeat" [size]="16" />
+              <app-icon name="repeat" />
               {{ 'guests.link.rotate' | t }}
             </app-button>
           }
@@ -35,7 +35,7 @@
   </div>
   @if (variant() === 'sheet') {
     <app-button class="jl__large" size="sm" variant="text" (click)="showLarge.emit()">
-      <app-icon name="grid" [size]="16" />
+      <app-icon name="grid" />
       {{ 'guests.sheet.showLarge' | t }}
     </app-button>
   }

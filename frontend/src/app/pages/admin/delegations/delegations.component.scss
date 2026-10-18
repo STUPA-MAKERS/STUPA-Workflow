@@ -27,11 +27,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.dl__error {
-  margin: 0;
-  color: var(--color-danger);
-}
-
 .dl__list {
   margin: 0;
   padding: 0;
@@ -134,15 +129,6 @@
 .dl__more:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
-}
-
-.dl__dialogText {
-  margin: 0;
-}
-.dl__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 @container (max-width: 48rem) {

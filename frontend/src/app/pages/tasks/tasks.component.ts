@@ -36,6 +36,7 @@ import { PageFrameService } from '../../layout/page-frame.service';
 import { ApplicationsPageService } from '../applications/applications-page.service';
 import { groupByMonth, type MonthGroup } from '../applications/applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 const DAY_MS = 86_400_000;
 
@@ -105,6 +106,7 @@ interface TaskRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     PageHeaderComponent,
     RouterOutlet,
     TranslatePipe,
@@ -340,6 +342,13 @@ export class TasksComponent implements OnDestroy {
     const child = this.route.snapshot.firstChild?.paramMap;
     this.selectedId.set(child?.get('id') ?? null);
     this.selectedTodo.set(child?.get('cardId') ?? null);
+  }
+
+  /** Load the task list again after a failed first load. */
+  retry(): void {
+    this.error.set(false);
+    this.loading.set(true);
+    this.load();
   }
 
   /**

@@ -207,7 +207,7 @@ describe('ShareLinksDialogComponent', () => {
     http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
     expect(cmp.freshUrl()).toBe('https://x/s/t');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Schließen' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Schließen' }).at(-1)!);
     expect(host.open()).toBe(false);
     expect(cmp.freshUrl()).toBeNull();
 

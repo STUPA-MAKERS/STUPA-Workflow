@@ -11,7 +11,7 @@
           {{ 'budget.tree.stichtagTitle' | t }}
         </app-button>
         <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
-          <app-icon name="cal" [size]="16" /> {{ 'budget.tree.fyTitle' | t }}
+          <app-icon name="cal" /> {{ 'budget.tree.fyTitle' | t }}
         </app-button>
       }
     </ng-container>
@@ -70,7 +70,7 @@
                 [attr.aria-label]="('budget.tree.fold' | t) + ': ' + n.name"
                 (click)="toggleCollapse(n.id)"
               >
-                <app-icon [name]="isCollapsed(n.id) ? 'chevron-right' : 'chevron-down'" [size]="16" />
+                <app-icon [name]="isCollapsed(n.id) ? 'right' : 'down'" [size]="16" />
               </button>
             } @else {
               <span class="bt__foldGap" aria-hidden="true"></span>
@@ -162,7 +162,7 @@
                 <app-button type="submit" variant="fill" size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()">
                   {{ 'budget.tree.add' | t }}
                 </app-button>
-                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'action.cancel' | t }}</app-button>
               </span>
             </form>
           }
@@ -181,7 +181,7 @@
   [open]="!!limitNode()"
   [title]="'budget.tree.limitTitle' | t"
   [subtitle]="limitNode() ? limitNode()!.pathKey + ' · ' + limitNode()!.name : ''"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeLimit()"
 >
   @if (limitNode()) {
@@ -195,7 +195,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeLimit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
   </div>
 </app-dialog>
@@ -205,7 +205,7 @@
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
   [subtitle]="editNode()?.pathKey ?? ''"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeEditNode()"
 >
   @if (editNode()) {
@@ -294,7 +294,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeEditNode()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!editKey().trim() || !editName().trim() || editColorInvalid()" (click)="saveEditNode()">{{
       'budget.tree.save' | t
     }}</app-button>
@@ -302,26 +302,21 @@
 </app-dialog>
 
 <!-- Delete a cost centre. A node with sub cost centres or allocations gives 409. -->
-<app-dialog
+<app-confirm-dialog
   [open]="!!nodeDelete()"
   [title]="'budget.tree.deleteTitle' | t"
-  [closeLabel]="'budget.tree.cancel' | t"
-  (closed)="closeDeleteNode()"
+  [body]="nodeDelete() ? ('budget.tree.deleteConfirm' | t: { name: nodeDelete()!.name, path: nodeDelete()!.pathKey }) : ''"
+  [disabled]="nodeDeleteBlocked()"
+  (confirm)="deleteNode()"
+  (cancel)="closeDeleteNode()"
 >
-  @if (nodeDelete(); as node) {
-    <p class="bt__confirm">{{ 'budget.tree.deleteConfirm' | t: { name: node.name, path: node.pathKey } }}</p>
-  }
   @if (nodeDeleteBlocked()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.deleteBlocked' | t }}</app-note>
   }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeDeleteNode()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="danger" [disabled]="nodeDeleteBlocked()" (click)="deleteNode()">{{ 'budget.tree.delete' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>
 
 <!-- Create a top budget. -->
-<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeTop()">
+<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'action.close' | t" (closed)="closeTop()">
   <form id="bt-top-form" class="bt__form" (submit)="createTop($event)">
     <div class="bt__pair">
       <app-input
@@ -352,7 +347,7 @@
     </div>
   </form>
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeTop()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{
       'budget.tree.add' | t
     }}</app-button>
@@ -364,7 +359,7 @@
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeFy()"
 >
   <form id="bt-fy-form" class="bt__form" (submit)="createFiscalYear($event)">
@@ -411,14 +406,14 @@
   </section>
 
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeFy()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Correct a fiscal year. Only the year and the active flag change. The server derives
      the start and the end date again from the budget cutoff. -->
-<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyEdit()">
+<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'action.close' | t" (closed)="closeFyEdit()">
   @if (fyEdit()) {
     <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
       <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" />
@@ -428,32 +423,32 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFyEdit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeFyEdit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
      applications still hang on the year. That reason stays visible in the dialog. -->
-<app-dialog [open]="!!fyDelete()" [title]="'budget.tree.fyDeleteTitle' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyDelete()">
-  @if (fyDelete(); as fy) {
-    <p class="bt__confirm">{{ 'budget.tree.fyDeleteConfirm' | t: { year: fy.display } }}</p>
-  }
+<app-confirm-dialog
+  [open]="!!fyDelete()"
+  [title]="'budget.tree.fyDeleteTitle' | t"
+  [body]="fyDelete() ? ('budget.tree.fyDeleteConfirm' | t: { year: fyDelete()!.display }) : ''"
+  [disabled]="!!fyDeleteBlocked()"
+  (confirm)="doFyDelete()"
+  (cancel)="closeFyDelete()"
+>
   @if (fyDeleteBlocked(); as reason) {
     <app-note kind="error" icon="alert" role="alert">{{ reason }}</app-note>
   }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFyDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="danger" [disabled]="!!fyDeleteBlocked()" (click)="doFyDelete()">{{ 'budget.tree.fyDelete' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>
 
 <!-- Set the fiscal-year cutoff of the selected budget. A field saves on change. -->
 <app-dialog
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeStichtag()"
 >
   <form id="bt-stichtag-form" class="bt__form" (submit)="$event.preventDefault()">
@@ -494,7 +489,7 @@
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeStateConfig()"
 >
   @if (stateOptions().length) {

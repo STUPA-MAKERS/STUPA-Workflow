@@ -2,7 +2,7 @@
   [open]="item() !== null"
   [title]="(canOpen() ? 'meetings.vote.dialogTitle' : 'meetings.vote.prepareTitle') | t"
   [subtitle]="subtitle()"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancel()"
 >
   <form class="vod" (submit)="$event.preventDefault(); submit()">
@@ -50,7 +50,7 @@
           [iconOnly]="true"
           [ariaLabel]="'election.dialog.seatsLess' | t"
           (click)="changeSeats(-1)"
-        ><app-icon name="minus" [size]="16" /></app-button>
+        ><app-icon name="minus" /></app-button>
         <span class="vod__seats mono" aria-live="polite">{{ seats() }}</span>
         <app-button
           variant="tonal"
@@ -59,7 +59,7 @@
           [iconOnly]="true"
           [ariaLabel]="'election.dialog.seatsMore' | t"
           (click)="changeSeats(1)"
-        ><app-icon name="plus" [size]="16" /></app-button>
+        ><app-icon name="plus" /></app-button>
       </div>
     </div>
 
@@ -72,9 +72,9 @@
               <span class="vod__candNo mono" aria-hidden="true">{{ i + 1 }}</span>
               <span class="vod__candName ell" [appTruncated]="c.name" #cut="appTruncated" [attr.title]="cut.truncated() ? c.name : null">{{ c.name }}</span>
               <span class="vod__candKind">{{ (c.principalId ? 'election.dialog.member' : 'election.dialog.free') | t }}</span>
-              <app-button variant="text" size="sm" [disabled]="first" [iconOnly]="true" [ariaLabel]="'election.dialog.up' | t: { name: c.name }" (click)="moveCandidate(i, -1)"><app-icon name="up" [size]="16" /></app-button>
-              <app-button variant="text" size="sm" [disabled]="last" [iconOnly]="true" [ariaLabel]="'election.dialog.down' | t: { name: c.name }" (click)="moveCandidate(i, 1)"><app-icon name="down" [size]="16" /></app-button>
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'election.dialog.remove' | t: { name: c.name }" (click)="removeCandidate(c.key)"><app-icon name="trash" [size]="16" /></app-button>
+              <app-button variant="text" size="sm" [disabled]="first" [iconOnly]="true" [ariaLabel]="'election.dialog.up' | t: { name: c.name }" (click)="moveCandidate(i, -1)"><app-icon name="up" /></app-button>
+              <app-button variant="text" size="sm" [disabled]="last" [iconOnly]="true" [ariaLabel]="'election.dialog.down' | t: { name: c.name }" (click)="moveCandidate(i, 1)"><app-icon name="down" /></app-button>
+              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'election.dialog.remove' | t: { name: c.name }" (click)="removeCandidate(c.key)"><app-icon name="trash" /></app-button>
             </li>
           }
         </ol>
@@ -104,7 +104,7 @@
           (keydown.enter)="$event.preventDefault(); addFreeName()"
         />
         <app-button variant="tonal" [disabled]="!freeName().trim() || freeNameTaken()" (click)="addFreeName()">
-          <app-icon name="plus" [size]="16" />
+          <app-icon name="plus" />
           {{ 'election.dialog.add' | t }}
         </app-button>
       </div>

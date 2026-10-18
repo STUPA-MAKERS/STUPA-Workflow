@@ -3,7 +3,7 @@
     <div class="gr__head">
       <h3 class="gr__cap cap">{{ 'guests.request.title' | t: { n: rows().length } }}</h3>
       <app-button size="sm" variant="tonal" [loading]="guests.busy() === 'all'" [disabled]="!!guests.busy()" (click)="guests.admitAll()">
-        <app-icon name="check" [size]="16" />
+        <app-icon name="check" />
         {{ 'guests.request.admitAll' | t }}
       </app-button>
     </div>
@@ -20,7 +20,7 @@
           <div class="g__ctl">
             @if (phone()) {
               <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
-                <app-icon name="x" [size]="18" />
+                <app-icon name="x" />
               </app-button>
             } @else {
               <app-button size="sm" variant="text" class="g__reject" [ariaLabel]="'guests.request.rejectName' | t: { name: row.name }" [disabled]="!!guests.busy()" (click)="guests.reject(row.g)">
@@ -28,7 +28,7 @@
               </app-button>
             }
             <app-button size="sm" variant="fill" [ariaLabel]="'guests.request.admitName' | t: { name: row.name }" [loading]="guests.busy() === row.g.id" [disabled]="!!guests.busy()" (click)="guests.admit(row.g)">
-              <app-icon name="check" [size]="16" />
+              <app-icon name="check" />
               {{ 'guests.request.admit' | t }}
             </app-button>
           </div>

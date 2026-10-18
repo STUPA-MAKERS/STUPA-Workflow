@@ -430,6 +430,8 @@ describe('MeetingPageComponent', () => {
       expect(on.setNonPublic).toHaveBeenCalledWith({ item: AGENDA[1], nonPublic: true });
       await userEvent.click(within(rows[1]).getByRole('button', { name: /Aktionen für/ }));
       await userEvent.click(await screen.findByRole('menuitem', { name: 'TOP entfernen' }));
+      const ask = await screen.findByRole('dialog', { name: 'TOP entfernen?' });
+      await userEvent.click(within(ask).getByRole('button', { name: 'Entfernen' }));
       expect(on.removeFromAgenda).toHaveBeenCalledWith('t-2');
     });
 

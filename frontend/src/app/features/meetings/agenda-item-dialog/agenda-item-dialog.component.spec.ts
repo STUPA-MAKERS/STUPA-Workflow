@@ -185,7 +185,8 @@ describe('AgendaItemDialogComponent', () => {
     flushApps(http, fixture);
     expect(cmp.pick()).toBeNull();
     expect(cmp.nonPublic()).toBe(false);
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
   });

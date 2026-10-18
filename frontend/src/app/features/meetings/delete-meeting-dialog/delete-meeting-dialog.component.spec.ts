@@ -38,13 +38,13 @@ describe('DeleteMeetingDialogComponent', () => {
   it('names what goes with a planned meeting and offers an outlined danger button', async () => {
     const { http } = await setup();
     flushCount(http, 0);
-    expect(screen.getByRole('dialog', { name: 'Sitzung löschen' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Sitzung löschen?' })).toBeInTheDocument();
     expect(
       screen.getByText(
-        '„35. Sitzung“ wird mit Tagesordnung, Anwesenheit und Vertretungen gelöscht. Das kann nicht rückgängig gemacht werden.',
+        '„35. Sitzung“ wird mit Tagesordnung, Anwesenheit und Vertretungen gelöscht. Das lässt sich nicht rückgängig machen.',
       ),
     ).toBeInTheDocument();
-    const confirm = screen.getByRole('button', { name: 'Endgültig löschen' });
+    const confirm = screen.getByRole('button', { name: 'Löschen' });
     expect(confirm).toHaveClass('btn--danger');
     expect(confirm).not.toHaveClass('btn--fill');
     // Without votes the dialog names none.
@@ -88,7 +88,7 @@ describe('DeleteMeetingDialogComponent', () => {
   it('deletes the meeting and reports it', async () => {
     const { http, deleted, toasts } = await setup();
     flushCount(http, 2);
-    await userEvent.click(screen.getByRole('button', { name: 'Endgültig löschen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
     const req = http.expectOne(DELETE);
     req.flush(null, { status: 204, statusText: 'No Content' });
     expect(deleted).toHaveBeenCalledWith('m-1');
@@ -125,7 +125,8 @@ describe('DeleteMeetingDialogComponent', () => {
 
   it('closes on cancel', async () => {
     const { closed } = await setup();
-    const [, footerCancel] = screen.getAllByRole('button', { name: 'Abbrechen' });
+    expect(screen.getByRole('button', { name: 'Schließen' })).toBeInTheDocument();
+    const footerCancel = screen.getByRole('button', { name: 'Abbrechen' });
     await userEvent.click(footerCancel);
     expect(closed).toHaveBeenCalled();
   });

@@ -99,7 +99,7 @@
                 <p class="ins__hint">{{ 'admin.flow.actMapEmpty' | t }}</p>
               }
               <app-button class="td__inlineAdd" variant="text" size="sm" [disabled]="hasBlankMapRow(act)" (click)="addMapRow(ai, act)">
-                <app-icon name="plus" [size]="15" /> {{ 'admin.flow.actMapAdd' | t }}
+                <app-icon name="plus" /> {{ 'admin.flow.actMapAdd' | t }}
               </app-button>
             }
             @case ('assignBudget') {
@@ -145,7 +145,7 @@
                 </div>
               }
               <app-button class="td__inlineAdd" variant="text" size="sm" (click)="recipientAdd.emit(ai)">
-                <app-icon name="plus" [size]="15" /> {{ 'admin.flow.addRecipient' | t }}
+                <app-icon name="plus" /> {{ 'admin.flow.addRecipient' | t }}
               </app-button>
             }
           }

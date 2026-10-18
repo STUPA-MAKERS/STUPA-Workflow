@@ -72,7 +72,7 @@ describe('SessionDockComponent', () => {
 
     it('shows no position and no word count while no item is open', async () => {
       await setup({ topIndex: -1 });
-      expect(screen.getByText('–')).toBeInTheDocument();
+      expect(screen.getByText('—')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Nächster TOP' })).toBeDisabled();
       expect(screen.queryByText(/Wörter/)).toBeNull();
     });
@@ -321,9 +321,9 @@ describe('SessionDockComponent', () => {
     it('names every minute-taker once, locked, and keeps the attendance', async () => {
       const { fixture } = await setup({ meeting: closed() });
       // The chip can cut the names off: the tooltip names them in full, then says why.
-      const keepers = screen.getByTitle(/Sitzung geschlossen – die Protokollführung steht fest\.$/);
+      const keepers = screen.getByTitle(/Sitzung geschlossen — die Protokollführung steht fest\.$/);
       expect(keepers.getAttribute('title')).toBe(
-        'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen – die Protokollführung steht fest.',
+        'Protokoll: Pia Protokoll, Mika Mitglied\nSitzung geschlossen — die Protokollführung steht fest.',
       );
       expect(keepers).toHaveTextContent('Protokoll: Pia Protokoll, Mika Mitglied');
       expect(keepers.tagName).toBe('SPAN');

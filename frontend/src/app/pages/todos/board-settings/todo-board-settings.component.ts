@@ -36,6 +36,7 @@ import {
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { LABEL_COLORS, LABEL_COLOR_NAME, sortedColumns } from '../../../features/todos/todos.util';
 
 /** The default archive age when the switch turns on. */
@@ -62,6 +63,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     CdkDrag,
     CdkDragHandle,
     CdkDropList,
+    ConfirmDialogComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -98,6 +100,8 @@ export class TodoBoardSettingsComponent {
   /** A column with cards to delete: the column that takes them. */
   readonly deleting = signal<TodoColumn | null>(null);
   readonly moveTo = signal<Uuid>('');
+  /** An empty column that "Spalte löschen?" asks about. */
+  readonly confirmEmpty = signal<TodoColumn | null>(null);
 
   readonly columns = computed(() => sortedColumns(this.board().columns));
   readonly archiveOn = computed(() => this.board().archiveAfterDays !== null);
@@ -118,6 +122,7 @@ export class TodoBoardSettingsComponent {
         this.newColumn.set(null);
         this.labelEdit.set(null);
         this.deleting.set(null);
+        this.confirmEmpty.set(null);
       });
     });
   }
@@ -237,18 +242,28 @@ export class TodoBoardSettingsComponent {
     this.run(this.api.orderColumns(this.board().id, ids));
   }
 
+  /** A column with cards asks where they go; an empty one asks "Spalte löschen?". */
   deleteColumn(col: TodoColumn): void {
     if (col.cardCount > 0) {
       this.askMoveTo(col);
       return;
     }
+    this.confirmEmpty.set(col);
+  }
+
+  /** "Löschen" in "Spalte löschen?". Archived cards in the column make it ask for a target. */
+  deleteEmptyColumn(): void {
+    const col = this.confirmEmpty();
+    if (!col) return;
     this.busy.set(true);
     this.api.deleteColumn(this.board().id, col.id).subscribe({
       next: (board) => {
         this.busy.set(false);
+        this.confirmEmpty.set(null);
         this.changed.emit(board);
       },
       error: (err: unknown) => {
+        this.confirmEmpty.set(null);
         if (err instanceof HttpErrorResponse && (err.error as { code?: string } | null)?.code === 'column_not_empty') {
           this.busy.set(false);
           this.askMoveTo(col);

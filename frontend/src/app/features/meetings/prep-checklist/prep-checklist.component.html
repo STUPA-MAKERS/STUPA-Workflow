@@ -43,7 +43,7 @@
   @if (m.canControl) {
     <div class="pc__start">
       <app-button variant="fill" [disabled]="!m.protokollantId || !!opensAtText()" [title]="m.protokollantId ? (opensAtText() || ('meetings.control.open' | t)) : ('meetings.control.needProtokollant' | t)" (click)="start.emit()">
-        <app-icon name="play" [size]="16" />
+        <app-icon name="play" />
         {{ 'meetings.control.open' | t }}
       </app-button>
       @if (opensAtText()) {

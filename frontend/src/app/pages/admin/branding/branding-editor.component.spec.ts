@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -328,9 +328,9 @@ describe('BrandingEditorComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
-      const internal = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Intern — angemeldet mit Konto (DE)' });
       expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
-      expect(screen.getByRole('textbox', { name: 'Extern – Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
+      expect(screen.getByRole('textbox', { name: 'Extern — Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
         'placeholder',
         expect.stringMatching(/persönlichen Link/),
       );
@@ -342,13 +342,13 @@ describe('BrandingEditorComponent', () => {
       const { fixture, api } = await setupWithStub({});
       await fixture.whenStable();
       fixture.detectChanges();
-      const internal = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Intern — angemeldet mit Konto (DE)' });
       await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
       expect(screen.getByTestId('submitted-preview-internal').innerHTML).toContain('<strong>sehr</strong>');
       expect(screen.getByTestId('submitted-preview-internal').querySelector('b')).toBeNull();
       expect(screen.getAllByText('Standardtext')).toHaveLength(1);
       await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-      const en = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (EN)' });
+      const en = screen.getByRole('textbox', { name: 'Intern — angemeldet mit Konto (EN)' });
       expect(en).toHaveValue('');
       expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
       await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
@@ -376,6 +376,11 @@ describe('BrandingEditorComponent', () => {
     const c = fixture.componentInstance as any;
     expect(typeof c.slotLabel('favicon')).toBe('string');
     expect(c.slotLabel('favicon').length).toBeGreaterThan(0);
+  });
+
+  it('shows the shape of the editor until the config arrives', async () => {
+    await setupWithStub({ getSiteConfig: jest.fn(() => NEVER) });
+    expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
   });
 
   it('patch is a no-op without a draft', async () => {

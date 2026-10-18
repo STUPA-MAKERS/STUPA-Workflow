@@ -15,7 +15,7 @@
     @if (loading()) {
       <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
     } @else if (loadError()) {
-      <p class="dl__error" role="alert">{{ 'admin.deleg.error' | t }}</p>
+      <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'admin.deleg.error' | t }}</app-note>
     } @else {
       <ng-template #rows let-list>
         @if (list.length) {
@@ -74,7 +74,7 @@
           aria-controls="dl-past"
           (click)="showPast.set(!showPast())"
         >
-          <app-icon [name]="showPast() ? 'chevron-up' : 'chevron-down'" [size]="16" />
+          <app-icon [name]="showPast() ? 'up' : 'down'" />
           {{ 'admin.deleg.past' | t: { count: past().length } }}
         </button>
         @if (showPast()) {
@@ -101,26 +101,17 @@
   }
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmRevoke() !== null"
   [title]="'admin.deleg.revokeTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmRevoke.set(null)"
->
-  @if (confirmRevoke(); as d) {
-    <p class="dl__dialogText">
-      {{
-        'admin.deleg.revokeConfirm'
-          | t: { from: who(d, 'from'), to: who(d, 'to'), meeting: d.meetingTitle ?? '' }
-      }}
-    </p>
-  }
-  <div dialog-footer class="dl__dialogFoot">
-    <app-button variant="text" (click)="confirmRevoke.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button variant="danger" [loading]="busy()" (click)="revoke()">{{
-      'admin.deleg.revoke' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="
+    confirmRevoke()
+      ? ('admin.deleg.revokeConfirm'
+        | t: { from: who(confirmRevoke()!, 'from'), to: who(confirmRevoke()!, 'to'), meeting: confirmRevoke()!.meetingTitle ?? '' })
+      : ''
+  "
+  [confirmLabel]="'admin.deleg.revoke' | t"
+  [busy]="busy()"
+  (confirm)="revoke()"
+  (cancel)="confirmRevoke.set(null)"
+/>

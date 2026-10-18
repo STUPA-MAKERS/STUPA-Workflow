@@ -29,6 +29,8 @@ import {
 } from '@stupa-makers/ui-kit';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -52,7 +54,9 @@ const SEARCH_ABOVE = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
+    SkeletonComponent,
     TruncatedDirective,
     FormsModule,
     TranslatePipe,
@@ -120,6 +124,12 @@ export class LeadSubstituteDialogComponent {
       if (!m) return;
       untracked(() => this.load(meetingId, m.principalId));
     });
+  }
+
+  /** Load the pool of the member again after a failed load. */
+  protected retry(): void {
+    const m = this.member();
+    if (m) this.load(this.meetingId(), m.principalId);
   }
 
   private load(meetingId: Uuid, memberId: Uuid): void {

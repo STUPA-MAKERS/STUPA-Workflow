@@ -2,7 +2,7 @@
   [open]="meeting() !== null"
   [title]="'meetings.settings.title' | t"
   [subtitle]="meeting()?.gremiumName ?? ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="cancel()"
 >
   <form class="msd" (submit)="$event.preventDefault(); save()">
@@ -85,13 +85,11 @@
 </app-dialog>
 
 <!-- Off in a live meeting: the consequences in one sentence, with the numbers. -->
-<app-dialog
+<app-confirm-dialog
   [open]="confirmOff()"
   [title]="'guests.off.title' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="keepPublic()"
->
-  <p class="msd__confirm">{{ 'guests.off.text' | t: { pending: offCounts().pending, admitted: offCounts().admitted } }}</p>
-  <app-button dialog-footer variant="text" (click)="keepPublic()">{{ 'action.cancel' | t }}</app-button>
-  <app-button dialog-footer variant="danger" (click)="confirmPublicOff()">{{ 'guests.off.confirm' | t }}</app-button>
-</app-dialog>
+  [body]="'guests.off.text' | t: { pending: offCounts().pending, admitted: offCounts().admitted }"
+  [confirmLabel]="'guests.off.confirm' | t"
+  (confirm)="confirmPublicOff()"
+  (cancel)="keepPublic()"
+/>

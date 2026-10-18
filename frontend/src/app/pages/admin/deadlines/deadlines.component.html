@@ -66,7 +66,7 @@
 <app-dialog
   [open]="draft() !== null"
   [title]="(editingId() === null ? 'admin.deadlines.add' : 'admin.deadlines.edit') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   @if (draft(); as d) {
@@ -132,7 +132,7 @@
             </div>
           }
           <app-button class="dl__addDate" variant="text" size="sm" (click)="addDate()">
-            <app-icon name="plus" [size]="16" /> {{ 'admin.deadlines.addDate' | t }}
+            <app-icon name="plus" /> {{ 'admin.deadlines.addDate' | t }}
           </app-button>
         </fieldset>
       } @else {
@@ -170,15 +170,10 @@
   </div>
 </app-dialog>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.deadlines.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="dl__confirm">{{ 'admin.deadlines.deleteConfirm' | t: { name: label(confirmDelete()) } }}</p>
-  <div dialog-footer class="dl__foot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doDelete()">{{ 'admin.common.remove' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'admin.deadlines.deleteConfirm' | t: { name: label(confirmDelete()) }"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

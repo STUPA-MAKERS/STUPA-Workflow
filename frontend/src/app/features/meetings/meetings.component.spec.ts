@@ -594,6 +594,8 @@ describe('MeetingsComponent', () => {
       { status: 500, statusText: 'Server Error' },
     );
     expect(await screen.findByText(/konnte nicht geladen/i)).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    http.expectOne('/api/meetings/m-1').flush({ title: 'fail' }, { status: 500, statusText: 'Server Error' });
   });
 
   it('offers no on-demand protocol button — the protocol is created on start', async () => {
@@ -852,8 +854,8 @@ describe('MeetingsComponent — methods', () => {
       const { cmp, http, fixture, navigate } = await loaded();
       cmp.askDeleteMeeting(cmp.meeting()!);
       fixture.detectChanges();
-      const dialog = screen.getByRole('dialog', { name: 'Sitzung löschen' });
-      await userEvent.click(within(dialog).getByRole('button', { name: 'Endgültig löschen' }));
+      const dialog = screen.getByRole('dialog', { name: 'Sitzung löschen?' });
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
       http.expectOne((r) => r.url === '/api/meetings/m-1' && r.method === 'DELETE').flush(null);
       expect(navigate).toHaveBeenCalledWith(['/meetings']);
     });
@@ -1021,11 +1023,14 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.saveState()).toBe('idle');
     });
 
-    it('removes a TOP from the agenda', async () => {
-      const { cmp, http } = await loaded();
+    it('removes a TOP from the agenda and says so', async () => {
+      const { cmp, http, fixture } = await loaded();
+      const toasts = fixture.debugElement.injector.get(ToastService);
+      const success = jest.spyOn(toasts, 'success');
       cmp.removeFromAgenda('t-1');
       http.expectOne('/api/meetings/m-1/agenda/t-1').flush([]);
       expect(cmp.savingAgenda()).toBe(false);
+      expect(success).toHaveBeenCalledWith('TOP entfernt.');
     });
 
     it('ignores removeFromAgenda while saving and handles its error', async () => {

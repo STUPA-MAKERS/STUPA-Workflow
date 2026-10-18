@@ -283,14 +283,6 @@
 .cal__dayHead {
   padding-inline: var(--space-6);
 }
-.cal__note {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.cal__note--error {
-  color: var(--color-danger);
-}
 
 .cal__card {
   display: flex;

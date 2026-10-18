@@ -311,7 +311,7 @@ describe('TodosComponent', () => {
     cmp.reload();
     harness.detectChanges();
     expect(cmp.error()).toBe(true);
-    fireEvent.click(screen.getByTestId('td-retry'));
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
     harness.detectChanges();
     expect(cmp.board()).not.toBeNull();
   });

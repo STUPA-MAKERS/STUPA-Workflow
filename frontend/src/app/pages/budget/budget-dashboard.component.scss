@@ -15,13 +15,6 @@
   letter-spacing: -0.01em;
 }
 
-.bd__status {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-.bd__status--error {
-  color: var(--color-danger);
-}
 /* No cost centres or no fiscal year: the page holds nothing but the empty state. The
    host takes the free height of the shell main, and the empty state centres in the
    height below the title. */

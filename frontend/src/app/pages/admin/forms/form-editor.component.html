@@ -13,7 +13,7 @@
     <div actions class="fe__headTools">
       @if (phone()) {
         <app-button variant="fill" size="sm" [disabled]="!formValid()" [loading]="saving()" (click)="save()">
-          <app-icon name="check" [size]="16" /> {{ 'admin.forms.save' | t }}
+          <app-icon name="check" /> {{ 'admin.forms.save' | t }}
         </app-button>
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
@@ -23,11 +23,11 @@
           </app-button>
         }
         <app-button variant="outlined" (click)="preview.set(!preview())">
-          <app-icon [name]="preview() ? 'edit' : 'eye'" [size]="17" />
+          <app-icon [name]="preview() ? 'edit' : 'eye'" />
           {{ (preview() ? 'admin.forms.modeEdit' : 'admin.forms.modeView') | t }}
         </app-button>
         <app-button variant="fill" [disabled]="!formValid()" [loading]="saving()" (click)="save()">
-          <app-icon name="check" [size]="16" /> {{ 'admin.forms.save' | t }}
+          <app-icon name="check" /> {{ 'admin.forms.save' | t }}
         </app-button>
       }
     </div>
@@ -167,13 +167,13 @@
                   [attr.aria-expanded]="typeMenuGroup() === gi"
                   (click)="toggleTypeMenu(gi, $event)"
                 >
-                  <app-icon name="plus" [size]="15" /> {{ 'admin.forms.addQuestion' | t }}
+                  <app-icon name="plus" /> {{ 'admin.forms.addQuestion' | t }}
                 </app-button>
               </div>
             </section>
           }
           <app-button class="fe__addGroup" variant="tonal" size="sm" (click)="addGroup()">
-            <app-icon name="plus" [size]="15" /> {{ 'admin.form.addGroup' | t }}
+            <app-icon name="plus" /> {{ 'admin.form.addGroup' | t }}
           </app-button>
         </nav>
 
@@ -275,11 +275,11 @@
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
                         <app-input label="DE" [ariaLabel]="'admin.common.labelDe' | t" [(ngModel)]="opt.label['de']" (ngModelChange)="touch()" />
                         <app-input label="EN" [ariaLabel]="'admin.common.labelEn' | t" [(ngModel)]="opt.label['en']" (ngModelChange)="touch()" />
-                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="x" /></app-button>
+                        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
                       </div>
                     }
                     <app-button class="fe__inlineAdd" variant="text" size="sm" (click)="addOption(pos)">
-                      <app-icon name="plus" [size]="15" /> {{ 'admin.form.addOption' | t }}
+                      <app-icon name="plus" /> {{ 'admin.form.addOption' | t }}
                     </app-button>
                   </fieldset>
                 }

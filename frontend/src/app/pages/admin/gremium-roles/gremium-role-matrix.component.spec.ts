@@ -179,8 +179,8 @@ describe('GremiumRoleMatrixComponent', () => {
     const api = makeApi();
     const { counts } = await setup({ api });
     await userEvent.click(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' }));
-    const dialog = screen.getByRole('dialog', { name: 'Gremium-Rolle löschen' });
-    await userEvent.click(within(dialog).getByText('Rolle löschen'));
+    const dialog = screen.getByRole('dialog', { name: 'Gremium-Rolle löschen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
     expect(api.deleteGremiumRole).toHaveBeenCalledWith('gr-p');
     expect(screen.queryByRole('rowheader', { name: /^Protokoll/ })).toBeNull();
     expect(counts).toEqual([3]);
@@ -190,7 +190,7 @@ describe('GremiumRoleMatrixComponent', () => {
     const api = makeApi({ deleteGremiumRole: jest.fn(() => throwError(() => ({ status: 409 }))) });
     const { toast } = await setup({ api });
     await userEvent.click(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByText('Rolle löschen'));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Löschen' }));
     expect(toast.error).toHaveBeenCalledWith(
       'Eine Mitgliedschaft oder eine Gruppen-Zuordnung verwendet die Rolle noch.',
     );
@@ -226,7 +226,7 @@ describe('GremiumRoleMatrixComponent', () => {
     await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: Protokoll' }));
     await userEvent.click(screen.getByText('Rolle löschen', { selector: '.btn__label' }));
-    expect(screen.getByRole('dialog', { name: 'Gremium-Rolle löschen' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Gremium-Rolle löschen?' })).toBeInTheDocument();
   });
 
   it('names a failed load', async () => {

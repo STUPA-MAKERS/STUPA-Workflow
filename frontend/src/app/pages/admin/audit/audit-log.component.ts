@@ -37,6 +37,7 @@ import type {
   ConfigRevisionDiff,
 } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 const PAGE_SIZE = 50;
 
@@ -251,6 +252,7 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,
@@ -529,6 +531,12 @@ export class AuditLogComponent {
       default:
         return 'admin.audit.revert.conflict';
     }
+  }
+
+  /** Load again after a failed load: the next page when entries show, else the first. */
+  protected retry(): void {
+    if (this.entries().length) this.load(false);
+    else this.reload();
   }
 
   /** After a filter change, drop the list and load again from the newest entry. */

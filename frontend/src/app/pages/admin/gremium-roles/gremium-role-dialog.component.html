@@ -3,7 +3,7 @@
   [open]="open()"
   [title]="title() | t"
   [subtitle]="gremiumName()"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   <form class="rd" (submit)="$event.preventDefault(); save()">

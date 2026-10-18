@@ -211,7 +211,7 @@
   >
     <!-- While the tab loads, the table draws its own skeleton rows (a phone: the skeleton). -->
     @if (tabError()) {
-      <p class="dash__state dash__state--error" role="alert">{{ 'dashboard.error' | t }}</p>
+      <app-note class="dash__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryTab()">{{ 'dashboard.error' | t }}</app-note>
     } @else if (tabEmpty()) {
       <div class="dash__emptyGrid" [class.dash__emptyGrid--two]="newUser() && applyTypes().length">
         @switch (tab()) {

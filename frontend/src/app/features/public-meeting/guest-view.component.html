@@ -4,7 +4,7 @@
   <section class="gv__vote" [attr.aria-label]="'voting.cast.heading' | t">
     <div class="gv__voteHead">
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'guests.vote.back' | t" (click)="openVoteId.set(null)">
-        <app-icon name="back" [size]="20" />
+        <app-icon name="back" />
       </app-button>
       <span class="gv__voteTitles">
         <span class="gv__voteTitle">{{ 'voting.cast.heading' | t }}</span>
@@ -75,7 +75,7 @@
             <span class="ell">{{ fv.question }}</span>
           }
         </span>
-        <app-icon name="chevron-right" [size]="18" />
+        <app-icon name="right" [size]="18" />
       </button>
     } @else {
       <div class="gv__noVote">

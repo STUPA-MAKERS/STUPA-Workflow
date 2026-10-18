@@ -9,15 +9,15 @@
     <div actions class="fe__headTools">
       @if (phone()) {
         <app-button variant="fill" size="sm" [disabled]="!validation().valid" [loading]="saving()" (click)="save()">
-          <app-icon name="check" [size]="16" /> {{ 'admin.flow.save' | t }}
+          <app-icon name="check" /> {{ 'admin.flow.save' | t }}
         </app-button>
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
         <app-button variant="text" [attr.aria-pressed]="showVersions()" (click)="toggleVersions()">
-          <app-icon name="history" [size]="17" /> {{ 'admin.flow.versions' | t }}
+          <app-icon name="history" /> {{ 'admin.flow.versions' | t }}
         </app-button>
         <app-button variant="fill" [disabled]="!validation().valid" [loading]="saving()" (click)="save()">
-          <app-icon name="check" [size]="16" /> {{ 'admin.flow.save' | t }}
+          <app-icon name="check" /> {{ 'admin.flow.save' | t }}
         </app-button>
       }
     </div>
@@ -27,7 +27,7 @@
     <section class="fe__sheet" [attr.aria-label]="'admin.flow.diagram' | t">
       <div class="fe__toolbar" role="toolbar" [attr.aria-label]="'admin.flow.toolbar' | t">
         <app-button variant="text" size="sm" (click)="addState()">
-          <app-icon name="plus" [size]="15" /> {{ 'admin.flow.addState' | t }}
+          <app-icon name="plus" /> {{ 'admin.flow.addState' | t }}
         </app-button>
         <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="!canUndo()" [ariaLabel]="'admin.flow.undo' | t" [title]="'admin.flow.undo' | t" (click)="undo()">
           <app-icon name="undo" />
@@ -57,7 +57,7 @@
         <nav class="fe__crumbs" [attr.aria-label]="'admin.flow.group.inspector' | t">
           <button type="button" class="fe__crumb" (click)="navigateTo(null)">{{ 'admin.flow.group.rootCrumb' | t }}</button>
           @for (c of breadcrumbs(); track c.id; let last = $last) {
-            <span class="fe__crumbSep" aria-hidden="true">›</span>
+            <app-icon class="fe__crumbSep" name="right" [size]="13" />
             @if (last) {
               <span class="fe__crumb fe__crumb--current" aria-current="page">{{ c.name }}</span>
             } @else {
@@ -82,6 +82,7 @@
         <svg
           #canvas
           class="fe__canvas"
+          [class.fe__canvas--loading]="loading()"
           [attr.viewBox]="viewBox()"
           width="100%"
           height="100%"
@@ -210,6 +211,9 @@
             </g>
           }
         </svg>
+        @if (loading()) {
+          <app-skeleton class="fe__canvasSkel" variant="panel" [label]="'common.loading' | t" />
+        }
 
         <p class="fe__legend">
           <span class="fe__legendItem"><span class="fe__legendDot" aria-hidden="true"></span>{{ 'admin.flow.initial' | t }}</span>
@@ -223,7 +227,7 @@
            line) and shows only on "Versionen". -->
       <div class="fe__versions" [class.fe__hidden]="!showVersions()">
         <app-button class="fe__back" variant="text" size="sm" (click)="showVersions.set(false)">
-          <app-icon name="back" [size]="16" /> {{ 'admin.flow.versionsClose' | t }}
+          <app-icon name="back" /> {{ 'admin.flow.versionsClose' | t }}
         </app-button>
         <app-version-history
           entityType="flow"

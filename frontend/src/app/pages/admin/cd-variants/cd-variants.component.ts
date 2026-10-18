@@ -54,6 +54,7 @@ import {
   variantInitials,
 } from './cd-variants.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -129,6 +130,7 @@ function errorCode(err: unknown): string {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,
@@ -258,7 +260,7 @@ export class AdminCdVariantsComponent {
     return logo.vendoredName ?? logo.fileName ?? '—';
   }
 
-  /** "Basis: Protokoll · genutzt von StuPa, AStA" for the card of a variant. */
+  /** "Basis: Protokoll · genutzt von STUPA, AStA" for the card of a variant. */
   usage(variant: CdVariant): string {
     const base = this.i18n.translate('admin.cdVariants.baseLine', { base: this.baseLabel(variant.baseVariant) });
     const names = this.usedBy().get(variant.id) ?? [];
