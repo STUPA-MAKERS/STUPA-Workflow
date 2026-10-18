@@ -42,6 +42,7 @@ import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/ca
 import { GremienStore } from '../gremien.store';
 import { localized, weekdayDay } from '../gremien.util';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The permission that shows every gremium, also without a membership. */
 export const GREMIUM_VIEW_ALL = 'gremium.view_all';
@@ -78,6 +79,7 @@ export interface GremiumRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     NgTemplateOutlet,
     RouterOutlet,
     TranslatePipe,

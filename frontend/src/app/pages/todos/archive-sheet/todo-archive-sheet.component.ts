@@ -10,6 +10,7 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { isoDay, shortDay } from '../../../features/todos/todos.util';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** One page of the archive. */
 export const ARCHIVE_PAGE = 50;
@@ -22,7 +23,7 @@ export const ARCHIVE_PAGE = 50;
   selector: 'app-todo-archive-sheet',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
+  imports: [NoteComponent, TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SearchPillComponent, SideSheetComponent],
   templateUrl: './todo-archive-sheet.component.html',
   styleUrl: './todo-archive-sheet.component.scss',
 })
@@ -63,7 +64,7 @@ export class TodoArchiveSheetComponent {
     });
   }
 
-  private load(offset = 0): void {
+  protected load(offset = 0): void {
     this.loading.set(true);
     this.failed.set(false);
     this.api.archive(this.boardId(), this.search.applied(), offset, ARCHIVE_PAGE).subscribe({

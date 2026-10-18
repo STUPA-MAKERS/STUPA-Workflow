@@ -1,6 +1,10 @@
 @switch (phase()) {
   @case ('loading') {
-    <p class="sp__loading" role="status">{{ 'status.loading' | t }}</p>
+    <!-- The shape of the page: the head lines, then the body. -->
+    <div class="sp">
+      <app-skeleton variant="lines" [count]="3" />
+      <app-skeleton variant="panel" [label]="'status.loading' | t" />
+    </div>
   }
 
   @case ('expired') {

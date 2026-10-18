@@ -46,6 +46,7 @@ import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
@@ -91,6 +92,7 @@ export interface TicketGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     RouterOutlet,
     TranslatePipe,
     AvatarComponent,
@@ -337,6 +339,13 @@ export class TicketsComponent implements OnDestroy {
     if (s === 'open') return ['new', 'in_progress'];
     if (s === 'all') return [];
     return [s];
+  }
+
+  /** Load page 0 again after a failed load. */
+  retry(): void {
+    this.error.set(false);
+    this.loading.set(true);
+    this.reload();
   }
 
   /**

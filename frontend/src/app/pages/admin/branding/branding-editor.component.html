@@ -333,5 +333,11 @@
     </details>
 
     <app-version-history entityType="site_config" entityId="global" (restored)="loadConfig()" />
+  } @else {
+    <!-- The shape of the editor: the fields beside the preview. -->
+    <div class="br__cols">
+      <app-skeleton variant="lines" [count]="6" [label]="'common.loading' | t" />
+      <app-skeleton variant="panel" />
+    </div>
   }
 </section>

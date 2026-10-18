@@ -282,7 +282,7 @@ export class AdminGremienComponent {
   }
 
   /** `first`: the first load opens the first row, as on the board. */
-  private reload(first: boolean): void {
+  protected reload(first: boolean): void {
     if (first) this.loading.set(true);
     this.loadError.set(false);
     this.api.listGremien({ quiet: true }).subscribe({

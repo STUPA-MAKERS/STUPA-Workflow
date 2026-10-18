@@ -49,7 +49,7 @@
               @if (diff(); as d) {
                 <app-config-diff [diff]="d.diff" />
               } @else {
-                <p class="vh__empty">{{ 'common.loading' | t }}</p>
+                <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
               }
             </div>
           }

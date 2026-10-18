@@ -158,10 +158,8 @@
 .ad__progress {
   inset-inline: var(--radius-2xl);
 }
-.ad__error {
-  margin: 0;
-  padding: var(--space-5) 0;
-  color: var(--color-danger);
+.ad__loadError {
+  margin: var(--space-5) 0;
 }
 
 /* ------------------------------------------------------------------ header */

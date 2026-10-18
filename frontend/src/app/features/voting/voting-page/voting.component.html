@@ -65,7 +65,7 @@
 
       <div class="vl__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
         @if (error()) {
-          <p class="vl__status vl__status--error" role="alert">{{ 'voting.list.error' | t }}</p>
+          <app-note class="vl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'voting.list.error' | t }}</app-note>
         } @else if (loading()) {
           <!-- The shape of the loaded list (a month heading, rows in the geometry of
                `app-list-item`), shown after 300ms. -->
@@ -144,13 +144,9 @@
 
           @if (hasMore()) {
             <div class="vl__more">
-              @if (loadingMore()) {
-                <span class="vl__status" aria-live="polite">{{ 'voting.list.loadingMore' | t }}</span>
-              } @else {
-                <app-button variant="text" size="sm" (click)="loadMore()">
-                  {{ 'voting.list.loadMore' | t }}
-                </app-button>
-              }
+              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                {{ 'voting.list.loadMore' | t }}
+              </app-button>
             </div>
           }
           <p class="vl__count" aria-live="polite">

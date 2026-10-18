@@ -26,9 +26,11 @@
           />
         </label>
       }
-      @if (pool() === null || failed()) {
+      @if (failed()) {
+        <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'meetings.leadSubstitute.loadFailed' | t }}</app-note>
+      } @else if (pool() === null) {
         <div class="dd__rows rowgroup rowgroup--bg3">
-          <p class="dd__empty">{{ (failed() ? 'meetings.leadSubstitute.loadFailed' : 'meetings.leadSubstitute.loading') | t }}</p>
+          <app-skeleton variant="items" [lead]="true" [count]="3" [label]="'meetings.leadSubstitute.loading' | t" />
         </div>
       } @else if (shown().length) {
         <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">

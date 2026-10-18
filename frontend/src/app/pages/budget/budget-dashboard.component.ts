@@ -45,6 +45,7 @@ import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
@@ -137,6 +138,7 @@ export const APPS_SHOWN = 5;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     PageHeaderComponent,
     SheetBarComponent,
     SheetBarKickerDirective,
@@ -618,7 +620,7 @@ export class BudgetDashboardComponent {
     }).format(value);
   }
 
-  private load(): void {
+  protected load(): void {
     this.loading.set(true);
     this.error.set(false);
     this.api.tree().subscribe({
@@ -748,7 +750,7 @@ export class BudgetDashboardComponent {
     if (changed || this.apps() === null) this.loadApps();
   }
 
-  private loadApps(): void {
+  protected loadApps(): void {
     const ks = this.selectedKsId();
     if (!ks) {
       this.apps.set([]);

@@ -120,9 +120,6 @@
   outline-offset: 2px;
 }
 
-.gmb__status {
-  @include gremien-tab.status;
-}
 
 @include bp.phone {
   .gmb__search {

@@ -28,4 +28,21 @@ describe('NoteComponent', () => {
     });
     expect(container.querySelector('[role="status"], [role="alert"]')).toBeNull();
   });
+
+  it('shows no button without retryable', async () => {
+    await render(`<app-note kind="error">Fehler</app-note>`, { imports: [NoteComponent] });
+    expect(screen.queryByRole('button')).toBeNull();
+  });
+
+  it('offers "Erneut versuchen" when retryable and emits retry on a press', async () => {
+    const retry = jest.fn();
+    const { container } = await render(
+      `<app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">Laden fehlgeschlagen</app-note>`,
+      { imports: [NoteComponent], componentProperties: { retry } },
+    );
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('alert')).toHaveTextContent('Laden fehlgeschlagen');
+    expect(await runAxe(container)).toHaveNoViolations();
+  });
 });

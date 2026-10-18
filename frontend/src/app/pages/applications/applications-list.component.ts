@@ -77,6 +77,7 @@ import {
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
 import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
@@ -145,6 +146,7 @@ type FilterSheet = 'budget' | 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     FormsModule,

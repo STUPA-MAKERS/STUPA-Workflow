@@ -40,10 +40,7 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.attendance.loading' | t" />
 } @else if (error()) {
-  <div class="gat__status" role="alert">
-    <span>{{ 'gremien.attendance.error' | t }}</span>
-    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
-  </div>
+  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.attendance.error' | t }}</app-note>
 } @else if (noMeetings()) {
   <!-- The grey grid says it to the eye; the text stays for screen readers only. -->
   <p class="sr-only">{{ 'gremien.attendance.noMeetings' | t }}</p>

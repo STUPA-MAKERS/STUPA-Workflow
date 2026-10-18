@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -376,6 +376,11 @@ describe('BrandingEditorComponent', () => {
     const c = fixture.componentInstance as any;
     expect(typeof c.slotLabel('favicon')).toBe('string');
     expect(c.slotLabel('favicon').length).toBeGreaterThan(0);
+  });
+
+  it('shows the shape of the editor until the config arrives', async () => {
+    await setupWithStub({ getSiteConfig: jest.fn(() => NEVER) });
+    expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
   });
 
   it('patch is a no-op without a draft', async () => {

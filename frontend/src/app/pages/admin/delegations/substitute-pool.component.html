@@ -15,7 +15,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
   } @else if (failed()) {
-    <p class="sp__error" role="alert">{{ 'admin.substitutes.loadFailed' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.substitutes.loadFailed' | t }}</app-note>
   } @else if (entries().length) {
     <ul class="rowgroup sp__list" aria-labelledby="sp-title">
       @for (s of entries(); track s.id) {

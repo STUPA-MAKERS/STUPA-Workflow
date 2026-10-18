@@ -46,6 +46,7 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { renderMarkdown } from '../../../features/meetings/meetings.util';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /** The language of the texts in the editor. */
 type TextLang = 'de' | 'en';
@@ -82,6 +83,7 @@ type FreetextKey = (typeof FREETEXTS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SkeletonComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
