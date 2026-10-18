@@ -32,6 +32,7 @@ import {
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 let nextId = 0;
 
@@ -55,6 +56,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     TranslatePipe,
     CapitalizePipe,
@@ -108,7 +110,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
     this.load();
   }
 
-  private load(): void {
+  protected load(): void {
     const id = this.gremiumId();
     this.loading.set(true);
     this.failed.set(false);

@@ -32,7 +32,7 @@
 
       <div class="tasks__scroll" appScrollFade="y">
         @if (error()) {
-          <p class="tasks__status tasks__status--error" role="alert">{{ 'tasks.error' | t }}</p>
+          <app-note class="tasks__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tasks.error' | t }}</app-note>
         } @else if (loading()) {
           <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
         } @else if (!rows().length && !hasTodos()) {

@@ -594,6 +594,8 @@ describe('MeetingsComponent', () => {
       { status: 500, statusText: 'Server Error' },
     );
     expect(await screen.findByText(/konnte nicht geladen/i)).toBeInTheDocument();
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    http.expectOne('/api/meetings/m-1').flush({ title: 'fail' }, { status: 500, statusText: 'Server Error' });
   });
 
   it('offers no on-demand protocol button — the protocol is created on start', async () => {

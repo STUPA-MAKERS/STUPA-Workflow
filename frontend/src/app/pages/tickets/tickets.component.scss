@@ -169,14 +169,8 @@
   border-radius: var(--radius-sm);
 }
 
-.tk__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.tk__status--error {
-  color: var(--color-danger);
+.tk__loadError {
+  margin: var(--space-4);
 }
 .tk__more {
   display: flex;

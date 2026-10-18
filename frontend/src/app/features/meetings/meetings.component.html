@@ -18,7 +18,7 @@
     <span class="sr-only" role="status">{{ 'meetings.loading' | t }}</span>
   </div>
 } @else if (error()) {
-  <p class="mtg__status mtg__status--error" role="alert">{{ 'meetings.error' | t }}</p>
+  <app-note class="mtg__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryMeeting()">{{ 'meetings.error' | t }}</app-note>
 } @else if (meeting(); as m) {
   @if (isFollower()) {
     <!-- A member without write or manage right: the participant view. -->

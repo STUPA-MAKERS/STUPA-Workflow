@@ -148,15 +148,8 @@
   color: var(--color-text-muted);
 }
 
-.grl__status {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
+.grl__loadError {
+  margin: var(--space-4);
 }
 
 /* ------------------------------------------------------------------ detail pane */

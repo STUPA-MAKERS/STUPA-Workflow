@@ -84,6 +84,7 @@ import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /**
  * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
@@ -107,6 +108,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [FlowEditorOptionsService],
   imports: [
+    SkeletonComponent,
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,
@@ -170,6 +172,8 @@ export class FlowEditorComponent {
    * about the request being in flight.
    */
   protected readonly loaded = signal(false);
+  /** The first read of the flow has not answered yet: a placeholder covers the canvas. */
+  protected readonly loading = signal(true);
 
   private readonly history = new FlowHistory();
   protected readonly canUndo = this.history.canUndo;
@@ -238,10 +242,14 @@ export class FlowEditorComponent {
             this.graph.set(autoLayout(normalizeFlowGraph(graph)));
           }
           this.loaded.set(true);
+          this.loading.set(false);
         },
         // Core editor data: surface the failure instead of an empty canvas. The
         // validation stays hidden: there is no flow to have findings about.
-        error: () => this.toast.error(this.i18n.translate('admin.flow.loadFailed')),
+        error: () => {
+          this.loading.set(false);
+          this.toast.error(this.i18n.translate('admin.flow.loadFailed'));
+        },
       });
 
     // Measure the canvas box, so a small flow shows at its real size instead of

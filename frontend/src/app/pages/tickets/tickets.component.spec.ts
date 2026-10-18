@@ -309,10 +309,15 @@ describe('TicketsComponent', () => {
   });
 
   it('names a failed read, and counts no closed tickets after their failure', async () => {
-    const { cmp } = await start('/tickets', { answer: () => throwError(() => new Error('down')) });
+    const { cmp, harness, setAnswer } = await start('/tickets', { answer: () => throwError(() => new Error('down')) });
     expect(screen.getByRole('alert')).toHaveTextContent('Die Tickets konnten nicht geladen werden.');
     expect(cmp.closedTotal()).toBe(0);
     expect(cmp.hasRows()).toBe(false);
+    setAnswer(defaultAnswer);
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    harness.detectChanges();
+    expect(cmp.error()).toBe(false);
+    expect(cmp.hasRows()).toBe(true);
   });
 
   it('loads the next page, once at a time', async () => {

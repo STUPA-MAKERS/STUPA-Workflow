@@ -1,2 +1,5 @@
 <app-icon class="note__icon" [name]="icon()" [size]="18" />
 <div class="note__text"><ng-content /></div>
+@if (retryable()) {
+  <app-button class="note__action" variant="text" size="sm" (click)="retry.emit()">{{ 'action.retry' | t }}</app-button>
+}

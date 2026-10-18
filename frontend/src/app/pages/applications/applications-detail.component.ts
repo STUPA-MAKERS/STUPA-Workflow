@@ -907,6 +907,11 @@ export class ApplicationsDetailComponent {
   /** The comments of the shown application have been read once. */
   private commentsLoaded = false;
 
+  /** Load the application again after a failed load. */
+  protected retry(): void {
+    this.loadApplication(this.id);
+  }
+
   private loadApplication(id: Uuid): void {
     this.id = id;
     const seq = ++this.loadSeq;

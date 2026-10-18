@@ -242,13 +242,8 @@
   color: var(--color-warning);
 }
 
-.dash__state {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-}
-.dash__state--error {
-  color: var(--color-danger);
+.dash__loadError {
+  margin: var(--space-4);
 }
 
 /* Empty tab: the empty state, and for a new user the card "Antrag stellen" beside it. */

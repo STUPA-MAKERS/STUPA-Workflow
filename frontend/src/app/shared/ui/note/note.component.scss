@@ -36,3 +36,9 @@
   flex: 1 1 0;
   min-width: 0;
 }
+
+/* The retry button sits at the end of the line, centred on the first text line. */
+.note__action {
+  flex: none;
+  margin-block: calc((1.25rem - 2rem) / 2); /* a 32px sm button on a 20px text line */
+}

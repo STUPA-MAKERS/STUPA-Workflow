@@ -371,7 +371,7 @@ describe('ApplicationsListComponent', () => {
       const req = http.expectOne(LIST);
       expect(req.request.params.get('offset')).toBe('1');
       harness.detectChanges();
-      expect(screen.getByText('Weitere Anträge werden geladen …')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mehr laden' })).toHaveAttribute('aria-busy', 'true');
       req.flush(page([ROWS[1]], 2, 1));
       harness.detectChanges();
       expect(screen.getAllByRole('listitem')).toHaveLength(2);

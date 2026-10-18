@@ -56,8 +56,7 @@
   </div>
 } @else if (error()) {
   <div class="cd cd--state">
-    <p class="cd__error" role="alert">{{ 'todos.card.error' | t }}</p>
-    <app-button variant="tonal" (click)="reload()">{{ 'todos.card.retry' | t }}</app-button>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'todos.card.error' | t }}</app-note>
   </div>
 } @else if (card(); as card) {
   <article class="cd" aria-labelledby="cd-title">

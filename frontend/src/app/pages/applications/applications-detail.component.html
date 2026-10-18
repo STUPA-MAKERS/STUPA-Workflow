@@ -50,7 +50,7 @@
   </div>
 } @else if (error()) {
   <div class="ad">
-    <p class="ad__error" role="alert">{{ 'applications.detail.error' | t }}</p>
+    <app-note class="ad__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'applications.detail.error' | t }}</app-note>
   </div>
 } @else if (app(); as application) {
   @if (editing()) {

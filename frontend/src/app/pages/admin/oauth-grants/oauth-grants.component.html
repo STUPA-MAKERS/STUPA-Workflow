@@ -17,7 +17,7 @@
   </div>
 
   @if (loadError()) {
-    <p class="og__error" role="alert">{{ 'admin.oauthGrants.error' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'admin.oauthGrants.error' | t }}</app-note>
   } @else if (loading()) {
     <app-skeleton variant="rows" [count]="4" [label]="'admin.oauthGrants.loading' | t" />
   } @else {

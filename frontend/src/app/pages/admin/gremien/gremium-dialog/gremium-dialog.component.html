@@ -9,7 +9,7 @@
     <!-- The question before the switch to "public" is saved, in the same dialog. -->
     <div class="gd gd--confirm" aria-live="polite">
       @if (previewLoading()) {
-        <p class="gd__text">{{ 'admin.gremien.publicConfirm.loading' | t }}</p>
+        <app-skeleton variant="lines" [count]="2" [label]="'admin.gremien.publicConfirm.loading' | t" />
       } @else if (preview(); as pv) {
         <p class="gd__text">
           {{ 'admin.gremien.publicConfirm.count' | t: { n: pv.finalCount, name: gremium()?.name ?? '' } }}

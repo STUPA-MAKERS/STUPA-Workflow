@@ -30,7 +30,7 @@
     @if (loading()) {
       <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
     } @else if (failed()) {
-      <p class="gmm__error" role="alert">{{ 'admin.gremien.membersLoadFailed' | t }}</p>
+      <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadMembers()">{{ 'admin.gremien.membersLoadFailed' | t }}</app-note>
     } @else if (!visible().length) {
       <app-empty-state shape="person" [heading]="'admin.gremien.membersEmpty' | t" />
     } @else {

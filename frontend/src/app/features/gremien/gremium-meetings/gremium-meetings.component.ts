@@ -28,11 +28,12 @@ import {
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { topsLabel } from '../../meetings/meetings-overview.util';
 import { GREMIEN_NOW } from '../gremien.store';
 import { clock, isoDay, monthKey, monthLabel, shiftMonth, weekdayDay } from '../gremien.util';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 export type MeetingsRange = '' | 'upcoming' | 'past6' | 'past12';
 export type MeetingsProtocol = '' | 'final' | 'draft' | 'none';
@@ -71,9 +72,9 @@ const NO_PROTOCOL: StatusView = { kind: 'muted', key: 'gremien.meetings.protocol
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     RouterLink,
     TranslatePipe,
-    ButtonComponent,
     IconComponent,
     DateBlockComponent,
     EmptyStateComponent,

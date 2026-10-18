@@ -15,7 +15,7 @@
     @if (loading()) {
       <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />
     } @else if (loadError()) {
-      <p class="dl__error" role="alert">{{ 'admin.deleg.error' | t }}</p>
+      <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'admin.deleg.error' | t }}</app-note>
     } @else {
       <ng-template #rows let-list>
         @if (list.length) {

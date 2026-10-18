@@ -52,10 +52,7 @@
 @if (loading() && !items().length) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.decisions.loading' | t" />
 } @else if (error()) {
-  <div class="gdc__status" role="alert">
-    <span>{{ 'gremien.decisions.error' | t }}</span>
-    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
-  </div>
+  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.decisions.error' | t }}</app-note>
 } @else if (!groups().length) {
   @if (filterActive()) {
     <app-empty-state rows="3" [heading]="'gremien.decisions.noMatch' | t" />
@@ -106,11 +103,12 @@
   @if (nextCursor()) {
     <div class="gdc__more">
       @if (moreError()) {
-        <span class="gdc__status" role="alert">{{ 'gremien.decisions.moreError' | t }}</span>
+        <app-note kind="error" icon="alert" role="alert" retryable (retry)="loadMore()">{{ 'gremien.decisions.moreError' | t }}</app-note>
+      } @else {
+        <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+          {{ 'gremien.decisions.more' | t }}
+        </app-button>
       }
-      <app-button variant="tonal" [disabled]="loadingMore()" (click)="loadMore()">
-        {{ 'gremien.decisions.more' | t }}
-      </app-button>
     </div>
   }
 }

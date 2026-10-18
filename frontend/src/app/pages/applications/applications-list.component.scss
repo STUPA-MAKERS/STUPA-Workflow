@@ -241,14 +241,8 @@
   bottom: 0;
 }
 
-.apps__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.apps__status--error {
-  color: var(--color-danger);
+.apps__loadError {
+  margin: var(--space-4);
 }
 .apps__sentinel {
   height: 1px;

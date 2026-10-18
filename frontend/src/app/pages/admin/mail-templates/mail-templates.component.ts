@@ -20,6 +20,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
@@ -38,6 +39,7 @@ type Lang = (typeof LANGS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SkeletonComponent,
     EmptyStateComponent,
     ScrollFadeDirective,
     FormsModule,
@@ -66,6 +68,8 @@ export class MailTemplatesComponent {
   // Select by key, not by ID. A builtin template has no database ID.
   readonly selectedKey = signal<string | null>(null);
   readonly draft = signal<MailTemplate | null>(null);
+  /** The list has not arrived yet. */
+  readonly loading = signal(true);
   readonly lang = signal<Lang>('de');
   readonly saving = signal(false);
   readonly resetting = signal(false);
@@ -110,10 +114,14 @@ export class MailTemplatesComponent {
   constructor() {
     this.api.listMailTemplates().subscribe({
       next: (t) => {
+        this.loading.set(false);
         this.templates_.set(t);
         if (t.length && !this.selectedKey()) this.select(t[0].key);
       },
-      error: () => this.toast.error(this.i18n.translate('admin.mailTemplates.loadFailed')),
+      error: () => {
+        this.loading.set(false);
+        this.toast.error(this.i18n.translate('admin.mailTemplates.loadFailed'));
+      },
     });
   }
 

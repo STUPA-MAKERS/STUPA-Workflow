@@ -115,14 +115,8 @@
   color: var(--color-text-muted);
 }
 
-.tasks__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.tasks__status--error {
-  color: var(--color-danger);
+.tasks__loadError {
+  margin: var(--space-4);
 }
 
 /* ------------------------------------------------------------------ detail pane */

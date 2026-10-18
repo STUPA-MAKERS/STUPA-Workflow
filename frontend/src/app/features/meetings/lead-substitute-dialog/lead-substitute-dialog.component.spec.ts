@@ -131,6 +131,13 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(dialog()).getByText('Der Pool konnte nicht geladen werden.')).toBeInTheDocument();
     // Without the context the vote transfer counts as off.
     expect(within(dialog()).queryByRole('switch')).toBeNull();
+    // "Erneut versuchen" reads the pool of the member again.
+    within(dialog()).getByRole('button', { name: 'Erneut versuchen' }).click();
+    fixture.detectChanges();
+    http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-9`).flush([]);
+    http.match(CONTEXT_URL);
+    fixture.detectChanges();
+    expect(within(dialog()).queryByText('Der Pool konnte nicht geladen werden.')).toBeNull();
   });
 
   it('ignores a pool answer for a member who is no longer picked', async () => {

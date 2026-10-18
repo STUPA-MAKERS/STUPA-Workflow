@@ -163,14 +163,8 @@
   color: var(--color-text-muted);
 }
 
-.vl__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.vl__status--error {
-  color: var(--color-danger);
+.vl__loadError {
+  margin: var(--space-4);
 }
 .vl__more {
   display: flex;

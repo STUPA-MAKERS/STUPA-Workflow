@@ -170,6 +170,9 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     await setup({ getGlobalFlow: jest.fn(() => NEVER) });
     expect(screen.queryByText('Der Flow hat keine Status.')).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    // A placeholder covers the canvas until the flow arrives.
+    expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
+    expect(document.querySelector('.fe__canvas--loading')).not.toBeNull();
   });
 
   it('reports the empty graph once the load comes back with no flow', async () => {
@@ -477,6 +480,7 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
       getGlobalFlow: jest.fn(() => throwError(() => new Error('boom'))),
     });
     expect(toast.error).toHaveBeenCalled();
+    expect(document.querySelector('.fe__canvasSkel')).toBeNull();
   });
 
   it('swallows errors from option/role/webhook/policy/budget loads', async () => {

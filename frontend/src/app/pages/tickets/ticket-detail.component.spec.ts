@@ -704,6 +704,15 @@ describe('TicketDetailComponent', () => {
     cmp.close('done');
   });
 
+  it('reads the ticket again on "Erneut versuchen"', async () => {
+    const { cmp, harness, setGet } = await start('/tickets/t40', { get: () => throwError(() => new Error('down')) });
+    setGet(() => of(detail()));
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    harness.detectChanges();
+    expect(cmp.error()).toBe(false);
+    expect(cmp.ticket()).not.toBeNull();
+  });
+
   it('shows the skeleton while the ticket loads', async () => {
     await start('/tickets/t40', { get: () => new Subject<TicketDetail>() });
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();

@@ -55,6 +55,7 @@ import { applicationTitle, transitionLooks } from '../../pages/applications/appl
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -92,6 +93,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SkeletonComponent,
     EmptyStateComponent,
     ReactiveFormsModule,
     RouterLink,

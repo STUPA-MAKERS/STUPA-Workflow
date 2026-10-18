@@ -165,9 +165,9 @@
 
       <div class="apps__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
         @if (error()) {
-          <p class="apps__status apps__status--error" role="alert">
+          <app-note class="apps__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">
             {{ 'applications.list.error' | t }}
-          </p>
+          </app-note>
         } @else if (loading()) {
           <!-- The shape of the loaded list: a month heading and rows in the geometry of
                `app-list-item`, as many as fill the pane, so nothing moves when they arrive.
@@ -262,13 +262,9 @@
           @if (hasMore()) {
             <div #sentinel class="apps__sentinel" aria-hidden="true"></div>
             <div class="apps__more">
-              @if (loadingMore()) {
-                <span class="apps__status" aria-live="polite">{{ 'applications.list.loadingMore' | t }}</span>
-              } @else {
-                <app-button variant="text" size="sm" (click)="loadMore()">
-                  {{ 'applications.list.loadMore' | t }}
-                </app-button>
-              }
+              <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">
+                {{ 'applications.list.loadMore' | t }}
+              </app-button>
             </div>
           }
           <p class="apps__count" aria-live="polite">

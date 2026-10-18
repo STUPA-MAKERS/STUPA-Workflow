@@ -53,7 +53,7 @@
   </div>
 } @else if (error()) {
   <div class="td">
-    <p class="td__error" role="alert">{{ 'tickets.detail.error.load' | t }}</p>
+    <app-note class="td__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.detail.error.load' | t }}</app-note>
   </div>
 } @else if (ticket(); as ticket) {
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">

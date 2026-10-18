@@ -29,6 +29,7 @@ import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -56,6 +57,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     ScrollFadeDirective,
     FormsModule,
@@ -122,6 +124,11 @@ export class SubstitutePoolComponent {
       untracked(() => this.load(id, own));
     });
     inject(DestroyRef).onDestroy(() => this.loads?.unsubscribe());
+  }
+
+  /** Load the pool again after a failed load. */
+  protected retry(): void {
+    this.load(this.gremiumId(), this.members() === null);
   }
 
   private load(id: Uuid, ownMembers: boolean): void {

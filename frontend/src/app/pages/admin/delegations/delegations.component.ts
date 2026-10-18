@@ -22,6 +22,7 @@ import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
 export function localToday(now = new Date()): string {
@@ -46,6 +47,7 @@ export function localToday(now = new Date()): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     RouterLink,
@@ -151,7 +153,7 @@ export class DelegationsComponent {
     });
   }
 
-  private reload(): void {
+  protected reload(): void {
     this.loading.set(true);
     this.loadError.set(false);
     this.api.list().subscribe({

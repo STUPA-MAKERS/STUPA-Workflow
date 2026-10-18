@@ -1,7 +1,7 @@
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -71,6 +71,13 @@ describe('MailTemplatesComponent', () => {
     };
     const { toast } = await setup(api);
     expect(toast.error).toHaveBeenCalledWith('Vorlagen konnten nicht geladen werden.');
+    expect(document.querySelector('app-skeleton')).toBeNull();
+  });
+
+  it('shows placeholders, not the empty states, while the list loads', async () => {
+    await setup({ ...setupApi(), listMailTemplates: jest.fn(() => NEVER) });
+    expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
+    expect(screen.queryByText('Keine Vorlagen vorhanden.')).toBeNull();
   });
 
   it('patches the subject of the active language into the draft', async () => {
