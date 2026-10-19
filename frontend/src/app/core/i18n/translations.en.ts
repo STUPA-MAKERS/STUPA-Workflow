@@ -10,9 +10,6 @@ import type { TranslationKey } from './translations';
 export const en: Partial<Record<TranslationKey, string>> = {
   'app.title': 'STUPA Application Platform',
   'app.skipToContent': 'Skip to content',
-  'filter.button': 'Filter',
-  'filter.apply': 'Apply',
-  'filter.reset': 'Reset',
 
   'shell.nav.start': 'Home',
   'shell.nav.brand': '{name}, home',
@@ -2008,8 +2005,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.cfgDeadlinePh': 'No deadline',
   'admin.flow.guardPriority': 'Guard priority',
   'admin.flow.guardDefault': 'No guard (catch-all)',
-  'admin.flow.moveUp': 'Move up',
-  'admin.flow.moveDown': 'Move down',
   'admin.flow.branch': 'Outcome branch',
   'admin.flow.branchNone': '— (no branch)',
   'admin.flow.from': 'From',

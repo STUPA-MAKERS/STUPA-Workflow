@@ -17,7 +17,13 @@ import type { Attendance, AttendanceStatus, Meeting, Uuid } from '@core/api/mode
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
@@ -29,7 +35,6 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import type { StatusKind } from '@shared/status-kind.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import {
   type DelegationCardChange,
   MeetingDelegationCardComponent,
@@ -153,7 +158,7 @@ export class AttendanceSheetComponent {
   private readonly toast = inject(ToastService);
 
   /** A phone opens the sheet from the bottom. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly open = model(false);
   readonly meeting = input.required<Meeting>();

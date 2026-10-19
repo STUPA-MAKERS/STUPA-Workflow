@@ -22,7 +22,14 @@ import type { TodoBoard, TodoCardMove, TodoCardTile, TodoColumn, TodoLabel } fro
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { ButtonComponent, IconComponent, TabsComponent, type TabItem } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  matchesMedia,
+  MEDIA,
+  type TabItem,
+  TabsComponent,
+} from '@stupa-makers/ui-kit';
 import { LongPressDirective } from '@shared/long-press.directive';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
@@ -33,7 +40,7 @@ import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../featu
 const ARRIVED = 0.05;
 
 function reduceMotion(): boolean {
-  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return matchesMedia(MEDIA.reducedMotion);
 }
 
 /** The done column shows this many cards until "n weitere" opens the rest. */

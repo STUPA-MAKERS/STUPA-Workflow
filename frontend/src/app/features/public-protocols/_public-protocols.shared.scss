@@ -1,3 +1,5 @@
+@use 'dot-parts' as dots;
+
 // Shared pieces of the public protocol pages (list and detail).
 
 // "Start › Öffentliche Protokolle": a small path above the title.
@@ -32,11 +34,7 @@
     flex-wrap: wrap;
     margin: 0;
   }
-  #{$sel} > span + span::before {
-    content: '·';
-    padding: 0 6px;
-    color: var(--color-text-subtle);
-  }
+  @include dots.between('#{$sel} > span', $next: 'span');
 }
 
 // A link that looks like an outlined pill button (the PDF download is a real `<a>`).

@@ -20,7 +20,9 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   IconComponent,
+  InfiniteScrollDirective,
   MEDIA,
+  mediaQuery,
   SegmentedComponent,
   type SegmentedOption,
   type SelectOption,
@@ -49,7 +51,6 @@ import {
 import { FileDropDirective } from '@shared/file-drop.directive';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { downloadBlob } from '@shared/download.util';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
@@ -111,6 +112,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
@@ -151,7 +153,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
   /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
   readonly split = computed(() => this.layout()?.collapsed() === false);
@@ -267,9 +269,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly groups = computed(() =>
     monthGroups(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.locale()),
   );
-
-  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
-  readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   /** Debounced search, about 250 ms. It drives the `q` param of the server query. */
   onSearch(value: string): void {
@@ -449,20 +448,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
     effect(() => this.frame.fill.set(this.split()));
 
-    // Infinite scroll. Side by side the list scrolls inside its own box.
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const root = this.split() ? (this.scroller()?.nativeElement ?? null) : null;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((e) => e.isIntersecting)) this.loadMore();
-        },
-        { root, rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   /**

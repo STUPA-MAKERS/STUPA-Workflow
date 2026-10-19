@@ -1,4 +1,4 @@
-@use '../../../features/meetings/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 :host {
   display: block;
@@ -106,12 +106,6 @@
 }
 .sp__none {
   color: var(--color-text-muted);
-}
-
-.sp__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 /* The shared top and bottom fade: an end fades only while more content lies past it. */

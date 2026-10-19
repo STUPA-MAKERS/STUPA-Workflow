@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 /* The participant view is a pane page like the session page: it takes the free height
    of the main column of the shell (`flex: 1 1 0`) and pulls the block padding and the
@@ -84,29 +85,8 @@
 .fv__fade {
   --fv-fade: var(--space-5);
 }
-.fv__fade.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fv-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--fv-fade));
-}
-.fv__fade.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--fv-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--fv-fade));
-}
-.fv__fade.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fv-fade),
-    #000 calc(100% - var(--fv-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fv-fade),
-    #000 calc(100% - var(--fv-fade)),
-    transparent
-  );
+.fv__fade {
+  @include fade.fade-y(var(--fv-fade));
 }
 
 .fv__body {

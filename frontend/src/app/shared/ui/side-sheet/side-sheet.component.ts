@@ -12,7 +12,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  focusableIn,
+  IconComponent,
+  lockBodyScroll,
+  trapTab,
+} from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /**
@@ -23,15 +29,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 export type SheetSide = 'end' | 'start' | 'bottom';
 
 let nextId = 0;
-
-const FOCUSABLE = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled])',
-  'select:not([disabled])',
-  'textarea:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(',');
 
 /** A drag down by more than this many pixels closes a bottom sheet. */
 const SWIPE_CLOSE_PX = 96;
@@ -110,7 +107,7 @@ export class SideSheetComponent {
   private returnFocus: HTMLElement | null = null;
   /** The pane of the current opening, to see after a closing whether it is still there. */
   private paneEl: HTMLElement | null = null;
-  private bodyOverflow: string | null = null;
+  private releaseScroll: (() => void) | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
@@ -198,39 +195,21 @@ export class SideSheetComponent {
       this.close();
       return;
     }
-    if (event.key !== 'Tab') return;
-    const pane = event.currentTarget as HTMLElement;
-    const items = this.focusables(pane);
-    if (items.length === 0) {
-      event.preventDefault();
-      pane.focus();
-      return;
-    }
-    const first = items[0];
-    const last = items[items.length - 1];
-    const active = document.activeElement;
-    if (event.shiftKey && (active === first || active === pane)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    trapTab(event, event.currentTarget as HTMLElement);
   }
 
   /** Runs once per opening: the effect reads only `open`. */
   private activate(): void {
     this.shown.set(true);
     this.returnFocus = document.activeElement as HTMLElement | null;
-    this.bodyOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    this.releaseScroll = lockBodyScroll();
     // The pane renders in this change detection; focus it right after. Closing clears
     // the timer, so the pane is there when it runs.
     this.timer = setTimeout(() => {
       this.timer = null;
       const pane = this.pane()!.nativeElement;
       this.paneEl = pane;
-      (this.focusables(pane)[0] ?? pane).focus();
+      (focusableIn(pane)[0] ?? pane).focus();
       this.watchBody();
     });
   }
@@ -265,15 +244,11 @@ export class SideSheetComponent {
     this.dragging.set(false);
     this.dragY.set(0);
     // Closed from the start: nothing to undo.
-    if (this.bodyOverflow === null) return;
-    document.body.style.overflow = this.bodyOverflow;
-    this.bodyOverflow = null;
+    if (!this.releaseScroll) return;
+    this.releaseScroll();
+    this.releaseScroll = null;
     const target = this.returnFocus;
     this.returnFocus = null;
     if (target?.isConnected) target.focus();
-  }
-
-  private focusables(root: HTMLElement): HTMLElement[] {
-    return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE));
   }
 }

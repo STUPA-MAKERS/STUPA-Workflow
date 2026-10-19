@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../../features/meetings/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -272,7 +272,7 @@
   min-height: 0;
   overflow: visible;
 }
-@media (max-width: 768px) {
+@include bp.phone {
   .bv--phone {
     --bv-gutter: var(--space-4);
   }

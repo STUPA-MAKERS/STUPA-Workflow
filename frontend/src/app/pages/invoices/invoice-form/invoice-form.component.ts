@@ -20,6 +20,7 @@ import {
   SegmentedComponent,
   type SegmentedOption,
   type SelectOption,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
 import { formatBytes } from '@shared/format-bytes';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
@@ -105,6 +106,7 @@ export interface InvoiceFormHost {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
     NoteComponent,
     ButtonComponent,
     CurrencyInputComponent,

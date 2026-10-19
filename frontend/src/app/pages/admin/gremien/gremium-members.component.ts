@@ -15,6 +15,7 @@ import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
+import { ButtonComponent } from '@stupa-makers/ui-kit';
 import { AvatarComponent, NoteComponent, PageHeaderComponent, SkeletonComponent } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import {
@@ -57,6 +58,7 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,

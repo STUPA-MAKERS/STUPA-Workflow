@@ -21,8 +21,7 @@ import {
 } from '@shared/ui/filter-select/filter-select.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { fileSlug, fullDate, localized, personName, roleRank, toCsv } from '../gremien.util';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
@@ -75,7 +74,7 @@ export class GremiumMembersComponent {
   /** The name of the gremium, for the file name of the export. */
   readonly gremiumName = input('');
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   readonly error = signal(false);

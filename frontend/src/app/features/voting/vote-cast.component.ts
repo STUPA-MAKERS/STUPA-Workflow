@@ -25,10 +25,10 @@ import {
   ButtonComponent,
   IconComponent,
   MEDIA,
+  mediaQuery,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { RailStatusService } from '../../layout/rail-status.service';
-import { mediaQuerySignal } from '../../layout/media-query';
 import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
 import { VotePhoneHeaderComponent } from './phone-header/phone-header.component';
 import { VotePanelComponent } from './vote-panel/vote-panel.component';
@@ -111,7 +111,7 @@ export class VoteCastComponent implements OnDestroy {
   /** The list page around the pane. The pane also works without it (a test). */
   private readonly page = inject(VotingPageService, { optional: true });
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list sits beside the pane: the vote is a sheet. */
   readonly split = computed(() => this.page?.split() ?? false);
   readonly phase = signal<Phase>('loading');

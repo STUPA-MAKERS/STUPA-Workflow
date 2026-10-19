@@ -15,9 +15,15 @@ import {
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
-import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import {
+  anchorOutOfView,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  showInTopLayer,
+  watchAnchoredPopover,
+} from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent, type AvatarPerson } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 
@@ -110,7 +116,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
   /** The chosen value. Two-way for a signal; a form control writes it too. */
   readonly value = model('');
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   protected readonly open = signal(false);
   protected readonly popoverOpen = computed(() => this.open() && !this.phone());
   protected readonly sheetOpen = computed(() => this.open() && this.phone());
@@ -190,30 +196,21 @@ export class SelectFieldComponent implements ControlValueAccessor {
   private typedAt = 0;
 
   constructor() {
-    const inside = (root: HTMLElement | undefined, target: EventTarget | null) =>
-      !!root && target instanceof Node && root.contains(target);
-    const onPointer = (e: Event) => {
-      if (this.popoverOpen() && !inside(this.host.nativeElement, e.target)) this.close(false);
-    };
-    const onViewport = (e: Event) => {
-      // A scroll inside the list itself does not move the field.
-      if (this.popoverOpen() && !inside(this.menu()?.nativeElement, e.target)) this.follow();
-    };
     // A resize across the phone limit swaps the popover and the sheet: close the list,
     // so no list stays open that never reached the top layer.
     effect(() => {
       this.phone();
       untracked(() => this.close(false));
     });
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('scroll', onViewport, true);
-    window.addEventListener('resize', onViewport);
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('scroll', onViewport, true);
-      window.removeEventListener('resize', onViewport);
-      this.clearTimer();
+    watchAnchoredPopover({
+      isOpen: () => this.popoverOpen(),
+      inside: () => [this.host.nativeElement],
+      // A scroll inside the list itself does not move the field.
+      ownScroll: () => this.menu()?.nativeElement,
+      close: () => this.close(false),
+      follow: () => this.follow(),
     });
+    inject(DestroyRef).onDestroy(() => this.clearTimer());
   }
 
   // --- ControlValueAccessor ---------------------------------------------------------
@@ -460,7 +457,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
     if (this.phone()) {
       // The sheet focuses its first control after its render; the listbox goes after.
       this.later(() => {
-        this.toTopLayer(this.layer()?.nativeElement);
+        showInTopLayer(this.layer()?.nativeElement);
         this.later(() => {
           document.getElementById(this.listId())?.focus();
           this.reveal(this.active());
@@ -472,7 +469,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
     this.later(() => {
       const menu = this.menu()?.nativeElement;
       if (!menu) return;
-      this.toTopLayer(menu);
+      showInTopLayer(menu);
       this.place(menu);
       this.placed.set(true);
       this.reveal(this.active());
@@ -488,12 +485,6 @@ export class SelectFieldComponent implements ControlValueAccessor {
     this.typed = '';
     this.onTouched();
     if (returnFocus) this.trigger().nativeElement.focus();
-  }
-
-  /** Show a popover element. It renders anew on each opening, so it is not shown yet. */
-  private toTopLayer(el: HTMLElement | undefined): void {
-    const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
-    if (typeof pop?.showPopover === 'function') pop.showPopover();
   }
 
   /** Scroll the active row into the visible part of the list. */
@@ -523,8 +514,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
 
   /** The page scrolled or resized: keep the list at its field; close it when it leaves. */
   private follow(): void {
-    const rect = this.box().nativeElement.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+    if (anchorOutOfView(this.box().nativeElement.getBoundingClientRect())) {
       this.close(false);
       return;
     }

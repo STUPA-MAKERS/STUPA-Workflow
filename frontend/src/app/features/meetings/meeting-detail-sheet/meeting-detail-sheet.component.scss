@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'dot-parts' as dots;
 
 :host {
   display: flex;
@@ -39,24 +40,10 @@
   overflow-x: clip;
 }
 .ms__parts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-inline-start: calc(-1 * var(--ms-sep));
-  min-width: 0;
+  @include dots.list(var(--ms-sep));
 }
 .ms__part {
-  min-width: 0;
-  white-space: nowrap;
-}
-.ms__part::before {
-  display: inline-block;
-  width: var(--ms-sep);
-  color: var(--color-text-subtle);
-  font-family: var(--font-sans);
-  text-align: center;
-  content: '·';
-  content: '·' / '';
+  @include dots.part(var(--ms-sep), $font: var(--font-sans));
 }
 .ms__warn {
   color: var(--color-warning);

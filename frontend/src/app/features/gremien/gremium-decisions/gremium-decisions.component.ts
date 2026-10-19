@@ -32,8 +32,7 @@ import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { electionStatus } from '../../voting/election.util';
 import { GREMIEN_NOW } from '../gremien.store';
 import { dayMonth, euro, monthKey, monthLabel, shiftMonth } from '../gremien.util';
@@ -108,7 +107,7 @@ export class GremiumDecisionsComponent {
 
   readonly gremiumId = input.required<string>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   readonly error = signal(false);

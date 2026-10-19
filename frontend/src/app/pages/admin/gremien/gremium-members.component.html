@@ -42,11 +42,11 @@
         }
       </ul>
       @if (members().length > preview) {
-        <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
-        <button
-          type="button"
+        <app-button
           class="gmm__more"
-          [attr.aria-expanded]="showAll()"
+          variant="text"
+          size="sm"
+          [ariaExpanded]="showAll()"
           (click)="showAll.set(!showAll())"
         >
           {{
@@ -54,7 +54,7 @@
               ? ('admin.gremien.showLess' | t)
               : ('admin.gremien.showAll' | t: { count: members().length })
           }}
-        </button>
+        </app-button>
       }
     }
   </section>

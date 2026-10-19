@@ -683,12 +683,12 @@ describe('MeetingPageComponent', () => {
   });
 
   it('keeps the height of the dock as room below the page on a phone', async () => {
-    const callbacks: (() => void)[] = [];
+    const callbacks: ((entries: ResizeObserverEntry[]) => void)[] = [];
     const original = globalThis.ResizeObserver;
     Object.defineProperty(globalThis, 'ResizeObserver', {
       writable: true,
       value: class {
-        constructor(cb: () => void) {
+        constructor(cb: (entries: ResizeObserverEntry[]) => void) {
           callbacks.push(cb);
         }
         observe(): void {}
@@ -699,7 +699,7 @@ describe('MeetingPageComponent', () => {
       const { fixture } = await setup();
       const dock = fixture.nativeElement.querySelector('app-session-dock') as HTMLElement;
       Object.defineProperty(dock, 'offsetHeight', { value: 96 });
-      callbacks.forEach((cb) => cb());
+      callbacks.forEach((cb) => cb([]));
       fixture.detectChanges();
       expect((fixture.nativeElement as HTMLElement).style.getPropertyValue('--fx-dock-h')).toBe('96px');
     } finally {

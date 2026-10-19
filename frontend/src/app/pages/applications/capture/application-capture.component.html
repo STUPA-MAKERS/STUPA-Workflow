@@ -33,63 +33,31 @@
             (valueChange)="setMode($event ?? 'account')"
           />
           @if (mode() === 'account') {
-            <!-- The applicant search: a combobox in a filled field like the kit inputs. -->
-            <div class="ff__app">
-              <div class="ff__box">
-                <label class="ff__label" for="cap-applicant">{{ 'applications.capture.account' | t }}</label>
-                @if (picked()) {
-                  <span class="ff__picked" data-testid="cap-picked">
-                    <app-icon name="user" [size]="16" />
-                    <span class="cap__pickedText">{{ pickedLabel() }}</span>
-                    <button
-                      type="button"
-                      class="ff__iconBtn"
-                      [attr.aria-label]="'applications.capture.clearAccount' | t"
-                      [title]="'applications.capture.clearAccount' | t"
-                      (click)="clearPick()"
-                    >
-                      <app-icon name="x" [size]="16" />
-                    </button>
-                  </span>
-                } @else {
-                  <input
-                    id="cap-applicant"
-                    class="ff__control"
-                    type="search"
-                    autocomplete="off"
-                    name="applicantSearch"
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-controls="cap-applicant-list"
-                    [attr.aria-expanded]="suggestOpen()"
-                    [placeholder]="'applications.capture.searchPlaceholder' | t"
-                    [ngModel]="query()"
-                    (ngModelChange)="onSearch($event)"
-                  />
-                  <app-icon class="ff__searchIcon" name="search" [size]="18" />
-                }
-              </div>
-              @if (suggestOpen()) {
-                <ul id="cap-applicant-list" class="ff__suggest" role="listbox">
-                  @for (c of candidates(); track c.id) {
-                    <li role="presentation">
-                      <button
-                        type="button"
-                        role="option"
-                        aria-selected="false"
-                        class="ff__option cap__option"
-                        (click)="pick(c)"
-                      >
-                        <span class="cap__optionName">{{ c.displayName || c.email }}</span>
-                        @if (c.displayName && c.email) {
-                          <span class="cap__optionMail">{{ c.email }}</span>
-                        }
-                      </button>
-                    </li>
+            <app-autocomplete
+              inputId="cap-applicant"
+              name="applicantSearch"
+              [label]="'applications.capture.account' | t"
+              [placeholder]="'applications.capture.searchPlaceholder' | t"
+              [clearLabel]="'applications.capture.clearAccount' | t"
+              [query]="query()"
+              [options]="candidates()"
+              [open]="suggestOpen()"
+              [picked]="picked() ? pickedLabel() : null"
+              [wrapPicked]="true"
+              (queryChange)="onSearch($event)"
+              (choose)="pick($event)"
+              (cleared)="clearPick()"
+            >
+              <app-icon acPickedIcon name="user" [size]="16" />
+              <ng-template let-c>
+                <span class="cap__option">
+                  <span class="cap__optionName">{{ c.displayName || c.email }}</span>
+                  @if (c.displayName && c.email) {
+                    <span class="cap__optionMail">{{ c.email }}</span>
                   }
-                </ul>
-              }
-            </div>
+                </span>
+              </ng-template>
+            </app-autocomplete>
             @if (emailMatch(); as match) {
               <app-note icon="user" [surface]="layout() === 'sheet' ? 3 : 2" role="status" data-testid="cap-email-match">{{ 'applications.capture.emailMatch' | t: { name: match.displayName || match.email || '' } }}</app-note>
             }

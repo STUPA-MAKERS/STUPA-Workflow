@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   type OnDestroy,
   computed,
   effect,
@@ -25,7 +24,9 @@ import {
   ButtonComponent,
   CheckboxComponent,
   IconComponent,
+  InfiniteScrollDirective,
   MEDIA,
+  mediaQuery,
   SegmentedComponent,
   type SegmentedOption,
   ToastService,
@@ -52,7 +53,6 @@ import {
 } from '@shared/ui';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { downloadBlob } from '@shared/download.util';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
@@ -125,6 +125,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
     ConfirmDialogComponent,
     PageHeaderComponent,
     BookingDetailComponent,
@@ -178,7 +179,7 @@ export class ExpensesComponent implements OnDestroy {
   protected readonly dialogs = new ExpenseDialogsState(this.list, this.sub, this.transfers);
 
   /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
   /** The list and the detail sit side by side. */
@@ -474,10 +475,6 @@ export class ExpensesComponent implements OnDestroy {
     monthGroups(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.locale()),
   );
 
-  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
-  /** The scroll box of the list. It scrolls side by side only. */
-  readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
-
   constructor() {
     // Apply the URL first, then load data exactly once. The URL keeps the view shareable,
     // survives a reload, and is the target of links from the budget page, the invoices
@@ -569,24 +566,6 @@ export class ExpensesComponent implements OnDestroy {
 
     effect(() => this.frame.fill.set(this.split()));
 
-    // Infinite scroll. Side by side the list scrolls inside its own box, so the box is the
-    // root there; one pane at a time the page scrolls.
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const root = this.split() ? (this.scroller()?.nativeElement ?? null) : null;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((e) => e.isIntersecting)) {
-            if (this.tab() === 'transfers') this.loadMoreTransfers();
-            else this.loadMore();
-          }
-        },
-        { root, rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   /**

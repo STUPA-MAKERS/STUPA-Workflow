@@ -122,20 +122,11 @@
             <legend class="sec ff__secTitle">{{ 'expenses.form.fixed' | t }}</legend>
             @if (pair(); as p) {
               <div class="ff__grid">
-                <div class="ff__box ff__box--locked">
-                  <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.transferFrom' | t }}</span>
-                  <span class="ff__locked">{{ p.from.name }}</span>
-                </div>
-                <div class="ff__box ff__box--locked">
-                  <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.transferTo' | t }}</span>
-                  <span class="ff__locked">{{ p.to.name }}</span>
-                </div>
+                <app-locked-field [label]="'expenses.transferFrom' | t">{{ p.from.name }}</app-locked-field>
+                <app-locked-field [label]="'expenses.transferTo' | t">{{ p.to.name }}</app-locked-field>
               </div>
             }
-            <div class="ff__box ff__box--locked">
-              <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
-              <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
-            </div>
+            <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</app-locked-field>
             <app-note icon="lock" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.transfers.pairLocked' | t }}</app-note>
           </fieldset>
         </div>
@@ -170,17 +161,15 @@
                 (ngModelChange)="t.editPaymentDate.set($event)"
               />
             </div>
-            <label class="ff__box ff__box--area" for="transfer-note">
-              <span class="ff__label">{{ 'expenses.field.note' | t }}</span>
+            <app-textarea [label]="'expenses.field.note' | t">
               <textarea
                 id="transfer-note"
-                class="ff__area"
                 name="tenote"
                 rows="3"
                 [ngModel]="t.editNote()"
                 (ngModelChange)="t.editNote.set($event)"
               ></textarea>
-            </label>
+            </app-textarea>
           </fieldset>
         </div>
       }

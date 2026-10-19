@@ -23,6 +23,8 @@ import {
   CheckboxComponent,
   DialogComponent,
   IconComponent,
+  matchesMedia,
+  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
@@ -383,6 +385,6 @@ export class AttachmentsPanelComponent {
   /** Touch-first device without an iframe PDF viewer. A separate method makes it
    *  stubbable in tests. */
   protected coarsePointer(): boolean {
-    return window.matchMedia('(pointer: coarse)').matches;
+    return matchesMedia(MEDIA.coarse);
   }
 }

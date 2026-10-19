@@ -12,9 +12,17 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { IconComponent, MEDIA, type IconName } from '@stupa-makers/ui-kit';
+import {
+  anchorOutOfView,
+  IconComponent,
+  type IconName,
+  MEDIA,
+  mediaQuery,
+  placeBelow,
+  showInTopLayer,
+  watchAnchoredPopover,
+} from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent, type AvatarPerson } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 import { TruncatedDirective } from '../../truncated.directive';
@@ -105,7 +113,7 @@ export class FilterSelectComponent {
   readonly opened = output<void>();
 
   protected readonly listId = `filter-select-${nextId++}`;
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   protected readonly open = signal(false);
   protected readonly popoverOpen = computed(() => this.open() && !this.phone());
   protected readonly sheetOpen = computed(() => this.open() && this.phone());
@@ -147,24 +155,15 @@ export class FilterSelectComponent {
   private typedAt = 0;
 
   constructor() {
-    const inside = (root: HTMLElement | undefined, target: EventTarget | null) =>
-      !!root && target instanceof Node && root.contains(target);
-    const onPointer = (e: Event) => {
-      if (this.popoverOpen() && !inside(this.host.nativeElement, e.target)) this.close(false);
-    };
-    const onViewport = (e: Event) => {
+    watchAnchoredPopover({
+      isOpen: () => this.popoverOpen(),
+      inside: () => [this.host.nativeElement],
       // A scroll inside the list itself does not move the chip.
-      if (this.popoverOpen() && !inside(this.list()?.nativeElement, e.target)) this.follow();
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('scroll', onViewport, true);
-    window.addEventListener('resize', onViewport);
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('scroll', onViewport, true);
-      window.removeEventListener('resize', onViewport);
-      this.clearTimer();
+      ownScroll: () => this.list()?.nativeElement,
+      close: () => this.close(false),
+      follow: () => this.follow(),
     });
+    inject(DestroyRef).onDestroy(() => this.clearTimer());
   }
 
   protected isOn(value: string): boolean {
@@ -255,7 +254,7 @@ export class FilterSelectComponent {
     if (this.phone()) {
       // The sheet focuses its first control after its render; the current value goes after.
       this.later(() => {
-        this.toTopLayer(this.layer()?.nativeElement);
+        showInTopLayer(this.layer()?.nativeElement);
         this.later(() => this.focusItem(focus));
       });
       return;
@@ -263,16 +262,10 @@ export class FilterSelectComponent {
     this.placeBelow();
     this.later(() => {
       const list = this.list()!.nativeElement;
-      this.toTopLayer(list);
+      showInTopLayer(list);
       this.fit(list);
       this.focusItem(focus);
     });
-  }
-
-  /** Show a popover element. It renders anew on each opening, so it is not shown yet. */
-  private toTopLayer(el: HTMLElement | undefined): void {
-    const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
-    if (typeof pop?.showPopover === 'function') pop.showPopover();
   }
 
   private close(returnFocus: boolean): void {
@@ -313,13 +306,12 @@ export class FilterSelectComponent {
   /** Under the chip, aligned to its start, inside the viewport. */
   private placeBelow(): void {
     const rect = this.trigger().nativeElement.getBoundingClientRect();
-    this.position.set({ top: rect.bottom + GAP, left: Math.max(EDGE, rect.left) });
+    this.position.set(placeBelow(rect, { width: 0, height: 0 }, { gap: GAP, edge: EDGE }));
   }
 
   /** The page scrolled or resized: keep the list at its chip; close it when the chip leaves. */
   private follow(): void {
-    const rect = this.trigger().nativeElement.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+    if (anchorOutOfView(this.trigger().nativeElement.getBoundingClientRect())) {
       this.close(false);
       return;
     }
@@ -331,15 +323,8 @@ export class FilterSelectComponent {
   /** Move the list left when it passes the right edge, and up when it does not fit below. */
   private fit(list: HTMLElement): void {
     const pos = this.position();
-    const box = list.getBoundingClientRect();
-    let { top, left } = pos;
-    if (left + box.width > window.innerWidth - EDGE) {
-      left = Math.max(EDGE, window.innerWidth - EDGE - box.width);
-    }
-    if (top + box.height > window.innerHeight - EDGE) {
-      const above = this.trigger().nativeElement.getBoundingClientRect().top - GAP - box.height;
-      if (above >= EDGE) top = above;
-    }
+    const anchor = this.trigger().nativeElement.getBoundingClientRect();
+    const { top, left } = placeBelow(anchor, list.getBoundingClientRect(), { gap: GAP, edge: EDGE });
     if (top !== pos.top || left !== pos.left) this.position.set({ top, left });
   }
 

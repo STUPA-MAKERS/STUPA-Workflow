@@ -144,12 +144,6 @@
   font-family: var(--font-mono);
 }
 
-.ar__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 @container (max-width: 40rem) {
   .ar__head {
     flex-wrap: wrap;

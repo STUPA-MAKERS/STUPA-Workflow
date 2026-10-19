@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -108,29 +109,8 @@
   flex: none;
 }
 /* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.apps__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--apps-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--apps-fade));
-}
-.apps__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--apps-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--apps-fade));
-}
-.apps__scroll.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--apps-fade),
-    #000 calc(100% - var(--apps-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--apps-fade),
-    #000 calc(100% - var(--apps-fade)),
-    transparent
-  );
+.apps__scroll {
+  @include fade.fade-y(var(--apps-fade));
 }
 
 .apps__group {
@@ -325,29 +305,8 @@
   .apps__chips::-webkit-scrollbar {
     display: none;
   }
-  .apps__chips.is-fade-start {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--apps-chip-fade));
-    mask-image: linear-gradient(to right, transparent, #000 var(--apps-chip-fade));
-  }
-  .apps__chips.is-fade-end {
-    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--apps-chip-fade));
-    mask-image: linear-gradient(to left, transparent, #000 var(--apps-chip-fade));
-  }
-  .apps__chips.is-fade-start.is-fade-end {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--apps-chip-fade),
-      #000 calc(100% - var(--apps-chip-fade)),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--apps-chip-fade),
-      #000 calc(100% - var(--apps-chip-fade)),
-      transparent
-    );
+  .apps__chips {
+    @include fade.fade-x(var(--apps-chip-fade));
   }
   .apps__month {
     padding-inline: var(--space-1);

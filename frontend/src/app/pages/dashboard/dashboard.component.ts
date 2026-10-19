@@ -26,8 +26,9 @@ import {
   DataTableComponent,
   IconComponent,
   MEDIA,
-  TabsComponent,
+  mediaQuery,
   type TabItem,
+  TabsComponent,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
@@ -52,7 +53,6 @@ import { closedStatus } from '../../features/voting/election.util';
 import { shortTime } from '../../features/meetings/meetings-display.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { NavService } from '../../layout/nav.service';
 import {
   type BudgetAllocationView,
@@ -211,11 +211,11 @@ export class DashboardComponent {
   private readonly router = inject(Router);
 
   /** Phone width (<= 768px): compact head, the band first, list rows, floating button. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** Wide (>= 1200px): the list and the sheet side by side, no page scroll. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
+  readonly wide = mediaQuery(MEDIA.wide);
   /** A very wide screen shows more meetings in the sheet. */
-  private readonly extraWide = mediaQuerySignal('(min-width: 1680px)');
+  private readonly extraWide = mediaQuery('(min-width: 1680px)');
   /** The account sheet of the compact phone head. */
   readonly accountOpen = signal(false);
 

@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 /* The same two panes as the votes (voting.component.scss). */
 
@@ -64,24 +65,8 @@
 .grl--split .grl__scroll > * {
   flex: none;
 }
-.grl__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--grl-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--grl-fade));
-}
-.grl__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--grl-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--grl-fade));
-}
-.grl__scroll.is-fade-start.is-fade-end {
-  --grl-mask: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--grl-fade),
-    #000 calc(100% - var(--grl-fade)),
-    transparent
-  );
-  -webkit-mask-image: var(--grl-mask);
-  mask-image: var(--grl-mask);
+.grl__scroll {
+  @include fade.fade-y(var(--grl-fade));
 }
 
 .grl__group {

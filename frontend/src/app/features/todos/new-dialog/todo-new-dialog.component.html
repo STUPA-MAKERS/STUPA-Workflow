@@ -54,18 +54,15 @@
     <div class="tn__links" role="group" aria-labelledby="tn-links">
       <span id="tn-links" class="tn__cap">{{ 'todos.new.linked' | t }}</span>
       @for (link of links(); track link.kind + link.targetId) {
-        <span class="tn__chip">
+        <app-chip
+          class="tn__chip"
+          [removable]="true"
+          [removeLabel]="'todos.new.unlink' | t: { label: link.label }"
+          (remove)="unlink(link)"
+        >
           <app-icon [name]="icon(link.kind)" [size]="15" />
           <span class="tn__chipText">{{ link.label }}</span>
-          <button
-            type="button"
-            class="tn__chipX"
-            [attr.aria-label]="'todos.new.unlink' | t: { label: link.label }"
-            (click)="unlink(link)"
-          >
-            <app-icon name="x" [size]="14" />
-          </button>
-        </span>
+        </app-chip>
       }
       <div class="tn__add">
         <app-button variant="text" size="sm" (click)="pickerOpen.set(!pickerOpen())">
@@ -79,11 +76,9 @@
     </div>
 
     @if (withDescription()) {
-      <label class="tn__field" for="tn-desc">
-        <span class="tn__label">{{ 'todos.new.description' | t }}</span>
+      <app-textarea class="tn__desc" [label]="'todos.new.description' | t" [grow]="true">
         <textarea
           id="tn-desc"
-          class="tn__textarea"
           name="description"
           rows="3"
           maxlength="20000"
@@ -91,7 +86,7 @@
           [ngModel]="description()"
           (ngModelChange)="description.set($event)"
         ></textarea>
-      </label>
+      </app-textarea>
     }
   </form>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>

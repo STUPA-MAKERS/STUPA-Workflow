@@ -35,10 +35,13 @@
       <a class="jq__url mono" [href]="l.joinUrl" target="_blank" rel="noopener">{{ l.joinUrl }}</a>
       <p class="jq__code">{{ 'guests.qr.code' | t: { code: formatCode(l.joinCode) } }}</p>
       <div class="jq__actions">
-        <app-button size="sm" variant="tonal" (click)="copy()">
-          <app-icon [name]="copied() ? 'check' : 'copy'" />
-          {{ (copied() ? 'guests.link.copied' : 'guests.qr.copy') | t }}
-        </app-button>
+        <app-copy-button
+          [text]="l.joinUrl"
+          variant="tonal"
+          [label]="'guests.qr.copy' | t"
+          [copiedLabel]="'guests.link.copied' | t"
+          [resetMs]="copiedMs"
+        />
         @if (!phone()) {
           <app-button size="sm" variant="tonal" (click)="showOnBeamer()">
             <app-icon name="monitor" />

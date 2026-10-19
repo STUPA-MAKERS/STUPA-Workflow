@@ -58,13 +58,15 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
+  ChipComponent,
+  copyText,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
@@ -128,6 +130,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ChipComponent,
     FormsModule,
     NgTemplateOutlet,
     RouterLink,
@@ -202,7 +205,7 @@ export class TodoCardDetailComponent {
    */
   readonly transferred = output<{ card: TodoCardDetail; fromBoardId: Uuid }>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly card = signal<TodoCardDetail | null>(null);
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -998,14 +1001,10 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     const url = `${location.origin}/todos/${c.boardId}?card=${c.id}`;
-    const clip = navigator.clipboard;
-    if (!clip) {
-      this.toast.error(this.t('todos.card.linkFailed'));
-      return;
-    }
-    clip.writeText(url).then(
-      () => this.toast.success(this.t('todos.card.linkCopied')),
-      () => this.toast.error(this.t('todos.card.linkFailed')),
+    void copyText(url).then((ok) =>
+      ok
+        ? this.toast.success(this.t('todos.card.linkCopied'))
+        : this.toast.error(this.t('todos.card.linkFailed')),
     );
   }
 

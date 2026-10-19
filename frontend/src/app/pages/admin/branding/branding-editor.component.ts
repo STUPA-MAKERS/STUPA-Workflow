@@ -24,8 +24,11 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   ButtonComponent,
+  FilePickerComponent,
   IconComponent,
   InputComponent,
+  MoveButtonsComponent,
+  moveItem,
   SegmentedComponent,
   type SegmentedOption,
   SwitchComponent,
@@ -82,6 +85,8 @@ type FreetextKey = (typeof FREETEXTS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
+    MoveButtonsComponent,
     FabComponent,
     SkeletonComponent,
     FormsModule,
@@ -253,9 +258,8 @@ export class BrandingEditorComponent {
     return this.linkErrors().includes(url);
   }
 
-  protected onLogoSelected(slot: LogoSlot, input: HTMLInputElement): void {
-    const file = input.files?.[0];
-    input.value = '';
+  protected onLogoSelected(slot: LogoSlot, files: File[]): void {
+    const file = files[0];
     if (file) this.readLogo(slot, file);
   }
 
@@ -319,11 +323,7 @@ export class BrandingEditorComponent {
 
   protected moveColumn(i: number, dir: -1 | 1): void {
     this.patch((d) => {
-      const next = [...d.footerColumns];
-      const j = i + dir;
-      if (j < 0 || j >= next.length) return;
-      [next[i], next[j]] = [next[j], next[i]];
-      d.footerColumns = next;
+      d.footerColumns = moveItem(d.footerColumns, i, dir);
     });
   }
 

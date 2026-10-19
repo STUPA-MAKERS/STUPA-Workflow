@@ -25,8 +25,7 @@ import {
   type FilterSelectOption,
 } from '@shared/ui/filter-select/filter-select.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { AttendanceDetailComponent } from '../attendance-detail/attendance-detail.component';
 import { GREMIEN_NOW } from '../gremien.store';
 import {
@@ -134,7 +133,7 @@ export class GremiumAttendanceComponent {
   /** The sheet is as high as the pane: the matrix takes the free height and scrolls. */
   readonly fill = input(false);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   private readonly detail = viewChild(AttendanceDetailComponent);
 
   readonly preset = signal<RangePreset>('last6');

@@ -32,11 +32,12 @@ import {
   IconComponent,
   InputComponent,
   MEDIA,
+  mediaQuery,
+  MoveButtonsComponent,
   type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
@@ -98,6 +99,7 @@ type QPos = QuestionPos;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MoveButtonsComponent,
     EmptyStateComponent,
     FabComponent,
     FormsModule,
@@ -126,9 +128,9 @@ export class FormEditorComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** Wide viewport: three columns that scroll on their own. */
-  protected readonly wide = mediaQuerySignal(MEDIA.wide);
+  protected readonly wide = mediaQuery(MEDIA.wide);
   /** Phone: the header moves its actions into a ⋮ menu. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   protected readonly typeId = signal<Uuid>('');
   /** Version sidebar. Reload it after a save. */

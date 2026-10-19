@@ -84,11 +84,9 @@
 }
 
 
+/* The kit lays out the footer wrapper (flex, wrap, end, 12px); the spacer pushes the
+   delete to the start. */
 .rd__foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-3);
   width: 100%;
 }
 .rd__spacer {
@@ -106,9 +104,6 @@
 
 /* A phone: cancel and save on one line, the delete below them at the start. */
 @include bp.phone {
-  .rd__foot {
-    justify-content: flex-end;
-  }
   .rd__spacer {
     display: none;
   }

@@ -27,10 +27,13 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  MoveButtonsComponent,
+  moveItem,
   SegmentedComponent,
-  SwitchComponent,
-  ToastService,
   type SegmentedOption,
+  SwitchComponent,
+  TextareaComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS, errorDetail } from '../meetings-display.util';
@@ -79,6 +82,8 @@ export interface CandidateDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    MoveButtonsComponent,
     EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
@@ -310,9 +315,7 @@ export class VoteOpenDialogComponent {
     const to = index + delta;
     this.candidates.update((list) => {
       if (to < 0 || to >= list.length) return list;
-      const next = [...list];
-      [next[index], next[to]] = [next[to], next[index]];
-      return next;
+      return moveItem(list, index, delta);
     });
   }
 

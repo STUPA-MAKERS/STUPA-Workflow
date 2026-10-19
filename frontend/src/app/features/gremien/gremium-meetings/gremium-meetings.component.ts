@@ -28,8 +28,7 @@ import {
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { topsLabel } from '../../meetings/meetings-overview.util';
 import { GREMIEN_NOW } from '../gremien.store';
 import { clock, isoDay, monthKey, monthLabel, shiftMonth, weekdayDay } from '../gremien.util';
@@ -95,7 +94,7 @@ export class GremiumMeetingsComponent {
   /** The number of meetings, for the tab bar. */
   readonly count = output<number>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   readonly error = signal(false);

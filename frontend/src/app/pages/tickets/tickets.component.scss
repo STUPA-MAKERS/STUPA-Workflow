@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 /* The same two panes as the applications and the voting page. */
 
@@ -62,29 +63,8 @@
 .tk--split .tk__scroll > * {
   flex: none;
 }
-.tk__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--tk-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--tk-fade));
-}
-.tk__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--tk-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--tk-fade));
-}
-.tk__scroll.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--tk-fade),
-    #000 calc(100% - var(--tk-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--tk-fade),
-    #000 calc(100% - var(--tk-fade)),
-    transparent
-  );
+.tk__scroll {
+  @include fade.fade-y(var(--tk-fade));
 }
 
 .tk__group {
@@ -200,13 +180,8 @@
   .tk__chips::-webkit-scrollbar {
     display: none;
   }
-  .tk__chips.is-fade-start {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--tk-chip-fade));
-    mask-image: linear-gradient(to right, transparent, #000 var(--tk-chip-fade));
-  }
-  .tk__chips.is-fade-end {
-    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--tk-chip-fade));
-    mask-image: linear-gradient(to left, transparent, #000 var(--tk-chip-fade));
+  .tk__chips {
+    @include fade.fade-x(var(--tk-chip-fade), $both: false);
   }
   .tk__groupTitle {
     padding-inline: var(--space-1);

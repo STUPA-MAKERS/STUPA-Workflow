@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
   Injector,
   afterNextRender,
@@ -14,7 +13,13 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { BREAKPOINTS, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import {
+  BREAKPOINTS,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  observeElementSize,
+} from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 
 /** The width of the navigation rail of the shell, in px. */
@@ -88,7 +93,7 @@ export class ListDetailLayoutComponent {
   readonly back = output<void>();
 
   /** The viewport is in the wide class (`MEDIA.wide`). */
-  private readonly viewportWide = signal(false);
+  private readonly viewportWide = mediaQuery(MEDIA.wide);
   /** The measured width of the host. 0 means "not laid out yet" (hidden, or a test). */
   private readonly width = signal(0);
 
@@ -106,26 +111,12 @@ export class ListDetailLayoutComponent {
   });
 
   constructor() {
-    const media = window.matchMedia(MEDIA.wide);
-    this.viewportWide.set(media.matches);
-    const onMedia = (event: MediaQueryListEvent): void => this.viewportWide.set(event.matches);
-    media.addEventListener('change', onMedia);
-
     this.manageFocus();
 
-    let observer: ResizeObserver | null = null;
-    afterNextRender(() => {
-      const el = this.host.nativeElement;
-      this.width.set(el.getBoundingClientRect().width);
-      observer = new ResizeObserver((entries) => {
-        for (const entry of entries) this.width.set(entry.contentRect.width);
-      });
-      observer.observe(el);
-    });
-    inject(DestroyRef).onDestroy(() => {
-      observer?.disconnect();
-      media.removeEventListener('change', onMedia);
-    });
+    observeElementSize(
+      () => this.host.nativeElement,
+      (size) => this.width.set(size.width),
+    );
   }
 
   /**

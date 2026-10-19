@@ -156,9 +156,12 @@ app-status-text.pal__rowSub {
   font-weight: var(--fw-regular);
 }
 /* The matching letters, in the accent: the reader sees why the row is there. */
-.pal__hit {
-  color: var(--color-accent-text);
-  font-weight: var(--fw-semibold);
+.pal__rowText {
+  --highlight-bg: transparent;
+  --highlight-color: var(--color-accent-text);
+  --highlight-weight: var(--fw-semibold);
+  --highlight-radius: 0;
+  --highlight-padding: 0;
 }
 
 .pal__archived {

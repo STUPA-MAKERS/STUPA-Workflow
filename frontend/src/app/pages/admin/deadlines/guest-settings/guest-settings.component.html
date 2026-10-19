@@ -13,17 +13,15 @@
     } @else {
       <form class="gs__grid" (submit)="$event.preventDefault(); save()">
         <div class="gs__field">
-          <div class="gs__unitBox">
-            <app-input
-              type="number"
-              [label]="'admin.guest.hours' | t"
-              [error]="hoursError()"
-              name="confirmTtlHours"
-              [ngModel]="draft().hours"
-              (ngModelChange)="patch({ hours: $event })"
-            />
-            <span class="gs__unit" aria-hidden="true">{{ 'admin.guest.hoursUnit' | t }}</span>
-          </div>
+          <app-input
+            type="number"
+            [label]="'admin.guest.hours' | t"
+            [error]="hoursError()"
+            name="confirmTtlHours"
+            [ngModel]="draft().hours"
+            (ngModelChange)="patch({ hours: $event })"
+            [suffix]="'admin.guest.hoursUnit' | t"
+          />
         </div>
 
         <div class="gs__field">
@@ -36,17 +34,15 @@
               (ngModelChange)="setMode($event)"
             />
             @if (draft().mode === 'days') {
-              <div class="gs__unitBox">
-                <app-input
-                  type="number"
-                  [label]="'admin.guest.days' | t"
-                  [error]="daysError()"
-                  name="linkTtlDays"
-                  [ngModel]="draft().days"
-                  (ngModelChange)="patch({ days: $event })"
-                />
-                <span class="gs__unit" aria-hidden="true">{{ 'admin.guest.daysUnit' | t }}</span>
-              </div>
+              <app-input
+                type="number"
+                [label]="'admin.guest.days' | t"
+                [error]="daysError()"
+                name="linkTtlDays"
+                [ngModel]="draft().days"
+                (ngModelChange)="patch({ days: $event })"
+                [suffix]="'admin.guest.daysUnit' | t"
+              />
             }
           </div>
         </div>

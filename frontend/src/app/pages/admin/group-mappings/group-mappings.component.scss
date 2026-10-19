@@ -73,11 +73,6 @@
 .gm__dialogNote {
   font-size: var(--fs-sm);
 }
-.gm__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
 
 @container (max-width: 36rem) {
   .gm__row {

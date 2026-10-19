@@ -50,8 +50,14 @@ import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-out
 import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { mediaQuerySignal } from '../../layout/media-query';
-import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonLinkComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { FileDropDirective } from '@shared/file-drop.directive';
 import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
@@ -115,6 +121,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ChatComponent,
     StatusTextComponent,
     ButtonComponent,
+    ButtonLinkComponent,
     IconComponent,
     AttachmentsPanelComponent,
     DropOverlayComponent,
@@ -142,7 +149,7 @@ export class StatusTimelineComponent {
   private readonly editRow = viewChild<ElementRef<HTMLButtonElement>>('editRow');
   private readonly pageTitle = viewChild<ElementRef<HTMLElement>>('pageTitle');
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly phase = signal<Phase>('loading');
   readonly application = signal<Application | null>(null);

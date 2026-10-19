@@ -174,7 +174,7 @@
           }
           </div>
           @if (hasMore()) {
-            <div #sentinel class="inv__sentinel" aria-hidden="true"></div>
+            <div class="inv__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
             <div class="inv__more">
               <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
                 'invoices.loadMore' | t

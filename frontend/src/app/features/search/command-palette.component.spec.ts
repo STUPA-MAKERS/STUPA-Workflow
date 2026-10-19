@@ -343,7 +343,7 @@ describe('CommandPaletteComponent', () => {
       failed: [],
     });
     fixture.detectChanges();
-    const hits = Array.from(container.querySelectorAll('.pal__hit')).map((h) => h.textContent);
+    const hits = Array.from(container.querySelectorAll('mark.hl__hit')).map((h) => h.textContent);
     expect(hits).toEqual(['rad', 'Rad']);
     expect(container.querySelector('.pal__rowTitle')).toHaveTextContent('Lastenrad');
   });

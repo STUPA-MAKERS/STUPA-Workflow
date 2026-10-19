@@ -85,7 +85,7 @@
             <span class="au__lbl">{{ 'admin.users.col.groups' | t }}</span>
             <span class="au__tags">
               @for (g of p.oidcGroups; track g) {
-                <code class="au__tag">{{ g }}</code>
+                <code class="code-tag">{{ g }}</code>
               } @empty {
                 <span class="au__val au__val--muted">{{ 'admin.users.noGroups' | t }}</span>
               }

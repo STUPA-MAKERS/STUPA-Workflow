@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'dot-parts' as dots;
 
 /* The shared parts of the four sub-tabs of a gremium: the chip row, a group of rows with
    its heading, a sub line with a dot between its parts and the chevron. */
@@ -44,12 +45,7 @@
 /* A sub line: the parts with a dot between two of them. */
 @mixin parts($part) {
   display: inline;
-  #{$part} + #{$part}::before {
-    content: '·';
-    content: '·' / '';
-    margin-inline: 6px;
-    color: var(--color-text-subtle);
-  }
+  @include dots.between($part);
 }
 
 @mixin chevron {

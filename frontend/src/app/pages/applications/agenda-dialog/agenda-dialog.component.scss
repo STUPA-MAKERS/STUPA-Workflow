@@ -1,4 +1,4 @@
-@use '../../../features/meetings/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 /* The host adds no box; a closed dialog takes no gap in a flex column of the page. */
 :host {

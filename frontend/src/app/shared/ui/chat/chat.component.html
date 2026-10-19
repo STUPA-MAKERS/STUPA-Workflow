@@ -202,32 +202,34 @@
         @for (f of files(); track f.id) {
           @let st = fileState(f);
           <li class="chat__draft" [class.chat__draft--failed]="f.failed">
-            <span class="chat__fileIcon" aria-hidden="true">
-              <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
-            </span>
-            <span class="chat__fileText">
-              <span class="mono chat__fileName">{{ f.filename }}</span>
-              <span class="chat__fileMeta">
-                {{ fileMeta(f) }} · <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-              </span>
-            </span>
-            <button
-              type="button"
-              class="chat__draftX"
-              [attr.aria-label]="'chat.removeFile' | t: { name: f.filename }"
-              (click)="removeFile(f)"
+            <app-chip
+              class="chat__chip"
+              removeSize="lg"
+              [removable]="true"
+              [removeLabel]="'chat.removeFile' | t: { name: f.filename }"
+              (remove)="removeFile(f)"
             >
-              <app-icon name="x" [size]="16" />
-            </button>
+              <span class="chat__fileIcon" aria-hidden="true">
+                <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
+              </span>
+              <span class="chat__fileText">
+                <span class="mono chat__fileName">{{ f.filename }}</span>
+                <span class="chat__fileMeta">
+                  {{ fileMeta(f) }} · <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
+                </span>
+              </span>
+            </app-chip>
           </li>
         }
         @for (p of uploads(); track p.key) {
           <li class="chat__draft chat__draft--pending">
-            <span class="chat__spinner" aria-hidden="true"></span>
-            <span class="chat__fileText" role="status">
-              <span class="mono chat__fileName">{{ p.filename }}</span>
-              <span class="chat__fileMeta">{{ 'chat.uploading' | t }}</span>
-            </span>
+            <app-chip class="chat__chip">
+              <span class="chat__spinner" aria-hidden="true"></span>
+              <span class="chat__fileText" role="status">
+                <span class="mono chat__fileName">{{ p.filename }}</span>
+                <span class="chat__fileMeta">{{ 'chat.uploading' | t }}</span>
+              </span>
+            </app-chip>
           </li>
         }
       </ul>

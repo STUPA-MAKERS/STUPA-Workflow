@@ -75,13 +75,15 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import {
   ButtonComponent,
   CheckboxComponent,
+  copyText,
   DialogComponent,
   IconComponent,
   InputComponent,
   MEDIA,
+  mediaQuery,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -89,7 +91,6 @@ import {
   TodoNewDialogComponent,
   type NewTodoLink,
 } from '../../features/todos/new-dialog/todo-new-dialog.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_ICON,
@@ -239,7 +240,7 @@ export class TicketDetailComponent {
   readonly manager = this.auth.can('ticket.manage');
   /** The reporter may write: false while a block holds back the sender. */
   readonly canReply = signal(true);
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   private id: Uuid = '';
   private seq = 0;
@@ -643,10 +644,9 @@ export class TicketDetailComponent {
 
   /** Copy the link of the ticket. */
   async copyLink(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(location.href.split('?')[0]);
+    if (await copyText(location.href.split('?')[0])) {
       this.toast.success(this.t('tickets.detail.linkCopied'));
-    } catch {
+    } else {
       this.toast.error(this.t('tickets.detail.linkFailed'));
     }
   }

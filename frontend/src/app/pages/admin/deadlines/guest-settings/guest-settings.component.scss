@@ -40,23 +40,6 @@
   min-width: 0;
 }
 
-/* The unit sits at the end of the field box, on the line of the value. */
-.gs__unitBox {
-  position: relative;
-  min-width: 0;
-}
-.gs__unitBox app-input ::ng-deep input {
-  padding-inline-end: 5rem;
-}
-.gs__unit {
-  position: absolute;
-  inset-inline-end: var(--space-4);
-  top: 1.5rem;
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-
 /* The lifetime: the select, and beside it the days once "Begrenzt" is set. */
 .gs__link {
   display: grid;

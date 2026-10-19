@@ -235,20 +235,16 @@
       <dt>{{ 'todos.card.assignees' | t }}</dt>
       <dd class="cd__chips">
         @for (person of card.assignees; track person.principalId ?? $index) {
-          <span class="cd__person">
+          <app-chip
+            class="cd__person"
+            removeSize="sm"
+            [removable]="canWrite() && !!person.principalId"
+            [removeLabel]="'todos.card.removeAssignee' | t: { name: name(person) }"
+            (remove)="removeAssignee(person.principalId!)"
+          >
             <app-avatar size="xs" [name]="name(person)" [principalId]="person.principalId" [decorative]="true" />
             <span>{{ name(person) }}</span>
-            @if (canWrite() && person.principalId) {
-              <button
-                type="button"
-                class="cd__x"
-                [attr.aria-label]="'todos.card.removeAssignee' | t: { name: name(person) }"
-                (click)="removeAssignee(person.principalId)"
-              >
-                <app-icon name="x" [size]="13" />
-              </button>
-            }
-          </span>
+          </app-chip>
         }
         @if (canWrite()) {
           <app-filter-select
@@ -281,20 +277,17 @@
         <dt>{{ 'todos.card.labels' | t }}</dt>
         <dd class="cd__chips">
           @for (label of card.labels; track label.id) {
-            <span class="cd__label" [attr.data-color]="label.color">
+            <app-chip
+              class="cd__label"
+              [attr.data-color]="label.color"
+              removeSize="sm"
+              [removable]="canWrite()"
+              [removeLabel]="'todos.card.removeLabel' | t: { name: label.name }"
+              (remove)="removeLabel(label.id)"
+            >
               <span class="cd__dot" aria-hidden="true"></span>
               {{ label.name }}
-              @if (canWrite()) {
-                <button
-                  type="button"
-                  class="cd__x"
-                  [attr.aria-label]="'todos.card.removeLabel' | t: { name: label.name }"
-                  (click)="removeLabel(label.id)"
-                >
-                  <app-icon name="x" [size]="13" />
-                </button>
-              }
-            </span>
+            </app-chip>
           }
           @if (canWrite()) {
             <app-filter-select

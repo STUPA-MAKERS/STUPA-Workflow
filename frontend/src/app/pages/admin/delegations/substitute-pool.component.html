@@ -102,7 +102,7 @@
     }
     <button type="submit" hidden></button>
   </form>
-  <div dialog-footer class="sp__foot">
+  <div dialog-footer>
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!selected()" [loading]="adding()" (click)="add()">{{
       'admin.common.add' | t

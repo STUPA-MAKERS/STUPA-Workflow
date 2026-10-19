@@ -2,7 +2,7 @@
 // the cards of the shown group, and the form settings with the versions.
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use '../../../features/meetings/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 :host {
   display: flex;

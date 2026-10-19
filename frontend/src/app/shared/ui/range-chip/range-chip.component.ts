@@ -15,13 +15,17 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  anchorOutOfView,
   ButtonComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  placeBelow,
+  showInTopLayer,
+  watchAnchoredPopover,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 import { TruncatedDirective } from '@shared/truncated.directive';
 
@@ -83,7 +87,7 @@ export class RangeChipComponent {
   /** "Anwenden" or "Zurücksetzen" set a new range. */
   readonly applied = output<RangeValue>();
 
-  private readonly phone = mediaQuerySignal(MEDIA.phone);
+  private readonly phone = mediaQuery(MEDIA.phone);
 
   protected readonly open = signal(false);
   protected readonly popoverOpen = computed(() => this.open() && !this.phone());
@@ -100,22 +104,15 @@ export class RangeChipComponent {
   private lastPlace = '';
 
   constructor() {
-    const inside = (root: HTMLElement | undefined, target: EventTarget | null) =>
-      !!root && target instanceof Node && root.contains(target);
-    // The popover is a child of the host, so a click in it is no click outside.
-    const onPointer = (e: Event) => {
-      if (this.popoverOpen() && !inside(this.host.nativeElement, e.target)) this.close(false);
-    };
-    const onViewport = (e: Event) => {
-      if (this.popoverOpen() && !inside(this.pop()?.nativeElement, e.target)) this.follow();
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('scroll', onViewport, true);
-    window.addEventListener('resize', onViewport);
+    watchAnchoredPopover({
+      isOpen: () => this.popoverOpen(),
+      // The popover is a child of the host, so a click in it is no click outside.
+      inside: () => [this.host.nativeElement],
+      ownScroll: () => this.pop()?.nativeElement,
+      close: () => this.close(false),
+      follow: () => this.follow(),
+    });
     inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('scroll', onViewport, true);
-      window.removeEventListener('resize', onViewport);
       if (this.timer) clearTimeout(this.timer);
       this.stopTracking();
     });
@@ -163,7 +160,7 @@ export class RangeChipComponent {
       // The sheet moves the focus into itself.
       this.timer = setTimeout(() => {
         this.timer = null;
-        this.toTopLayer(this.layer()?.nativeElement);
+        showInTopLayer(this.layer()?.nativeElement);
       });
       return;
     }
@@ -173,7 +170,7 @@ export class RangeChipComponent {
       this.timer = null;
       const pop = this.pop()?.nativeElement;
       if (!pop) return;
-      this.toTopLayer(pop);
+      showInTopLayer(pop);
       // The popover is a DOM child of the chip row. A focus that scrolls would move the
       // row (and the chip) away from the place that placeBelow() read.
       (pop.querySelector<HTMLElement>('input') ?? pop).focus({ preventScroll: true });
@@ -219,12 +216,6 @@ export class RangeChipComponent {
     if (returnFocus && wasPopover) this.trigger().nativeElement.focus();
   }
 
-  /** Show a popover element. It renders anew on each opening, so it is not shown yet. */
-  private toTopLayer(el: HTMLElement | undefined): void {
-    const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
-    if (typeof pop?.showPopover === 'function') pop.showPopover();
-  }
-
   /**
    * Keep the popover at its chip while it is open. The chip can move without a scroll or
    * a resize of the window: a chip before it appears when its data loads, or the row
@@ -261,13 +252,12 @@ export class RangeChipComponent {
   /** Under the chip, aligned to its start, inside the viewport. */
   private placeBelow(): void {
     const rect = this.trigger().nativeElement.getBoundingClientRect();
-    this.position.set({ top: rect.bottom + GAP, left: Math.max(EDGE, rect.left) });
+    this.position.set(placeBelow(rect, { width: 0, height: 0 }, { gap: GAP, edge: EDGE }));
   }
 
   /** The page scrolled or resized: keep the popover at its chip; close it when the chip leaves. */
   private follow(): void {
-    const rect = this.trigger().nativeElement.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+    if (anchorOutOfView(this.trigger().nativeElement.getBoundingClientRect())) {
       this.close(false);
       return;
     }
@@ -279,17 +269,11 @@ export class RangeChipComponent {
   /** Move the popover left when it passes the right edge, and up when it does not fit below. */
   private fit(pop: HTMLElement): void {
     const pos = this.position();
-    const box = pop.getBoundingClientRect();
-    let { top, left } = pos;
-    if (left + box.width > window.innerWidth - EDGE) {
-      left = Math.max(EDGE, window.innerWidth - EDGE - box.width);
-    }
-    if (top + box.height > window.innerHeight - EDGE) {
-      const above = this.trigger().nativeElement.getBoundingClientRect().top - GAP - box.height;
-      if (above >= EDGE) top = above;
-    }
+    const anchor = this.trigger().nativeElement.getBoundingClientRect();
+    const { top, left } = placeBelow(anchor, pop.getBoundingClientRect(), { gap: GAP, edge: EDGE });
     if (top !== pos.top || left !== pos.left) this.position.set({ top, left });
   }
+
 
   private format(value: string): string {
     if (this.kind() === 'amount') {

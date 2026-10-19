@@ -9,29 +9,25 @@
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.loginSettings.loadError' | t }}</app-note>
   } @else {
     <form class="ls__grid" (submit)="$event.preventDefault(); save()">
-      <div class="ls__unitBox">
-        <app-input
-          type="number"
-          [label]="'admin.loginSettings.web' | t"
-          [error]="webError()"
-          name="webSessionDays"
-          [ngModel]="draft().web"
-          (ngModelChange)="patch({ web: $event })"
-        />
-        <span class="ls__unit" aria-hidden="true">{{ 'admin.loginSettings.daysUnit' | t }}</span>
-      </div>
+      <app-input
+        type="number"
+        [label]="'admin.loginSettings.web' | t"
+        [error]="webError()"
+        name="webSessionDays"
+        [ngModel]="draft().web"
+        (ngModelChange)="patch({ web: $event })"
+        [suffix]="'admin.loginSettings.daysUnit' | t"
+      />
 
-      <div class="ls__unitBox">
-        <app-input
-          type="number"
-          [label]="'admin.loginSettings.pwa' | t"
-          [error]="pwaError()"
-          name="pwaSessionDays"
-          [ngModel]="draft().pwa"
-          (ngModelChange)="patch({ pwa: $event })"
-        />
-        <span class="ls__unit" aria-hidden="true">{{ 'admin.loginSettings.daysUnit' | t }}</span>
-      </div>
+      <app-input
+        type="number"
+        [label]="'admin.loginSettings.pwa' | t"
+        [error]="pwaError()"
+        name="pwaSessionDays"
+        [ngModel]="draft().pwa"
+        (ngModelChange)="patch({ pwa: $event })"
+        [suffix]="'admin.loginSettings.daysUnit' | t"
+      />
     </form>
 
     @if (saved()?.updatedAt; as at) {

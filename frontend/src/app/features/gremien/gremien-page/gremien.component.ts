@@ -35,8 +35,7 @@ import {
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { GremienStore } from '../gremien.store';
@@ -110,7 +109,7 @@ export class GremienComponent implements OnDestroy {
   private readonly frame = inject(PageFrameService);
   protected readonly store = inject(GremienStore);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   private readonly layout = viewChild(ListDetailLayoutComponent);
   /** The list and the detail sit side by side. */

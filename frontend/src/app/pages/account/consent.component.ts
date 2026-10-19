@@ -8,7 +8,12 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, CheckboxComponent, IconComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  CheckboxComponent,
+  ChipGroupComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 import { scopeDesc, scopeLabel } from './scope-labels';
 
 /**
@@ -32,6 +37,7 @@ import { scopeDesc, scopeLabel } from './scope-labels';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ChipGroupComponent,
     ButtonComponent,
     CheckboxComponent,
     FormsModule,
@@ -83,6 +89,11 @@ export class OAuthConsentComponent {
   scopeDesc(key: string): string {
     return scopeDesc(this.i18n, key);
   }
+
+  /** The lifetimes of the request as chips. */
+  readonly lifetimeOptions = computed(() =>
+    (this.req()?.lifetimes ?? []).map((value) => ({ value, label: this.lifetimeLabel(value) })),
+  );
 
   /** The label of a lifetime key; an unknown key shows itself. */
   lifetimeLabel(value: string): string {

@@ -19,8 +19,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { IconComponent, MEDIA, type IconName } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { IconComponent, type IconName, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 
 export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
   personal: 'user',
@@ -69,7 +68,7 @@ export class TodoBoardPickerComponent {
   readonly allId = input<string | null>(null);
   readonly picked = output<Uuid>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly open = signal(false);
   readonly listId = `todo-board-picker-${nextId++}`;
   private readonly chip = viewChild.required<ElementRef<HTMLButtonElement>>('chip');

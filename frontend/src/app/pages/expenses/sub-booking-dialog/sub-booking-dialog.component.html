@@ -39,7 +39,7 @@
       </div>
     </form>
   }
-  <div dialog-footer class="sd-form__footer">
+  <div dialog-footer>
     <app-button variant="text" (click)="s.closeCreateSub()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!s.canSubmitSub()" [loading]="saving()" (click)="s.createSub($event)">{{
       'expenses.sub.add' | t
