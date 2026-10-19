@@ -89,8 +89,9 @@ describe('LocalizedDatePipe', () => {
   it('formats the weekday presets of the meeting pages', () => {
     const pipe = pipeFor('de');
     const v = new Date(2026, 9, 13, 17, 0);
-    expect(pipe.transform(v, 'weekdayDate')).toBe('Di., 13.10.2026');
-    expect(pipe.transform(v, 'weekdayShort')).toBe('Di., 13.10.2026, 17:00');
+    expect(pipe.transform(v, 'weekdayDate')).toBe('Di, 13.10.2026');
+    expect(pipe.transform(v, 'weekdayShort')).toBe('Di, 13.10.2026, 17:00');
+    expect(pipeFor('en').transform(v, 'weekdayShort')).toBe('Tue, 13/10/2026, 17:00');
   });
 });
 

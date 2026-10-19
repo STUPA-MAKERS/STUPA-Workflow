@@ -6,12 +6,11 @@ import type {
   TicketReporter,
   TicketStatus,
 } from '@core/api/tickets.service';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { StatusKind } from '@shared/status-kind.util';
 import type { IconName } from '@stupa-makers/ui-kit';
-
-/** A translate function: the key and its parameters. */
-export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+import { daysUntil, shortDay } from '@shared/date-format';
+import { personLabel, personName } from '@shared/person-label.util';
 
 export const KIND_ICON: Record<TicketKind, IconName> = {
   bug: 'bug',
@@ -45,15 +44,10 @@ export function isOpen(status: TicketStatus): boolean {
   return status === 'new' || status === 'in_progress';
 }
 
-/** A person by name; a deleted or anonymized one is "Gelöschte Person". */
-export function personName(ref: PersonRef | null | undefined, t: Translate): string {
-  return ref?.displayName || t('chat.deletedPerson');
-}
-
 /** The reporter: the name, else the e-mail, else "Anonymisiert". */
 export function reporterName(reporter: TicketReporter, t: Translate): string {
   if (reporter.anonymized) return t('tickets.reporter.anonymized');
-  return reporter.displayName || reporter.email || t('chat.deletedPerson');
+  return personLabel(reporter, t, { fallback: 'chat.deletedPerson' });
 }
 
 /**
@@ -70,11 +64,6 @@ export function reporterRowName(reporter: TicketReporter, t: Translate): string 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 
-/** Midnight of the local day of a date. */
-function dayStart(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
 /**
  * The age of a ticket for a list row: "gerade eben", "vor 12 Min.", "vor 3 Std.",
  * "gestern", then the date ("12.10.", with the year when it is another year).
@@ -85,15 +74,10 @@ export function ticketAge(at: string, now: Date, locale: string, t: Translate): 
   const diff = now.getTime() - then.getTime();
   if (diff < MINUTE) return t('tickets.age.now');
   if (diff < HOUR) return t('tickets.age.minutes', { n: Math.floor(diff / MINUTE) });
-  const days = Math.round((dayStart(now) - dayStart(then)) / (24 * HOUR));
+  const days = daysUntil(now, then);
   if (days === 0) return t('tickets.age.hours', { n: Math.floor(diff / HOUR) });
   if (days === 1) return t('tickets.age.yesterday');
-  const sameYear = then.getFullYear() === now.getFullYear();
-  return new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(then);
+  return shortDay(then, locale, now);
 }
 
 /**

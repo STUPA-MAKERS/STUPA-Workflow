@@ -1,4 +1,4 @@
-import type { ApplicationListItem, Transition } from '@core/api/models';
+import type { Transition } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
 import { formatBytes as formatBytesIn } from '@shared/format-bytes';
 import { flowColorKind } from '@shared/status-kind.util';
@@ -29,47 +29,12 @@ export { formatDateRangeValue, formatFieldValue, formatIsoDate } from '@shared/f
 /**
  * Human-readable bytes in the UI locale ("1,5 MB"), binary base, one decimal from KB up.
  * An invalid size gives "—".
+ *
+ * @deprecated Call `formatBytes(bytes, formatLocale, 'fixed')` from `@shared/format-bytes`.
+ * Only the attachments panel still uses this wrapper.
  */
 export function formatBytes(bytes: number, locale: string): string {
   return formatBytesIn(bytes, toFormatLocale(locale), 'fixed');
-}
-
-/** One month of the list: a heading and the rows submitted in that month. */
-export interface MonthGroup<T> {
-  /** `YYYY-MM` of the submission, also the track key. */
-  key: string;
-  /** The month as the reader says it, for example "September 2026". */
-  label: string;
-  items: T[];
-}
-
-/**
- * Group the rows by the month of their submission (`createdAt`), in the order the rows
- * come in. The list sorts by date, so each month is one run of rows; a month that comes
- * back later (another sort) starts a new group rather than pulling rows out of order.
- *
- * The month is the local month of the reader, the same day the date column shows.
- */
-export function groupByMonth<T extends Pick<ApplicationListItem, 'createdAt'>>(
-  items: readonly T[],
-  locale: string,
-): MonthGroup<T>[] {
-  const fmt = new Intl.DateTimeFormat(toFormatLocale(locale), { month: 'long', year: 'numeric' });
-  const groups: MonthGroup<T>[] = [];
-  for (const item of items) {
-    const date = new Date(item.createdAt);
-    const valid = !Number.isNaN(date.getTime());
-    const key = valid
-      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-      : '';
-    const last = groups[groups.length - 1];
-    if (last && last.key === key) {
-      last.items.push(item);
-    } else {
-      groups.push({ key, label: valid ? fmt.format(date) : '', items: [item] });
-    }
-  }
-  return groups;
 }
 
 /** The look of a transition button in the detail header. */

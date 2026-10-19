@@ -49,13 +49,13 @@ import {
   type MeetingsView,
   overviewGroups,
   topsLabel,
-  weekdayShort,
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { beamerUrl } from '../../voting/beamer-link.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
+import { weekdayName } from '@shared/date-format';
 
 /**
  * The list view of the meeting overview (`/meetings`, board Sitzungen, variant A): a
@@ -308,7 +308,7 @@ export class MeetingsListComponent {
     if (t.since) return this.i18n.translate('meetings.list.since', { time: t.text });
     const start = t.text.split('–')[0];
     if (!m.date) return start;
-    const weekday = weekdayShort(m.date, this.i18n.locale());
+    const weekday = weekdayName(m.date, this.i18n.formatLocale());
     return start ? `${weekday}, ${start}` : weekday;
   }
 

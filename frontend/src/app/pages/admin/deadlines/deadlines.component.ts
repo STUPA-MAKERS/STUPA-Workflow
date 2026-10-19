@@ -31,18 +31,13 @@ import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { dayMonthYear, localToday } from '@shared/date-format';
 
 /** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
 export interface DeadlineValue {
   text: string;
   title: string;
   muted: boolean;
-}
-
-/** Today as `YYYY-MM-DD` in local time, for the comparison with the recurring dates. */
-function localToday(now: Date): string {
-  const p = (n: number): string => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
 const KINDS: DeadlineKind[] = [
@@ -249,11 +244,7 @@ export class AdminDeadlinesComponent {
   }
 
   private dateText(iso: string): string {
-    return new Date(iso).toLocaleDateString(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return dayMonthYear(iso, this.i18n.formatLocale());
   }
 
   protected openAdd(): void {

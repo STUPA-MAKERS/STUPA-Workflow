@@ -42,12 +42,14 @@ import { liveSearch } from '@shared/live-search';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
-import { groupByMonth } from '../../../pages/applications/applications.util';
 import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { clock, dayMonthYear } from '@shared/date-format';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
+import { groupByMonth } from '@shared/group-by-month';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -264,7 +266,7 @@ export class VotingComponent implements OnDestroy {
     if (drafts.length) {
       out.push({ key: 'draft', label: this.i18n.translate('voting.list.group.draft'), rows: drafts });
     }
-    for (const g of groupByMonth(ended, this.i18n.locale())) {
+    for (const g of groupByMonth(ended, (r) => r.createdAt, this.i18n.formatLocale())) {
       out.push({ key: `m-${g.key}`, label: g.label, rows: g.items });
     }
     return out;
@@ -633,12 +635,8 @@ export class VotingComponent implements OnDestroy {
     if (Number.isNaN(date.getTime())) return [null, null];
     const locale = this.i18n.formatLocale();
     const today = new Date(Date.now()).toDateString() === date.toDateString();
-    const text = today
-      ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
-      : new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-    const exact = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      date,
-    );
+    const text = today ? clock(date, locale) : dayMonthYear(date, locale);
+    const exact = formatMoment(date, locale);
     return [key ? this.i18n.translate(key, { time: text }) : text, exact];
   }
 }

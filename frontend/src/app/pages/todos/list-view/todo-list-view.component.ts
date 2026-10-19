@@ -7,15 +7,15 @@ import { IconComponent } from '@stupa-makers/ui-kit';
 import {
   dueInfo,
   linkLine,
-  personName,
   sortedColumns,
   type DueInfo,
-  type Translate,
 } from '../../../features/todos/todos.util';
+import type { Translate } from '@core/i18n/translations';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLabelComponent } from '../../../features/todos/card-facts/todo-label.component';
 import { TodoDueComponent } from '../../../features/todos/card-facts/todo-due.component';
 import { TodoAssigneesComponent } from '../../../features/todos/card-facts/todo-assignees.component';
+import { personName } from '@shared/person-label.util';
 
 export type DueSort = 'none' | 'asc' | 'desc';
 

@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ExpensesComponent } from './expenses.component';
 import { ExpensesListState } from './expenses-list.state';
@@ -2271,8 +2272,10 @@ describe('ExpensesListState.refresh', () => {
     state.onExport();
     const reqs = http.match((r) => r.url.endsWith('/expenses/export.xlsx'));
     expect(reqs.length).toBe(1);
+    const toast = jest.spyOn(TestBed.inject(ToastService), 'error');
     reqs[0].error(new ProgressEvent('err'));
     expect(state.exporting()).toBe(false);
+    expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
   });
 });
 

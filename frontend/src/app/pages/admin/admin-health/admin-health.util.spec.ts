@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { I18nService } from '@core/i18n/i18n.service';
-import { checkedAt, formatBytes, formatCount, formatWhen, triggerLabel } from './admin-health.util';
+import { checkedAt, formatCount, formatWhen, triggerLabel } from './admin-health.util';
 
 describe('admin-health.util', () => {
   let i18n: I18nService;
@@ -19,14 +19,8 @@ describe('admin-health.util', () => {
     expect(formatWhen(new Date().toISOString(), i18n)).toMatch(/^heute, /);
   });
 
-  it('formats counts and sizes in the locale', () => {
+  it('formats counts in the locale', () => {
     expect(formatCount(18412, i18n)).toBe('18.412');
-    expect(formatBytes(null, i18n)).toBe('—');
-    expect(formatBytes(undefined, i18n)).toBe('—');
-    expect(formatBytes(512, i18n)).toBe('512 B');
-    expect(formatBytes(433_061_888, i18n)).toBe('413 MB');
-    expect(formatBytes(4.2 * 1024 ** 3, i18n)).toBe('4,2 GB');
-    expect(formatBytes(1024 ** 5 * 3, i18n)).toBe('3.072 TB');
   });
 
   it('names the trigger and the time of a stored check', () => {

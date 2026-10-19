@@ -37,6 +37,7 @@ import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -184,7 +185,7 @@ export class SubstitutePoolComponent {
               list.push({
                 id: m.principalId,
                 name:
-                  m.displayName || m.email || this.i18n.translate('admin.gremien.unknownMember'),
+                  personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
               });
             }
             this.loadedMembers.set(list.sort((a, b) => a.name.localeCompare(b.name)));
@@ -222,7 +223,7 @@ export class SubstitutePoolComponent {
 
   /** Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
   protected label(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   protected pick(p: AdminPrincipal): void {

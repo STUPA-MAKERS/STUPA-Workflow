@@ -24,8 +24,6 @@ import {
   costCentreTrail,
   findBudgetNode,
   findTopBudgetNode,
-  formatEur,
-  shortDate,
   signedEur,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
@@ -36,6 +34,8 @@ import { CostCentreLabelComponent } from '../../budget/cost-centre-label/cost-ce
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
+import { dayMonth } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
@@ -109,7 +109,7 @@ export class BookingDetailComponent {
   /** "Buchung · HHJ 2026" (or "Unterbuchung"). */
   protected readonly amount = computed(() => {
     const e = this.expense();
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   });
 
   protected readonly paymentMethod = computed(() => {
@@ -133,7 +133,7 @@ export class BookingDetailComponent {
     return {
       id: e.applicationId,
       title: e.applicationTitle || this.i18n.translate('expenses.col.application'),
-      amount: loaded?.amount ? formatEur(Number(loaded.amount), this.i18n.locale()) : null,
+      amount: loaded?.amount ? formatMoney(loaded.amount, this.i18n.formatLocale()) : null,
       state: loaded?.state ?? null,
       stateKind: flowColorKind(loaded?.state?.color),
     };
@@ -185,7 +185,7 @@ export class BookingDetailComponent {
 
   protected readonly subSum = computed(() => {
     const e = this.expense();
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   });
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
@@ -231,15 +231,17 @@ export class BookingDetailComponent {
   }
 
   money(value: number | string): string {
-    return formatEur(Number(value), this.i18n.locale());
+    return formatMoney(value, this.i18n.formatLocale());
   }
 
   signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** "900,00 € von 2.890,00 € verbucht", the name of the bar. */

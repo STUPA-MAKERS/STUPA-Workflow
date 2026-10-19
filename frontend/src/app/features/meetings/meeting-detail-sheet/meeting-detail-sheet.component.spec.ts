@@ -88,7 +88,7 @@ describe('MeetingDetailSheetComponent', () => {
     // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
-    expect(screen.getByText('Do., 15.10.2026')).toHaveClass('ms__part');
+    expect(screen.getByText('Do, 15.10.2026')).toHaveClass('ms__part');
     expect(screen.getByRole('heading', { level: 2, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
     expect(screen.getByText('Live')).toHaveClass('st--accent');
     expect(screen.getByText('seit 18:04')).toBeInTheDocument();

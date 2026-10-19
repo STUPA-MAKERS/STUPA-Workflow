@@ -209,9 +209,9 @@ describe('BudgetPieComponent', () => {
     expect(c.sliceTransform(arc, 3)).toBe('none');
   });
 
-  it('money() formats integers as whole euros in the active locale', async () => {
-    const { c } = await setup();
-    const out = c.money(1234);
+  it('writes the total as whole euros in the active locale', async () => {
+    const view = await setup({ slices: [{ label: 'A', value: 1234, color: '#111', id: 'a' }] });
+    const out = view.container.querySelector('.pie__total')?.textContent ?? '';
     expect(out).toContain('1.234');
     expect(out).toContain('€');
     // maximumFractionDigits:0 → no decimal part.

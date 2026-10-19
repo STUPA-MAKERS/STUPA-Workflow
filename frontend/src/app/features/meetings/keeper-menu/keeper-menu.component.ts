@@ -15,6 +15,7 @@ import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { personLabel } from '@shared/person-label.util';
 
 /** One member of the picker. */
 interface Candidate {
@@ -89,7 +90,7 @@ export class KeeperMenuComponent {
           a.status ? `meetings.attendance.${a.status}` : 'meetings.attendance.unknown',
         );
         const sub = current ? `${state} · ${this.i18n.translate('meetings.keeper.keeps')}` : state;
-        return { principalId: a.principalId, name: a.displayName || a.email || '—', sub, current };
+        return { principalId: a.principalId, name: personLabel(a, this.i18n, { fallbackText: '—' }), sub, current };
       });
   });
 

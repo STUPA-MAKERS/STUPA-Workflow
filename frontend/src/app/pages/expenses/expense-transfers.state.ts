@@ -2,7 +2,7 @@ import { computed, inject, signal } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { BudgetTreeApi, type BudgetTransfer, type TransferUpdate } from '../budget/budget-tree.api';
-import { problemDetail } from '../budget/expense-display.util';
+import { problemDetail } from '@core/api/problem';
 import type { ExpensesListState } from './expenses-list.state';
 
 /**
@@ -56,7 +56,7 @@ export class ExpenseTransfersState {
   constructor(private readonly list: ExpensesListState) {}
 
   private failureText(err: unknown): string {
-    return problemDetail(err) ?? this.i18n.translate('expenses.toast.failed');
+    return problemDetail(err) || this.i18n.translate('expenses.toast.failed');
   }
 
   /** The cost-centre filter and the search of the bookings tab also narrow the

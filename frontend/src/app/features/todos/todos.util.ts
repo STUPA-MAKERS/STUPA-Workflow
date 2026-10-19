@@ -14,13 +14,12 @@ import type {
   TodoVoteResult,
   TodoVoteStatus,
 } from '@core/api/todos.service';
-import type { TranslationKey } from '@core/i18n/translations';
-import { formatMoney } from '@shared/decision/decision.util';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
+import { formatMoney } from '@shared/format-money';
+import { daysUntil, parseDay, shortDay, weekdayDate, weekdayName } from '@shared/date-format';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import type { IconName } from '@stupa-makers/ui-kit';
-
-/** A translate function: the key and its parameters. */
-export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+import { personName } from '@shared/person-label.util';
 
 /** The fixed label palette of the server, in the order of the settings dialog. */
 export const LABEL_COLORS: readonly TodoLabelColor[] = ['green', 'blue', 'violet', 'amber', 'red', 'gray'];
@@ -81,53 +80,6 @@ export const TICKET_STATUS_LABEL: Record<string, TranslationKey> = {
   rejected: 'tickets.status.rejected',
 };
 
-const DAY_MS = 86_400_000;
-
-/** The local calendar day of a moment as `YYYY-MM-DD`. */
-export function isoDay(at: Date): string {
-  const m = String(at.getMonth() + 1).padStart(2, '0');
-  const d = String(at.getDate()).padStart(2, '0');
-  return `${at.getFullYear()}-${m}-${d}`;
-}
-
-/** A `YYYY-MM-DD` day as a local date at noon (no DST edge), or null. */
-export function parseDay(day: string | null | undefined): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day ?? '');
-  if (!m) return null;
-  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12);
-}
-
-/** Calendar days from `today` to `day` (negative = past), or null for a bad day. */
-export function daysUntil(day: string, today: string): number | null {
-  const a = parseDay(today);
-  const b = parseDay(day);
-  if (!a || !b) return null;
-  return Math.round((b.getTime() - a.getTime()) / DAY_MS);
-}
-
-/** "14.10." in the current year, else "14.10.2027". */
-export function shortDay(day: string, today: string, locale: string): string {
-  const d = parseDay(day);
-  if (!d) return day;
-  const sameYear = day.slice(0, 4) === today.slice(0, 4);
-  const text = new Intl.DateTimeFormat(locale, {
-    day: '2-digit',
-    month: '2-digit',
-    ...(sameYear ? {} : { year: 'numeric' }),
-  }).format(d);
-  // de-DE writes "14.10" without the closing dot of a day without a year.
-  return sameYear && locale.startsWith('de') && !text.endsWith('.') ? `${text}.` : text;
-}
-
-/** "Di, 03.11.2026". */
-export function longDay(day: string, locale: string): string {
-  const d = parseDay(day);
-  if (!d) return day;
-  const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d).replace(/\.$/, '');
-  const date = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(d);
-  return `${weekday}, ${date}`;
-}
-
 /** The colour of a due date: overdue red, today and tomorrow amber. */
 export type DueTone = 'overdue' | 'soon' | 'normal';
 
@@ -144,7 +96,7 @@ export interface DueInfo {
  * done column has no note and no colour.
  */
 export function dueInfo(day: string, today: string, locale: string, t: Translate, done = false): DueInfo {
-  const date = shortDay(day, today, locale);
+  const date = shortDay(day, locale, today) || day;
   const n = daysUntil(day, today);
   if (done || n === null || n > 1) return { date, note: null, tone: 'normal' };
   if (n < 0) return { date, note: t('todos.due.overdue'), tone: 'overdue' };
@@ -159,11 +111,6 @@ export function relativeDays(day: string, today: string, t: Translate): string {
   if (n === 1) return t('todos.due.tomorrow');
   if (n === -1) return t('todos.due.yesterday');
   return n > 0 ? t('todos.due.inDays', { n }) : t('todos.due.daysAgo', { n: -n });
-}
-
-/** A person by name; a deleted one is "Gelöschte Person". */
-export function personName(ref: PersonRef | null | undefined, t: Translate): string {
-  return ref?.displayName || t('chat.deletedPerson');
 }
 
 /** The title of a link, or "<Kind> (kein Zugriff)". */
@@ -193,7 +140,7 @@ export function linkSub(
       if (d.stateLabel) parts.push(resolveI18n(d.stateLabel, lang));
       break;
     case 'meeting':
-      if (d.date) parts.push(longDay(d.date, locale));
+      if (d.date) parts.push(weekdayDate(d.date, locale));
       break;
     case 'agenda_item':
       if (d.meetingTitle) parts.push(d.meetingTitle);
@@ -211,7 +158,7 @@ export function linkSub(
       if (d.number && !title.startsWith(d.number)) parts.push(d.number);
       if (d.counterparty && d.counterparty !== title) parts.push(d.counterparty);
       if (d.amount) parts.push(formatMoney(d.amount, locale));
-      else if (d.date) parts.push(longDay(d.date, locale));
+      else if (d.date) parts.push(weekdayDate(d.date, locale));
       break;
     case 'expense':
       if (d.costCentre) parts.push(d.costCentre);
@@ -241,10 +188,7 @@ export function linkLine(link: TodoLink, today: string, locale: string, t: Trans
   }
   if ((link.kind === 'meeting' || link.kind === 'agenda_item') && link.detail?.date) {
     const d = parseDay(link.detail.date);
-    if (d) {
-      const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d).replace(/\.$/, '');
-      parts.push(`${weekday}, ${shortDay(link.detail.date, today, locale)}`);
-    }
+    if (d) parts.push(`${weekdayName(d, locale)}, ${shortDay(d, locale, today)}`);
   }
   return parts.join(' · ');
 }
@@ -272,7 +216,7 @@ export function eventText(event: TodoEvent, locale: string, t: Translate): strin
     case 'due': {
       const to = str(p['to']);
       return to
-        ? t('todos.event.due', { actor, date: longDay(to, locale) })
+        ? t('todos.event.due', { actor, date: weekdayDate(to, locale) })
         : t('todos.event.dueCleared', { actor });
     }
     case 'linked':

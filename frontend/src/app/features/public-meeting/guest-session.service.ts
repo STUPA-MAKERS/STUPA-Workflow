@@ -2,6 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, type OnDestroy, computed, inject, signal } from '@angular/core';
 import { ApiClient } from '@core/api/api-client.service';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { problemCode } from '@core/api/problem';
 import type { GuestMe, PublicMeetingHead } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
 import type { ServerMessage } from '@core/ws/ws-messages';
@@ -30,13 +31,6 @@ export const GUEST_REFRESH_MS = 300;
 /** The guest channel reconnects after this delay times the attempt (ms). */
 const RECONNECT_MS = 2000;
 const MAX_ATTEMPTS = 5;
-
-/** The problem code of an HTTP error, or an empty string. */
-function codeOf(err: unknown): string {
-  if (!(err instanceof HttpErrorResponse)) return '';
-  const body = err.error as { code?: unknown } | null;
-  return typeof body?.code === 'string' ? body.code : '';
-}
 
 /**
  * The join page of a public meeting (`/j/:code`, #17): the head of the meeting, the own
@@ -106,7 +100,7 @@ export class GuestSessionService implements OnDestroy {
         // The head answers 404 `join_code_unknown` also for a closed meeting and a
         // meeting without public participation (no probing). A device with a request
         // still learns from `/me` that the meeting is no longer public.
-        if (codeOf(err) === 'join_code_unknown') {
+        if (problemCode(err) === 'join_code_unknown') {
           this.api.guestMe(code).subscribe({
             next: (me) => {
               this.adopt(me);
@@ -114,7 +108,7 @@ export class GuestSessionService implements OnDestroy {
             },
             error: (meErr: unknown) => {
               this.loading.set(false);
-              this.fail(codeOf(meErr) === 'meeting_not_public' ? meErr : err);
+              this.fail(problemCode(meErr) === 'meeting_not_public' ? meErr : err);
             },
           });
           return;
@@ -136,7 +130,7 @@ export class GuestSessionService implements OnDestroy {
       error: (err: unknown) => {
         this.loading.set(false);
         const status = err instanceof HttpErrorResponse ? err.status : 0;
-        const c = codeOf(err);
+        const c = problemCode(err);
         if (status === 401 || c === 'guest_not_found' || c === 'guest_token_missing') {
           this.me.set(null);
           this.disconnect();
@@ -168,7 +162,7 @@ export class GuestSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.joining.set(false);
-        const c = codeOf(err);
+        const c = problemCode(err);
         if (c === 'already_admitted' || c === 'retry_later') {
           this.refresh();
           return;
@@ -232,7 +226,7 @@ export class GuestSessionService implements OnDestroy {
   }
 
   private fail(err: unknown): void {
-    const c = codeOf(err);
+    const c = problemCode(err);
     if (c === 'join_code_unknown' || (err instanceof HttpErrorResponse && err.status === 404 && !c)) {
       this.failure.set('unknown');
     } else if (c === 'meeting_not_public') {

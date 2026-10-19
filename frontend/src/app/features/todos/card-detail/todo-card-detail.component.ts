@@ -34,7 +34,7 @@ import {
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
@@ -73,16 +73,14 @@ import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfe
 import {
   LINK_ICON,
   eventText,
-  isoDay,
   linkSub,
   linkTitle,
-  longDay,
-  personName,
   relativeDays,
   splitUrl,
-  type Translate,
 } from '../todos.util';
 import { copyToClipboard } from '@shared/clipboard';
+import { isoDay, weekdayDate } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 type CardTab = 'details' | 'activity';
 
@@ -315,8 +313,7 @@ export class TodoCardDetailComponent {
   readonly createdParts = computed<string[]>(() => {
     const c = this.card();
     if (!c) return [];
-    const d = new Date(c.createdAt);
-    const day = Number.isNaN(d.getTime()) ? '' : longDay(isoDay(d), this.i18n.formatLocale());
+    const day = weekdayDate(c.createdAt, this.i18n.formatLocale());
     const by = this.t('todos.card.createdBy', { name: personName(c.createdBy, this.t) });
     return day ? [by, day] : [by];
   });
@@ -324,8 +321,7 @@ export class TodoCardDetailComponent {
   readonly archivedLine = computed(() => {
     const at = this.card()?.archivedAt;
     if (!at) return null;
-    const d = new Date(at);
-    return Number.isNaN(d.getTime()) ? null : longDay(isoDay(d), this.i18n.formatLocale());
+    return weekdayDate(at, this.i18n.formatLocale()) || null;
   });
 
   readonly canWrite = computed(() => {

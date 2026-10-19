@@ -16,6 +16,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
 import { type Observable, from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
+import { problemDetail } from '@core/api/problem';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Application, Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
@@ -68,10 +69,6 @@ import {
   costCentreIndex,
   costCentreLabel,
   findTopBudgetNode,
-  formatEur,
-  monthGroups,
-  problemDetail,
-  shortDate,
   signedEur,
 } from '../budget/expense-display.util';
 import { BookingDetailComponent } from './booking-detail/booking-detail.component';
@@ -87,6 +84,9 @@ import { TransferFormComponent } from './transfer-form/transfer-form.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { CostCentreLabelComponent } from '../budget/cost-centre-label/cost-centre-label.component';
+import { dayMonth } from '@shared/date-format';
+import { groupByMonth } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 
@@ -473,11 +473,18 @@ export class ExpensesComponent implements OnDestroy {
         : field === 'createdAt'
           ? e.createdAt
           : (e.paymentDate ?? e.createdAt);
-    return monthGroups(this.items(), date, this.i18n.locale(), field !== 'amount');
+    // Sorted by amount, the months would interleave: one group without a heading.
+    if (field === 'amount') {
+      const items = this.items();
+      return items.length ? [{ key: 'all', label: '', items: [...items] }] : [];
+    }
+    return groupByMonth(this.items(), date, this.i18n.formatLocale(), { utc: true });
   });
 
   readonly transferGroups = computed(() =>
-    monthGroups(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.locale()),
+    groupByMonth(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.formatLocale(), {
+      utc: true,
+    }),
   );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -760,15 +767,17 @@ export class ExpensesComponent implements OnDestroy {
 
   // --- formatting ------------------------------------------------------------------
   money(amount: string): string {
-    return formatEur(Number(amount), this.i18n.locale());
+    return formatMoney(amount, this.i18n.formatLocale());
   }
 
   signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   costCentre(id: string, pathKey: string | null): CostCentreLabel {
@@ -1044,7 +1053,7 @@ export class ExpensesComponent implements OnDestroy {
       },
       error: (err) => {
         this.bulkBusy.set(false);
-        this.toast.error(problemDetail(err) ?? this.i18n.translate('expenses.toast.failed'));
+        this.toast.error(problemDetail(err) || this.i18n.translate('expenses.toast.failed'));
       },
     });
   }

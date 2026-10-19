@@ -49,6 +49,7 @@ import {
 } from './revoke-selection';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
 export interface RevokeLine {
@@ -218,7 +219,7 @@ export class UserRevokeComponent {
   }
 
   protected name(p: { displayName?: string | null; email?: string | null } | null): string {
-    return p?.displayName || p?.email || this.i18n.translate('admin.users.merge.unnamed');
+    return personLabel(p, this.i18n, { fallback: 'admin.users.merge.unnamed' });
   }
 
   /** "vor 8 Monaten", "vor 12 Tagen", "heute". */

@@ -34,7 +34,6 @@ import {
   type CostCentreLabel,
   costCentreLabel,
   costCentreTrail,
-  formatEur,
   signedEur,
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -43,6 +42,7 @@ import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.compo
 import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { formatMoney } from '@shared/format-money';
 
 /** Which booking the form writes: a new one, or the one in `state.editing`. */
 export type BookingFormMode = 'create' | 'edit';
@@ -149,7 +149,7 @@ export class BookingFormComponent {
   /** A parent booking: its amount is the sum of its sub-bookings and read-only. */
   protected readonly parentAmount = computed(() => {
     const e = this.editingRow();
-    return e && (e.childCount ?? 0) > 0 ? formatEur(Number(e.amount), this.i18n.locale()) : null;
+    return e && (e.childCount ?? 0) > 0 ? formatMoney(e.amount, this.i18n.formatLocale()) : null;
   });
 
   /** Only a standalone booking moves to another cost centre. A bound booking and a
@@ -228,7 +228,7 @@ export class BookingFormComponent {
   }
 
   protected signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   close(): void {

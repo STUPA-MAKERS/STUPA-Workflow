@@ -14,8 +14,8 @@ import {
   type DecisionDraft,
   draftError,
   formatDiff,
-  formatMoney,
 } from './decision.util';
+import { formatMoney } from '../format-money';
 
 /**
  * The decision proposal (F1, approval with deviations): a switch, and when it is on the
@@ -49,7 +49,7 @@ export class DecisionEditorComponent {
   /** "Beantragt: 1.250,00 € · Abweichung −350,00 €". */
   readonly amountHint = computed(() => {
     const locale = this.i18n.formatLocale();
-    const requested = formatMoney(this.requested(), locale, this.currency());
+    const requested = formatMoney(this.requested(), locale, { currency: this.currency() });
     if (!requested) return '';
     const diff = formatDiff(this.requested(), this.draft().amount, locale, this.currency());
     return diff

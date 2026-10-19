@@ -14,6 +14,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
+import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -60,7 +61,7 @@ import {
   type InvoiceSegmentCounts,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
-import { costCentreIndex, formatEur, monthGroups, shortDate } from '../budget/expense-display.util';
+import { costCentreIndex } from '../budget/expense-display.util';
 import { InvoiceDetailComponent } from './invoice-detail/invoice-detail.component';
 import {
   type InvoiceFormHost,
@@ -70,6 +71,9 @@ import {
 import { debounced } from '@shared/debounced';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { dayMonth } from '@shared/date-format';
+import { groupByMonth } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 
@@ -269,7 +273,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
   /** The rows by the month of their invoice date. */
   readonly groups = computed(() =>
-    monthGroups(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.locale()),
+    groupByMonth(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.formatLocale(), {
+      utc: true,
+    }),
   );
 
   readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
@@ -518,11 +524,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   }
 
   money(amount: string): string {
-    return formatEur(Number(amount), this.i18n.locale());
+    return formatMoney(amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** The title of a row: the supplier, else the number. */
@@ -679,7 +687,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
           this.importNotice.set('manual');
           this.attachFile(file);
         } else {
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         }
       },
     });
@@ -722,7 +730,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       },
       error: (err) => {
         this.attaching.set(false);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.failureText(err));
       },
     });
   }
@@ -804,7 +812,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         },
       });
   }
@@ -851,7 +859,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         },
       });
   }
@@ -870,7 +878,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       },
       error: (err) => {
         this.markingPaid.set(null);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.failureText(err));
       },
     });
   }
@@ -960,8 +968,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     return this.i18n.translate('invoices.rowMenu', { number: i.number || i.supplier || '' });
   }
 
-  private problemDetail(err: unknown): string {
-    const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
-    return detail || this.i18n.translate('invoices.toast.failed');
+  private failureText(err: unknown): string {
+    return problemDetail(err) || this.i18n.translate('invoices.toast.failed');
   }
 }

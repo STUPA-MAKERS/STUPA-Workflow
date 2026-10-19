@@ -47,11 +47,12 @@ import { type DockPanel, SessionDockComponent } from '../session-dock/session-do
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, votesInText } from '../meetings.util';
-import { clockTime, voteOptionLabel } from '../meetings-display.util';
+import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
 type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'delete';
@@ -241,15 +242,15 @@ export class MeetingPageComponent {
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
     const m = this.meeting();
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const parts: string[] = [];
     if (m.gremiumName) parts.push(m.gremiumName);
     if (m.date) parts.push(this.dateText(m.date));
-    const started = clockTime(m.startedAt, locale);
+    const started = clock(m.startedAt, locale);
     if (m.status === 'live' && started) {
       parts.push(this.i18n.translate('meetings.page.since', { time: started }));
     } else if (m.status === 'closed' && started) {
-      const closed = clockTime(m.closedAt, locale);
+      const closed = clock(m.closedAt, locale);
       parts.push(closed ? `${started}–${closed}` : started);
     } else if (m.startTime) {
       parts.push(m.startTime.slice(0, 5));
@@ -480,13 +481,6 @@ export class MeetingPageComponent {
 
   /** "Di, 29.09.2026" in the language of the page. */
   private dateText(isoDate: string): string {
-    const date = new Date(`${isoDate}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return isoDate;
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
+    return weekdayDate(isoDate, this.i18n.formatLocale()) || isoDate;
   }
 }
