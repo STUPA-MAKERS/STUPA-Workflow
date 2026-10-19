@@ -697,8 +697,8 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  // Inline preview
-  it('offers a preview only for clean images/PDFs and opens the PDF in an iframe dialog', async () => {
+  // Preview in the full-screen kit viewer
+  it('offers a preview only for clean images/PDFs and opens the PDF in the viewer', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
     http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
@@ -709,6 +709,7 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.canPreview({ ...cmp.attachments()[0] })).toBe(true);
     expect(cmp.canPreview({ ...cmp.attachments()[0], scanState: 'scanning' })).toBe(false);
     expect(cmp.canPreview({ ...cmp.attachments()[0], mime: 'application/zip' })).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
 
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
     const req = http.expectOne(dlUrl('att-1'));
@@ -716,23 +717,25 @@ describe('AttachmentsPanelComponent', () => {
     req.flush({ url: '/api/attachments/att-1/download?sig=ok', expiresIn: 120 });
     detectChanges();
 
-    expect(cmp.previewing()?.id).toBe('att-1');
-    expect(cmp.previewIsImage()).toBe(false);
-    expect(cmp.previewFrameUrl()).not.toBeNull();
+    expect(cmp.viewerOpen()).toBe(true);
+    const viewer = screen.getByRole('dialog', { name: 'plan.pdf' });
     // The `inline=1` flag keeps Content-Disposition inline. The file then renders
     // instead of downloading.
-    expect(cmp.previewUrl()).toBe('/api/attachments/att-1/download?sig=ok&inline=1');
-    expect(document.querySelector('iframe[title="plan.pdf"]')).not.toBeNull();
+    const frame = viewer.querySelector('iframe[title="plan.pdf"]');
+    expect(frame?.getAttribute('src')).toBe('/api/attachments/att-1/download?sig=ok&inline=1');
+    // One file: no arrows.
+    expect(within(viewer).queryByRole('button', { name: 'Nächste Datei' })).toBeNull();
 
-    cmp.closePreview();
+    await userEvent.click(within(viewer).getByRole('button', { name: 'Vorschau schließen' }));
     detectChanges();
-    expect(cmp.previewing()).toBeNull();
-    expect(cmp.previewFrameUrl()).toBeNull();
+    expect(cmp.viewerOpen()).toBe(false);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(cmp.viewerItems()[0].url).toBe('');
     http.verify();
   });
 
   it('previews a clean image as <img> (no iframe)', async () => {
-    const { http, detectChanges, fixture } = await setup();
+    const { http, detectChanges } = await setup();
     await uploadFile('foto.png');
     http
       .expectOne(uploadUrl)
@@ -746,17 +749,112 @@ describe('AttachmentsPanelComponent', () => {
     http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
     detectChanges();
 
-    expect(fixture.componentInstance.previewIsImage()).toBe(true);
-    expect(screen.getByAltText('foto.png')).toBeInTheDocument();
+    const viewer = screen.getByRole('dialog', { name: 'foto.png' });
+    expect(within(viewer).getByAltText('foto.png')).toHaveAttribute(
+      'src',
+      '/api/attachments/att-9/download?inline=1',
+    );
+    expect(viewer.querySelector('iframe')).toBeNull();
     http.verify();
   });
 
-  it('opens PDFs in the system viewer on coarse-pointer devices (no dialog)', async () => {
+  it('steps through the previewable files, fetching each URL when the viewer reaches it', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
     http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
-    detectChanges();
     const cmp = fixture.componentInstance;
+    const pdfAtt = cmp.attachments()[0];
+    cmp.attachments.set([
+      pdfAtt,
+      { ...pdfAtt, id: 'att-2', filename: 'liste.zip', mime: 'application/zip' },
+      { ...pdfAtt, id: 'att-3', filename: 'neu.png', mime: 'image/png', scanState: 'scanning' },
+      { ...pdfAtt, id: 'att-9', filename: 'foto.png', mime: 'image/png' },
+    ]);
+    detectChanges();
+    const open = jest
+      .spyOn(cmp as unknown as { openUrl: (u: string) => void }, 'openUrl')
+      .mockImplementation(() => {});
+
+    await userEvent.click(screen.getAllByRole('button', { name: 'Vorschau' })[1]);
+    http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
+    detectChanges();
+    // Only the clean image and the clean PDF are in the viewer, in the order of the list.
+    expect(cmp.viewerItems().map((i) => i.name)).toEqual(['plan.pdf', 'foto.png']);
+    const viewer = screen.getByRole('dialog', { name: 'foto.png' });
+    expect(within(viewer).getByRole('button', { name: 'Nächste Datei' })).toBeDisabled();
+
+    await userEvent.click(within(viewer).getByRole('button', { name: 'Vorherige Datei' }));
+    detectChanges();
+    expect(screen.getByRole('dialog', { name: 'plan.pdf' })).toBeInTheDocument();
+    // Until the URL arrives the viewer shows the loading state and no frame.
+    expect(viewer.querySelector('iframe')).toBeNull();
+    expect(within(viewer).getByRole('status')).toBeInTheDocument();
+    const req = http.expectOne(dlUrl('att-1'));
+    // A second visit before the answer sends no second request.
+    cmp.onViewerIndex(0);
+    req.flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
+    detectChanges();
+    expect(viewer.querySelector('iframe')?.getAttribute('src')).toBe(
+      '/api/attachments/att-1/download?inline=1',
+    );
+    // Back to the image: its URL is known, so no request.
+    cmp.onViewerIndex(1);
+    detectChanges();
+
+    // The bar downloads the file it shows.
+    await userEvent.click(within(viewer).getByRole('button', { name: 'Herunterladen' }));
+    http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
+    expect(open).toHaveBeenCalledWith('/api/attachments/att-9/download');
+    http.verify();
+  });
+
+  it('closes the viewer with the toast when the URL of the next file fails (409 quarantines it)', async () => {
+    const { http, detectChanges, fixture, toast } = await setup();
+    const error = jest.spyOn(toast, 'error');
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    const cmp = fixture.componentInstance;
+    const pdfAtt = cmp.attachments()[0];
+    cmp.attachments.set([pdfAtt, { ...pdfAtt, id: 'att-9', filename: 'foto.png', mime: 'image/png' }]);
+    detectChanges();
+
+    cmp.openPreview(pdfAtt);
+    http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
+    detectChanges();
+    cmp.onViewerIndex(1);
+    http.expectOne(dlUrl('att-9')).flush({}, { status: 409, statusText: 'Conflict' });
+    detectChanges();
+    expect(cmp.viewerOpen()).toBe(false);
+    expect(cmp.attachments()[1].scanState).toBe('quarantined');
+    expect(error).toHaveBeenCalledTimes(1);
+
+    // A late answer after the viewer closed changes nothing.
+    cmp.openPreview(pdfAtt);
+    http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
+    cmp.attachments.update((list) => [...list, { ...pdfAtt, id: 'att-5', filename: 'b.png', mime: 'image/png' }]);
+    cmp.onViewerIndex(1);
+    const late = http.expectOne(dlUrl('att-5'));
+    cmp.closePreview();
+    late.flush({}, { status: 410, statusText: 'Gone' });
+    expect(error).toHaveBeenCalledTimes(1);
+    cmp.openPreview(pdfAtt);
+    http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
+    cmp.onViewerIndex(1);
+    const ok = http.expectOne(dlUrl('att-5'));
+    cmp.closePreview();
+    ok.flush({ url: '/api/attachments/att-5/download', expiresIn: 120 });
+    expect(cmp.viewerItems().every((i) => i.url === '')).toBe(true);
+    http.verify();
+  });
+
+  it('opens PDFs in the system viewer on coarse-pointer devices (images only in the viewer)', async () => {
+    const { http, detectChanges, fixture } = await setup();
+    await uploadFile();
+    http.expectOne(uploadUrl).flush(wire({ scanned: true }), { status: 201, statusText: 'Created' });
+    const cmp = fixture.componentInstance;
+    const pdfAtt = cmp.attachments()[0];
+    cmp.attachments.set([pdfAtt, { ...pdfAtt, id: 'att-9', filename: 'foto.png', mime: 'image/png' }]);
+    detectChanges();
     jest
       .spyOn(cmp as unknown as { coarsePointer: () => boolean }, 'coarsePointer')
       .mockReturnValue(true);
@@ -764,11 +862,17 @@ describe('AttachmentsPanelComponent', () => {
       .spyOn(cmp as unknown as { openUrl: (u: string) => void }, 'openUrl')
       .mockImplementation(() => {});
 
-    cmp.openPreview(cmp.attachments()[0]);
+    cmp.openPreview(pdfAtt);
     http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
 
     expect(open).toHaveBeenCalledWith('/api/attachments/att-1/download?inline=1');
-    expect(cmp.previewing()).toBeNull(); // system viewer instead of the dialog
+    expect(cmp.viewerOpen()).toBe(false); // system viewer instead of the viewer
+
+    cmp.openPreview(cmp.attachments()[1]);
+    http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
+    detectChanges();
+    expect(cmp.viewerOpen()).toBe(true);
+    expect(cmp.viewerItems().map((i) => i.name)).toEqual(['foto.png']);
     http.verify();
   });
 
@@ -783,7 +887,7 @@ describe('AttachmentsPanelComponent', () => {
     cmp.openPreview(cmp.attachments()[0]);
     http.expectOne(dlUrl('att-1')).flush({}, { status: 409, statusText: 'Conflict' });
     expect(cmp.attachments()[0].scanState).toBe('quarantined');
-    expect(cmp.previewing()).toBeNull();
+    expect(cmp.viewerOpen()).toBe(false);
     expect(error).toHaveBeenCalledTimes(1);
 
     // The 410 path and the generic error path reuse the attachment object directly.
@@ -793,6 +897,10 @@ describe('AttachmentsPanelComponent', () => {
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     http.expectOne(dlUrl('att-1')).flush({}, { status: 500, statusText: 'Err' });
     expect(error).toHaveBeenCalledTimes(3);
+    // A file that left the list while its request ran opens no viewer.
+    cmp.openPreview({ ...cmp.attachments()[0], id: 'gone', scanState: 'clean' });
+    http.expectOne(dlUrl('gone')).flush({ url: '/api/attachments/gone/download', expiresIn: 120 });
+    expect(cmp.viewerOpen()).toBe(false);
     // Guard: openPreview ignores further calls while a preview request is in flight.
     cmp.previewLoadingId.set('att-1');
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });

@@ -326,6 +326,21 @@
   }
 </app-side-sheet>
 
+<app-file-viewer [items]="viewerItems()" [(index)]="viewerIndex" [(open)]="viewerOpen">
+  @if (viewerFile(); as file) {
+    <a
+      viewerActions
+      class="fv__btn"
+      [href]="file.url"
+      download
+      [attr.aria-label]="'chat.download' | t"
+      [title]="'chat.download' | t"
+    >
+      <app-icon name="download" [size]="20" />
+    </a>
+  }
+</app-file-viewer>
+
 <!-- The files of a message: under the bubble, and read-only under its edit (files stay as sent). -->
 <ng-template #msgFiles let-m>
   @if (m.attachments?.length) {
@@ -333,11 +348,23 @@
       @for (f of m.attachments; track f.id) {
         <li>
           @if (isLink(f) && isImage(f)) {
-            <a class="chat__thumb" [href]="inline(f.url)" target="_blank" rel="noopener">
+            <a
+              class="chat__thumb"
+              [href]="inline(f.url)"
+              target="_blank"
+              rel="noopener"
+              (click)="openViewer($event, m, f)"
+            >
               <app-image-thumb [src]="inline(f.url)" [alt]="f.filename" />
             </a>
           } @else if (isLink(f)) {
-            <a class="chat__file" [href]="f.url" target="_blank" rel="noopener">
+            <a
+              class="chat__file"
+              [href]="f.url"
+              target="_blank"
+              rel="noopener"
+              (click)="openViewer($event, m, f)"
+            >
               <span class="chat__fileIcon" aria-hidden="true">
                 <app-icon [name]="f.mime.startsWith('image/') ? 'image' : 'file'" [size]="17" />
               </span>
