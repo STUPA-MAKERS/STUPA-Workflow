@@ -873,6 +873,7 @@ export const de = {
   'chat.deleteConfirm': 'Die Nachricht wird gelöscht. Das lässt sich nicht rückgängig machen.',
   'chat.ownMessage': 'Deine Nachricht · {time}',
   'chat.attach': 'Datei anhängen',
+  'chat.drop': 'Dateien zum Anhängen ablegen',
   'chat.removeFile': '{name} entfernen',
   'chat.uploading': 'wird hochgeladen …',
   'chat.pastedImage': 'Bild',

@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -637,88 +637,19 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  // Drag and drop
-  function dragEvent(types: string[], files: File[] = []): DragEvent {
-    return {
-      preventDefault: jest.fn(),
-      dataTransfer: { types, files },
-    } as unknown as DragEvent;
-  }
+  // Drag and drop (the counting of `appFileDrop` has its own spec)
+  const pdf = () => new File(['x'], 'drop.pdf', { type: 'application/pdf' });
+  const panel = (container: Element) => container.querySelector('.att') as HTMLElement;
 
-  it('activates the drop overlay on dragenter with files and hides it on leave', async () => {
-    const { detectChanges, fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    const enter = dragEvent(['Files']);
-    cmp.onDragEnter(enter);
-    expect(enter.preventDefault).toHaveBeenCalled();
-    expect(cmp.dragActive()).toBe(true);
+  it('shows the overlay while files hover and uploads a drop', async () => {
+    const { http, detectChanges, container } = await setup();
+    fireEvent.dragEnter(panel(container), { dataTransfer: { types: ['Files'] } });
     detectChanges();
     expect(screen.getByText('Dateien zum Hochladen ablegen')).toBeInTheDocument();
 
-    const over = dragEvent(['Files']);
-    cmp.onDragOver(over);
-    expect(over.preventDefault).toHaveBeenCalled();
-
-    const leave = dragEvent(['Files']);
-    cmp.onDragLeave(leave);
-    expect(cmp.dragActive()).toBe(false);
-  });
-
-  it('counts nested enter/leave so the overlay does not flicker', async () => {
-    const { fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    cmp.onDragEnter(dragEvent(['Files'])); // depth 1
-    cmp.onDragEnter(dragEvent(['Files'])); // depth 2
-    expect(cmp.dragActive()).toBe(true);
-    cmp.onDragLeave(dragEvent(['Files'])); // depth 1 → still active
-    expect(cmp.dragActive()).toBe(true);
-    cmp.onDragLeave(dragEvent(['Files'])); // depth 0 → inactive
-    expect(cmp.dragActive()).toBe(false);
-  });
-
-  it('ignores drag events without upload permission or without files', async () => {
-    const { fixture } = await setup(false);
-    const cmp = fixture.componentInstance;
-    const noPerm = dragEvent(['Files']);
-    cmp.onDragEnter(noPerm);
-    expect(noPerm.preventDefault).not.toHaveBeenCalled();
-    expect(cmp.dragActive()).toBe(false);
-    cmp.onDragOver(noPerm);
-    expect(noPerm.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it('ignores dragenter/over when the payload carries no files', async () => {
-    const { fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    const noFiles = dragEvent(['text/plain']);
-    cmp.onDragEnter(noFiles);
-    expect(cmp.dragActive()).toBe(false);
-    expect(noFiles.preventDefault).not.toHaveBeenCalled();
-    cmp.onDragOver(noFiles);
-    expect(noFiles.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it('ignores dragleave when no drag is active', async () => {
-    const { fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    const leave = dragEvent(['Files']);
-    cmp.onDragLeave(leave);
-    expect(leave.preventDefault).not.toHaveBeenCalled();
-    expect(cmp.dragActive()).toBe(false);
-  });
-
-  it('uploads files dropped onto the panel (active drop)', async () => {
-    const { http, detectChanges, fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    cmp.onDragEnter(dragEvent(['Files']));
-    expect(cmp.dragActive()).toBe(true);
-
-    const dropped = new File(['x'], 'drop.pdf', { type: 'application/pdf' });
-    const drop = dragEvent(['Files'], [dropped]);
-    cmp.onDrop(drop);
-    expect(drop.preventDefault).toHaveBeenCalled();
-    expect(cmp.dragActive()).toBe(false);
-
+    fireEvent.drop(panel(container), { dataTransfer: { types: ['Files'], files: [pdf()] } });
+    detectChanges();
+    expect(screen.queryByText('Dateien zum Hochladen ablegen')).not.toBeInTheDocument();
     http.expectOne(uploadUrl).flush(wire({ id: 'd', filename: 'drop.pdf' }), {
       status: 201,
       statusText: 'Created',
@@ -728,38 +659,38 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  it('ignores a drop without upload permission', async () => {
+  it('takes no drop without upload permission', async () => {
+    const { http, detectChanges, container } = await setup(false);
+    const enter = fireEvent.dragEnter(panel(container), { dataTransfer: { types: ['Files'] } });
+    expect(enter).toBe(true); // not prevented: the page keeps the drag
+    detectChanges();
+    expect(screen.queryByText('Dateien zum Hochladen ablegen')).not.toBeInTheDocument();
+    fireEvent.drop(panel(container), { dataTransfer: { types: ['Files'], files: [pdf()] } });
+    http.verify();
+  });
+
+  it('leaves the drop to the page without its own target, and uploads what the page hands it', async () => {
+    const { http, detectChanges, container, fixture, rerender } = await setup();
+    await rerender({
+      inputs: { applicationId: APP_ID, canUpload: true, dropTarget: false },
+      partialUpdate: true,
+    });
+    const enter = fireEvent.dragEnter(panel(container), { dataTransfer: { types: ['Files'] } });
+    expect(enter).toBe(true);
+    detectChanges();
+    expect(screen.queryByText('Dateien zum Hochladen ablegen')).not.toBeInTheDocument();
+
+    fixture.componentInstance.upload([pdf()]);
+    http.expectOne(uploadUrl).flush(wire({ id: 'd', filename: 'drop.pdf' }), {
+      status: 201,
+      statusText: 'Created',
+    });
+    http.verify();
+  });
+
+  it('uploads nothing that a page hands it without upload permission', async () => {
     const { http, fixture } = await setup(false);
-    const cmp = fixture.componentInstance;
-    const drop = dragEvent(['Files'], [new File(['x'], 'd.pdf', { type: 'application/pdf' })]);
-    cmp.onDrop(drop);
-    expect(drop.preventDefault).not.toHaveBeenCalled();
-    http.verify();
-  });
-
-  it('resets the drop overlay even when no files are dropped', async () => {
-    const { http, fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    cmp.onDragEnter(dragEvent(['Files']));
-    const drop = dragEvent(['Files'], []);
-    cmp.onDrop(drop);
-    expect(drop.preventDefault).toHaveBeenCalled();
-    expect(cmp.dragActive()).toBe(false);
-    http.verify();
-  });
-
-  it('handles a drop / dragenter with no dataTransfer (?? [] fallback)', async () => {
-    const { http, fixture } = await setup();
-    const cmp = fixture.componentInstance;
-    const noDt = { preventDefault: jest.fn(), dataTransfer: null } as unknown as DragEvent;
-    // hasFiles gets the `types ?? []` fallback, so dragenter returns before
-    // preventDefault.
-    cmp.onDragEnter(noDt);
-    expect(cmp.dragActive()).toBe(false);
-    // onDrop reaches the `files ?? []` fallback, gets nothing and uploads nothing.
-    cmp.onDrop(noDt);
-    expect(noDt.preventDefault).toHaveBeenCalled();
-    expect(cmp.dragActive()).toBe(false);
+    fixture.componentInstance.upload([pdf()]);
     http.verify();
   });
 

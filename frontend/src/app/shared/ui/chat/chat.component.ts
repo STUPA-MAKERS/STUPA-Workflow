@@ -33,9 +33,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { markdownToSafeHtml } from '@shared/markdown/markdown.util';
+import { FileDragTracker, isFileDrag } from '@shared/file-drop.directive';
 import { PressSelectDirective } from '@shared/press-select.directive';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
+import { DropOverlayComponent } from '../drop-overlay/drop-overlay.component';
 import { ImageThumbComponent, inlineUrl, isThumbImage } from '../image-thumb/image-thumb.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 import { SkeletonComponent } from '../skeleton/skeleton.component';
@@ -106,11 +108,6 @@ function pad(n: number): string {
   return String(n).padStart(2, '0');
 }
 
-/** A drag that carries files from the desktop, not a text selection. */
-function isFileDrag(event: DragEvent): boolean {
-  return Array.from(event.dataTransfer?.types ?? []).includes('Files');
-}
-
 /** The body of a message as safe HTML: escaped Markdown, bare URLs as links, marked mentions. */
 @Pipe({ name: 'chatBody', standalone: true })
 export class ChatBodyPipe implements PipeTransform {
@@ -161,7 +158,8 @@ function writeStore(key: string, value: string | null): void {
  *   composer) and "Verwerfen".
  * - Own messages: edit and delete on hover or focus (desktop), a long press opens a
  *   bottom sheet (phone).
- * - Files (`canAttach`): the paperclip, a pasted image and a dropped file upload drafts through
+ * - Files (`canAttach`): the paperclip, a pasted image and a file dropped anywhere on the chat
+ *   (the log or the composer, with an overlay while it hovers) upload drafts through
  *   `POST /apply/attachments` (its own `DraftAttachmentsService`, never kept in
  *   `sessionStorage`). Up to 5 per message, each under the limit of the site config.
  *   The chips show the upload and the scan state and can leave before the send; the
@@ -180,6 +178,7 @@ function writeStore(key: string, value: string | null): void {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ConfirmDialogComponent,
+    DropOverlayComponent,
     EmptyStateComponent,
     AvatarComponent,
     ButtonComponent,
@@ -201,7 +200,13 @@ function writeStore(key: string, value: string | null): void {
       useFactory: () => inject(ChatDrafts, { optional: true })?.claim() ?? new DraftAttachmentsService(),
     },
   ],
-  host: { '[class.chat--phone]': 'phone()' },
+  host: {
+    '[class.chat--phone]': 'phone()',
+    '(dragenter)': 'fileDrag.enter($event)',
+    '(dragover)': 'fileDrag.over($event)',
+    '(dragleave)': 'fileDrag.leave($event)',
+    '(drop)': 'onDrop($event)',
+  },
   templateUrl: './chat.component.html',
   styleUrl: './chat.component.scss',
 })
@@ -641,24 +646,30 @@ export class ChatComponent {
     void this.addFiles(files.map((f) => this.named(f)));
   }
 
+  /** The chat takes dropped files: the whole chat, log and composer, is the drop target. */
+  protected readonly takesFiles = computed(() => this.canPost() && this.canAttach());
+  protected readonly fileDrag = new FileDragTracker(() => this.takesFiles());
+
   /**
-   * A file dragged onto the composer: without a handler the browser opens the file in
-   * the tab, the app unloads and the outbox is lost. A file drag is therefore always
-   * taken, and its files upload only when the chat takes files (`addFiles` applies the
-   * count and the size). A text drag stays with the textarea.
+   * A file dragged onto a composer that takes no files: without a handler the browser opens
+   * the file in the tab, the app unloads and the outbox is lost. A text drag stays with the
+   * textarea. A chat that takes files handles the drag on its host (`fileDrag`).
    */
-  protected onDragOver(event: DragEvent): void {
-    if (!isFileDrag(event)) return;
+  protected onComposerDragOver(event: DragEvent): void {
+    if (!isFileDrag(event) || this.takesFiles()) return;
     event.preventDefault();
-    if (event.dataTransfer) event.dataTransfer.dropEffect = this.canAttach() && !this.full() ? 'copy' : 'none';
+    (event.dataTransfer as DataTransfer).dropEffect = 'none';
   }
 
-  protected onDrop(event: DragEvent): void {
-    if (!isFileDrag(event)) return;
+  protected onComposerDrop(event: DragEvent): void {
+    if (!isFileDrag(event) || this.takesFiles()) return;
     event.preventDefault();
-    if (!this.canAttach()) return;
-    const files = Array.from(event.dataTransfer?.files ?? []);
-    if (files.length) void this.addFiles(files);
+  }
+
+  /** The count and the size are checked in `addFiles`, as for the paperclip. */
+  protected onDrop(event: DragEvent): void {
+    const files = this.fileDrag.drop(event);
+    if (files?.length) void this.addFiles(files);
   }
 
   /**
