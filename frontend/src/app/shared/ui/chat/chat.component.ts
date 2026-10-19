@@ -21,10 +21,12 @@ import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import {
   ButtonComponent,
+  FileViewerComponent,
   IconComponent,
   MEDIA,
   SegmentedComponent,
   ToastService,
+  type FileViewerItem,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -183,6 +185,7 @@ function writeStore(key: string, value: string | null): void {
     AvatarComponent,
     ButtonComponent,
     ChatBodyPipe,
+    FileViewerComponent,
     IconComponent,
     ImageThumbComponent,
     NgTemplateOutlet,
@@ -257,6 +260,18 @@ export class ChatComponent {
 
   protected readonly phone = mediaQuerySignal(MEDIA.phone);
   private readonly coarse = mediaQuerySignal('(pointer: coarse)');
+  /** The full-screen viewer over the previewable files of one message. */
+  protected readonly viewerOpen = signal(false);
+  protected readonly viewerIndex = signal(0);
+  private readonly viewerFiles = signal<readonly ChatAttachment[]>([]);
+  protected readonly viewerItems = computed<FileViewerItem[]>(() =>
+    this.viewerFiles().map((f) => ({ name: f.filename, mime: f.mime, url: inlineUrl(f.url) })),
+  );
+  /** The file the viewer shows, for its download link. */
+  protected readonly viewerFile = computed<ChatAttachment | null>(() => {
+    const files = this.viewerFiles();
+    return files[Math.min(Math.max(0, this.viewerIndex()), files.length - 1)] ?? null;
+  });
   /**
    * The long press opens the actions only on a phone with a touch screen. A narrow
    * window or a zoomed page with a mouse or a keyboard keeps the hover and focus actions.
@@ -504,6 +519,27 @@ export class ChatComponent {
   /** A clean raster image shows as a thumbnail instead of a file chip. */
   protected isImage(file: ChatAttachment): boolean {
     return isThumbImage(file);
+  }
+
+  /**
+   * A click on a clean image or PDF of a message opens the viewer over the files of that
+   * message that preview. A click with a modifier, any other file, and a PDF on a coarse
+   * pointer (a phone browser has no PDF frame) keep the link: a new tab or a download.
+   */
+  protected openViewer(event: MouseEvent, message: ChatMessage, file: ChatAttachment): void {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const files = (message.attachments ?? []).filter((f) => this.inViewer(f));
+    const index = files.findIndex((f) => f.id === file.id);
+    if (index < 0) return;
+    event.preventDefault();
+    this.viewerFiles.set(files);
+    this.viewerIndex.set(index);
+    this.viewerOpen.set(true);
+  }
+
+  private inViewer(file: ChatAttachment): boolean {
+    if (!this.isLink(file)) return false;
+    return this.isImage(file) || (file.mime === 'application/pdf' && !this.coarse());
   }
 
   /** The inline preview URL of a message file. */
