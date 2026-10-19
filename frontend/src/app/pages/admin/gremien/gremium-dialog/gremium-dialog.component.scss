@@ -1,6 +1,6 @@
-:host {
-  display: contents;
-}
+@use '../../../../shared/ui/dialog-form' as df;
+
+@include df.host;
 
 .gd {
   display: flex;

@@ -23,10 +23,12 @@ import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
   costCentreLabel,
-  formatEur,
-  shortDate,
   signedEur,
 } from '../../budget/expense-display.util';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { dayMonth } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The bulk actions of the selected bookings (board Fin-Buchungen-Auswahl). Side by side
@@ -41,6 +43,8 @@ import {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SumRowComponent,
+    BookingRowComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
@@ -83,8 +87,7 @@ export class BulkPanelComponent {
       (acc, e) => acc + (e.kind === 'income' ? 1 : -1) * Number(e.amount),
       0,
     );
-    const text = formatEur(Math.abs(total), this.i18n.locale());
-    return total > 0 ? `+${text}` : total < 0 ? `−${text}` : text;
+    return formatMoney(total, this.i18n.formatLocale(), { signed: true });
   });
 
   /** The cost centre all selected rows share, else null. */
@@ -119,11 +122,13 @@ export class BulkPanelComponent {
   }
 
   signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** "„A“ und „B“": the bound rows, by name, for the hint. */

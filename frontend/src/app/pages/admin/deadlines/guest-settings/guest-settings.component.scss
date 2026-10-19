@@ -10,14 +10,9 @@
 }
 
 .gs__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-inline: var(--space-1);
-}
-.gs__text {
-  min-width: 0;
+  --sh-wrap: nowrap;
+  --sh-gap: var(--space-4);
+  --sh-title-min: 0;
 }
 
 /* Two fields side by side; one column in a narrow sheet. */

@@ -14,6 +14,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import type { StateDef } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /** Row of the guard priority stack. The parent computes the label. */
 export interface GuardPriorityRow {
@@ -32,6 +33,7 @@ export interface GuardPriorityRow {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MoveButtonsComponent,
+    I18nInputComponent,
     TruncatedDirective,
     FormsModule,
     TranslatePipe,

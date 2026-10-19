@@ -4,7 +4,6 @@ import {
   formatDateRangeValue,
   formatFieldValue,
   formatIsoDate,
-  groupByMonth,
   isRejection,
   transitionLooks,
 } from './applications.util';
@@ -126,46 +125,6 @@ describe('formatBytes', () => {
     expect(formatBytes(-1, 'de')).toBe('—');
     expect(formatBytes(NaN, 'de')).toBe('—');
     expect(formatBytes(Infinity, 'de')).toBe('—');
-  });
-});
-
-describe('groupByMonth', () => {
-  const row = (id: string, createdAt: string) => ({ id, createdAt });
-
-  it('groups consecutive rows by the month of their submission', () => {
-    const groups = groupByMonth(
-      [
-        row('a', '2026-09-28T10:00:00'),
-        row('b', '2026-09-02T10:00:00'),
-        row('c', '2026-08-15T10:00:00'),
-      ],
-      'de',
-    );
-    expect(groups.map((g) => [g.key, g.label, g.items.map((i) => i.id)])).toEqual([
-      ['2026-09', 'September 2026', ['a', 'b']],
-      ['2026-08', 'August 2026', ['c']],
-    ]);
-  });
-
-  it('names the month in the locale of the reader', () => {
-    expect(groupByMonth([row('a', '2026-10-01T12:00:00')], 'en')[0].label).toBe('October 2026');
-  });
-
-  it('starts a new group when a month comes back later', () => {
-    const groups = groupByMonth(
-      [row('a', '2026-09-01T12:00:00'), row('b', '2026-08-01T12:00:00'), row('c', '2026-09-03T12:00:00')],
-      'de',
-    );
-    expect(groups.map((g) => g.key)).toEqual(['2026-09', '2026-08', '2026-09']);
-  });
-
-  it('puts rows with an invalid date into a group without a label', () => {
-    const groups = groupByMonth([row('a', 'kaputt'), row('b', 'auch kaputt')], 'de');
-    expect(groups).toEqual([{ key: '', label: '', items: [row('a', 'kaputt'), row('b', 'auch kaputt')] }]);
-  });
-
-  it('gives no group for no rows', () => {
-    expect(groupByMonth([], 'de')).toEqual([]);
   });
 });
 

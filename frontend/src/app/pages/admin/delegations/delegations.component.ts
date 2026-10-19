@@ -6,7 +6,9 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { PageHeaderComponent } from '@shared/ui';
+import {
+  PageHeaderComponent,
+} from '@shared/ui';
 import {
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -22,12 +24,8 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
-
-/** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
-export function localToday(now = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { localToday } from '@shared/date-format';
 
 /**
  * The admin overview of the delegations (`/admin/delegations`, board Admin-Vertretung).
@@ -46,6 +44,7 @@ export function localToday(now = new Date()): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

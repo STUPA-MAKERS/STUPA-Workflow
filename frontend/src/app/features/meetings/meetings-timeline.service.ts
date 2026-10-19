@@ -87,6 +87,14 @@ export class MeetingsTimelineService {
     { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
     ...this.filterGremien().map((g) => ({ value: g.id, label: g.name })),
   ]);
+  /** The Gremium chip shows only when there is more than one Gremium to pick. */
+  readonly showGremiumFilter = computed(() => this.filterGremien().length > 1);
+  /** The text of the Gremium chip. An unknown value (a Gremium that left the list) reads as "Alle Gremien". */
+  readonly gremiumFilterLabel = computed(() => {
+    const options = this.filterGremiumOptions();
+    const value = this.gremiumFilter();
+    return options.find((o) => o.value === value)?.label ?? options[0].label;
+  });
 
   /** Active search query (empty = normal past/upcoming timeline). */
   readonly searchQuery = signal('');

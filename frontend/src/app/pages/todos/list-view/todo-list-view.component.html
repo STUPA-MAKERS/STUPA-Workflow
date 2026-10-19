@@ -59,23 +59,16 @@
             </span>
             <span class="lv__c lv__c--label" role="cell">
               @for (label of row.labels; track label.id) {
-                <span class="lv__label" [attr.data-color]="label.color"><span class="lv__dot" aria-hidden="true"></span>{{ label.name }}</span>
+                <app-todo-label class="lv__label" [label]="label" />
               }
             </span>
             <span class="lv__c lv__c--due" role="cell">
               @if (row.due; as due) {
-                <span class="lv__due" [class.lv__due--overdue]="due.tone === 'overdue'" [class.lv__due--soon]="due.tone === 'soon'">
-                  <app-icon name="cal" [size]="14" />
-                  <span class="num">{{ due.date }}@if (due.note) { · {{ due.note }}}</span>
-                </span>
+                <app-todo-due class="lv__due" [due]="due" />
               }
             </span>
             <span class="lv__c lv__c--who" role="cell">
-              @if (row.names.length) {
-                <app-avatar-stack [names]="row.names" [principalIds]="row.ids" [max]="3" size="xs" />
-              } @else {
-                <span class="lv__nobody" role="img" [attr.aria-label]="'todos.tile.nobody' | t"><app-icon name="user" [size]="13" /></span>
-              }
+              <app-todo-assignees [names]="row.names" [ids]="row.ids" />
             </span>
           </div>
         } @empty {

@@ -11,7 +11,6 @@ import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   DialogComponent,
-  downloadBlob,
   EmptyStateComponent,
   FilterSelectComponent,
   IconComponent,
@@ -32,10 +31,15 @@ import {
   SkeletonComponent,
   type StatusKind,
   StatusTextComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
+import { exportDownload } from '@shared/download.util';
 import { SimplifyPathPipe } from '@shared/budget-path';
-import { PageHeaderComponent, flowColorKind } from '@shared/ui';
+import {
+  PageHeaderComponent,
+  flowColorKind,
+} from '@shared/ui';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,
@@ -48,6 +52,7 @@ import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
+import { formatMoney } from '@shared/format-money';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
@@ -171,6 +176,7 @@ export const APPS_SHOWN = 5;
 export class BudgetDashboardComponent {
   private readonly api = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
+  private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
@@ -606,20 +612,12 @@ export class BudgetDashboardComponent {
   }
 
   money(value: string | number | null | undefined, currency = 'EUR'): string {
-    const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: currency || 'EUR',
-    }).format(n);
+    return formatMoney(value || 0, this.i18n.formatLocale(), { currency });
   }
 
   /** Whole currency units, for the tree and the charts. */
   moneyShort(value: number, currency = 'EUR'): string {
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: currency || 'EUR',
-      maximumFractionDigits: 0,
-    }).format(value);
+    return formatMoney(value, this.i18n.formatLocale(), { currency, whole: true });
   }
 
   protected load(): void {
@@ -834,20 +832,16 @@ export class BudgetDashboardComponent {
   }
 
   onExport(): void {
-    if (this.exporting()) return;
-    this.exporting.set(true);
-    this.api
-      .exportXlsx({
-        node: this.selectedKsId() || undefined,
-        fiscalYear: this.selectedFyId() || undefined,
-      })
-      .subscribe({
-        next: (blob) => {
-          downloadBlob(blob, 'budget.xlsx');
-          this.exporting.set(false);
-        },
-        error: () => this.exporting.set(false),
-      });
+    exportDownload(
+      this.exporting,
+      () =>
+        this.api.exportXlsx({
+          node: this.selectedKsId() || undefined,
+          fiscalYear: this.selectedFyId() || undefined,
+        }),
+      'budget.xlsx',
+      () => this.toast.error(this.i18n.translate('budget.dash.exportError')),
+    );
   }
 }
 

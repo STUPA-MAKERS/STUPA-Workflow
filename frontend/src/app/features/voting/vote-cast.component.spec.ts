@@ -83,6 +83,8 @@ async function setup(opts: {
   meetingError?: boolean;
   /** The list page around the pane: `split` side by side. */
   page?: { split: boolean };
+  /** The read answers twice, as a vote read ahead does: the kept vote, then this one. */
+  newer?: Partial<Vote>;
 } = {}) {
   // The server sets the capability flags of the caller on GET /votes/{id}.
   const served: Vote = {
@@ -92,7 +94,7 @@ async function setup(opts: {
   };
   const getVote = opts.getError
     ? jest.fn(() => throwError(() => opts.getError))
-    : jest.fn(() => of(served));
+    : jest.fn(() => (opts.newer ? of(served, { ...served, ...opts.newer }) : of(served)));
   const castBallot = opts.castError
     ? jest.fn(() => throwError(() => opts.castError))
     : jest.fn(() => of({ status: 'cast' as const }));
@@ -204,7 +206,13 @@ describe('VoteCastComponent', () => {
     expect(screen.getByText('Zweidrittelmehrheit')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2, name: 'Soll der Antrag gefördert werden?' })).toBeInTheDocument();
     expect(screen.getByText('5 von 12 Anwesenden haben abgestimmt')).toBeInTheDocument();
-    expect(getMeeting).toHaveBeenCalledWith('m1', { quiet: true });
+    expect(getMeeting).toHaveBeenCalledWith('m1', { quiet: true, detail: true });
+  });
+
+  it('takes a newer answer behind a vote read ahead: the voting right, one context read', async () => {
+    const { getMeeting } = await setup({ canCast: false, newer: { canCast: true } });
+    expect(screen.queryByText(/nicht stimmberechtigt/i)).toBeNull();
+    expect(getMeeting).toHaveBeenCalledTimes(1);
   });
 
   it('lists the to-dos that link the vote under it', async () => {
@@ -300,7 +308,7 @@ describe('VoteCastComponent', () => {
       screen.queryByRole('group', { name: 'Als Vertretung für Jonas Weber' }),
     ).not.toBeInTheDocument();
     expect(getVote).toHaveBeenCalledWith('v1', { quiet: true });
-    expect(voteStatus).toHaveBeenCalledWith('v1');
+    expect(voteStatus).toHaveBeenCalledWith('v1', { detail: false });
   });
 
   it('explains a voting right handed over after the load, on a 403 from an own cast', async () => {

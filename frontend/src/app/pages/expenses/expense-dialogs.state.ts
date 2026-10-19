@@ -11,10 +11,12 @@ import {
   type Invoice,
   type PaymentMethod,
 } from '../budget/budget-tree.api';
-import { findTopBudgetNode, formatEur, problemDetail } from '../budget/expense-display.util';
+import { problemDetail } from '@core/api/problem';
+import { findTopBudgetNode } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * Booking forms: create (standalone or application-bound), edit, delete, transfer
@@ -158,13 +160,13 @@ export class ExpenseDialogsState {
   }
 
   private invoiceLabel(i: Invoice): string {
-    return [i.number, i.supplier, formatEur(Number(i.grossAmount), this.i18n.locale())]
+    return [i.number, i.supplier, formatMoney(i.grossAmount, this.i18n.formatLocale())]
       .filter((p) => !!p)
       .join(' · ');
   }
 
   private failureText(err: unknown): string {
-    return problemDetail(err) ?? this.i18n.translate('expenses.toast.failed');
+    return problemDetail(err) || this.i18n.translate('expenses.toast.failed');
   }
 
   /**

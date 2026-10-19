@@ -23,7 +23,7 @@ import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoLinkKind, type TodoLinkTarget } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
   focusableIn,
@@ -34,7 +34,7 @@ import {
   SideSheetComponent,
   trapTab,
 } from '@stupa-makers/ui-kit';
-import { LINK_ICON, linkSub, type Translate } from '../todos.util';
+import { LINK_ICON, linkSub } from '../todos.util';
 
 type PickerKind = TodoLinkKind | 'all';
 

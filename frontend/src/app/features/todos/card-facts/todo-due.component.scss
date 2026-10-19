@@ -1,0 +1,14 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tdu-color, currentColor);
+}
+:host(.tdu--overdue) {
+  color: var(--color-danger);
+  font-weight: var(--fw-semibold);
+}
+:host(.tdu--soon) {
+  color: var(--color-warning);
+  font-weight: var(--fw-semibold);
+}

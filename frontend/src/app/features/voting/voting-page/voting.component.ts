@@ -11,10 +11,13 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet, type ParamMap } from '@angular/router';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, type Observable, of } from 'rxjs';
 import { catchError, expand, filter, map, reduce } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
+import { DelegationsApiService } from '@core/api/delegations.service';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -42,10 +45,13 @@ import {
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
-import { groupByMonth } from '../../../pages/applications/applications.util';
 import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { clock, dayMonthYear } from '@shared/date-format';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
+import { groupByMonth } from '@shared/group-by-month';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -123,6 +129,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     PageHeaderComponent,
     RouterOutlet,
@@ -261,13 +268,34 @@ export class VotingComponent implements OnDestroy {
     if (drafts.length) {
       out.push({ key: 'draft', label: this.i18n.translate('voting.list.group.draft'), rows: drafts });
     }
-    for (const g of groupByMonth(ended, this.i18n.locale())) {
+    for (const g of groupByMonth(ended, (r) => r.createdAt, this.i18n.formatLocale())) {
       out.push({ key: `m-${g.key}`, label: g.label, rows: g.items });
     }
     return out;
   });
 
   constructor() {
+    // The shown votes read their detail ahead, so a click shows it at once: the vote, the
+    // voting right, the linked to-dos, and once per meeting the meeting and its agenda.
+    const meetings = new Set<Uuid>();
+    prefetchDetails({
+      items: this.items,
+      key: (v) => v.id,
+      reads: (v) => {
+        const reads: Observable<unknown>[] = [
+          this.api.getVote(v.id, { detail: true }),
+          inject(DelegationsApiService).voteStatus(v.id, { detail: true }),
+          inject(TodosApiService).linked('vote', v.id),
+        ];
+        const meetingId = v.meetingId;
+        if (meetingId && !meetings.has(meetingId)) {
+          meetings.add(meetingId);
+          reads.push(this.api.getMeeting(meetingId, { quiet: true, detail: true }));
+          if (v.agendaItemId) reads.push(this.api.listAgenda(meetingId, { quiet: true, detail: true }));
+        }
+        return reads;
+      },
+    });
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.readFilters(pm);
       this.reload();
@@ -609,12 +637,8 @@ export class VotingComponent implements OnDestroy {
     if (Number.isNaN(date.getTime())) return [null, null];
     const locale = this.i18n.formatLocale();
     const today = new Date(Date.now()).toDateString() === date.toDateString();
-    const text = today
-      ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
-      : new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-    const exact = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      date,
-    );
+    const text = today ? clock(date, locale) : dayMonthYear(date, locale);
+    const exact = formatMoment(date, locale);
     return [key ? this.i18n.translate(key, { time: text }) : text, exact];
   }
 }

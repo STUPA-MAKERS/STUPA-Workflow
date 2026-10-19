@@ -1,4 +1,6 @@
+import { FormControl, FormGroup } from '@angular/forms';
 import type { FormlyFieldConfig } from '@ngx-formly/core';
+import type { Observable } from 'rxjs';
 import type { FormFieldDef, FormSection } from '@core/api/models';
 import { toFormlyFields, toFormlySections } from './formly-mapper';
 
@@ -309,6 +311,84 @@ describe('toFormlyFields', () => {
     ];
     expect(toFormlyFields(fields, 'en')[0].props?.label).toBe('EN');
     expect(toFormlyFields(fields, 'fr')[0].props?.label).toBe('DE');
+  });
+});
+
+describe('requested funding', () => {
+  const positions = (...values: number[]) =>
+    values.map((v, i) => ({ label: `P${i}`, offers: [{ label: 'A', value: v, preferred: true }] }));
+  const fields: FormFieldDef[] = [
+    { key: 'kosten', type: 'positions', label: { de: 'Kosten' } },
+    { key: 'foerderung', type: 'funding', label: { de: 'Förderung' }, help: { de: 'Hilfe.' } },
+  ];
+
+  function build(lang = 'de') {
+    const form = new FormGroup({ kosten: new FormControl<unknown>(null), foerderung: new FormControl<unknown>(null) });
+    const cfg = toFormlyFields(fields, lang)[1];
+    const field = { ...cfg, form, formControl: form.controls.foerderung, model: {} } as FormlyFieldConfig;
+    const valid = (model: Record<string, unknown>) => {
+      field.model = model;
+      form.controls.foerderung.setValue(model['foerderung'] ?? null, { emitEvent: false });
+      const v = cfg.validators?.['fundingMax'] as { expression: (c: unknown, f: FormlyFieldConfig) => boolean };
+      return v.expression(form.controls.foerderung, field);
+    };
+    return { cfg, form, field, valid };
+  }
+
+  it('maps to a currency input', () => {
+    const { cfg } = build();
+    expect(cfg.type).toBe('input');
+    expect(cfg.props?.type).toBe('currency');
+  });
+
+  it('accepts an empty value and a value up to the cost total', () => {
+    const { valid } = build();
+    expect(valid({ kosten: positions(300, 200) })).toBe(true);
+    expect(valid({ kosten: positions(300, 200), foerderung: '' })).toBe(true);
+    expect(valid({ kosten: positions(300, 200), foerderung: 500 })).toBe(true);
+    expect(valid({ kosten: positions(300, 200), foerderung: 500.01 })).toBe(false);
+    expect(valid({ foerderung: 1 })).toBe(false);
+  });
+
+  it('shows the cost total in the hint and in the error text', () => {
+    const { cfg, field, form } = build('en');
+    field.model = { kosten: positions(300, 200) };
+    form.controls.foerderung.setValue(600);
+    const desc = (cfg.expressions?.['props.description'] as (f: FormlyFieldConfig) => string)(field);
+    expect(desc).toBe('Hilfe. Total costs: €500.00. Leave empty to request the full amount.');
+    const err = cfg.expressions?.['props.errorText'] as (f: FormlyFieldConfig) => string | undefined;
+    expect(err(field)).toBe('The funding must not exceed the costs (€500.00).');
+    form.controls.foerderung.setValue(100);
+    expect(err(field)).toBeUndefined();
+  });
+
+  it('leaves out the help text when the field has none', () => {
+    const cfg = toFormlyFields([{ ...fields[1], help: undefined }], 'de')[0];
+    const desc = (cfg.expressions?.['props.description'] as (f: FormlyFieldConfig) => string)({
+      model: {},
+    } as FormlyFieldConfig);
+    expect(desc).toBe('Kosten gesamt: 0,00\u00a0€. Leer lassen, um die volle Summe zu beantragen.');
+  });
+
+  it('re-checks the cap when another answer changes', () => {
+    const { cfg, form, field } = build();
+    const spy = jest.spyOn(form.controls.foerderung, 'updateValueAndValidity');
+    const sub = (cfg.hooks?.onInit as (f: FormlyFieldConfig) => Observable<unknown>)(field).subscribe();
+    form.controls.kosten.setValue(positions(10));
+    expect(spy).toHaveBeenCalledWith({ emitEvent: false });
+    sub.unsubscribe();
+  });
+
+  it('finds the positions in other sections of the edit form', () => {
+    const sections: FormSection[] = [
+      { key: 'a', label: { de: 'A' }, fields: [fields[0]] },
+      { key: 'b', label: { de: 'B' }, fields: [fields[1]] },
+    ];
+    const group = toFormlySections(sections, 'de')[0].fieldGroup ?? [];
+    const cfg = group.find((g) => g.key === 'foerderung') as FormlyFieldConfig;
+    const v = cfg.validators?.['fundingMax'] as { expression: (c: unknown, f: FormlyFieldConfig) => boolean };
+    const field = { model: { kosten: positions(50) }, formControl: new FormControl(60) } as FormlyFieldConfig;
+    expect(v.expression(null, field)).toBe(false);
   });
 });
 

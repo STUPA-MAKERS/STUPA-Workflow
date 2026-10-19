@@ -1,8 +1,7 @@
 @use 'breakpoints' as bp;
+@use '../../../shared/ui/dialog-form' as df;
 
-:host {
-  display: contents;
-}
+@include df.host;
 
 .rd {
   display: flex;

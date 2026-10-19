@@ -17,8 +17,8 @@ import type { AgendaItem, Attendance, Meeting, Uuid } from '@core/api/models';
 import { ButtonComponent, IconComponent, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
 import { KeeperMenuComponent } from '../keeper-menu/keeper-menu.component';
 import { keeperNames } from '../keepers.util';
-import { clockTime } from '../meetings-display.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
+import { clock } from '@shared/date-format';
 
 /**
  * The panel that is open. The minute-taker menu is a popover above the dock (a bottom
@@ -160,7 +160,7 @@ export class SessionDockComponent {
 
   /** The closed dock: "Geschlossen um 21:12", or "Geschlossen" without a known time. */
   protected readonly closedLine = computed(() => {
-    const time = clockTime(this.meeting().closedAt, this.i18n.locale());
+    const time = clock(this.meeting().closedAt, this.i18n.formatLocale());
     return time
       ? this.i18n.translate('meetings.dock.closedAt', { time })
       : this.i18n.translate('meetings.status.closed');

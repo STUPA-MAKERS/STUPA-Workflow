@@ -1,20 +1,17 @@
 @let m = meeting();
 @let proto = protocol();
 
-<header class="mp__head" role="toolbar" [attr.aria-label]="'meetings.control.title' | t">
-  <app-button class="mp__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
-    <app-icon name="back" />
-  </app-button>
-  <div class="mp__titles">
-    <div class="mp__titleLine">
-      <h1 class="mp__title" [title]="m.title">{{ m.title }}</h1>
-      <app-status-text class="mp__status" [kind]="status().kind">{{ status().key | t }}</app-status-text>
-    </div>
-    @if (subLine()) {
-      <span class="mp__sub">{{ subLine() }}</span>
-    }
-  </div>
-
+<header
+  appMeetingHead
+  class="mp__head"
+  role="toolbar"
+  [attr.aria-label]="'meetings.control.title' | t"
+  [heading]="m.title"
+  [statusKind]="status().kind"
+  [statusText]="status().key | t"
+  [sub]="subLine() || null"
+  (back)="back.emit()"
+>
   @if (showPresence()) {
     <div class="mp__presence">
       <button

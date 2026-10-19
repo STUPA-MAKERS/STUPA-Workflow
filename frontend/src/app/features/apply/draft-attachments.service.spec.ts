@@ -23,7 +23,6 @@ function attachment(id: string, size = 10, extra: Partial<Attachment> = {}): Att
     mime: 'application/pdf',
     size,
     scanned: false,
-    isComparisonOffer: false,
     scanState: 'scanning',
     ...extra,
   };
@@ -56,13 +55,10 @@ function setup(
   let n = 0;
   const upload =
     opts.upload ??
-    jest.fn((f: File, o: { fieldKey?: string | null; isComparisonOffer?: boolean }) => {
+    jest.fn((f: File) => {
       n++;
       const res: DraftUpload = {
-        attachment: attachment(`d${n}`, f.size, {
-          filename: f.name,
-          isComparisonOffer: !!o.isComparisonOffer,
-        }),
+        attachment: attachment(`d${n}`, f.size, { filename: f.name }),
         draftToken: 'tok',
         draftExpiresAt: '2999-01-01T00:00:00Z',
       };
@@ -109,10 +105,10 @@ describe('DraftAttachmentsService', () => {
 
   it('needs no ALTCHA for a signed-in applicant', async () => {
     const { svc, upload, solve } = setup({ loggedIn: true });
-    await svc.upload([file('a.pdf')], { isComparisonOffer: true });
+    await svc.upload([file('a.pdf')]);
     expect(solve).not.toHaveBeenCalled();
-    expect(upload.mock.calls[0][1]).toMatchObject({ altcha: null, isComparisonOffer: true, fieldKey: null });
-    expect(svc.files()[0].isComparisonOffer).toBe(true);
+    expect(upload.mock.calls[0][1]).toMatchObject({ altcha: null, fieldKey: null });
+    expect(svc.files()[0].filename).toBe('a.pdf');
   });
 
   it('keeps the token and the files in sessionStorage only, and restores them', async () => {

@@ -37,9 +37,8 @@ import type {
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
-import { localToday } from './capture/application-capture.component';
 import { toFormlySections } from '@shared/forms/formly-mapper';
-import { formatAnswer, formatEuro, formatFieldValue } from '@shared/forms/answer-format';
+import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
 import {
   normalizePositions,
   positionValue,
@@ -87,7 +86,7 @@ import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
-import { decisionHistoryLine, formatMoney } from '@shared/decision/decision.util';
+import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
@@ -95,6 +94,9 @@ import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-l
 import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { AmountComponent } from '@shared/ui/amount/amount.component';
+import { localToday } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -143,6 +145,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AmountComponent,
     DropOverlayComponent,
     FileDropDirective,
     ConfirmDialogComponent,
@@ -533,7 +536,7 @@ export class ApplicationsDetailComponent {
 
   /** An amount in euro; a missing value counts as 0, as on the server. */
   private money(value: number | null): string {
-    return formatEuro(Number(value), this.i18n.locale()) ?? '';
+    return formatMoney(value ?? 0, this.i18n.formatLocale());
   }
 
   /** The label of a field of the diff, or its key when the form does not define it. */
@@ -921,18 +924,26 @@ export class ApplicationsDetailComponent {
       this.notFound.set(true);
       return;
     }
-    this.api.getApplication(id, { quiet: true }).subscribe({
+    // A read ahead by the list paints at once; a newer answer behind it replaces only the
+    // application, so the open view and its other reads stay.
+    let shown = false;
+    this.api.getApplication(id, { quiet: true, detail: true }).subscribe({
       next: (app) => {
         if (seq !== this.loadSeq) return;
+        if (shown) {
+          this.app.set(app);
+          return;
+        }
+        shown = true;
         this.resetShown();
         this.switching.set(false);
         this.app.set(app);
         this.loading.set(false);
-        this.loadAux();
+        this.loadAux(true);
         // Take the effective form from the pinned version of the application, not from
         // the active one. The labels and the edit fields then match the data that the
         // server validates.
-        this.api.applicationForm(app.id).subscribe({
+        this.api.applicationForm(app.id, { detail: true }).subscribe({
           next: (eff) => {
             if (seq !== this.loadSeq) return;
             this.sections.set(eff.sections);
@@ -995,10 +1006,11 @@ export class ApplicationsDetailComponent {
 
   /** Load the versions, the comments and the available transitions.
    *  An error degrades silently to an empty result. The transitions load only with
-   *  the needed permission. The server filters them again. */
-  private loadAux(): void {
+   *  the needed permission. The server filters them again. `detail`: the first read of
+   *  an opened application, which takes what the list read ahead. */
+  private loadAux(detail = false): void {
     const seq = this.loadSeq;
-    this.api.versions(this.id).subscribe({
+    this.api.versions(this.id, { detail }).subscribe({
       next: (v) => {
         if (seq === this.loadSeq) this.versions.set(v);
       },
@@ -1007,7 +1019,7 @@ export class ApplicationsDetailComponent {
     // Only the first read of an application shows the loading state. A reload after a
     // transition keeps the thread and the count, so the header does not shift.
     if (!this.commentsLoaded) this.commentsLoading.set(true);
-    this.api.comments(this.id, { quiet: true }).subscribe({
+    this.api.comments(this.id, { quiet: true, detail }).subscribe({
       next: (c) => {
         if (seq !== this.loadSeq) return;
         this.comments.set(c);
@@ -1018,7 +1030,7 @@ export class ApplicationsDetailComponent {
         if (seq === this.loadSeq) this.commentsLoading.set(false);
       },
     });
-    this.api.timeline(this.id, { quiet: true }).subscribe({
+    this.api.timeline(this.id, { quiet: true, detail }).subscribe({
       next: (events) => {
         if (seq === this.loadSeq) this.timeline.set(events);
       },
@@ -1026,7 +1038,7 @@ export class ApplicationsDetailComponent {
     });
     if (this.canTransition()) {
       this.transitionsLoading.set(true);
-      this.api.transitions(this.id).subscribe({
+      this.api.transitions(this.id, { detail }).subscribe({
         next: (t) => {
           if (seq !== this.loadSeq) return;
           this.transitions.set(t);
@@ -1087,12 +1099,7 @@ export class ApplicationsDetailComponent {
 
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
-    const value = Number(app.amount);
-    if (Number.isNaN(value)) return app.amount;
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: app.currency ?? 'EUR',
-    }).format(value);
+    return formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount;
   }
 
   /**
@@ -1102,7 +1109,7 @@ export class ApplicationsDetailComponent {
   approvedAmount(app: Application): string {
     if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
     if (Number(app.approvedAmount) === Number(app.amount)) return '';
-    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), app.currency);
+    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
   }
 
   startEdit(app: Application): void {

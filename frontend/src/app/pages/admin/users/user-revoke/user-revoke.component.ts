@@ -50,6 +50,8 @@ import {
   toggleEntry,
   type RevokeEntry,
 } from './revoke-selection';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
 export interface RevokeLine {
@@ -101,6 +103,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,
@@ -218,7 +221,7 @@ export class UserRevokeComponent {
   }
 
   protected name(p: { displayName?: string | null; email?: string | null } | null): string {
-    return p?.displayName || p?.email || this.i18n.translate('admin.users.merge.unnamed');
+    return personLabel(p, this.i18n, { fallback: 'admin.users.merge.unnamed' });
   }
 
   /** "vor 8 Monaten", "vor 12 Tagen", "heute". */

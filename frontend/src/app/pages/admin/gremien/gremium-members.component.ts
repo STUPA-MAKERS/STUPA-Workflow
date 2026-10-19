@@ -22,7 +22,9 @@ import {
   NoteComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
-import { PageHeaderComponent } from '@shared/ui';
+import {
+  PageHeaderComponent,
+} from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import {
   FORCED_GREMIUM_ROLE_KEYS,
@@ -33,6 +35,8 @@ import {
   MEMBER_GREMIUM_ROLE_KEY,
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
 interface Member {
@@ -64,6 +68,7 @@ export const MEMBER_PREVIEW = 7;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    SectionHeaderComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,
@@ -119,7 +124,7 @@ export class GremiumMembersComponent {
       const role = this.rolesById().get(m.gremiumRoleId);
       rows.push({
         id: m.principalId,
-        name: m.displayName || m.email || this.i18n.translate('admin.gremien.unknownMember'),
+        name: personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
         email: m.email ?? null,
         role: role ? this.roleName(role) : '—',
         rank: this.rank(role),

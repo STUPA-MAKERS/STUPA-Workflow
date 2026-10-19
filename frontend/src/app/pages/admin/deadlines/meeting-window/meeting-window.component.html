@@ -1,41 +1,35 @@
-@if (loadState() !== 'forbidden') {
+@if (form.state() !== 'forbidden') {
   <section class="gs" aria-labelledby="mw-title">
-    <header class="gs__head">
-      <div class="gs__text">
-        <h2 class="section-title" id="mw-title">{{ 'admin.meetingWindow.title' | t }}</h2>
-      </div>
-    </header>
+    <app-section-header class="gs__head" headingId="mw-title" [heading]="'admin.meetingWindow.title' | t" />
 
-    @if (loading()) {
-      <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
-    } @else if (loadState() === 'error') {
-      <app-note kind="error" icon="alert" role="alert">{{ 'admin.guest.loadError' | t }}</app-note>
-    } @else {
-      <form class="gs__grid" (submit)="$event.preventDefault(); save()">
-        <div class="gs__field">
-          <app-input
-            type="number"
-            [label]="'admin.meetingWindow.openLead' | t"
-            [error]="openError()"
-            name="openLeadMinutes"
-            [ngModel]="draft().open"
-            (ngModelChange)="patch({ open: $event })"
-            [suffix]="'admin.meetingWindow.unit' | t"
-          />
-        </div>
+    <app-load-state [state]="form.state()" [lines]="2" [errorText]="'admin.guest.loadError' | t">
+      <ng-template #content>
+        <form class="gs__grid" (submit)="$event.preventDefault(); save()">
+          <div class="gs__field">
+            <app-input
+              type="number"
+              [label]="'admin.meetingWindow.openLead' | t"
+              [error]="openError()"
+              name="openLeadMinutes"
+              [ngModel]="draft().open"
+              (ngModelChange)="patch({ open: $event })"
+              [suffix]="'admin.meetingWindow.unit' | t"
+            />
+          </div>
 
-        <div class="gs__field">
-          <app-input
-            type="number"
-            [label]="'admin.meetingWindow.confirmLead' | t"
-            [error]="confirmError()"
-            name="confirmLeadMinutes"
-            [ngModel]="draft().confirm"
-            (ngModelChange)="patch({ confirm: $event })"
-            [suffix]="'admin.meetingWindow.unit' | t"
-          />
-        </div>
-      </form>
-    }
+          <div class="gs__field">
+            <app-input
+              type="number"
+              [label]="'admin.meetingWindow.confirmLead' | t"
+              [error]="confirmError()"
+              name="confirmLeadMinutes"
+              [ngModel]="draft().confirm"
+              (ngModelChange)="patch({ confirm: $event })"
+              [suffix]="'admin.meetingWindow.unit' | t"
+            />
+          </div>
+        </form>
+      </ng-template>
+    </app-load-state>
   </section>
 }

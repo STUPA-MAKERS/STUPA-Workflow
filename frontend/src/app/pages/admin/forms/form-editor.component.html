@@ -176,6 +176,9 @@
           @if (duplicates().length > 0) {
             <p class="fe__alert" role="alert">{{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}</p>
           }
+          @if (fundingIssue(); as issue) {
+            <p class="fe__alert" role="alert">{{ issue | t }}</p>
+          }
           @if (groups().length === 0) {
             <app-empty-state [heading]="'admin.forms.empty' | t" />
           }
@@ -239,24 +242,22 @@
                 </div>
 
                 <div class="fe__pair">
-                  <app-input
-                    [label]="'admin.common.labelDe' | t"
-                    [placeholder]="'admin.forms.questionPlaceholder' | t"
-                    [(ngModel)]="field.label['de']"
-                    (ngModelChange)="touch()"
+                  <app-i18n-input
+                    [dePlaceholder]="'admin.forms.questionPlaceholder' | t"
+                    [de]="field.label['de']"
+                    (deChange)="field.label['de'] = $event; touch()"
+                    [en]="field.label['en']"
+                    (enChange)="field.label['en'] = $event; touch()"
                   />
-                  <app-input [label]="'admin.common.labelEn' | t" [(ngModel)]="field.label['en']" (ngModelChange)="touch()" />
                 </div>
                 <div class="fe__pair">
-                  <app-input
-                    [label]="'admin.forms.helpDe' | t"
-                    [ngModel]="field.help && field.help['de']"
-                    (ngModelChange)="field.help = { de: $event, en: (field.help && field.help['en']) || '' }; touch()"
-                  />
-                  <app-input
-                    [label]="'admin.forms.helpEn' | t"
-                    [ngModel]="field.help && field.help['en']"
-                    (ngModelChange)="field.help = { de: (field.help && field.help['de']) || '', en: $event }; touch()"
+                  <app-i18n-input
+                    [deLabel]="'admin.forms.helpDe' | t"
+                    [enLabel]="'admin.forms.helpEn' | t"
+                    [de]="field.help?.['de'] ?? ''"
+                    (deChange)="field.help = { de: $event, en: field.help?.['en'] || '' }; touch()"
+                    [en]="field.help?.['en'] ?? ''"
+                    (enChange)="field.help = { de: field.help?.['de'] || '', en: $event }; touch()"
                   />
                 </div>
 
@@ -266,8 +267,16 @@
                     @for (opt of field.options ?? []; track $index; let oi = $index) {
                       <div class="fe__opt">
                         <app-input class="fe__mono" [label]="'admin.form.optionValue' | t" [(ngModel)]="opt.value" (ngModelChange)="touch()" />
-                        <app-input label="DE" [ariaLabel]="'admin.common.labelDe' | t" [(ngModel)]="opt.label['de']" (ngModelChange)="touch()" />
-                        <app-input label="EN" [ariaLabel]="'admin.common.labelEn' | t" [(ngModel)]="opt.label['en']" (ngModelChange)="touch()" />
+                        <app-i18n-input
+                          deLabel="DE"
+                          enLabel="EN"
+                          [deAriaLabel]="'admin.common.labelDe' | t"
+                          [enAriaLabel]="'admin.common.labelEn' | t"
+                          [de]="opt.label['de']"
+                          (deChange)="opt.label['de'] = $event; touch()"
+                          [en]="opt.label['en']"
+                          (enChange)="opt.label['en'] = $event; touch()"
+                        />
                         <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'admin.common.remove' | t" [title]="'admin.common.remove' | t" (click)="removeOption(pos, oi)"><app-icon name="trash" /></app-button>
                       </div>
                     }
@@ -379,8 +388,14 @@
       <aside class="fe__side" appScrollFade="y">
         <section class="fe__card fe__meta" [attr.aria-label]="'admin.form.formCard' | t">
           <h2 class="cap fe__cap">{{ 'admin.form.formCard' | t }}</h2>
-          <app-input [label]="'admin.forms.nameDe' | t" [ngModel]="title()['de']" (ngModelChange)="setTitle('de', $event)" />
-          <app-input [label]="'admin.forms.nameEn' | t" [ngModel]="title()['en']" (ngModelChange)="setTitle('en', $event)" />
+          <app-i18n-input
+            [deLabel]="'admin.forms.nameDe' | t"
+            [enLabel]="'admin.forms.nameEn' | t"
+            [de]="title()['de']"
+            (deChange)="setTitle('de', $event)"
+            [en]="title()['en']"
+            (enChange)="setTitle('en', $event)"
+          />
           <div class="fe__area">
             <label class="fe__areaLabel" for="fe-desc-de">{{ 'admin.forms.descDe' | t }}</label>
             <textarea id="fe-desc-de" rows="3" [ngModel]="description()['de']" (ngModelChange)="setDescription('de', $event)" [attr.placeholder]="'admin.forms.descPlaceholder' | t"></textarea>

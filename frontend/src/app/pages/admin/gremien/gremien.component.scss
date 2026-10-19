@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use '../../../shared/ui/surface-card' as sc;
 
 :host {
   display: block;
@@ -118,8 +119,7 @@
 
 .grem__body {
   /* The row is surface 2: the settings card and the matrix rows take surface 3. */
-  --color-surface-sunken: var(--color-surface-3);
-  --color-text-subtle: var(--color-text-muted);
+  @include sc.raised-fields;
   display: flex;
   flex-direction: column;
   gap: var(--space-5);

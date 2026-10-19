@@ -14,6 +14,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
+import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -47,7 +48,11 @@ import {
   StickyBarComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { FabComponent, PageHeaderComponent, invoiceStatus } from '@shared/ui';
+import {
+  FabComponent,
+  PageHeaderComponent,
+  invoiceStatus,
+} from '@shared/ui';
 import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
@@ -58,7 +63,7 @@ import {
   type InvoiceSegmentCounts,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
-import { costCentreIndex, formatEur, monthGroups, shortDate } from '../budget/expense-display.util';
+import { costCentreIndex } from '../budget/expense-display.util';
 import { InvoiceDetailComponent } from './invoice-detail/invoice-detail.component';
 import {
   type InvoiceFormHost,
@@ -66,6 +71,12 @@ import {
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
 import { debounced } from '@shared/debounced';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { dayMonth } from '@shared/date-format';
+import { groupByMonth } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -109,6 +120,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     InfiniteScrollDirective,
+    DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
@@ -263,7 +275,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
   /** The rows by the month of their invoice date. */
   readonly groups = computed(() =>
-    monthGroups(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.locale()),
+    groupByMonth(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.formatLocale(), {
+      utc: true,
+    }),
   );
 
   /** Debounced search, about 250 ms. It drives the `q` param of the server query. */
@@ -399,6 +413,12 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly detailOpen = computed(() => (!!this.formMode() && !this.phone()) || !!this.selectedId());
 
   constructor() {
+    // The detail shows the row at once; the shown rows read their linked to-dos ahead.
+    prefetchDetails({
+      items: this.items,
+      key: (i) => i.id,
+      reads: (i) => [inject(TodosApiService).linked('invoice', i.id)],
+    });
     this.adoptUrl(this.route.snapshot.queryParamMap);
     this.reload();
 
@@ -489,11 +509,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   }
 
   money(amount: string): string {
-    return formatEur(Number(amount), this.i18n.locale());
+    return formatMoney(amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** The title of a row: the supplier, else the number. */
@@ -650,7 +672,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
           this.importNotice.set('manual');
           this.attachFile(file);
         } else {
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         }
       },
     });
@@ -693,7 +715,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       },
       error: (err) => {
         this.attaching.set(false);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.failureText(err));
       },
     });
   }
@@ -775,7 +797,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         },
       });
   }
@@ -822,7 +844,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         },
       });
   }
@@ -841,7 +863,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       },
       error: (err) => {
         this.markingPaid.set(null);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.failureText(err));
       },
     });
   }
@@ -931,8 +953,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     return this.i18n.translate('invoices.rowMenu', { number: i.number || i.supplier || '' });
   }
 
-  private problemDetail(err: unknown): string {
-    const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
-    return detail || this.i18n.translate('invoices.toast.failed');
+  private failureText(err: unknown): string {
+    return problemDetail(err) || this.i18n.translate('invoices.toast.failed');
   }
 }

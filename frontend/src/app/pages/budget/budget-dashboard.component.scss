@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use 'swatch';
 
 :host {
   display: flex;
@@ -211,10 +212,7 @@ button.tn__chev:hover:not(:disabled) {
   min-width: 0;
 }
 .tn__swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  @include swatch.mark($radius: 3px);
 }
 .tn__name {
   flex: 1 1 0;

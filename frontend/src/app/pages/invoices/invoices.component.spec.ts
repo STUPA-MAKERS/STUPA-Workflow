@@ -1355,7 +1355,7 @@ describe('InvoicesComponent (list/detail)', () => {
   it('names a row without supplier and number, and shows the empty sheet of an empty list', async () => {
     setViewport('min-width: 1200px');
     const { c, container, fixture, http } = await setup({ initial: [] });
-    expect(container.querySelector('.inv__none--skeleton')).not.toBeNull();
+    expect(container.querySelector('app-detail-none .dn__ghost')).not.toBeNull();
     expect(c.titleOf(inv({ supplier: null, number: null }))).toBe('Rechnung ohne Lieferant');
     c.q.set('x');
     fixture.detectChanges();

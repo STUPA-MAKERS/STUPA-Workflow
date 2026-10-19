@@ -98,24 +98,3 @@
   align-items: center;
   gap: 2px;
 }
-
-/* Drop overlay over the whole panel. */
-/* The file preview dialog goes wider than the lg step, almost full screen. */
-.att__previewDlg ::ng-deep .dialog {
-  max-width: min(80rem, 96vw);
-}
-.att__previewImg {
-  display: block;
-  max-width: 100%;
-  max-height: 72dvh;
-  margin: 0 auto;
-  border-radius: var(--radius-md);
-}
-.att__previewFrame {
-  display: block;
-  width: 100%;
-  height: 72dvh;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-2);
-}

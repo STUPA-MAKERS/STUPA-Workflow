@@ -126,8 +126,8 @@ describe('MeetingFollowViewComponent', () => {
       context();
       expect(screen.getByRole('heading', { level: 1, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
       expect(screen.getByText('Geplant')).toBeInTheDocument();
-      expect(screen.getByText('StuPa · Do., 15.10.2026 · 18:00')).toBeInTheDocument();
-      expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do., 15.10.2026 um 18:00' })).toBeInTheDocument();
+      expect(screen.getByText('StuPa · Do, 15.10.2026 · 18:00')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do, 15.10.2026 um 18:00' })).toBeInTheDocument();
       const subscribe = screen.getByRole('button', { name: 'Kalender abonnieren' });
       expect(subscribe).toHaveAttribute('aria-expanded', 'false');
       // No dock before the start.
@@ -137,7 +137,7 @@ describe('MeetingFollowViewComponent', () => {
     it('says the date alone without a time, and that the date is open without one', async () => {
       const { fixture, context } = await setup({ meeting: { ...planned(), startTime: null } });
       context();
-      expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do., 15.10.2026' })).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Die Sitzung beginnt am Do, 15.10.2026' })).toBeInTheDocument();
       fixture.componentRef.setInput('meeting', { ...planned(), date: null, gremiumName: null });
       fixture.detectChanges();
       expect(screen.getByRole('heading', { name: 'Der Termin der Sitzung steht noch nicht fest.' })).toBeInTheDocument();
@@ -166,7 +166,7 @@ describe('MeetingFollowViewComponent', () => {
     it('shows the delegation setup with its deadline and locks "Anwesend" while delegated', async () => {
       const { context, fixture } = await setup({ meeting: planned() });
       context({ allowVoteDelegation: true, canDelegate: true, meetingStarted: false, deadline: '2026-10-15T15:00:00Z' });
-      expect(screen.getByText(/^Einrichtbar bis Do\., 15\.10\.2026/)).toBeInTheDocument();
+      expect(screen.getByText(/^Einrichtbar bis Do, 15\.10\.2026/)).toBeInTheDocument();
       expect(screen.getByRole('radio', { name: 'Anwesend' })).toBeEnabled();
       // The card reports an own delegation: the member cannot report "Anwesend" (O23).
       const card = fixture.debugElement.query((el) => el.name === 'app-meeting-delegation-card');
@@ -219,7 +219,7 @@ describe('MeetingFollowViewComponent', () => {
     it('follows the item of the room and names the minute-taker', async () => {
       const { context } = await setup();
       context();
-      expect(screen.getByText(/^StuPa · Do\., 15\.10\.2026 · seit \d\d:04$/)).toBeInTheDocument();
+      expect(screen.getByText(/^StuPa · Do, 15\.10\.2026 · seit \d\d:04$/)).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 1, name: 'Bericht des Finanzreferats' })).toBeInTheDocument();
       expect(screen.getByText('Jetzt')).toBeInTheDocument();
       expect(screen.getByText('Mara Keller führt das Protokoll')).toBeInTheDocument();
@@ -393,7 +393,7 @@ describe('MeetingFollowViewComponent', () => {
       context();
       expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
       expect(screen.queryByText('Jetzt')).toBeNull();
-      expect(screen.getByText(/^StuPa · Do\., 15\.10\.2026 · \d\d:04–\d\d:12$/)).toBeInTheDocument();
+      expect(screen.getByText(/^StuPa · Do, 15\.10\.2026 · \d\d:04–\d\d:12$/)).toBeInTheDocument();
       const dock = screen.getByRole('contentinfo', { name: 'Stand der Sitzung' });
       expect(within(dock).getByText(/^Geschlossen um \d\d:12$/)).toBeInTheDocument();
       expect(within(dock).getByText('3 TOPs')).toBeInTheDocument();
@@ -541,7 +541,7 @@ describe('MeetingFollowViewComponent', () => {
         media: PHONE,
       });
       context();
-      expect(screen.getByText('StuPa · Do., 15.10.2026 · 18:00')).toBeInTheDocument();
+      expect(screen.getByText('StuPa · Do, 15.10.2026 · 18:00')).toBeInTheDocument();
       expect(screen.getByText('Kalender abonnieren')).toBeInTheDocument();
     });
   });

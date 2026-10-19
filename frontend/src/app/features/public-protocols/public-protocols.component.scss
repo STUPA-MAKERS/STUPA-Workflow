@@ -157,8 +157,17 @@
   gap: 6px;
   font-style: italic;
 }
-.pp__result {
+/* The results of one item wrap inside the column. The template drops the spaces between
+   the spans, so a plain run of spans has no break point and runs into the next column. */
+.pp__results {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+  max-width: 100%;
   margin-left: 6px;
+  vertical-align: top;
+}
+.pp__result {
   color: var(--color-accent-text);
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);

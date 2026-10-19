@@ -118,14 +118,14 @@ describe('MeetingPageComponent', () => {
       const bar = screen.getByRole('toolbar', { name: 'Sitzungssteuerung' });
       expect(within(bar).getByRole('heading', { level: 1, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
       expect(within(bar).getByText('Live')).toBeInTheDocument();
-      expect(within(bar).getByText(/^StuPa · Do\., 15\.10\.2026 · seit \d\d:04$/)).toBeInTheDocument();
+      expect(within(bar).getByText(/^StuPa · Do, 15\.10\.2026 · seit \d\d:04$/)).toBeInTheDocument();
       await userEvent.click(screen.getByRole('button', { name: 'Zurück zu Sitzungen' }));
       expect(on.back).toHaveBeenCalled();
     });
 
     it('shows the planned start before the opening and start and close after the close', async () => {
       const { fixture } = await setup({ meeting: meeting({ status: 'planned', gremiumName: null }) });
-      expect(screen.getByText(/^Do\., 15\.10\.2026 · 18:00$/)).toBeInTheDocument();
+      expect(screen.getByText(/^Do, 15\.10\.2026 · 18:00$/)).toBeInTheDocument();
       fixture.componentRef.setInput(
         'meeting',
         meeting({ status: 'closed', date: null, startedAt: '2026-10-15T16:00:00Z', closedAt: '2026-10-15T18:30:00Z' }),
@@ -140,7 +140,7 @@ describe('MeetingPageComponent', () => {
       expect(screen.getByText(/^StuPa · kein Datum · \d\d:00$/)).toBeInTheDocument();
       fixture.componentRef.setInput('meeting', meeting({ status: 'planned', startTime: null }));
       fixture.detectChanges();
-      expect(screen.getByText(/^StuPa · Do\., 15\.10\.2026$/)).toBeInTheDocument();
+      expect(screen.getByText(/^StuPa · Do, 15\.10\.2026$/)).toBeInTheDocument();
     });
 
     it('lists the people who have the meeting open (N22)', async () => {

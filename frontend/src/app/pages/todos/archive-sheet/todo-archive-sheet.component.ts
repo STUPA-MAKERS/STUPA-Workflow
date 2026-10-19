@@ -15,7 +15,7 @@ import {
   SideSheetComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { isoDay, shortDay } from '../../../features/todos/todos.util';
+import { isoDay, shortDay } from '@shared/date-format';
 
 /** One page of the archive. */
 export const ARCHIVE_PAGE = 50;
@@ -99,7 +99,7 @@ export class TodoArchiveSheetComponent {
     const d = new Date(card.completedAt);
     if (Number.isNaN(d.getTime())) return '';
     return this.i18n.translate('todos.archive.doneOn', {
-      date: shortDay(isoDay(d), this.today, this.i18n.formatLocale()),
+      date: shortDay(d, this.i18n.formatLocale(), this.today),
     });
   }
 

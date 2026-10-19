@@ -7,6 +7,9 @@ export const DEFAULT_LOCALE: Locale = 'de';
 
 export type TranslationKey = keyof typeof de;
 
+/** The shape of `I18nService.translate`, for pure helpers that take the translator as an argument. */
+export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
 export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
@@ -201,6 +204,7 @@ export const de = {
   'expenses.title': 'Buchungen',
   'expenses.add': 'Buchung hinzufügen',
   'expenses.export': 'Export',
+  'expenses.exportError': 'Der Export ist fehlgeschlagen.',
   'expenses.transferFrom': 'Von Kostenstelle',
   'expenses.transferTo': 'Zu Kostenstelle',
   'expenses.transferConfirm': 'Übertragen',
@@ -473,8 +477,6 @@ export const de = {
   'apply.files.hint': 'PDF, Bilder, Word, Excel, PowerPoint, OpenDocument · bis {size} je Datei',
   'apply.files.drop': 'Dateien hierher ziehen oder auswählen',
   'apply.files.pick': 'Auswählen',
-  'apply.files.asOffer': 'Als Vergleichsangebot hochladen',
-  'apply.files.offerTag': 'Vergleichsangebot',
   'apply.files.remove': '{name} entfernen',
   'apply.files.uploading': 'Wird hochgeladen …',
   'apply.files.lost': 'Nicht mehr vorhanden',
@@ -807,6 +809,8 @@ export const de = {
   'forms.positions.offers': 'Angebote',
   'forms.positions.preferred': 'bevorzugt',
   'forms.positions.total': 'Gesamtbetrag',
+  'forms.funding.hint': 'Kosten gesamt: {total}. Leer lassen, um die volle Summe zu beantragen.',
+  'forms.funding.max': 'Die Förderung darf die Kosten ({total}) nicht übersteigen.',
   'forms.positions.sum': 'Gesamt',
   'forms.table.pending': '(Tabellen-Eingabe wird in einem späteren Schritt ergänzt.)',
   'forms.positions.position': 'Position',
@@ -858,6 +862,7 @@ export const de = {
   'chat.editShort': 'Bearbeiten',
   'chat.deleteShort': 'Löschen',
   'chat.copy': 'Text kopieren',
+  'chat.download': 'Herunterladen',
   'chat.save': 'Speichern',
   'chat.deleteTitle': 'Nachricht löschen?',
   'chat.deleteConfirm': 'Die Nachricht wird gelöscht. Das lässt sich nicht rückgängig machen.',
@@ -920,10 +925,8 @@ export const de = {
   'applications.attachments.drop': 'Dateien zum Hochladen ablegen',
   'applications.attachments.selectedCount': '{count} ausgewählt',
   'applications.attachments.deleteSelected': 'Auswahl löschen',
-  'applications.attachments.comparisonOffer': 'Vergleichsangebot',
   'applications.attachments.download': 'Herunterladen',
   'applications.attachments.preview': 'Vorschau',
-  'applications.attachments.previewClose': 'Vorschau schließen',
   'applications.attachments.delete': 'Anhang löschen',
   'applications.attachments.deleted': 'Anhang gelöscht.',
   'applications.attachments.deleteError': 'Anhang konnte nicht gelöscht werden.',
@@ -1952,6 +1955,9 @@ export const de = {
   'admin.form.isPromoted': 'In Kennzahl übernehmen',
   'admin.form.promoteTarget': 'Ziel-Kennzahl',
   'admin.form.dupKeys': 'Doppelte Feld-Schlüssel: {keys}',
+  'admin.form.fundingTwice': 'Ein Formular hat höchstens ein Feld „Beantragte Förderung“.',
+  'admin.form.fundingNoPositions':
+    'Das Feld „Beantragte Förderung“ braucht Kostenpositionen im selben Formular.',
   'admin.form.type.text': 'Kurztext',
   'admin.form.type.textarea': 'Langtext',
   'admin.form.type.number': 'Zahl',
@@ -1970,6 +1976,7 @@ export const de = {
   'admin.form.type.markdown': 'Hinweistext (Markdown)',
   'admin.form.type.computed': 'Berechnetes Feld',
   'admin.form.type.positions': 'Kostenpositionen',
+  'admin.form.type.funding': 'Beantragte Förderung (€)',
   'admin.form.type.section': 'Abschnitt (neuer Schritt)',
   'admin.form.metric.amount': 'Betrag (Budget)',
   'admin.form.positions': 'Kostenpositionen',
@@ -2019,7 +2026,6 @@ export const de = {
   'admin.flow.err.notifyRecipientInvalid': 'Ungültiger Empfänger in der Benachrichtigungs-Aktion.',
   'admin.flow.err.notifyRecipientValue': 'Der Empfänger „{kind}“ braucht einen Wert.',
   'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
-  'admin.flow.preset': 'Vorlage',
   'admin.flow.addState': 'Status hinzufügen',
   'admin.flow.initial': 'Initial',
   'admin.flow.color': 'Farbe',
@@ -2184,8 +2190,6 @@ export const de = {
   'admin.flow.actionDesc.openVote':
     'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
-  'admin.flow.preset.simple': 'Einfach: Entwurf → Eingereicht → Entschieden',
-  'admin.flow.preset.vote': 'Mit Abstimmung: Entwurf → Prüfung → Abstimmung → Entschieden',
   // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versionen',
   'admin.flow.versionsClose': 'Zurück zur Bearbeitung',
@@ -2830,6 +2834,7 @@ export const de = {
   'budget.dash.year': 'Haushaltsjahr',
   'budget.dash.yearShort': 'HHJ {year}',
   'budget.dash.export': 'Exportieren',
+  'budget.dash.exportError': 'Der Export ist fehlgeschlagen.',
   'budget.dash.fig.allocated': 'Zuteilung',
   'budget.dash.fig.requested': 'Beantragt',
   'budget.dash.fig.bound': 'Gebunden',

@@ -48,17 +48,11 @@
                     [disabled]="true"
                     [name]="r.id + '-key'"
                   />
-                  <app-input
-                    [label]="'admin.common.labelDe' | t"
-                    [ngModel]="nameDraft(r).de"
-                    (ngModelChange)="patchName(r, 'de', $event)"
-                    [name]="r.id + '-nde'"
-                  />
-                  <app-input
-                    [label]="'admin.common.labelEn' | t"
-                    [ngModel]="nameDraft(r).en"
-                    (ngModelChange)="patchName(r, 'en', $event)"
-                    [name]="r.id + '-nen'"
+                  <app-i18n-input
+                    [de]="nameDraft(r).de"
+                    (deChange)="patchName(r, 'de', $event)"
+                    [en]="nameDraft(r).en"
+                    (enChange)="patchName(r, 'en', $event)"
                   />
                 </div>
 
@@ -134,17 +128,11 @@
       [required]="true"
       [error]="keyError()"
     />
-    <app-input
-      [label]="'admin.common.labelDe' | t"
-      [ngModel]="draft().labelDe"
-      (ngModelChange)="patchDraft('labelDe', $event)"
-      name="roleLabelDe"
-    />
-    <app-input
-      [label]="'admin.common.labelEn' | t"
-      [ngModel]="draft().labelEn"
-      (ngModelChange)="patchDraft('labelEn', $event)"
-      name="roleLabelEn"
+    <app-i18n-input
+      [de]="draft().labelDe"
+      (deChange)="patchDraft('labelDe', $event)"
+      [en]="draft().labelEn"
+      (enChange)="patchDraft('labelEn', $event)"
     />
     <button type="submit" hidden></button>
   </form>

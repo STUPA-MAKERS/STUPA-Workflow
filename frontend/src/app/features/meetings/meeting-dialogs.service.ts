@@ -6,7 +6,7 @@ import type { AgendaItem, Attendance, HandoverMode, Meeting, Uuid } from '@core/
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingSessionService } from './meeting-session.service';
 import { MeetingsTimelineService } from './meetings-timeline.service';
-import { errorCode, errorDetail } from './meetings-display.util';
+import { problemCode, problemDetail } from '@core/api/problem';
 
 /** The refusals of a handover that the dialog explains in its body. */
 const HANDOVER_REFUSALS = new Set([
@@ -144,7 +144,7 @@ export class MeetingDialogsService {
       },
       error: (err: unknown) => {
         this.handoverSaving.set(false);
-        const code = errorCode(err);
+        const code = problemCode(err);
         if (HANDOVER_REFUSALS.has(code)) {
           this.handoverRefusal.set(code);
           return;
@@ -166,11 +166,11 @@ export class MeetingDialogsService {
   }
 
   private keeperChangeFailed(err: unknown): void {
-    if (errorCode(err) === 'protokollant_needs_protocol_write') {
+    if (problemCode(err) === 'protokollant_needs_protocol_write') {
       this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
       return;
     }
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }

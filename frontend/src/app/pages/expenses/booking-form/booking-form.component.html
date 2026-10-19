@@ -9,17 +9,14 @@
   (submit)="submit($event)"
 >
   @if (layout() !== 'sheet') {
-    <header class="ff__head">
-      <div class="ff__titles">
-        <h2 class="ff__title" [id]="'bf-title-' + mode()">{{ (mode() === 'create' ? 'expenses.add' : 'expenses.edit') | t }}</h2>
-        @if (subtitle()) {
-          <p class="ff__subtitle">{{ subtitle() }}</p>
-        }
-      </div>
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" />
-      </app-button>
-    </header>
+    <header
+      class="ff__head"
+      appPaneFormHead
+      [heading]="(mode() === 'create' ? 'expenses.add' : 'expenses.edit') | t"
+      [headingId]="'bf-title-' + mode()"
+      [subtitle]="subtitle()"
+      (closed)="close()"
+    ></header>
   }
 
   <div class="ff__body" appScrollFade="y">
@@ -177,28 +174,21 @@
             @if (subRows().length) {
               <div class="rowgroup" [class.rowgroup--bg3]="layout() === 'sheet'" role="list">
                 @for (r of subRows(); track r.id) {
-                  <div class="ff__row" role="listitem">
-                    <span class="ff__rowBody">
-                      <span class="ell" [title]="r.description">↳ {{ r.description }}</span>
-                      <span class="ff__rowMeta ell">
-                        {{ r.paymentDate ? (r.paymentDate | ldate: 'mediumDate') : '—' }}
-                        @if (r.correspondent) {
-                          · {{ r.correspondent }}
-                        }
-                      </span>
+                  <app-booking-row mark plain [title]="r.description" [amount]="signed(r)">
+                    <span meta>
+                      {{ r.paymentDate ? (r.paymentDate | ldate: 'mediumDate') : '—' }}
+                      @if (r.correspondent) {
+                        · {{ r.correspondent }}
+                      }
                     </span>
-                    <span class="mono">{{ signed(r) }}</span>
                     <app-row-menu
                       [label]="'expenses.rowMenu' | t: { description: r.description }"
                       [sections]="subMenu()"
                       (selected)="onSubMenu($event, r)"
                     />
-                  </div>
+                  </app-booking-row>
                 }
-                <div class="ff__sum">
-                  <span>{{ 'expenses.sub.sumLine' | t }}</span>
-                  <span class="mono">{{ signed(e) }}</span>
-                </div>
+                <app-sum-row quiet [label]="'expenses.sub.sumLine' | t" [amount]="signed(e)" />
               </div>
             }
             <app-button variant="text" size="sm" (click)="addSub.emit()">
@@ -325,31 +315,22 @@
     </div>
   </div>
 
-  <footer class="ff__foot">
-    @if (mode() === 'edit') {
-      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
-      <app-button
-        variant="danger"
-        [iconOnly]="layout() === 'sheet'"
-        [ariaLabel]="'action.delete' | t"
-        (click)="remove.emit()"
-      >
-        <span class="ff__btn"
-          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
-        >
+  <footer
+    class="ff__foot"
+    appPaneFormFoot
+    [deletable]="mode() === 'edit'"
+    [compact]="layout() === 'sheet'"
+    (removed)="remove.emit()"
+    (cancelled)="close()"
+  >
+    @if (mode() === 'create') {
+      <app-button variant="fill" [disabled]="!s.canSubmitCreate()" [loading]="saving()" (click)="submit($event)">
+        <span class="ff__btn"><app-icon name="plus" />{{
+          (layout() === 'sheet' ? 'expenses.form.addShort' : 'expenses.add') | t
+        }}</span>
       </app-button>
+    } @else {
+      <app-button variant="fill" [loading]="saving()" (click)="submit($event)">{{ 'action.save' | t }}</app-button>
     }
-    <div class="ff__footEnd">
-      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-      @if (mode() === 'create') {
-        <app-button variant="fill" [disabled]="!s.canSubmitCreate()" [loading]="saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="plus" />{{
-            (layout() === 'sheet' ? 'expenses.form.addShort' : 'expenses.add') | t
-          }}</span>
-        </app-button>
-      } @else {
-        <app-button variant="fill" [loading]="saving()" (click)="submit($event)">{{ 'action.save' | t }}</app-button>
-      }
-    </div>
   </footer>
 </form>

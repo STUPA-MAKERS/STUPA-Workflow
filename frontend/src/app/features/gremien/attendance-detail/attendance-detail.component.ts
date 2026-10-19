@@ -34,7 +34,7 @@ import {
   StatusTextComponent,
   watchAnchoredPopover,
 } from '@stupa-makers/ui-kit';
-import { dayMonth, monthLabel } from '../gremien.util';
+import { dayMonth, monthYear } from '@shared/date-format';
 
 /** The gap between the cell and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
@@ -173,7 +173,7 @@ export class AttendanceDetailComponent {
   }
 
   day(value: string | null): string {
-    return dayMonth(value, this.i18n.locale());
+    return dayMonth(value, this.i18n.formatLocale());
   }
 
   private load(request: AttendanceDetailRequest): void {
@@ -194,7 +194,7 @@ export class AttendanceDetailComponent {
         this.groups.set(
           answers.map((a) => ({
             month: a.month,
-            label: multi ? monthLabel(a.month, this.i18n.locale(), 'long') : '',
+            label: multi ? monthYear(a.month, this.i18n.formatLocale()) : '',
             meetings: a.meetings,
           })),
         );

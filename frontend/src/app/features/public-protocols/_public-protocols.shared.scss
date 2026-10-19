@@ -1,5 +1,3 @@
-@use 'dot-parts' as dots;
-
 // Shared pieces of the public protocol pages (list and detail).
 
 // "Start › Öffentliche Protokolle": a small path above the title.
@@ -28,13 +26,23 @@
 }
 
 // Inline parts with a middle dot between them ("2 Beschlüsse · 1 TOP ausgelassen").
+// Every part starts with its dot, and the list moves one dot width to the left and clips
+// it, so the dot that starts a line (the first part, or a part that wrapped) is hidden.
+// A wrapped line then never starts with a separator.
 @mixin dot-list($sel) {
   #{$sel} {
     display: flex;
     flex-wrap: wrap;
-    margin: 0;
+    margin: 0 0 0 -15px;
+    clip-path: inset(0 0 0 15px);
   }
-  @include dots.between('#{$sel} > span', $next: 'span');
+  #{$sel} > span::before {
+    content: '·';
+    display: inline-block;
+    width: 15px;
+    text-align: center;
+    color: var(--color-text-subtle);
+  }
 }
 
 // A link that looks like an outlined pill button (the PDF download is a real `<a>`).

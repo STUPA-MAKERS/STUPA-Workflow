@@ -40,9 +40,13 @@ import {
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
+import { GremienApiService } from '@core/api/gremien.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { GremienStore } from '../gremien.store';
-import { localized, weekdayDay } from '../gremien.util';
+import { localized } from '../gremien.util';
+import { weekdayDate } from '@shared/date-format';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 /** The permission that shows every gremium, also without a membership. */
 export const GREMIUM_VIEW_ALL = 'gremium.view_all';
@@ -79,6 +83,7 @@ export interface GremiumRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     NgTemplateOutlet,
     RouterOutlet,
@@ -176,6 +181,12 @@ export class GremienComponent implements OnDestroy {
   ]);
 
   constructor() {
+    // The shown gremien read their first tab ahead, so a click shows it at once.
+    prefetchDetails({
+      items: computed(() => [...this.mine(), ...this.others()]),
+      key: (r) => r.item.id,
+      reads: (r) => [inject(GremienApiService).meetings(r.item.id)],
+    });
     this.store.load();
     this.readSelection();
     this.router.events
@@ -237,7 +248,7 @@ export class GremienComponent implements OnDestroy {
     else if (item.nextMeeting?.date) {
       next = {
         kind: 'date',
-        text: weekdayDay(item.nextMeeting.date, locale),
+        text: weekdayDate(item.nextMeeting.date, this.i18n.formatLocale(), { year: false }),
         title: this.i18n.translate('gremien.list.nextTitle', { title: item.nextMeeting.title }),
       };
     }

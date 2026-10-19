@@ -1,5 +1,7 @@
 import { computed, inject, signal, type WritableSignal } from '@angular/core';
-import type { SelectOption } from '@stupa-makers/ui-kit';
+import { I18nService } from '@core/i18n/i18n.service';
+import { type SelectOption, ToastService } from '@stupa-makers/ui-kit';
+import { exportDownload } from '@shared/download.util';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -8,7 +10,6 @@ import {
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { debounced } from '@shared/debounced';
-import { downloadBlob } from '@stupa-makers/ui-kit';
 
 export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
 
@@ -19,6 +20,8 @@ export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'payment
  */
 export class ExpensesListState {
   private readonly api = inject(BudgetTreeApi);
+  private readonly i18n = inject(I18nService);
+  private readonly toast = inject(ToastService);
 
   private readonly PAGE = 20;
   private nextOffset = 0;
@@ -239,25 +242,21 @@ export class ExpensesListState {
   }
 
   onExport(): void {
-    if (this.exporting()) return;
-    this.exporting.set(true);
-    this.api
-      .exportExpensesXlsx({
-        budget: this.budgetId() || undefined,
-        kind: this.kind() || undefined,
-        q: this.q().trim() || undefined,
-        amountMin: this.amountMin().trim() || undefined,
-        amountMax: this.amountMax().trim() || undefined,
-        createdFrom: this.createdFrom() || undefined,
-        createdTo: this.createdTo() || undefined,
-      })
-      .subscribe({
-        next: (blob) => {
-          downloadBlob(blob, 'buchungen.xlsx');
-          this.exporting.set(false);
-        },
-        error: () => this.exporting.set(false),
-      });
+    exportDownload(
+      this.exporting,
+      () =>
+        this.api.exportExpensesXlsx({
+          budget: this.budgetId() || undefined,
+          kind: this.kind() || undefined,
+          q: this.q().trim() || undefined,
+          amountMin: this.amountMin().trim() || undefined,
+          amountMax: this.amountMax().trim() || undefined,
+          createdFrom: this.createdFrom() || undefined,
+          createdTo: this.createdTo() || undefined,
+        }),
+      'buchungen.xlsx',
+      () => this.toast.error(this.i18n.translate('expenses.exportError')),
+    );
   }
 
   dispose(): void {

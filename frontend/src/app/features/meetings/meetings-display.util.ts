@@ -1,16 +1,18 @@
 /** Pure, DI-free display helpers for the meetings feature. */
 
 import { toFormatLocale } from '@core/i18n/i18n.service';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type {
   AgendaItem,
   Attendance,
   AttendanceStatus,
   Meeting,
   MeetingVote,
+  Quorum,
   SelfAttendanceStatus,
 } from '@core/api/models';
-import type { BadgeVariant, IconName } from '@stupa-makers/ui-kit';
+import { clock, shortTime, weekdayDate } from '@shared/date-format';
+import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ServerMessage } from '@core/ws/ws-messages';
 
 /** Canonical ballot options. The pass/fail evaluation needs yes, no and abstain. */
@@ -20,14 +22,6 @@ export const FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
  * The status mappers return status variants only (coloured text). `neutral` is a tag
  * (a grey plate), so a status that has no colour of its own uses `info` (muted text).
  */
-export function meetingStatusVariant(status: Meeting['status']): BadgeVariant {
-  return status === 'live' ? 'success' : 'info';
-}
-
-export function meetingStatusKey(status: Meeting['status']): TranslationKey {
-  return `meetings.status.${status}` as TranslationKey;
-}
-
 export function voteStatusVariant(status: MeetingVote['status']): BadgeVariant {
   if (status === 'open') return 'success';
   if (status === 'closed') return 'info';
@@ -46,27 +40,6 @@ export function voteResultVariant(result: string | null | undefined): BadgeVaria
   return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'info';
 }
 
-export function attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {
-  return `meetings.attendance.${status}` as TranslationKey;
-}
-
-export function attendanceButtonVariant(
-  status: AttendanceStatus,
-): 'primary' | 'secondary' | 'danger' {
-  return status === 'present' ? 'primary' : status === 'excused' ? 'secondary' : 'danger';
-}
-
-export function attendanceIcon(status: AttendanceStatus): IconName {
-  return status === 'present' ? 'check' : status === 'excused' ? 'half' : 'x';
-}
-
-export function attendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
-  return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
-}
-
-/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
-export const SELF_ATTENDANCE_STATUSES: readonly SelfAttendanceStatus[] = ['present', 'excused'];
-
 /** The member labels: "Anwesend / Abwesend", where "Abwesend" is `excused` (Z2). */
 export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey {
   return status === 'present' ? 'meetings.attendance.selfPresent' : 'meetings.attendance.selfExcused';
@@ -79,11 +52,6 @@ export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey 
  */
 export function memberAttendanceKey(status: AttendanceStatus): TranslationKey {
   return selfAttendanceKey(status === 'present' ? 'present' : 'excused');
-}
-
-/** The badge colour that a member sees. `excused` and `absent` look the same (Z2). */
-export function memberAttendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
-  return status === 'present' ? 'success' : 'warning';
 }
 
 /**
@@ -113,18 +81,6 @@ export function voteOptionLabel(
   return label === key ? opt : label;
 }
 
-/** The stable problem+json `code` of an HTTP error (for example `open_vote`), or `''`. */
-export function errorCode(err: unknown): string {
-  const body = (err as { error?: { code?: string } } | null)?.error;
-  return typeof body?.code === 'string' ? body.code : '';
-}
-
-/** The problem+json `detail` message of an HTTP error, or an empty string. */
-export function errorDetail(err: unknown): string {
-  const body = (err as { error?: { detail?: string } } | null)?.error;
-  return typeof body?.detail === 'string' ? body.detail : '';
-}
-
 /**
  * Assemble the protocol markdown from the ordered TOPs.
  * Top-level `#` headings are required. The protocol renderer numbers them
@@ -142,51 +98,11 @@ export function assembleProtocolMarkdown(agenda: AgendaItem[]): string {
     .join('\n\n');
 }
 
-/** A meeting date with a short weekday ("Di., 13.10.2026"). `formatLocale` is the
- *  `Intl` locale of the page (`I18nService.formatLocale()`). */
-export function weekdayDate(isoDate: string, formatLocale: string): string {
-  const date = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  return new Intl.DateTimeFormat(formatLocale, {
-    weekday: 'short',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(date);
-}
-
-/** "35. Sitzung des Studierendenparlaments · Di., 13.10.2026": the meeting below the
+/** "35. Sitzung des Studierendenparlaments · Di, 13.10.2026": the meeting below the
  *  title of a dialog. */
 export function meetingLine(m: Meeting, formatLocale: string): string {
-  return m.date ? `${m.title} · ${weekdayDate(m.date, formatLocale)}` : m.title;
-}
-
-/** Long localized date ("14. Juni 2026"). It mirrors the `ldate` pipe. */
-export function longDate(isoDate: string, i18nLocale: string): string {
-  const date = new Date(isoDate);
-  if (Number.isNaN(date.getTime())) return isoDate;
-  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), { dateStyle: 'long' }).format(date);
-}
-
-/**
- * Clock time of a meeting as `HH:MM`, always 24 h.
- *
- * The API sends a SQL `time`, thus `18:00:00`. The seconds are noise on screen.
- * An empty value gives an empty string. A value that is not a time stays as it
- * is, because unreadable source text tells more than an invented time. The
- * format stays 24 h on purpose: `app-time-input` also forces 24 h, because the
- * native `type="time"` follows the browser locale and can show AM/PM.
- */
-export function shortTime(value: string | null | undefined): string {
-  const raw = (value ?? '').trim();
-  const match = /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/.exec(raw);
-  return match ? `${match[1].padStart(2, '0')}:${match[2]}` : raw;
-}
-
-/** `", 18:00"` suffix behind a meeting date, or an empty string. */
-export function meetingTimeSuffix(value: string | null | undefined): string {
-  const time = shortTime(value);
-  return time ? `, ${time}` : '';
+  const day = weekdayDate(m.date, formatLocale);
+  return day ? `${m.title} · ${day}` : m.title;
 }
 
 /** Placeholder vote for a live `vote_opened` that was not loaded yet (follower). */
@@ -218,18 +134,6 @@ export function liveOpenedVote(
   };
 }
 
-/** The clock time (`HH:MM`, 24 h) of an ISO timestamp in local time, or `''`. */
-export function clockTime(iso: string | null | undefined, i18nLocale: string): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), {
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).format(date);
-}
-
 /** The time line of a meeting row: a running meeting shows its start (`since`). */
 export interface MeetingTimeText {
   /** `HH:MM` or `HH:MM–HH:MM`. Empty when the meeting has no time at all. */
@@ -249,10 +153,10 @@ export interface MeetingTimeText {
 export function meetingTimeText(m: Meeting, i18nLocale: string): MeetingTimeText {
   const range = (a: string, b: string): string => (a && b ? `${a}–${b}` : a);
   const planned = range(shortTime(m.startTime), shortTime(m.endTime));
-  const started = clockTime(m.startedAt, i18nLocale);
+  const started = clock(m.startedAt, toFormatLocale(i18nLocale));
   if (m.status === 'live' && started) return { text: started, since: true };
   if (m.status === 'closed' && started) {
-    return { text: range(started, clockTime(m.closedAt, i18nLocale)), since: false };
+    return { text: range(started, clock(m.closedAt, toFormatLocale(i18nLocale))), since: false };
   }
   return { text: planned, since: false };
 }
@@ -262,38 +166,75 @@ export function meetingDay(m: Meeting): string | null {
   return m.date ? `${m.date}T00:00:00` : null;
 }
 
+/** The rule fields of a vote that the rules line reads. */
+export interface VoteRules {
+  majorityRule?: string | null;
+  /** Unknown (a live vote before the next read) leaves the part out. */
+  secret?: boolean;
+  quorum?: Quorum | null;
+  /** Admitted guests vote too: no quorum, the majority of the cast votes decides (#17). */
+  guestsVote?: boolean;
+}
+
+/** "Einfache Mehrheit", or "Einfache Mehrheit der abgegebenen Stimmen" for a vote with guests. */
+export function majorityLabel(
+  rule: string,
+  guestsVote: boolean | undefined,
+  t: Translate,
+): string {
+  const family = guestsVote ? 'vote.majorityCast' : 'vote.majority';
+  return t(`${family}.${rule}` as TranslationKey);
+}
+
+/** "geheime Abstimmung" or "offene Abstimmung". */
+export function secrecyLabel(secret: boolean, t: Translate): string {
+  return t(secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort');
+}
+
+/** "Quorum 12" or "Quorum 50 %". */
+export function quorumLabel(quorum: Quorum, t: Translate): string {
+  return t(quorum.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount', {
+    n: quorum.value,
+  });
+}
+
+/** The options of {@link voteRulesParts}. */
+export interface VoteRulesOptions {
+  /**
+   * The ballot panel: "Absolute Mehrheit · Quorum 12 · geheime Abstimmung". The quorum
+   * comes before the secrecy, and only a secret vote names it (an open vote is the rule
+   * there, so "offene Abstimmung" says nothing).
+   */
+  ballot?: boolean;
+}
+
+/**
+ * The rule parts of a vote: "Einfache Mehrheit · offene Abstimmung · Quorum 12" (the
+ * meeting pages, the beamer, the public protocol), or the ballot form of
+ * {@link VoteRulesOptions.ballot}. A part without data stays out: a vote that a live event
+ * added before the next read has no rules yet, and a vote without a quorum shows none.
+ */
+export function voteRulesParts(vote: VoteRules, t: Translate, options: VoteRulesOptions = {}): string[] {
+  const majority = vote.majorityRule ? [majorityLabel(vote.majorityRule, vote.guestsVote, t)] : [];
+  const quorum = vote.quorum ? [quorumLabel(vote.quorum, t)] : [];
+  if (options.ballot) {
+    return [...majority, ...quorum, ...(vote.secret ? [secrecyLabel(true, t)] : [])];
+  }
+  const secrecy = vote.secret === undefined ? [] : [secrecyLabel(vote.secret, t)];
+  return [...majority, ...secrecy, ...quorum];
+}
+
 /**
  * The rules line of a vote card: "Einfache Mehrheit · offene Abstimmung · Quorum 12 ·
- * seit 18:48". A part without data stays out: a vote that a live event added before the
- * next read has no rules yet, and a vote without a quorum shows none.
+ * seit 18:48" ({@link voteRulesParts}, then the time of the open or the end).
  */
-export function voteMetaLine(
-  vote: MeetingVote,
-  translate: (key: TranslationKey, params?: Record<string, string | number>) => string,
-  i18nLocale: string,
-): string {
-  const parts: string[] = [];
-  if (vote.majorityRule) {
-    // A vote with guests has no quorum: the majority of the cast votes decides (#17).
-    const family = vote.guestsVote ? 'vote.majorityCast' : 'vote.majority';
-    parts.push(translate(`${family}.${vote.majorityRule}` as TranslationKey));
-  }
-  if (vote.secret !== undefined) {
-    parts.push(translate(vote.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'));
-  }
-  if (vote.quorum) {
-    parts.push(
-      translate(
-        vote.quorum.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount',
-        { n: vote.quorum.value },
-      ),
-    );
-  }
+export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
+  const parts = voteRulesParts(vote, translate);
   if (vote.status === 'open') {
-    const since = clockTime(vote.openedAt, i18nLocale);
+    const since = clock(vote.openedAt, toFormatLocale(i18nLocale));
     if (since) parts.push(translate('meetings.vote.since', { time: since }));
   } else if (vote.status === 'closed' || vote.status === 'cancelled') {
-    const ended = clockTime(vote.closedAt, i18nLocale);
+    const ended = clock(vote.closedAt, toFormatLocale(i18nLocale));
     if (ended) parts.push(translate('meetings.vote.endedAt', { time: ended }));
   }
   return parts.join(' · ');
@@ -306,7 +247,7 @@ export function voteMetaLine(
 export function guestComposition(
   members: number | null | undefined,
   guests: number | null | undefined,
-  translate: (key: TranslationKey, params?: Record<string, string | number>) => string,
+  translate: Translate,
 ): string | null {
   if (members === null || members === undefined || guests === null || guests === undefined) {
     return null;

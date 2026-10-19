@@ -100,8 +100,12 @@
                     } @else {
                       <span class="pp__topTitle">
                         <app-highlight [text]="top.title" [query]="appliedQuery()" />
-                        @for (r of top.results; track $index) {
-                          <span class="pp__result" [class.pp__result--no]="r !== 'passed' && r !== 'elected'">{{ resultLabel(r) | t }}</span>
+                        @if (top.results.length) {
+                          <span class="pp__results">
+                            @for (r of top.results; track $index) {
+                              <span class="pp__result" [class.pp__result--no]="r !== 'passed' && r !== 'elected'">{{ resultLabel(r) | t }}</span>
+                            }
+                          </span>
                         }
                       </span>
                     }

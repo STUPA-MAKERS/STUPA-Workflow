@@ -5,6 +5,7 @@
 // sits on the page.
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
+@use 'swatch';
 
 :host {
   display: flex;
@@ -27,13 +28,6 @@
 }
 
 /* ------------------------------------------------------------------ header */
-.fd__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sheet-head-gap);
-  padding-bottom: 22px;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 .fd__line {
   --fd-sep: 24px;
 }
@@ -176,19 +170,14 @@
   white-space: pre-line;
 }
 .fd__swatch {
-  display: inline-block;
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
+  @include swatch.mark;
 }
 .fd__dot {
   margin-inline: 6px;
   color: var(--color-text-subtle);
 }
-.fd__ccLine .fd__swatch {
-  margin-inline-end: 8px;
-  vertical-align: 0;
+.fd__ccLine {
+  --ccl-gap: 8px;
 }
 
 /* A row that links to another record (application, invoice, booking). */
@@ -275,46 +264,6 @@
   font-size: var(--fs-small);
 }
 
-/* Sub-booking rows. */
-.fd__subRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 3.5rem;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-}
-.fd__subMark {
-  flex: none;
-  color: var(--color-text-subtle);
-}
-.fd__subBody {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.fd__subTitle {
-  font-weight: var(--fw-medium);
-}
-.fd__subMeta {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.fd__subAmount {
-  flex: none;
-  font-size: 0.8125rem;
-}
-.fd__subSum {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.fd__subSum .mono {
-  color: var(--color-text);
-}
 
 /* The cost-centre card with its figures. */
 .fd__ccCard {

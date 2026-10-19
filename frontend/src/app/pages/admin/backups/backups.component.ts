@@ -4,7 +4,10 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent, backupStatus } from '@shared/ui';
+import {
+  PageHeaderComponent,
+  backupStatus,
+} from '@shared/ui';
 import {
   ButtonComponent,
   CellDirective,
@@ -15,6 +18,7 @@ import {
   downloadBlob,
   EmptyStateComponent,
   FilePickerComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
   NoteComponent,
@@ -25,8 +29,8 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
 import type { Backup, BackupKind } from '../admin.models';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** File name the browser saves an archive under. Mirrors the server-side name. */
 function archiveFileName(createdAt: string): string {
@@ -60,6 +64,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FilePickerComponent,
+    SectionHeaderComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
@@ -145,7 +150,7 @@ export class BackupsComponent implements OnDestroy {
 
   /** Human-readable size. Archives are megabytes to gigabytes, so bytes help nobody. */
   protected sizeLabel(bytes: number | null | undefined): string {
-    return formatBytes(bytes, this.i18n);
+    return formatBytes(bytes, this.i18n.formatLocale());
   }
 
   /** "Manuell · vor der Haushaltsabstimmung": the line under the restore title. */

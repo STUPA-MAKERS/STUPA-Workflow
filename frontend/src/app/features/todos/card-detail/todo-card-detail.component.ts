@@ -34,7 +34,7 @@ import {
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
@@ -76,15 +76,13 @@ import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfe
 import {
   LINK_ICON,
   eventText,
-  isoDay,
   linkSub,
   linkTitle,
-  longDay,
-  personName,
   relativeDays,
   splitUrl,
-  type Translate,
 } from '../todos.util';
+import { isoDay, weekdayDate } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 type CardTab = 'details' | 'activity';
 
@@ -318,8 +316,7 @@ export class TodoCardDetailComponent {
   readonly createdParts = computed<string[]>(() => {
     const c = this.card();
     if (!c) return [];
-    const d = new Date(c.createdAt);
-    const day = Number.isNaN(d.getTime()) ? '' : longDay(isoDay(d), this.i18n.formatLocale());
+    const day = weekdayDate(c.createdAt, this.i18n.formatLocale());
     const by = this.t('todos.card.createdBy', { name: personName(c.createdBy, this.t) });
     return day ? [by, day] : [by];
   });
@@ -327,8 +324,7 @@ export class TodoCardDetailComponent {
   readonly archivedLine = computed(() => {
     const at = this.card()?.archivedAt;
     if (!at) return null;
-    const d = new Date(at);
-    return Number.isNaN(d.getTime()) ? null : longDay(isoDay(d), this.i18n.formatLocale());
+    return weekdayDate(at, this.i18n.formatLocale()) || null;
   });
 
   readonly canWrite = computed(() => {
@@ -569,7 +565,8 @@ export class TodoCardDetailComponent {
       this.loadMembers(held.boardId);
     }
     const local = this.localSeq;
-    this.api.card(id).subscribe({
+    // `detail`: a list that read the card ahead (the tasks page) paints it at once.
+    this.api.card(id, { detail: fresh }).subscribe({
       next: (card) => {
         if (seq !== this.seq) return;
         if (held && (this.editing() || local !== this.localSeq)) {
@@ -596,7 +593,7 @@ export class TodoCardDetailComponent {
     this.membersOf = boardId;
     const held = this.cache?.members(boardId);
     if (held) this.members.set(held);
-    this.api.members(boardId).subscribe({
+    this.api.members(boardId, { detail: true }).subscribe({
       next: (list) => this.members.set(list),
       error: () => {
         this.membersOf = null;
@@ -1001,7 +998,8 @@ export class TodoCardDetailComponent {
   copyLink(): void {
     const c = this.card();
     if (!c) return;
-    const url = `${location.origin}/todos/${c.boardId}?card=${c.id}`;
+    // The card only: the link stays valid when the card moves to another board.
+    const url = `${location.origin}/todos?card=${c.id}`;
     void copyText(url).then((ok) =>
       ok
         ? this.toast.success(this.t('todos.card.linkCopied'))

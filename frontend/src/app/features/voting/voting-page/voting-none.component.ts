@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { DetailNoneComponent, type DetailNoneState } from '@shared/ui/detail-none/detail-none.component';
 import { VotingComponent } from './voting.component';
-import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The detail pane of `/voting` before a vote is open. Only the side-by-side layout shows
@@ -15,14 +15,14 @@ import { EmptyStateComponent } from '@stupa-makers/ui-kit';
   selector: 'app-voting-none',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, EmptyStateComponent],
+  imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './voting-none.component.html',
-  styleUrl: './voting-none.component.scss',
+  styleUrl: '../../../shared/ui/detail-none/detail-none-host.scss',
 })
 export class VotingNoneComponent {
   private readonly page = inject(VotingComponent, { optional: true });
 
-  protected readonly state = computed<'busy' | 'empty' | 'pick'>(() => {
+  protected readonly state = computed<DetailNoneState>(() => {
     const page = this.page;
     if (!page || page.loading() || page.error()) return 'busy';
     return page.items().length || page.activeFilterCount() > 0 ? 'pick' : 'empty';

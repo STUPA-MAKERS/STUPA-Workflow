@@ -27,6 +27,8 @@ import {
 } from '@stupa-makers/ui-kit';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import type { FinanceFormLayout } from '../../expenses/booking-form/booking-form.component';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 
 /** What the import found: `parsed` (ZUGFeRD read), `manual` (no ZUGFeRD), or nothing. */
 export type InvoiceImportNotice = 'parsed' | 'manual' | null;
@@ -107,6 +109,8 @@ export interface InvoiceFormHost {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TextareaComponent,
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
     NoteComponent,
     ButtonComponent,
     CurrencyInputComponent,

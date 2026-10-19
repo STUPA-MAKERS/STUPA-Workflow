@@ -59,8 +59,8 @@ def test_token_prefixes_and_hash() -> None:
     at = oauth.generate_access_token()
     rt = oauth.generate_refresh_token()
     assert oauth.is_access_token(at) and not oauth.is_access_token(rt)
-    assert oauth.tokens_match(at, oauth.hash_token(at))
-    assert not oauth.tokens_match(at, oauth.hash_token(rt))
+    assert len(oauth.hash_token(at)) == 32  # the SHA-256 digest, never the plaintext
+    assert oauth.hash_token(at) != oauth.hash_token(rt)
 
 
 def test_unscoped_principal_unrestricted() -> None:

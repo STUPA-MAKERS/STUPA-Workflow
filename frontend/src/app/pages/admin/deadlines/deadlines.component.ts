@@ -28,18 +28,14 @@ import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { dayMonthYear, localToday } from '@shared/date-format';
 
 /** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
 export interface DeadlineValue {
   text: string;
   title: string;
   muted: boolean;
-}
-
-/** Today as `YYYY-MM-DD` in local time, for the comparison with the recurring dates. */
-function localToday(now: Date): string {
-  const p = (n: number): string => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
 const KINDS: DeadlineKind[] = [
@@ -114,6 +110,7 @@ function emptyDraft(): PolicyDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -245,11 +242,7 @@ export class AdminDeadlinesComponent {
   }
 
   private dateText(iso: string): string {
-    return new Date(iso).toLocaleDateString(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return dayMonthYear(iso, this.i18n.formatLocale());
   }
 
   protected openAdd(): void {

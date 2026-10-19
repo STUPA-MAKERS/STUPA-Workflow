@@ -13,6 +13,8 @@ import { ActivatedRoute, NavigationEnd, type ParamMap, Router, RouterOutlet } fr
 import type { Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import type { PersonRef, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
@@ -49,6 +51,7 @@ import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
@@ -94,6 +97,7 @@ export interface TicketGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     RouterOutlet,
     TranslatePipe,
@@ -244,6 +248,15 @@ export class TicketsComponent implements OnDestroy {
   readonly hasMore = computed(() => this.items().length < this.total());
 
   constructor() {
+    // The shown tickets read their detail ahead, so a click shows it at once.
+    prefetchDetails({
+      items: computed(() => [...this.items(), ...(this.closedItems() ?? [])]),
+      key: (t) => t.id,
+      reads: (t) =>
+        this.manager
+          ? [this.api.get(t.id, { detail: true }), inject(TodosApiService).linked('ticket', t.id)]
+          : [this.api.getMine(t.id, { detail: true })],
+    });
     if (this.manager) {
       this.api.assignees().subscribe({
         next: (list) => this.assignees.set(list),

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { DetailNoneComponent, type DetailNoneState } from '@shared/ui/detail-none/detail-none.component';
 import { TicketsComponent } from './tickets.component';
-import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The detail pane of `/tickets` before a ticket is open. Only the side-by-side layout
@@ -12,14 +12,14 @@ import { EmptyStateComponent } from '@stupa-makers/ui-kit';
   selector: 'app-tickets-none',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, EmptyStateComponent],
+  imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './tickets-none.component.html',
-  styleUrl: './tickets-none.component.scss',
+  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
 })
 export class TicketsNoneComponent {
   private readonly page = inject(TicketsComponent, { optional: true });
 
-  protected readonly state = computed<'busy' | 'empty' | 'pick'>(() => {
+  protected readonly state = computed<DetailNoneState>(() => {
     const page = this.page;
     if (!page || page.loading() || page.error()) return 'busy';
     return page.hasRows() ? 'pick' : 'empty';

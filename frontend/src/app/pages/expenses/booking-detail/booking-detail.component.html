@@ -1,22 +1,16 @@
 @let e = expense();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="bd-title">
-  <header class="fd__head">
+  <header class="sheet-head fd__head">
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="bd-title" class="sheet-title fd__title">{{ e.description }}</h2>
       @if (canManage()) {
-        @if (phone()) {
-          <app-button variant="tonal" size="sm" (click)="edit.emit(e)">
-            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
-          </app-button>
-        } @else {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'expenses.edit' | t"
-            [title]="'expenses.edit' | t"
-            (click)="edit.emit(e)"
-          ><app-icon name="edit" /></app-button>
-        }
+        <app-sheet-action
+          icon="edit"
+          [label]="'action.edit' | t"
+          [ariaLabel]="'expenses.edit' | t"
+          [phone]="phone()"
+          (pressed)="edit.emit(e)"
+        />
       }
       @if (menu().length) {
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
@@ -97,18 +91,13 @@
           } @else if (subRows().length) {
             <div class="rowgroup" role="list">
               @for (s of subRows(); track s.id) {
-                <div class="fd__subRow" role="listitem">
-                  <span class="fd__subMark" aria-hidden="true">↳</span>
-                  <span class="fd__subBody">
-                    <span class="fd__subTitle ell" [title]="s.description">{{ s.description }}</span>
-                    <span class="fd__subMeta ell">
-                      <span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
-                      @if (s.correspondent) {
-                        <span class="fd__dot" aria-hidden="true">·</span>{{ s.correspondent }}
-                      }
-                    </span>
-                  </span>
-                  <span class="mono fd__subAmount">{{ signed(s) }}</span>
+                <app-booking-row mark [title]="s.description" [amount]="signed(s)">
+                  <span meta
+                    ><span class="mono">{{ s.paymentDate ? (s.paymentDate | ldate: 'mediumDate') : '—' }}</span>
+                    @if (s.correspondent) {
+                      <span class="fd__dot" aria-hidden="true">·</span>{{ s.correspondent }}
+                    }</span
+                  >
                   @if (canManage()) {
                     <app-row-menu
                       [label]="'expenses.rowMenu' | t: { description: s.description }"
@@ -116,12 +105,9 @@
                       (selected)="onSubMenu($event, s)"
                     />
                   }
-                </div>
+                </app-booking-row>
               }
-              <div class="fd__subSum">
-                <span>{{ 'expenses.sub.sumLine' | t }}</span>
-                <span class="mono">{{ subSum() }}</span>
-              </div>
+              <app-sum-row [label]="'expenses.sub.sumLine' | t" [amount]="subSum()" />
             </div>
           } @else {
             <app-empty-state rows="3" [heading]="'expenses.sub.none' | t" />
@@ -137,10 +123,7 @@
           <div>
             <dt>{{ 'expenses.detail.costCentreFy' | t }}</dt>
             <dd class="fd__ccLine">
-              @if (cc().color) {
-                <span class="fd__swatch" aria-hidden="true" [style.background]="cc().color"></span>
-              }
-              <span>{{ ccTrail() }}</span>
+              <app-cost-centre-label [name]="ccTrail()" [color]="cc().color" />
               @if (fyLabel(); as fy) {
                 <span class="fd__dot" aria-hidden="true">·</span>
                 <span>{{ 'expenses.detail.fy' | t: { fy } }}</span>

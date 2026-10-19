@@ -2,15 +2,12 @@
      "Mitglied → Stellvertretung"; an entry for the whole Gremium reads "Für alle
      Mitglieder → Stellvertretung". -->
 <section class="sp" aria-labelledby="sp-title">
-  <header class="sp__head">
-    <h2 class="section-title" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
-    <span class="sp__actions">
-      <ng-content select="[poolActions]" />
-      <app-button variant="text" size="sm" (click)="openAdd()">
-        <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
-      </app-button>
-    </span>
-  </header>
+  <app-section-header class="sp__head" headingId="sp-title" [heading]="'admin.substitutes.title' | t">
+    <ng-content select="[poolActions]" />
+    <app-button variant="text" size="sm" (click)="openAdd()">
+      <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
+    </app-button>
+  </app-section-header>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />

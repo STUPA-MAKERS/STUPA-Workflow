@@ -38,6 +38,7 @@ import {
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 let nextId = 0;
 
@@ -61,6 +62,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

@@ -1,6 +1,6 @@
 @use 'breakpoints' as bp;
-@use '../dialog-form' as df;
 @use 'scroll-fade' as fade;
+@use '../../../shared/ui/dialog-form' as df;
 
 @include df.host;
 

@@ -47,6 +47,7 @@ import {
   blankField,
   blankOption,
   duplicateKeys,
+  fundingProblem,
   groupsFromFields,
   groupsToFields,
   moveQuestionTo,
@@ -54,6 +55,7 @@ import {
   validateFormField,
 } from '../form-field.util';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -98,6 +100,7 @@ type QPos = QuestionPos;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MoveButtonsComponent,
+    I18nInputComponent,
     EmptyStateComponent,
     FabComponent,
     FormsModule,
@@ -263,6 +266,8 @@ export class FormEditorComponent {
   private readonly flatQuestions = computed(() => this.groups().flatMap((g) => g.fields));
 
   protected readonly duplicates = computed(() => duplicateKeys(this.flatQuestions()));
+  /** The form-level problem of the requested funding field, or null. */
+  protected readonly fundingIssue = computed(() => fundingProblem(this.flatQuestions()));
   /** Validation errors per question, indexed by "gi:qi". */
   protected readonly fieldErrors = computed(() => {
     const map: Record<string, string[]> = {};
@@ -277,6 +282,7 @@ export class FormEditorComponent {
     () =>
       this.flatQuestions().length > 0 &&
       this.duplicates().length === 0 &&
+      this.fundingIssue() === null &&
       Object.values(this.fieldErrors()).every((e) => e.length === 0),
   );
 

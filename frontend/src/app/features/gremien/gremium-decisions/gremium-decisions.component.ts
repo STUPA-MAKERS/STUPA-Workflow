@@ -40,7 +40,11 @@ import {
 } from '@stupa-makers/ui-kit';
 import { electionStatus } from '../../voting/election.util';
 import { GREMIEN_NOW } from '../gremien.store';
-import { dayMonth, euro, monthKey, monthLabel, shiftMonth } from '../gremien.util';
+import { monthKey, shiftMonth } from '../gremien.util';
+import { dayMonth, monthYear } from '@shared/date-format';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { majorityLabel } from '../../meetings/meetings-display.util';
+import { formatMoney } from '@shared/format-money';
 
 export type DecisionsResult = '' | GremiumDecisionResultFilter;
 export type DecisionsKind = '' | GremiumDecisionKind;
@@ -88,6 +92,7 @@ const NO_RESULT: StatusView = { kind: 'muted', key: 'gremien.decisions.noResult'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     StickyBarComponent,
     TranslatePipe,
@@ -182,7 +187,7 @@ export class GremiumDecisionsComponent {
   );
 
   readonly groups = computed<DecisionGroup[]>(() => {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const out = new Map<string, DecisionGroup>();
     for (const d of this.items()) {
       const day = d.meetingDate ?? d.closedAt?.slice(0, 10) ?? null;
@@ -192,7 +197,7 @@ export class GremiumDecisionsComponent {
       if (!group) {
         group = {
           key,
-          label: month ? monthLabel(month, locale, 'long') : this.i18n.translate('gremien.decisions.undated'),
+          label: month ? monthYear(month, locale) : this.i18n.translate('gremien.decisions.undated'),
           meeting: d.meetingId
             ? [d.meetingTitle, dayMonth(d.meetingDate, locale)].filter(Boolean).join(' · ')
             : this.i18n.translate('gremien.decisions.noMeeting'),
@@ -275,10 +280,9 @@ export class GremiumDecisionsComponent {
 
   private toRow(d: GremiumDecision): DecisionRow {
     const t = (key: TranslationKey, params?: Record<string, string | number>) => this.i18n.translate(key, params);
-    const locale = this.i18n.locale();
     const parts: string[] = [];
     if (d.kind === 'application') {
-      const amount = d.amount === null ? '' : euro(d.amount, locale);
+      const amount = formatMoney(d.amount, this.i18n.formatLocale());
       parts.push(amount ? `${t(KIND_KEYS.application)} · ${amount}` : t(KIND_KEYS.application));
     } else {
       parts.push(t(KIND_KEYS[d.kind]));
@@ -291,9 +295,7 @@ export class GremiumDecisionsComponent {
     } else {
       parts.push(d.ballots === 1 ? t('gremien.decisions.ballots1') : t('gremien.decisions.ballots', { n: d.ballots }));
     }
-    if (d.majorityRule) {
-      parts.push(t(`vote.majority.${d.majorityRule}` as TranslationKey));
-    }
+    if (d.majorityRule) parts.push(majorityLabel(d.majorityRule, false, t));
     let status = NO_RESULT;
     if (d.result) {
       status = d.kind === 'election' ? electionStatus(d.result) : voteResultStatus(d.result as VoteResult);

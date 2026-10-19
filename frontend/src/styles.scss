@@ -134,6 +134,34 @@ app-dialog {
   }
 }
 
+// The head of a detail sheet (`.sheet-head`): the sheet bar, the title and the lines
+// below it, closed by a rule. Every detail sheet uses it, so the title and the rule sit
+// at the same place on every page. A sheet without the rule (a phone) overrides it.
+.sheet-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sheet-head-gap);
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+// The way back of a detail sheet whose item is gone (`.sheet-back-link`): a tonal pill
+// link to the list.
+.sheet-back-link {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.sheet-back-link:hover {
+  background: var(--color-surface-4);
+}
+
 // Mobile: the page itself must NEVER scroll horizontally. An element that overflows,
 // such as a long link or a wide table cell, may only scroll inside its own overflow
 // container. `clip` instead of `hidden`: it makes no new scroll container, so

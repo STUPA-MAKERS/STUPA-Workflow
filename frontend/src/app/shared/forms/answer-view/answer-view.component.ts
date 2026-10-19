@@ -39,7 +39,7 @@ export interface AnswerBlock {
  *  have the block "Anhänge" with the scan state). */
 const NOT_SHOWN: ReadonlySet<FieldType> = new Set(['markdown', 'section', 'file']);
 /** Field types in the mono face. */
-const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency']);
+const MONO: ReadonlySet<FieldType> = new Set(['iban', 'currency', 'funding']);
 
 /**
  * The answers of an application, read-only (O19, the table "Darstellung der

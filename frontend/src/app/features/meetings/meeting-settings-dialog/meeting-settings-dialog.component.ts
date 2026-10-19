@@ -26,9 +26,10 @@ import {
   TimeInputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { errorCode, errorDetail } from '../meetings-display.util';
+import { problemCode, problemDetail } from '@core/api/problem';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The longest meeting title that the server accepts (`MEETING_TITLE_MAX`). */
 export const MEETING_TITLE_MAX = 200;
@@ -107,7 +108,7 @@ export class MeetingSettingsDialogComponent {
       ...this.roster()
         .filter((a) => a.canKeepProtocol || a.principalId === current)
         .map((a) => {
-          const label = a.displayName || a.email || this.i18n.translate('common.unnamed');
+          const label = personLabel(a, this.i18n);
           return { value: a.principalId, label, person: { name: label, principalId: a.principalId } };
         }),
     ];
@@ -218,7 +219,7 @@ export class MeetingSettingsDialogComponent {
       },
       error: (err: unknown) => {
         this.rotating.set(false);
-        const detail = errorDetail(err);
+        const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);
       },
@@ -269,19 +270,19 @@ export class MeetingSettingsDialogComponent {
         },
         error: (err: unknown) => {
           this.saving.set(false);
-          if (errorCode(err) === 'protokollant_needs_protocol_write') {
+          if (problemCode(err) === 'protokollant_needs_protocol_write') {
             this.toast.error(this.i18n.translate('meetings.toast.needsProtocolWrite'));
             return;
           }
-          if (errorCode(err) === 'public_join_needs_no_quorum') {
+          if (problemCode(err) === 'public_join_needs_no_quorum') {
             this.toast.error(this.i18n.translate('guests.toast.needsNoQuorum'));
             return;
           }
-          if (errorCode(err) === 'guest_vote_open') {
+          if (problemCode(err) === 'guest_vote_open') {
             this.toast.error(this.i18n.translate('guests.toast.guestVoteOpen'));
             return;
           }
-          const detail = errorDetail(err);
+          const detail = problemDetail(err);
           const base = this.i18n.translate('meetings.toast.actionFailed');
           this.toast.error(detail ? `${base}: ${detail}` : base);
         },

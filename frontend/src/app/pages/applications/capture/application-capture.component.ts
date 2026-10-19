@@ -49,6 +49,9 @@ import {
 import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-files.component';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { localToday } from '@shared/date-format';
 
 /** Who the application is for: an account, or a new person without one. */
 export type ApplicantMode = 'account' | 'guest';
@@ -100,6 +103,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     AutocompleteComponent,
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
     NoteComponent,
     FormsModule,
     FormlyForm,
@@ -454,10 +459,4 @@ function daysAgo(days: number, now: Date = new Date()): Date {
   const d = new Date(now);
   d.setDate(d.getDate() - days);
   return d;
-}
-
-/** Today in the local timezone as `YYYY-MM-DD`. */
-export function localToday(now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

@@ -15,6 +15,7 @@ import {
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  formatBytes,
   HighlightComponent,
   IconComponent,
   liveSearch,
@@ -22,7 +23,6 @@ import {
   SearchPillComponent,
   SkeletonComponent,
 } from '@stupa-makers/ui-kit';
-import { formatSize } from '../apply/apply.util';
 import type {
   PublicGremium,
   PublicProtocolSummary,
@@ -31,14 +31,12 @@ import type {
 } from './public-protocols.models';
 import { PublicProtocolsService } from './public-protocols.service';
 import {
-  longDate,
-  meetingDate,
   resultKey,
   semesterLabel,
-  shortDate,
   topCounts,
   useNoindex,
 } from './public-protocols.util';
+import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
 
 /** The size of one page of the list. */
 export const PAGE_SIZE = 20;
@@ -263,12 +261,12 @@ export class PublicProtocolsComponent {
 
   // Template helpers.
 
-  protected dateOf(p: PublicProtocolSummary): Date {
-    return meetingDate(p.date);
+  protected dateOf(p: PublicProtocolSummary): Date | null {
+    return parseDay(p.date);
   }
 
   protected when(p: PublicProtocolSummary): string {
-    return longDate(p.date, this.i18n.formatLocale());
+    return weekdayDate(p.date, this.i18n.formatLocale());
   }
 
   protected resultLabel(result: PublicVoteResult): TranslationKey {
@@ -300,8 +298,8 @@ export class PublicProtocolsComponent {
   /** "PDF · 212 KB · finalisiert 02.10.2026". */
   protected pdfMeta(p: PublicProtocolSummary): string {
     const parts = ['PDF'];
-    if (p.pdfSize !== null) parts.push(formatSize(p.pdfSize, this.i18n.formatLocale()));
-    const finalized = shortDate(p.finalizedAt, this.i18n.formatLocale());
+    if (p.pdfSize !== null) parts.push(formatBytes(p.pdfSize, this.i18n.formatLocale(), 'file'));
+    const finalized = dayMonthYear(p.finalizedAt, this.i18n.formatLocale());
     if (finalized) {
       parts.push(this.i18n.translate('publicProtocols.card.finalized', { date: finalized }));
     }

@@ -4,9 +4,15 @@ import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoLinkKind, type TodoLinkedCard } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { type AvatarSize, AvatarStackComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { personName, type Translate } from '../todos.util';
+import type { Translate } from '@core/i18n/translations';
+import { dayMonth } from '@shared/date-format';
+import {
+  type AvatarSize,
+  AvatarStackComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
+import { personName } from '@shared/person-label.util';
 
 /**
  * The back-reference "To-Dos" of an object (an application, an agenda item, a vote, an
@@ -83,7 +89,7 @@ export class TodoLinkedListComponent {
 
   sub(card: TodoLinkedCard): string {
     const parts = [card.boardName, card.columnName];
-    if (card.dueDate) parts.push(this.t('todos.linked.due', { date: this.shortDate(card.dueDate) }));
+    if (card.dueDate) parts.push(this.t('todos.linked.due', { date: dayMonth(card.dueDate, this.i18n.formatLocale()) }));
     return parts.join(' · ');
   }
 
@@ -93,13 +99,5 @@ export class TodoLinkedListComponent {
 
   ids(card: TodoLinkedCard): (string | null)[] {
     return card.assignees.map((a) => a.principalId);
-  }
-
-  /** `YYYY-MM-DD` as "17.10.". */
-  private shortDate(date: string): string {
-    const [y, m, d] = date.split('-').map(Number);
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { day: '2-digit', month: '2-digit' }).format(
-      new Date(y, m - 1, d),
-    );
   }
 }

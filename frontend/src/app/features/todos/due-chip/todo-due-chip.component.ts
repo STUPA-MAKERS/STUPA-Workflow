@@ -11,7 +11,7 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
-import { longDay } from '../todos.util';
+import { weekdayDate } from '@shared/date-format';
 
 /**
  * The due date of a card as a chip ("Di, 03.11.2026 ⌄", frame 2). The chip opens the
@@ -38,7 +38,7 @@ export class TodoDueChipComponent {
 
   readonly text = computed(() => {
     const v = this.value();
-    return v ? longDay(v, this.i18n.formatLocale()) : null;
+    return v ? weekdayDate(v, this.i18n.formatLocale()) : null;
   });
 
   /** Open the calendar of the browser; without `showPicker` the field takes a click. */

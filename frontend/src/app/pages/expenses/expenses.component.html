@@ -91,9 +91,7 @@
               [value]="kind()"
               (valueChange)="setKind($event)"
               [text]="kindChipLabel()"
-              [active]="kind() !== ''"
-              [icon]="kind() ? 'check' : null"
-              [chevron]="!kind()"
+              filled
             />
           }
           <app-range-chip
@@ -208,10 +206,10 @@
                       <span sub class="exp__sub">
                         <span class="mono">{{ day(t.paymentDate ?? t.createdAt) }}</span>
                         <span class="exp__dot" aria-hidden="true">·</span>
-                        <span class="exp__cc" [title]="from.name">@if (from.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="from.color"></span>}{{ from.name }}</span>
+                        <app-cost-centre-label class="exp__cc" [title]="from.name" [name]="from.name" [color]="from.color" />
                         <app-icon class="exp__arrow" name="arrow" [size]="13" />
                         <span class="sr-only">{{ 'expenses.transfers.to' | t }}</span>
-                        <span class="exp__cc" [title]="to.name">@if (to.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="to.color"></span>}{{ to.name }}</span>
+                        <app-cost-centre-label class="exp__cc" [title]="to.name" [name]="to.name" [color]="to.color" />
                       </span>
                       <span trail class="exp__trail">
                         <span class="mono exp__amount">{{ money(t.amount) }}</span>
@@ -298,7 +296,7 @@
                           (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
                         }}</app-status-text>
                         <span class="exp__dot" aria-hidden="true">·</span>
-                        <span class="exp__cc" [title]="cc.name">@if (cc.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="cc.color"></span>}{{ cc.name }}</span>
+                        <app-cost-centre-label class="exp__cc" [title]="cc.name" [name]="cc.name" [color]="cc.color" />
                         @if (day(e.paymentDate ?? e.createdAt); as d) {
                           <span class="exp__dot" aria-hidden="true">·</span>
                           <span class="mono">{{ d }}</span>
@@ -416,34 +414,25 @@
           />
         }
         @case ('missing') {
-          <div class="exp__none">
-            <app-empty-state plain icon="search"
-              [fill]="true"
-              [heading]="'expenses.notFound' | t"
-              [body]="'expenses.notFoundBody' | t"
-            />
-          </div>
+          <app-detail-none
+            [surface]="split() ? 'sheet' : 'flat'"
+            [inset]="false"
+            icon="search"
+            [heading]="'expenses.notFound' | t"
+            [body]="'expenses.notFoundBody' | t"
+          />
         }
         @default {
           @if (split()) {
             @if (!loading() && !(tab() === 'transfers' ? transferItems().length : items().length)) {
               <!-- Board Fin-Buchungen-Leer: an empty list leaves a neutral sheet. -->
-              <div class="exp__none exp__none--skeleton" aria-hidden="true">
-                <span class="exp__ghost exp__ghost--title"></span>
-                <span class="exp__ghost exp__ghost--meta"></span>
-                <span class="exp__ghost exp__ghost--rule"></span>
-                <div class="exp__ghostCols">
-                  <span class="exp__ghost exp__ghost--card"></span>
-                  <span class="exp__ghost exp__ghost--card"></span>
-                </div>
-              </div>
+              <app-detail-none [inset]="false" [ghost]="true" />
             } @else {
-              <div class="exp__none">
-                <app-empty-state plain icon="receipt"
-                  [fill]="true"
-                  [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
-                />
-              </div>
+              <app-detail-none
+                [inset]="false"
+                icon="receipt"
+                [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
+              />
             }
           }
         }

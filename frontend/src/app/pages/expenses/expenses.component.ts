@@ -13,8 +13,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
-import { from } from 'rxjs';
+import { type Observable, from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
+import { problemDetail } from '@core/api/problem';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Application, Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
@@ -50,7 +51,10 @@ import {
   StickyBarComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { FabComponent, PageHeaderComponent } from '@shared/ui';
+import {
+  FabComponent,
+  PageHeaderComponent,
+} from '@shared/ui';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
@@ -66,10 +70,6 @@ import {
   costCentreIndex,
   costCentreLabel,
   findTopBudgetNode,
-  formatEur,
-  monthGroups,
-  problemDetail,
-  shortDate,
   signedEur,
 } from '../budget/expense-display.util';
 import { BookingDetailComponent } from './booking-detail/booking-detail.component';
@@ -82,6 +82,13 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
 import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
 import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
 import { TransferFormComponent } from './transfer-form/transfer-form.component';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { CostCentreLabelComponent } from '../budget/cost-centre-label/cost-centre-label.component';
+import { dayMonth } from '@shared/date-format';
+import { groupByMonth } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -123,6 +130,8 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     InfiniteScrollDirective,
+    CostCentreLabelComponent,
+    DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     BookingDetailComponent,
@@ -465,14 +474,37 @@ export class ExpensesComponent implements OnDestroy {
         : field === 'createdAt'
           ? e.createdAt
           : (e.paymentDate ?? e.createdAt);
-    return monthGroups(this.items(), date, this.i18n.locale(), field !== 'amount');
+    // Sorted by amount, the months would interleave: one group without a heading.
+    if (field === 'amount') {
+      const items = this.items();
+      return items.length ? [{ key: 'all', label: '', items: [...items] }] : [];
+    }
+    return groupByMonth(this.items(), date, this.i18n.formatLocale(), { utc: true });
   });
 
   readonly transferGroups = computed(() =>
-    monthGroups(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.locale()),
+    groupByMonth(this.transferItems(), (t) => t.paymentDate ?? t.createdAt, this.i18n.formatLocale(), {
+      utc: true,
+    }),
   );
 
   constructor() {
+    // The shown bookings read their linked records ahead, so a click shows them at once.
+    prefetchDetails({
+      items: this.items,
+      key: (e) => e.id,
+      reads: (e) => {
+        const reads: Observable<unknown>[] = [inject(TodosApiService).linked('expense', e.id)];
+        const invoiceId = e.invoiceId;
+        if (invoiceId && !this.invoices().some((i) => i.id === invoiceId)) {
+          reads.push(this.api.getInvoice(invoiceId, { detail: true }));
+        }
+        if (e.applicationId) reads.push(this.apps.getApplication(e.applicationId, { quiet: true, detail: true }));
+        if ((e.childCount ?? 0) > 0) reads.push(this.api.listSubBookings(e.id, { detail: true }));
+        return reads;
+      },
+      when: () => this.tab() === 'bookings',
+    });
     // Apply the URL first, then load data exactly once. The URL keeps the view shareable,
     // survives a reload, and is the target of links from the budget page, the invoices
     // page and the global search. A second, unfiltered request could resolve last and
@@ -667,7 +699,7 @@ export class ExpensesComponent implements OnDestroy {
       const cached = this.invoices().find((i) => i.id === invoiceId);
       if (cached) this.linkedInvoice.set(cached);
       else
-        this.api.getInvoice(invoiceId).subscribe({
+        this.api.getInvoice(invoiceId, { detail: true }).subscribe({
           next: (inv) => {
             if (this.selectedExpense()?.invoiceId === inv.id) this.linkedInvoice.set(inv);
           },
@@ -679,7 +711,7 @@ export class ExpensesComponent implements OnDestroy {
     if (appId && this.linkedApplication()?.id !== appId) {
       // A budget reader may lack the right to read the application: the card then shows
       // only the title the booking carries.
-      this.apps.getApplication(appId, { quiet: true }).subscribe({
+      this.apps.getApplication(appId, { quiet: true, detail: true }).subscribe({
         next: (app) => {
           if (this.selectedExpense()?.applicationId === app.id) this.linkedApplication.set(app);
         },
@@ -687,7 +719,7 @@ export class ExpensesComponent implements OnDestroy {
       });
     }
     if (e && (e.childCount ?? 0) > 0 && !this.sub.subRows().has(e.id) && !this.sub.isLoadingSub(e.id)) {
-      this.sub.loadSub(e.id);
+      this.sub.loadSub(e.id, true);
     }
   }
 
@@ -714,15 +746,17 @@ export class ExpensesComponent implements OnDestroy {
 
   // --- formatting ------------------------------------------------------------------
   money(amount: string): string {
-    return formatEur(Number(amount), this.i18n.locale());
+    return formatMoney(amount, this.i18n.formatLocale());
   }
 
   signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   costCentre(id: string, pathKey: string | null): CostCentreLabel {
@@ -998,7 +1032,7 @@ export class ExpensesComponent implements OnDestroy {
       },
       error: (err) => {
         this.bulkBusy.set(false);
-        this.toast.error(problemDetail(err) ?? this.i18n.translate('expenses.toast.failed'));
+        this.toast.error(problemDetail(err) || this.i18n.translate('expenses.toast.failed'));
       },
     });
   }

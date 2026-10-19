@@ -31,6 +31,7 @@ import {
   ToastService,
   TruncatedDirective,
 } from '@stupa-makers/ui-kit';
+import { personLabel } from '@shared/person-label.util';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -94,7 +95,7 @@ export class LeadSubstituteDialogComponent {
   protected readonly open = computed(() => this.member() !== null);
   protected readonly memberName = computed(() => {
     const m = this.member();
-    return m?.displayName || m?.email || '—';
+    return personLabel(m, this.i18n, { fallbackText: '—' });
   });
   protected readonly subtitle = computed(() =>
     this.i18n.translate('meetings.leadSubstitute.for', { name: this.memberName() }),

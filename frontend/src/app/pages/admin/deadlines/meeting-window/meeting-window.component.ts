@@ -1,11 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { InputComponent, NoteComponent, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
+import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
+import { InputComponent } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { MAX_LEAD_MINUTES, type MeetingSettings } from '../../admin.models';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 type Body = Pick<MeetingSettings, 'openLeadMinutes' | 'confirmLeadMinutes'>;
 
@@ -45,7 +48,7 @@ function draftOf(s: MeetingSettings): Draft {
   selector: 'app-meeting-window-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, InputComponent, NoteComponent, SkeletonComponent],
+  imports: [SectionHeaderComponent, FormsModule, TranslatePipe, InputComponent, LoadStateComponent],
   templateUrl: './meeting-window.component.html',
   // The same section layout as the guest settings on this page.
   styleUrl: '../guest-settings/guest-settings.component.scss',
@@ -54,18 +57,19 @@ export class MeetingWindowSettingsComponent {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  private readonly toast = inject(ToastService);
 
-  /** The section needs the deadline right. The server checks it again. */
-  protected readonly allowed = computed(() => this.auth.can('admin.deadlines'));
-
-  protected readonly loading = signal(true);
-  /** The read failed: `forbidden` hides the section, `error` names the failure. */
-  protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
-  readonly saving = signal(false);
-  /** The stored values; the draft compares against them. */
-  private readonly saved = signal<MeetingSettings | null>(null);
-  protected readonly draft = signal<Draft>({ open: '', confirm: '' });
+  protected readonly form: SettingsForm<MeetingSettings, Draft> = settingsForm<MeetingSettings, Draft, Body>({
+    allowed: () => this.auth.can('admin.deadlines'),
+    load: () => this.api.getMeetingSettings(),
+    put: (body) => this.api.putMeetingSettings(body),
+    draftOf,
+    initial: { open: '', confirm: '' },
+    body: () => this.body(),
+    unchanged: (b, s) =>
+      b.openLeadMinutes === s.openLeadMinutes && b.confirmLeadMinutes === s.confirmLeadMinutes,
+  });
+  readonly saving = this.form.saving;
+  protected readonly draft = this.form.draft;
 
   protected readonly openLead = computed(() => minutes(this.draft().open));
   protected readonly confirmLead = computed(() => minutes(this.draft().confirm));
@@ -88,59 +92,17 @@ export class MeetingWindowSettingsComponent {
   });
 
   /** The section has changes that are not saved. The deadlines page then shows "Speichern". */
-  readonly dirty = computed(() => {
-    const s = this.saved();
-    const b = this.body();
-    if (!s) return false;
-    if (!b) return true;
-    return b.openLeadMinutes !== s.openLeadMinutes || b.confirmLeadMinutes !== s.confirmLeadMinutes;
-  });
+  readonly dirty = this.form.dirty;
 
   /** Every field is valid, so a save can send the section. */
-  readonly valid = computed(() => this.body() !== null);
-  private readonly canSave = computed(() => this.dirty() && this.body() !== null && !this.saving());
-
-  constructor() {
-    if (!this.allowed()) {
-      this.loading.set(false);
-      this.loadState.set('forbidden');
-      return;
-    }
-    this.api.getMeetingSettings().subscribe({
-      next: (s) => this.apply(s),
-      error: (err: { status?: number }) => {
-        this.loading.set(false);
-        this.loadState.set(err?.status === 403 ? 'forbidden' : 'error');
-      },
-    });
-  }
-
-  private apply(s: MeetingSettings): void {
-    this.saved.set(s);
-    this.draft.set(draftOf(s));
-    this.loading.set(false);
-    this.loadState.set('ok');
-  }
+  readonly valid = this.form.valid;
 
   protected patch(change: Partial<Draft>): void {
-    this.draft.update((d) => ({ ...d, ...change }));
+    this.form.patch(change);
   }
 
   /** Send the section. The "Speichern" button of the deadlines page and the form submit call it. */
   save(): void {
-    const body = this.body();
-    if (!body || !this.canSave()) return;
-    this.saving.set(true);
-    this.api.putMeetingSettings(body).subscribe({
-      next: (s) => {
-        this.saving.set(false);
-        this.apply(s);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => {
-        this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
-      },
-    });
+    this.form.save();
   }
 }

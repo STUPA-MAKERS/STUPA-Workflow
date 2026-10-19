@@ -31,6 +31,7 @@ import {
   ButtonComponent,
   ChipComponent,
   DialogComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
   SegmentedComponent,
@@ -39,7 +40,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from '../../apply/altcha.component';
-import { formatSize, UPLOAD_ACCEPT } from '../../apply/apply.util';
+import { UPLOAD_ACCEPT } from '../../apply/apply.util';
 import {
   DRAFT_FILES_STORAGE_KEY,
   DraftAttachmentsService,
@@ -47,6 +48,7 @@ import {
 } from '../../apply/draft-attachments.service';
 import { HelpService } from '../help.service';
 import { browserLabel, currentEnv, reportContext, viewportLabel, type ReportEnv } from '../report-context';
+import { weekdayName } from '@shared/date-format';
 
 /** The most files one ticket takes (server rule). */
 export const MAX_TICKET_FILES = 5;
@@ -172,7 +174,7 @@ export class ReportDialogComponent {
     if (at) {
       const locale = this.i18n.formatLocale();
       // "Do, 15.10.2026, 18:31:07": the weekday without its abbreviation dot.
-      const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(at).replace(/\.$/, '');
+      const weekday = weekdayName(at, locale);
       const rest = new Intl.DateTimeFormat(locale, {
         day: '2-digit',
         month: '2-digit',
@@ -246,7 +248,7 @@ export class ReportDialogComponent {
   }
 
   size(bytes: number): string {
-    return formatSize(bytes, this.i18n.formatLocale());
+    return formatBytes(bytes, this.i18n.formatLocale(), 'file');
   }
 
   /** "PNG · " from the file name, or nothing without an extension. */

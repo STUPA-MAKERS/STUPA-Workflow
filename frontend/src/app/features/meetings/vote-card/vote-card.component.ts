@@ -24,12 +24,12 @@ import { electionCaption, electionOf, electionStatus } from '../../voting/electi
 import { VoteProgressComponent } from '../../voting/vote-progress/vote-progress.component';
 import {
   countEntries,
-  errorDetail,
   guestComposition,
   voteMetaLine,
   voteOptionLabel,
   voteOptionsFor,
 } from '../meetings-display.util';
+import { problemDetail } from '@core/api/problem';
 
 /**
  * One vote of the open agenda item, as a card beside the sheet.
@@ -118,7 +118,7 @@ export class VoteCardComponent {
   protected readonly notCast: MyBallot = { cast: false, choice: null };
 
   protected onBallotFailed(failure: BallotFailure): void {
-    const detail = failure.alreadyVoted ? '' : errorDetail(failure.error);
+    const detail = failure.alreadyVoted ? '' : problemDetail(failure.error);
     const base = this.i18n.translate(
       failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'meetings.toast.actionFailed',
     );

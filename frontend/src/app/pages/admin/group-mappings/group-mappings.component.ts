@@ -8,7 +8,9 @@ import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import { PageHeaderComponent } from '@shared/ui';
+import {
+  PageHeaderComponent,
+} from '@shared/ui';
 import {
   ButtonComponent,
   ConfirmDialogComponent,
@@ -33,6 +35,7 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';
@@ -96,6 +99,7 @@ const RESERVED_GROUP_PREFIX = 'vote:';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     TruncatedDirective,

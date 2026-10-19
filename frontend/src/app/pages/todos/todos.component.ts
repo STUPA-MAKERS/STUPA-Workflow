@@ -72,7 +72,6 @@ import {
   defaultBoard,
   filterActive,
   insertTile,
-  isoDay,
   matchesFilter,
   moveErrorText,
   placeTile,
@@ -89,6 +88,7 @@ import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
+import { isoDay } from '@shared/date-format';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;
@@ -132,6 +132,11 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * transfer dialog.
  *
  * `?card=<id>` opens the card in a drawer over the board (a deep link works the same).
+ * A shared link names the card only (`/todos?card=<id>`): the page reads the card and opens
+ * its board, so the link stays valid when the card moves to another board. An older link
+ * with a board (`/todos/<board>?card=<id>`) whose card is on another board now opens the
+ * card's board too; only the personal board and "Alle" keep a card of another board, because
+ * their rows show it.
  * `?view=list` shows the table. The board reads itself again every 30 seconds while the
  * tab is visible and when the window gets the focus; the ETag makes an unchanged board
  * a 304.
@@ -210,6 +215,11 @@ export class TodosComponent implements OnDestroy {
   readonly view = computed<View>(() => (!this.all() && this.query().get('view') === 'list' ? 'list' : 'board'));
 
   readonly boards = signal<TodoBoardSummary[]>([]);
+  private readonly boardsRead = signal(false);
+  /** The card of the entry URL whose board is still to check; null once checked. */
+  private readonly entryCard = signal<Uuid | null>(this.boardId() ? this.cardId() : null);
+  /** A card-only link (`/todos?card=`) whose card did not read: open the default board. */
+  private readonly cardUnresolved = signal(false);
   readonly board = signal<TodoBoard | null>(null);
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -459,7 +469,8 @@ export class TodosComponent implements OnDestroy {
     this.api.boards().subscribe({
       next: (boards) => {
         this.boards.set(boards);
-        if (!this.boardId()) this.openDefault(boards);
+        this.boardsRead.set(true);
+        if (!this.boardId() && (!this.cardId() || this.cardUnresolved())) this.openDefault(boards);
         // Read every board and its cards ahead, so a board change and an opened card
         // show at once; the shown board first.
         const shown = this.boardId();
@@ -474,6 +485,20 @@ export class TodosComponent implements OnDestroy {
           this.error.set(true);
         }
       },
+    });
+
+    // A card-only link: open the board the card is on now.
+    const linked = this.boardId() ? null : this.cardId();
+    if (linked) this.openCardBoard(linked);
+
+    // An entry URL with a board and a card: the card may have moved to another board.
+    effect(() => {
+      const id = this.entryCard();
+      if (!id || !this.boardsRead()) return;
+      untracked(() => {
+        this.entryCard.set(null);
+        this.checkCardBoard(id);
+      });
     });
 
     // A board in the route: read it (and its people) when it changes. "Alle" has no
@@ -579,6 +604,38 @@ export class TodosComponent implements OnDestroy {
     void this.router.navigate(['/todos', pick.id], {
       replaceUrl: true,
       queryParamsHandling: 'preserve',
+    });
+  }
+
+  /** Open the board of a card-only link; a card that does not read falls back to the default board. */
+  private openCardBoard(cardId: Uuid): void {
+    this.api.card(cardId, { detail: true }).subscribe({
+      next: (card) => {
+        if (this.boardId() || this.cardId() !== cardId) return;
+        void this.router.navigate(['/todos', card.boardId], { replaceUrl: true, queryParamsHandling: 'preserve' });
+      },
+      error: () => {
+        if (this.boardId()) return;
+        this.cardUnresolved.set(true);
+        if (this.boardsRead()) this.openDefault(this.boards());
+      },
+    });
+  }
+
+  /**
+   * Move an older link (`/todos/<board>?card=<id>`) to the board the card is on now. The
+   * personal board and "Alle" stay: their rows show cards of other boards.
+   */
+  private checkCardBoard(cardId: Uuid): void {
+    const boardId = this.boardId();
+    if (!boardId || boardId === ALL_BOARDS) return;
+    if (this.boards().find((b) => b.id === boardId)?.kind === 'personal') return;
+    this.api.card(cardId, { detail: true }).subscribe({
+      next: (card) => {
+        if (card.boardId === boardId || this.boardId() !== boardId || this.cardId() !== cardId) return;
+        void this.router.navigate(['/todos', card.boardId], { replaceUrl: true, queryParamsHandling: 'preserve' });
+      },
+      error: () => undefined,
     });
   }
 

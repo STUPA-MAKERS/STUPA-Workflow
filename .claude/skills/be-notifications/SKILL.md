@@ -13,7 +13,6 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - `templates_catalogue.py` — `TEMPLATE_CATALOGUE` / `CATALOGUE_BY_KEY`: single source listing every mail key + builtin subject/body (imported from the sending modules) + placeholder docs. This file defines the `task_reminder` and `deadline_approaching` builtins.
 - `kinds.py` — `NOTIFICATION_KINDS` tuple, the opt-outable categories. magic_link is NOT in it, so a user cannot switch it off.
 - `recipients.py` — `RecipientResolver.resolve(specs)` → emails. Also `actionable_principal_emails` / `state_actionable` (task semantics #64).
-- `events.py` — `EVENTS` whitelist tuple + `is_event` (webhook event source of truth, NOT mail).
 - `mail.py` — `MailMessage`/`MailAttachment` value objects (queue-serializable), `compute_idempotency_key` (sha256 → `mail:<digest>`), `MailSender` protocol, `Capturing`/`Smtp` senders, `build_email_message`.
 - `queue.py` — `MailQueue` protocol. `ArqMailQueue` (enqueues the `send_mail` job, `_job_id = idempotency_key` → dedup) or `DirectMailQueue` (inline, tests).
 - `provider.py` — best-effort arq pool lifecycle. `mail_queue_from_pool` returns None when there is no Redis.
@@ -60,7 +59,6 @@ description: Email notifications backend — Jinja2 SandboxedEnvironment mail te
 - **Status and task mails for a status change run as flow actions**, NOT in `auto.py`. Implicit notifications go to `NotificationActionDispatcher` (`notify`/`taskNotify`). `notify` without an explicit `templateKey` falls back to `status_update`. The context auto-fills an empty `applicationTitle`/`status`, so `StrictUndefined` does not kill delivery.
 - **Every mail links its element.** A sender passes `link=MailLink(...)` to `send_kind_mail` / `handle_notify_action` (`applicant_link`, `team_link`). The context gets `link` (empty string without a link, safe under StrictUndefined). `_message` adds `"<label>: <url>"` to the text unless the text already holds the URL, and the layout adds a button unless the HTML already links it. So a DB override without `{{ link }}` still gets the link. A guest applicant (`created_by` None) gets `/antrag/{id}`; no mail mints a new magic-link token. A `notify` with an explicit `templateKey` to applicant AND team goes out as two mails (audience in the idempotency parts), each with its own link. Only `erasure_executed` has no link: the element is gone.
 - **Logs carry no PII** (`mail.py`): only recipient domains + idempotency key — never addresses, subject, body, or SMTP password.
-- `events.EVENTS` is the **webhook** event whitelist, not the mail catalog — do not conflate it with `kinds`/template keys.
 - `router.py` exposes three routers (`router`, `admin_router`, `templates_router`). `main.py` includes each one separately.
 
 **Related:** be-flow, be-webhooks, be-auth, be-admin, be-applications, be-livevote, be-delegations, be-audit, be-tickets

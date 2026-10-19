@@ -1,0 +1,18 @@
+:host {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.sum__amount {
+  color: var(--color-text);
+}
+:host(.sum--quiet) .sum__amount {
+  color: inherit;
+}
+:host(.sum--strong) {
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+}

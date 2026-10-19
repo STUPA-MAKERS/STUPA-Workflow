@@ -39,6 +39,6 @@ describe('EarlyOpenDialogComponent', () => {
 
   it('names the day when the meeting is on another day', async () => {
     await setup({ date: '2099-06-02', startTime: '18:00:00' });
-    expect(screen.getByText('Die Sitzung ist erst für Di., 02.06.2099, 18:00 Uhr geplant.')).toBeInTheDocument();
+    expect(screen.getByText('Die Sitzung ist erst für Di, 02.06.2099, 18:00 Uhr geplant.')).toBeInTheDocument();
   });
 });

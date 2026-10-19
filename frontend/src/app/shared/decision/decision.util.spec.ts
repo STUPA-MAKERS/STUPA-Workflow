@@ -10,7 +10,6 @@ import {
   draftError,
   emptyDraft,
   formatDiff,
-  formatMoney,
   toProposal,
 } from './decision.util';
 
@@ -80,11 +79,7 @@ describe('decision.util', () => {
     });
   });
 
-  it('formats money and the difference', () => {
-    expect(norm(formatMoney('1250', 'de-DE'))).toBe('1.250,00 €');
-    expect(norm(formatMoney(5, 'de-DE', null))).toBe('5,00 €');
-    expect(formatMoney(null, 'de-DE')).toBe('');
-    expect(formatMoney('x', 'de-DE')).toBe('');
+  it('formats the difference', () => {
     expect(norm(formatDiff('1250', '900', 'de-DE'))).toBe('−350,00 €');
     expect(norm(formatDiff('900', '1250', 'de-DE'))).toBe('+350,00 €');
     expect(formatDiff('10', '10', 'de-DE')).toBe('');

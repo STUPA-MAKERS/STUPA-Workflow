@@ -10,7 +10,6 @@ The transaction of the caller commits atomically with the config mutation.
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Sequence
 from typing import Any
 from uuid import UUID
 
@@ -182,9 +181,3 @@ class ConfigRevisionService:
             _flatten(revision.entity_type, prev_snapshot),
             _flatten(revision.entity_type, revision.snapshot or {}),
         )
-
-    async def resolve_versions(
-        self, revisions: Sequence[ConfigRevision]
-    ) -> dict[UUID, int]:
-        """Map ``revision_id`` to ``version`` for the sidebar diff labels."""
-        return {r.id: r.version for r in revisions}

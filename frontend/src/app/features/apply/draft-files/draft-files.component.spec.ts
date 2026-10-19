@@ -20,7 +20,6 @@ function draft(id: string, extra: Partial<DraftFile> = {}): DraftFile {
     mime: 'application/pdf',
     size: 212 * 1024,
     scanned: false,
-    isComparisonOffer: false,
     scanState: 'scanning',
     fieldKey: null,
     ...extra,
@@ -71,11 +70,11 @@ describe('DraftFilesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
-  it('lists the files with size, scan state, tag and a remove button', async () => {
+  it('lists the files with size, scan state and a remove button', async () => {
     await setup(
       { summary: true },
       fakeDrafts([
-        draft('a', { isComparisonOffer: true }),
+        draft('a'),
         draft('b', { scanState: 'clean', scanned: true, size: 2 * 1024 * 1024 }),
         draft('c', { failed: true, size: 512 }),
       ]),
@@ -86,12 +85,10 @@ describe('DraftFilesComponent', () => {
     expect(screen.getByText('In Prüfung')).toBeInTheDocument();
     expect(screen.getByText('Gescannt')).toBeInTheDocument();
     expect(screen.getByText('Nicht mehr vorhanden')).toBeInTheDocument();
-    expect(screen.getAllByText('Vergleichsangebot')).toHaveLength(1);
     expect(screen.getByRole('button', { name: 'a.pdf entfernen' })).toBeInTheDocument();
     expect(
       screen.getByText('PDF, Bilder, Word, Excel, PowerPoint, OpenDocument · bis 10 MB je Datei'),
     ).toBeInTheDocument();
-    // No checkbox without `comparison`.
     expect(screen.queryByRole('checkbox')).toBeNull();
   });
 
@@ -114,13 +111,12 @@ describe('DraftFilesComponent', () => {
     expect(screen.queryByText(/von 20 Dateien/)).toBeNull();
   });
 
-  it('uploads picked files as comparison offers when the box is set', async () => {
-    const { drafts, toast, changed, container } = await setup({ comparison: true });
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Als Vergleichsangebot hochladen' }));
+  it('uploads picked files with the field key', async () => {
+    const { drafts, toast, changed, container } = await setup({});
     const input = container.querySelector('input[type=file]') as HTMLInputElement;
     await userEvent.upload(input, new File(['x'], 'Angebot.pdf', { type: 'application/pdf' }));
     await waitFor(() => expect(drafts.upload).toHaveBeenCalled());
-    expect(drafts.upload.mock.calls[0][1]).toEqual({ fieldKey: null, isComparisonOffer: true });
+    expect(drafts.upload.mock.calls[0][1]).toEqual({ fieldKey: null });
     await waitFor(() => expect(changed).toHaveBeenCalledWith(['n0']));
     expect(toast.error).toHaveBeenCalledWith('bad.exe: Dieser Dateityp ist nicht erlaubt.');
   });

@@ -30,9 +30,9 @@ import {
   type RowMenuSection,
   StatusTextComponent,
 } from '@stupa-makers/ui-kit';
-import { clockTime } from '../meetings/meetings-display.util';
 import { GuestSessionService } from './guest-session.service';
 import { GuestViewComponent } from './guest-view.component';
+import { clock, weekdayDate } from '@shared/date-format';
 
 /** The join code: six characters without the easily confused ones (0, O, 1, I, L). */
 const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -109,7 +109,7 @@ export class PublicMeetingComponent {
     const parts: string[] = [];
     if (h.gremiumName) parts.push(h.gremiumName);
     if (h.status === 'live' && h.startedAt) {
-      parts.push(this.i18n.translate('guests.page.since', { time: clockTime(h.startedAt, this.i18n.locale()) }));
+      parts.push(this.i18n.translate('guests.page.since', { time: clock(h.startedAt, this.i18n.formatLocale()) }));
     } else if (h.date) {
       parts.push(this.dateText(h.date, h.startTime));
     }
@@ -155,7 +155,7 @@ export class PublicMeetingComponent {
     if (!me?.retryAfter) return '';
     const at = new Date(this.guest.fetchedAt() + me.retryAfter * 1000).toISOString();
     return this.i18n.translate('guests.page.retryAt', {
-      time: clockTime(at, this.i18n.locale()),
+      time: clock(at, this.i18n.formatLocale()),
       n: Math.max(1, Math.ceil(this.waitSeconds() / 60)),
     });
   });
@@ -220,14 +220,7 @@ export class PublicMeetingComponent {
   }
 
   private dateText(isoDate: string, time: string | null): string {
-    const d = new Date(`${isoDate}T${time ? time.slice(0, 5) : '00:00'}:00`);
-    if (Number.isNaN(d.getTime())) return isoDate;
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      ...(time ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' as const } : {}),
-    }).format(d);
+    const at = time ? `${isoDate}T${time.slice(0, 5)}:00` : isoDate;
+    return weekdayDate(at, this.i18n.formatLocale(), { time: !!time }) || isoDate;
   }
 }

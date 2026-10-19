@@ -1,7 +1,7 @@
+@use 'field' as f;
+@use '../../../shared/ui/dialog-form' as df;
 
-:host {
-  display: contents;
-}
+@include df.host;
 .tn {
   display: flex;
   flex-direction: column;

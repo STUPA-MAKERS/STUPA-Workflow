@@ -6,7 +6,10 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { PageHeaderComponent, erasureStatus } from '@shared/ui';
+import {
+  PageHeaderComponent,
+  erasureStatus,
+} from '@shared/ui';
 import {
   AvatarComponent,
   ButtonComponent,
@@ -31,6 +34,7 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, ErasureRequest } from '../admin.models';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The picker shows this many hits. A longer list means: type more. */
 const PERSON_HITS = 6;
@@ -166,7 +170,7 @@ export class PrivacyComponent {
 
   /** The name of an account; "Ohne Namen" when it has neither a name nor an e-mail (D7). */
   protected personName(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   protected pickPerson(p: AdminPrincipal): void {

@@ -44,7 +44,6 @@ import {
   fileSlug,
   localized,
   monthAverages,
-  monthLabel,
   oneDecimal,
   personName,
   presetRange,
@@ -54,6 +53,8 @@ import {
   sortRows,
   toCsv,
 } from '../gremien.util';
+import { monthShort, monthYear } from '@shared/date-format';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
@@ -113,6 +114,7 @@ export interface RowModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gat-host--fill]': 'fill()' },
   imports: [
+    RowChevronComponent,
     NoteComponent,
     EmptyStateComponent,
     TranslatePipe,
@@ -185,11 +187,11 @@ export class GremiumAttendanceComponent {
   readonly months = computed(() => this.data()?.months ?? []);
 
   readonly heads = computed<MonthHead[]>(() => {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     return this.months().map((m) => ({
       month: m.month,
-      short: monthLabel(m.month, locale),
-      long: monthLabel(m.month, locale, 'long'),
+      short: monthShort(m.month, locale),
+      long: monthYear(m.month, locale),
       meetings: this.meetingsText(m.meetings),
     }));
   });
@@ -278,7 +280,7 @@ export class GremiumAttendanceComponent {
       {
         principalId: model.row.principalId,
         name: model.name,
-        heading: `${model.name} · ${monthLabel(cell.month, this.i18n.locale(), 'long')}`,
+        heading: `${model.name} · ${monthYear(cell.month, this.i18n.formatLocale())}`,
         summary: this.summary(v.present, v.held, v.excused, v.delegated),
         months: [cell.month],
       },
@@ -318,10 +320,10 @@ export class GremiumAttendanceComponent {
     const data = this.data();
     if (!data) return;
     const t = (k: TranslationKey) => this.i18n.translate(k);
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const head = [t('gremien.attendance.member'), t('gremien.members.role')];
     for (const m of data.months) {
-      const label = monthLabel(m.month, locale, 'long');
+      const label = monthYear(m.month, locale);
       head.push(
         `${label} ${t('gremien.attendance.csvMeetings')}`,
         `${label} ${t('gremien.attendance.csvPresent')}`,
@@ -381,7 +383,7 @@ export class GremiumAttendanceComponent {
   }
 
   private cellLabel(name: string, month: string, view: CellView): string {
-    const when = monthLabel(month, this.i18n.locale(), 'long');
+    const when = monthYear(month, this.i18n.formatLocale());
     if (view.kind === 'na') return this.i18n.translate('gremien.attendance.cellNa', { name, month: when });
     if (view.kind === 'none') return this.i18n.translate('gremien.attendance.cellNone', { name, month: when });
     return `${name}, ${when}: ${this.summary(view.present, view.held, view.excused, view.delegated)}`;

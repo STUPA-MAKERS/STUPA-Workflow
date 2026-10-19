@@ -1,0 +1,22 @@
+@switch (state()) {
+  @case ('loading') {
+    @if (loadingTpl(); as tpl) {
+      <ng-container [ngTemplateOutlet]="tpl" />
+    } @else {
+      <app-skeleton variant="lines" [count]="lines()" [label]="'common.loading' | t" />
+    }
+  }
+  @case ('forbidden') {
+    @if (forbiddenText(); as text) {
+      <app-note kind="warn" icon="lock" role="alert">{{ text }}</app-note>
+    }
+  }
+  @case ('error') {
+    <app-note kind="error" icon="alert" role="alert">{{ errorText() }}</app-note>
+  }
+  @default {
+    @if (content(); as tpl) {
+      <ng-container [ngTemplateOutlet]="tpl" />
+    }
+  }
+}

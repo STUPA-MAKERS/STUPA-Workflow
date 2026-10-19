@@ -37,7 +37,6 @@ import { toFormlyFields, toFormlySections } from '@shared/forms/formly-mapper';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
-  BadgeComponent,
   ButtonComponent,
   ConfirmDialogComponent,
   EmptyStateComponent,
@@ -136,7 +135,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     AnswerViewComponent,
     FieldGroupComponent,
     FieldRowComponent,
-    BadgeComponent,
     ButtonComponent,
     IconComponent,
     InputComponent,

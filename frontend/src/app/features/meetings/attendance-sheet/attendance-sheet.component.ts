@@ -46,6 +46,7 @@ import { GuestListComponent } from '../guests/guest-list.component';
 import { GuestRequestsComponent } from '../guests/guest-requests.component';
 import { JoinLinkComponent } from '../public-join/join-link.component';
 import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
+import { personLabel } from '@shared/person-label.util';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -335,7 +336,7 @@ export class AttendanceSheetComponent {
       this.conflictId() === a.principalId && a.status !== 'present' ? (delegation ?? 'unknown') : null;
     return {
       a,
-      name: a.displayName || a.email || '—',
+      name: personLabel(a, this.i18n, { fallbackText: '—' }),
       sub: sub.join(' · '),
       options,
       value: a.status ?? 'open',

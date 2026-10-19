@@ -25,7 +25,7 @@ import {
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { errorDetail } from '../../meetings/meetings-display.util';
+import { problemDetail } from '@core/api/problem';
 import {
   type ElectionBar,
   candidateNames,
@@ -218,7 +218,7 @@ export class ElectionResultComponent {
 
   private fail(err: unknown): void {
     this.busy.set(null);
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.t('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }

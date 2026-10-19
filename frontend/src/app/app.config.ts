@@ -18,6 +18,7 @@ import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
 import { cacheInterceptor } from '@core/cache/cache.interceptor';
+import { provideDetailPrefetch } from '@core/cache/detail-prefetch';
 import { loadingInterceptor } from '@core/loading/loading.interceptor';
 import { LoadingService } from '@core/loading/loading.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -71,6 +72,7 @@ export const appConfig: ApplicationConfig = {
           : [loadingInterceptor, cacheInterceptor, authInterceptor],
       ),
     ),
+    provideDetailPrefetch(),
     {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),

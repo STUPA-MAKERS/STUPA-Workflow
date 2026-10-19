@@ -14,6 +14,9 @@ export const UPLOAD_ACCEPT =
 /**
  * A file size for people: whole KB below one MB ("212 KB"), else MB with at most one
  * decimal in the locale ("1,5 MB", "50 MB"). Nothing is "0 KB", a few bytes "1 KB".
+ *
+ * @deprecated Call `formatBytes(bytes, locale, 'file')` from `@shared/format-bytes`. Only the
+ * chat still uses this wrapper.
  */
 export function formatSize(bytes: number, locale: string): string {
   return formatBytes(bytes, locale, 'file');

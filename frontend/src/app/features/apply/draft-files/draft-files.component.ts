@@ -1,28 +1,25 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { scanStatus } from '@shared/status-kind.util';
 import {
-  BadgeComponent,
-  CheckboxComponent,
   FileDropZoneComponent,
+  formatBytes,
   IconComponent,
   StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { FormsModule } from '@angular/forms';
-import { formatSize, UPLOAD_ACCEPT } from '../apply.util';
+import { UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';
 
 /**
  * The draft files of one field of the wizard, or of the general block "Anhänge"
  * (`fieldKey` null), board Antrag-stellen.
  *
- * A row per file: name (it wraps, never cut), size and scan state as status text, the
- * tag "Vergleichsangebot", and a delete button. A file the server lost (422 on the
- * submit) shows "Nicht mehr vorhanden" in red; its button only takes it off the list.
- * Below the rows the drop zone with the limits. With `comparison`, a checkbox marks the
- * next uploads as comparison offers (the server takes the mark only with the upload).
+ * A row per file: name (it wraps, never cut), size and scan state as status text, and
+ * a delete button. A file the server lost (422 on the submit) shows "Nicht mehr
+ * vorhanden" in red; its button only takes it off the list. Below the rows the drop
+ * zone with the limits.
  *
  * `changed` emits the ids of the field after each upload and delete; the formly field
  * keeps them as its value.
@@ -32,10 +29,7 @@ import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.se
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    FormsModule,
     TranslatePipe,
-    BadgeComponent,
-    CheckboxComponent,
     IconComponent,
     FileDropZoneComponent,
     StatusTextComponent,
@@ -54,8 +48,6 @@ export class DraftFilesComponent {
   readonly heading = input.required<string>();
   /** Show the count and the bytes of the whole draft beside the heading. */
   readonly summary = input(false);
-  /** Offer the checkbox "Als Vergleichsangebot hochladen". */
-  readonly comparison = input(false);
   /** The field is required: the heading carries the mark. */
   readonly required = input(false);
   /** An error text of the field (for example "required"). */
@@ -65,7 +57,6 @@ export class DraftFilesComponent {
   readonly changed = output<string[]>();
 
   protected readonly accept = UPLOAD_ACCEPT;
-  protected readonly asOffer = signal(false);
 
   protected readonly files = computed(() => this.drafts.filesOf(this.fieldKey()));
   protected readonly pending = computed(() =>
@@ -80,20 +71,20 @@ export class DraftFilesComponent {
     return this.i18n.translate('apply.files.summary', {
       count: this.drafts.count(),
       max: limits.maxDraftFiles,
-      size: formatSize(this.drafts.bytes(), locale),
-      maxSize: formatSize(limits.maxDraftBytes, locale),
+      size: formatBytes(this.drafts.bytes(), locale, 'file'),
+      maxSize: formatBytes(limits.maxDraftBytes, locale, 'file'),
     });
   });
 
   /** "PDF, Bilder, Word, Excel, PowerPoint, OpenDocument · bis 10 MB je Datei". */
   protected readonly hint = computed(() =>
     this.i18n.translate('apply.files.hint', {
-      size: formatSize(this.drafts.limits().maxFileBytes, this.i18n.formatLocale()),
+      size: formatBytes(this.drafts.limits().maxFileBytes, this.i18n.formatLocale(), 'file'),
     }),
   );
 
   protected size(bytes: number): string {
-    return formatSize(bytes, this.i18n.formatLocale());
+    return formatBytes(bytes, this.i18n.formatLocale(), 'file');
   }
 
   protected scan(file: DraftFile) {
@@ -101,10 +92,7 @@ export class DraftFilesComponent {
   }
 
   protected async onFiles(files: File[]): Promise<void> {
-    const { failed } = await this.drafts.upload(files, {
-      fieldKey: this.fieldKey(),
-      isComparisonOffer: this.comparison() && this.asOffer(),
-    });
+    const { failed } = await this.drafts.upload(files, { fieldKey: this.fieldKey() });
     for (const f of failed) {
       this.toast.error(`${f.filename}: ${this.i18n.translate(f.reason)}`);
     }

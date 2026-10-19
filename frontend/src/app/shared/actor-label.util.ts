@@ -15,9 +15,7 @@
  * same rules, and it hides a value that looks like an id.
  */
 import type { ActorInfo } from '@core/api/models';
-import type { TranslationKey } from '@core/i18n/translations';
-
-export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 
 /** The actor value of the magic-link applicant in the timeline and the versions. */
 export const APPLICANT_ACTOR = 'applicant';

@@ -134,7 +134,7 @@ function fakeApi(o: ApiOverrides = {}): Partial<ApiClient> {
       o.listAttachments ??
       (() =>
         of([
-          { id: 'f1', filename: 'Angebot.pdf', mime: 'application/pdf', size: 1000, scanned: true, isComparisonOffer: false, scanState: 'clean' as const },
+          { id: 'f1', filename: 'Angebot.pdf', mime: 'application/pdf', size: 1000, scanned: true, scanState: 'clean' as const },
         ])),
     applicantTransitions: (o.applicantTransitions ?? (() => of([]))) as ApiClient['applicantTransitions'],
     fireApplicantTransition: (o.fireApplicant ??
@@ -388,7 +388,7 @@ describe('StatusTimelineComponent', () => {
 
   it('opens the sheet with a file dropped anywhere on the page and uploads it', async () => {
     const uploadAttachment = jest.fn(() =>
-      of({ id: 'f2', filename: 'Beleg.pdf', mime: 'application/pdf', size: 10, scanned: false, isComparisonOffer: false, scanState: 'scanning' as const }),
+      of({ id: 'f2', filename: 'Beleg.pdf', mime: 'application/pdf', size: 10, scanned: false, scanState: 'scanning' as const }),
     );
     const { comp, fixture, container } = await setup({
       ...fakeApi(),
@@ -670,7 +670,6 @@ describe('StatusTimelineComponent', () => {
       mime: 'application/pdf',
       size: 1,
       scanned: true,
-      isComparisonOffer: false,
       scanState: 'clean' as const,
     }));
     const { comp } = await setup(

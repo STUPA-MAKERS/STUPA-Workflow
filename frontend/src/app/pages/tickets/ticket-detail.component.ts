@@ -91,10 +91,11 @@ import {
   STATUS_LABEL,
   eventText,
   isOpen,
-  personName,
   reporterEventText,
   reporterName,
 } from './tickets.util';
+import { clock, dayMonth } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 type DetailTab = 'log' | 'details';
 
@@ -481,7 +482,9 @@ export class TicketDetailComponent {
 
   private load(id: Uuid): void {
     const seq = ++this.seq;
-    if (id !== this.id) {
+    // A newly opened ticket takes what the list read ahead; a reload reads fresh.
+    const opened = id !== this.id;
+    if (opened) {
       this.id = id;
       this.outbox.clear();
       this.ticket.set(null);
@@ -492,7 +495,7 @@ export class TicketDetailComponent {
     }
     this.notFound.set(false);
     this.error.set(false);
-    this.read(id).subscribe({
+    this.read(id, opened).subscribe({
       next: (t) => {
         if (seq !== this.seq) return;
         this.show(t);
@@ -509,15 +512,15 @@ export class TicketDetailComponent {
   }
 
   /** The ticket: the team detail, or the own ticket of the reporter in the same shape. */
-  private read(id: Uuid): Observable<TicketDetail> {
-    if (this.manager) return this.api.get(id);
+  private read(id: Uuid, detail = false): Observable<TicketDetail> {
+    if (this.manager) return this.api.get(id, { detail });
     const me: TicketReporter = {
       principalId: null,
       displayName: this.auth.displayName() || null,
       email: null,
       anonymized: false,
     };
-    return this.api.getMine(id).pipe(
+    return this.api.getMine(id, { detail }).pipe(
       tap((m) => this.canReply.set(m.canReply)),
       map((m) => fromMine(m, me)),
     );
@@ -812,13 +815,8 @@ export class TicketDetailComponent {
 
   /** "14.10., 21:14". */
   private when(at: string): string {
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).format(new Date(at));
+    const locale = this.i18n.formatLocale();
+    return `${dayMonth(at, locale)}, ${clock(at, locale)}`;
   }
 
   reportedAt(t: TicketDetail): string {
