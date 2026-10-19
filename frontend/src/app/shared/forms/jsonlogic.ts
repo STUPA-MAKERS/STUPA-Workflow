@@ -22,8 +22,6 @@ export class JsonLogicError extends Error {
   }
 }
 
-export type JsonLogicExpr = unknown;
-
 const OPERATORS = new Set([
   '==',
   '!=',

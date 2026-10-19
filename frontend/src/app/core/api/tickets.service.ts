@@ -22,8 +22,6 @@ export type TicketStatus = 'new' | 'in_progress' | 'done' | 'rejected';
 
 /** The kinds in the order of the dialog and the filter. */
 export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea'];
-/** The states in the order of the list groups and the filter. */
-export const TICKET_STATUSES: readonly TicketStatus[] = ['new', 'in_progress', 'done', 'rejected'];
 
 /** What the dialog sends along: every field optional, capped by the server. */
 export interface TicketContext {

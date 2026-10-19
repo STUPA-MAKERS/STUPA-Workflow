@@ -7,9 +7,7 @@ import {
   groupsToFields,
   moveQuestionTo,
   normalizeFormField,
-  parseFields,
   type QuestionGroup,
-  serializeFields,
   validateFormField,
   validateJsonLogic,
 } from './form-field.util';
@@ -120,12 +118,6 @@ describe('round-trip', () => {
       type: 'text',
       label: { de: 'Titel', en: 'Title' },
     });
-  });
-
-  it('serialize → parse is idempotent', () => {
-    const fields = [field(), field({ key: 'amount', type: 'currency', required: true })];
-    const back = parseFields(serializeFields(fields));
-    expect(back).toEqual(fields.map(normalizeFormField));
   });
 
   it('keeps isPromoted only for numeric types', () => {
