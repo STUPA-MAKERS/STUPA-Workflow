@@ -999,7 +999,7 @@ describe('TodoCardDetailComponent', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     fireEvent.click(screen.getByRole('button', { name: 'Link kopieren' }));
     await Promise.resolve();
-    expect(writeText).toHaveBeenCalledWith(`${location.origin}/todos/b-1?card=k-1`);
+    expect(writeText).toHaveBeenCalledWith(`${location.origin}/todos?card=k-1`);
     expect(toast.success).toHaveBeenCalledWith('Link kopiert');
     writeText.mockReturnValueOnce(Promise.reject(new Error('denied')));
     cmp.copyLink();

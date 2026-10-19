@@ -360,5 +360,5 @@ async def test_the_todo_source_links_the_card_on_its_board(
         "todo",
         "Plakat",
         "StuPa · Offen",
-        f"/todos/{board.id}?card={card.id}",
+        f"/todos?card={card.id}",
     )

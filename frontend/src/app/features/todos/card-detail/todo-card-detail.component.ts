@@ -1000,7 +1000,8 @@ export class TodoCardDetailComponent {
   copyLink(): void {
     const c = this.card();
     if (!c) return;
-    const url = `${location.origin}/todos/${c.boardId}?card=${c.id}`;
+    // The card only: the link stays valid when the card moves to another board.
+    const url = `${location.origin}/todos?card=${c.id}`;
     const clip = navigator.clipboard;
     if (!clip) {
       this.toast.error(this.t('todos.card.linkFailed'));
