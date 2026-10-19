@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../features/meetings/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 :host {
   display: flex;
   flex-direction: column;
@@ -63,29 +63,8 @@
   display: none;
 }
 /* The strip scrolls sideways: a fade marks only the side where more chips are. */
-.td__chips.is-fade-start {
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--td-chip-fade));
-  mask-image: linear-gradient(to right, transparent, #000 var(--td-chip-fade));
-}
-.td__chips.is-fade-end {
-  -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--td-chip-fade));
-  mask-image: linear-gradient(to left, transparent, #000 var(--td-chip-fade));
-}
-.td__chips.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 var(--td-chip-fade),
-    #000 calc(100% - var(--td-chip-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to right,
-    transparent,
-    #000 var(--td-chip-fade),
-    #000 calc(100% - var(--td-chip-fade)),
-    transparent
-  );
+.td__chips {
+  @include fade.fade-x(var(--td-chip-fade));
 }
 .td__reset {
   min-height: 32px;

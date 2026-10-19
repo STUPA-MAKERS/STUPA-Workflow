@@ -2,15 +2,12 @@
      "Mitglied → Stellvertretung"; an entry for the whole Gremium reads "Für alle
      Mitglieder → Stellvertretung". -->
 <section class="sp" aria-labelledby="sp-title">
-  <header class="sp__head">
-    <h2 class="section-title" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
-    <span class="sp__actions">
-      <ng-content select="[poolActions]" />
-      <app-button variant="text" size="sm" (click)="openAdd()">
-        <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
-      </app-button>
-    </span>
-  </header>
+  <app-section-header class="sp__head" headingId="sp-title" [heading]="'admin.substitutes.title' | t">
+    <ng-content select="[poolActions]" />
+    <app-button variant="text" size="sm" (click)="openAdd()">
+      <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
+    </app-button>
+  </app-section-header>
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
@@ -53,35 +50,30 @@
 >
   <form class="sp__form" (submit)="$event.preventDefault(); add()">
     <div class="sp__search">
-      <label class="sp__searchBox">
-        <span class="sp__searchLabel">{{ 'admin.substitutes.search' | t }}</span>
-        <input
-          class="sp__searchInput"
-          type="search"
-          autocomplete="off"
-          name="person"
-          [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-          [attr.aria-busy]="search.pending() || null"
-          [ngModel]="search.text()"
-          (ngModelChange)="onSearch($event)"
-        />
-      </label>
+      <app-search-pill
+        size="md"
+        [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
+        [label]="'admin.substitutes.search' | t"
+        [busy]="search.pending()"
+        [value]="search.text()"
+        (valueChange)="onSearch($event)"
+        (commit)="search.flush()"
+      />
       @if (candidates().length) {
         <ul class="sp__hits" appScrollFade="y" [attr.aria-label]="'admin.substitutes.hits' | t">
           @for (c of candidates(); track c.id) {
             <li>
-              <button
-                type="button"
-                class="sp__hit"
-                [class.sp__hit--on]="selected()?.id === c.id"
+              <app-list-item
+                [title]="label(c)"
+                [selected]="selected()?.id === c.id"
+                subWrap
                 [attr.title]="c.displayName || c.email ? null : c.sub"
-                (click)="pick(c)"
+                (activate)="pick(c)"
               >
-                <span class="sp__hitName">{{ label(c) }}</span>
                 @if (c.email) {
-                  <span class="sp__hitMail mono">{{ c.email }}</span>
+                  <span sub class="mono">{{ c.email }}</span>
                 }
-              </button>
+              </app-list-item>
             </li>
           }
         </ul>
@@ -103,11 +95,11 @@
       name="member"
     />
     @if (addError()) {
-      <p class="sp__error" role="alert">{{ addError() }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ addError() }}</app-note>
     }
     <button type="submit" hidden></button>
   </form>
-  <div dialog-footer class="sp__foot">
+  <div dialog-footer>
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!selected()" [loading]="adding()" (click)="add()">{{
       'admin.common.add' | t

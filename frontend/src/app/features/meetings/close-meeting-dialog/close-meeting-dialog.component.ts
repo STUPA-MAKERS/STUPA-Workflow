@@ -13,14 +13,14 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import {
   ButtonComponent,
   DialogComponent,
   IconComponent,
+  NoteComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { errorCode, errorDetail } from '../meetings-display.util';
+import { problemCode, problemDetail } from '@core/api/problem';
 
 /**
  * "Sitzung schließen?": the last step of a live meeting.
@@ -99,12 +99,12 @@ export class CloseMeetingDialogComponent {
       },
       error: (err: unknown) => {
         this.closing.set(false);
-        if (errorCode(err) === 'open_vote') {
+        if (problemCode(err) === 'open_vote') {
           // The vote opened in another tab after this page loaded.
           this.refused.set(true);
           return;
         }
-        const detail = errorDetail(err);
+        const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);
       },

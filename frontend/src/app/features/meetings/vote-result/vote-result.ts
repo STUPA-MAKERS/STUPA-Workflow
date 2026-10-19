@@ -1,15 +1,13 @@
 import type { MeetingVote } from '@core/api/models';
-import type { TranslationKey } from '@core/i18n/translations';
+import { toFormatLocale } from '@core/i18n/i18n.service';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type {
   VoteCalloutInfo,
   VoteCalloutResolver,
 } from '@stupa-makers/ui-kit/markdown-editor';
-import { clockTime } from '../meetings-display.util';
 import { voteSnippetQuestion } from '../meetings.util';
 import { electionCaption, electionStatus } from '../../voting/election.util';
-
-/** The translate function of the I18nService. */
-type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+import { clock } from '@shared/date-format';
 
 /**
  * The result block of a closed vote in the text of an agenda item.
@@ -23,7 +21,7 @@ type Translate = (key: TranslationKey, params?: Record<string, string | number>)
 export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   if (vote.kind === 'election') return electionResultInfo(vote, t, locale);
   const parts = [t('meetings.voteResult.caption')];
-  const time = clockTime(vote.closedAt, locale);
+  const time = clock(vote.closedAt, toFormatLocale(locale));
   if (time) parts.push(time);
   if (vote.majorityRule) parts.push(t(`vote.majority.${vote.majorityRule}` as TranslationKey));
   const passed = vote.result === 'passed';
@@ -48,7 +46,7 @@ export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string):
 /** The card of a personnel election (F2): "Wahl · 2 Posten · 18:52" and "Gewählt". */
 function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   const parts = [electionCaption(vote.election ?? null, vote.round, t)];
-  const time = clockTime(vote.closedAt, locale);
+  const time = clock(vote.closedAt, toFormatLocale(locale));
   if (time) parts.push(time);
   const elected = vote.result === 'elected';
   return {

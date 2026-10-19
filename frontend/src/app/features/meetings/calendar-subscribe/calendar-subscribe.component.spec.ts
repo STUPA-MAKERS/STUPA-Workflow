@@ -6,7 +6,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { CalendarFeed } from '@core/api/models';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
-import { COPIED_MS, CalendarSubscribeComponent } from './calendar-subscribe.component';
+import { CalendarSubscribeComponent } from './calendar-subscribe.component';
 
 @Component({
   standalone: true,
@@ -74,46 +74,24 @@ describe('CalendarSubscribeComponent', () => {
     expect(screen.getByRole('button', { name: 'Kopiert!' })).toBeInTheDocument();
   });
 
-  it('reads "Kopieren" again after a short time', async () => {
-    const writeText = jest.fn(() => Promise.resolve());
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { openIt, fixture, cmp } = await setup();
-    await openIt();
-    jest.useFakeTimers();
-    try {
-      cmp.copy();
-      await Promise.resolve();
-      await Promise.resolve();
-      expect(cmp.copied()).toBe(true);
-      // A second copy starts the time again.
-      cmp.copy();
-      await Promise.resolve();
-      await Promise.resolve();
-      jest.advanceTimersByTime(COPIED_MS - 1);
-      expect(cmp.copied()).toBe(true);
-      jest.advanceTimersByTime(1);
-      expect(cmp.copied()).toBe(false);
-      cmp.copy();
-      await Promise.resolve();
-      await Promise.resolve();
-      fixture.destroy();
-      jest.advanceTimersByTime(COPIED_MS);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('forgets "copied" when the clipboard refuses, and does nothing without a URL', async () => {
+  it('forgets "copied" when the clipboard refuses, and when the popover opens again', async () => {
     const writeText = jest.fn(() => Promise.reject(new Error('denied')));
     Object.assign(navigator, { clipboard: { writeText } });
     const { openIt, fixture, cmp } = await setup();
     await openIt();
     await userEvent.click(screen.getByRole('button', { name: 'Kopieren' }));
     await fixture.whenStable();
-    expect(cmp.copied()).toBe(false);
-    cmp.url.set(null);
-    cmp.copy();
-    expect(writeText).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Kopieren' })).toBeInTheDocument();
+    writeText.mockImplementation(() => Promise.resolve());
+    await userEvent.click(screen.getByRole('button', { name: 'Kopieren' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Kopiert!' })).toBeInTheDocument();
+    cmp.close(false);
+    cmp.open();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Kopieren' })).toBeInTheDocument();
   });
 
   it('asks before it makes a new URL, and can be cancelled', async () => {

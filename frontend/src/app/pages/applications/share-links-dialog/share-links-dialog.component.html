@@ -13,9 +13,13 @@
       <div class="sld__freshRow">
         <!-- The whole link, wrapped, selectable and a real link: a copyable value is never cut. -->
         <p class="sld__url mono"><span class="sr-only">{{ 'applications.share.url' | t }}: </span><a class="sld__link" [href]="url" target="_blank" rel="noopener"><code>{{ url }}</code></a></p>
-        <app-button variant="tonal" size="sm" (click)="copy()">
-          {{ (copied() ? 'applications.share.copied' : 'applications.share.copy') | t }}
-        </app-button>
+        <app-copy-button
+          [text]="url"
+          [icon]="false"
+          [resetMs]="0"
+          [label]="'applications.share.copy' | t"
+          [copiedLabel]="'applications.share.copied' | t"
+        />
       </div>
     </div>
   }

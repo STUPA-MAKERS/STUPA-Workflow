@@ -7,12 +7,11 @@
   <!-- Three separate mappings. They do not depend on each other. -->
   @for (sec of sections(); track sec.kind) {
     <section class="gm__section" [attr.aria-labelledby]="'gm-' + sec.kind + '-title'">
-      <header class="gm__head">
-        <h2 class="section-title" [id]="'gm-' + sec.kind + '-title'">{{ key(sec.kind, 'title') | t }}</h2>
+      <app-section-header [headingId]="'gm-' + sec.kind + '-title'" [heading]="key(sec.kind, 'title') | t">
         <app-button size="sm" variant="tonal" [ariaLabel]="key(sec.kind, 'create') | t" (click)="openAdd(sec.kind)">
           <app-icon name="plus" /> {{ 'admin.groupMappings.create' | t }}
         </app-button>
-      </header>
+      </app-section-header>
 
       @if (sec.loading) {
         <app-skeleton variant="rows" [count]="3" [label]="'common.loading' | t" />
@@ -126,7 +125,7 @@
       <button type="submit" hidden></button>
     </form>
   }
-  <div dialog-footer class="gm__dialogFoot">
+  <div dialog-footer>
     <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!valid()" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>

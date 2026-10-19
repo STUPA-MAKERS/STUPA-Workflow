@@ -37,58 +37,43 @@ import type {
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
-import { localToday } from './capture/application-capture.component';
 import { toFormlySections } from '@shared/forms/formly-mapper';
-import { formatAnswer, formatEuro, formatFieldValue } from '@shared/forms/answer-format';
+import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
 import {
   normalizePositions,
   positionValue,
   positionsTotal,
 } from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
+import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type HistoryChange, type HistoryEntry } from '@shared/ui';
 import {
-  ChatComponent,
-  ChatDrafts,
-  ChatOutbox,
-  appendOnce,
-  withScanStates,
-  draftDropper,
-  filesRefused,
-  sendErrorKey,
-  toChatAttachments,
+  ButtonComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  DropOverlayComponent,
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
-  HistoryComponent,
-  NoteComponent,
-  RowMenuComponent,
-  StatusTextComponent,
-  flowColorKind,
-  chatPeople,
-  type ChatEdit,
-  type ChatPerson,
-  type ChatMessage,
-  type ChatRef,
-  type ChatSend,
-  type ChatVisibility,
-  type HistoryChange,
-  type HistoryEntry,
-  type RowMenuItem,
-  type RowMenuSection,
-} from '@shared/ui';
-import {
-  ButtonComponent,
-  DialogComponent,
+  FileDropDirective,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SelectFieldComponent,
+  type SelectOption,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SideSheetComponent,
+  StatusTextComponent,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type SelectOption,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -97,24 +82,21 @@ import {
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
-import { FileDropDirective } from '@shared/file-drop.directive';
-import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
 import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
-import { decisionHistoryLine, formatMoney } from '@shared/decision/decision.util';
+import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { AmountComponent } from '@shared/ui/amount/amount.component';
+import { localToday } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -163,6 +145,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AmountComponent,
     DropOverlayComponent,
     FileDropDirective,
     ConfirmDialogComponent,
@@ -224,7 +207,7 @@ export class ApplicationsDetailComponent {
   /** The route of the list pane: `/applications`, or `/tasks` on the tasks page. */
   readonly listPath = computed(() => this.page?.listPath() ?? ['/applications']);
   /** Phone: every header action goes into the menu. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   /**
@@ -553,7 +536,7 @@ export class ApplicationsDetailComponent {
 
   /** An amount in euro; a missing value counts as 0, as on the server. */
   private money(value: number | null): string {
-    return formatEuro(Number(value), this.i18n.locale()) ?? '';
+    return formatMoney(value ?? 0, this.i18n.formatLocale());
   }
 
   /** The label of a field of the diff, or its key when the form does not define it. */
@@ -1116,12 +1099,7 @@ export class ApplicationsDetailComponent {
 
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
-    const value = Number(app.amount);
-    if (Number.isNaN(value)) return app.amount;
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: app.currency ?? 'EUR',
-    }).format(value);
+    return formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount;
   }
 
   /**
@@ -1131,7 +1109,7 @@ export class ApplicationsDetailComponent {
   approvedAmount(app: Application): string {
     if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
     if (Number(app.approvedAmount) === Number(app.amount)) return '';
-    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), app.currency);
+    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
   }
 
   startEdit(app: Application): void {

@@ -225,7 +225,7 @@ describe('ApplicationsListComponent', () => {
       expect(screen.getByText('Archiviert')).toBeInTheDocument();
       // No amount, no placeholder.
       const trikots = screen.getByRole('link', { name: 'Trikots' }).closest('app-list-item')!;
-      expect(trikots.querySelector('.apps__amount')).toBeNull();
+      expect(trikots.querySelector('.amt__value')).toBeNull();
     });
 
     it('names an untitled row and leaves an unknown type and a missing state out', async () => {
@@ -1104,7 +1104,7 @@ describe('ApplicationsListComponent', () => {
       });
       harness.detectChanges();
       const host = harness.fixture.nativeElement as HTMLElement;
-      const struck = host.querySelectorAll('.apps__amountStruck');
+      const struck = host.querySelectorAll('app-amount .amt__struck');
       expect(struck).toHaveLength(1);
       expect(struck[0].textContent?.replace(/\u00a0/g, ' ')).toBe('1.250,00 €');
     });

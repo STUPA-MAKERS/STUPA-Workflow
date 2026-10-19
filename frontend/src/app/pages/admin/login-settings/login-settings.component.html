@@ -1,15 +1,13 @@
 <section class="ls admin-page">
   <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t" />
 
-  @if (loading()) {
-    <app-skeleton variant="lines" [count]="3" [label]="'common.loading' | t" />
-  } @else if (loadState() === 'forbidden') {
-    <app-note kind="warn" icon="lock" role="alert">{{ 'admin.loginSettings.forbidden' | t }}</app-note>
-  } @else if (loadState() === 'error') {
-    <app-note kind="error" icon="alert" role="alert">{{ 'admin.loginSettings.loadError' | t }}</app-note>
-  } @else {
-    <form class="ls__grid" (submit)="$event.preventDefault(); save()">
-      <div class="ls__unitBox">
+  <app-load-state
+    [state]="form.state()"
+    [forbiddenText]="'admin.loginSettings.forbidden' | t"
+    [errorText]="'admin.loginSettings.loadError' | t"
+  >
+    <ng-template #content>
+      <form class="ls__grid" (submit)="$event.preventDefault(); save()">
         <app-input
           type="number"
           [label]="'admin.loginSettings.web' | t"
@@ -17,11 +15,9 @@
           name="webSessionDays"
           [ngModel]="draft().web"
           (ngModelChange)="patch({ web: $event })"
+          [suffix]="'admin.loginSettings.daysUnit' | t"
         />
-        <span class="ls__unit" aria-hidden="true">{{ 'admin.loginSettings.daysUnit' | t }}</span>
-      </div>
 
-      <div class="ls__unitBox">
         <app-input
           type="number"
           [label]="'admin.loginSettings.pwa' | t"
@@ -29,17 +25,17 @@
           name="pwaSessionDays"
           [ngModel]="draft().pwa"
           (ngModelChange)="patch({ pwa: $event })"
+          [suffix]="'admin.loginSettings.daysUnit' | t"
         />
-        <span class="ls__unit" aria-hidden="true">{{ 'admin.loginSettings.daysUnit' | t }}</span>
-      </div>
-    </form>
+      </form>
 
-    @if (saved()?.updatedAt; as at) {
-      <p class="ls__meta">{{ 'admin.loginSettings.updatedAt' | t: { date: (at | ldate: 'medium') } }}</p>
-    }
+      @if (saved()?.updatedAt; as at) {
+        <p class="ls__meta">{{ 'admin.loginSettings.updatedAt' | t: { date: (at | ldate: 'medium') } }}</p>
+      }
 
-    @if (dirty()) {
-      <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!body()" (activate)="save()" />
-    }
-  }
+      @if (dirty()) {
+        <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!body()" (activate)="save()" />
+      }
+    </ng-template>
+  </app-load-state>
 </section>

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type {
   ElectionConfig,
   ElectionResult,
@@ -11,12 +11,17 @@ import type {
   VoteResult,
 } from '@core/api/models';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from '../voting/vote-bars.component';
 import { ElectionResultComponent } from '../voting/election-result/election-result.component';
 import { electionCaption, electionResultLine, electionStatus } from '../voting/election.util';
+import {
+  guestComposition,
+  majorityLabel,
+  quorumLabel,
+  secrecyLabel,
+  voteRulesParts,
+} from './meetings-display.util';
 
 /** The vote that the beamer shows, as the page assembles it from the server data. */
 export interface BeamerVote {
@@ -146,24 +151,21 @@ export class MeetingBeamerComponent {
   });
 
   private describe(v: BeamerVote): BeamerText {
-    const t = (key: TranslationKey, params?: Record<string, string | number>) =>
-      this.i18n.translate(key, params);
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
     if (v.election) return this.describeElection(v, v.election, t);
     const guests = !!v.guestsVote;
-    const majority = t(`${guests ? 'vote.majorityCast' : 'vote.majority'}.${v.majorityRule}` as TranslationKey);
+    const majority = majorityLabel(v.majorityRule, guests, t);
     const q = v.quorum;
-    const quorum = q
-      ? t(q.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount', {
-          n: q.value,
-        })
-      : '';
+    const quorum = q ? quorumLabel(q, t) : '';
     // Every result that is not `passed` is a rejection, also a tie (O18).
     const passed = v.result === 'passed';
     const quorumOpen = v.status === 'open' && !!q && !v.quorumMet;
 
     // "Einfache Mehrheit · offene Abstimmung", plus the quorum while it is reached.
-    const rules = [majority, t(v.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort')];
-    if (q && !quorumOpen) rules.push(quorum);
+    const rules = voteRulesParts(
+      { majorityRule: v.majorityRule, secret: v.secret, quorum: quorumOpen ? null : q, guestsVote: guests },
+      t,
+    );
 
     // "Einfache Mehrheit · Quorum erreicht · 20 Stimmen". A closed vote missed its
     // quorum exactly when the server names it as the reason.
@@ -171,10 +173,7 @@ export class MeetingBeamerComponent {
     const outcome = [passed || missedQuorum ? majority : t('beamer.majorityMissed', { rule: majority })];
     if (q) outcome.push(t(missedQuorum ? 'beamer.quorumMissed' : 'beamer.quorumMet'));
     outcome.push(v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted }));
-    const composition =
-      guests && typeof v.presentMembers === 'number' && typeof v.presentGuests === 'number'
-        ? t('guests.vote.composition', { members: v.presentMembers, guests: v.presentGuests })
-        : null;
+    const composition = guests ? guestComposition(v.presentMembers, v.presentGuests, t) : null;
 
     return {
       // Counts show after the close, or while open once the server revealed them.
@@ -196,12 +195,9 @@ export class MeetingBeamerComponent {
   private describeElection(
     v: BeamerVote,
     election: ElectionConfig,
-    t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+    t: Translate,
   ): BeamerText {
-    const rules = [
-      electionCaption(election, v.round, t),
-      t(v.secret ? 'meetings.vote.secretShort' : 'meetings.vote.publicShort'),
-    ].join(' · ');
+    const rules = [electionCaption(election, v.round, t), secrecyLabel(v.secret, t)].join(' · ');
     const ballots = v.voted === 1 ? t('beamer.ballotsOne') : t('beamer.ballots', { n: v.voted });
     return {
       bars: v.counts !== null && (v.status === 'closed' || !v.secret),

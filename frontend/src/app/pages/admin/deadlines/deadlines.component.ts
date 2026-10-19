@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
@@ -9,38 +10,32 @@ import {
   ButtonComponent,
   CellDirective,
   type ColumnDef,
+  ConfirmDialogComponent,
   DataTableComponent,
   DatepickerComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  SelectFieldComponent,
   type SelectOption,
   TimeInputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import {
-  RowMenuComponent,
-  type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { dayMonthYear, localToday } from '@shared/date-format';
 
 /** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
 export interface DeadlineValue {
   text: string;
   title: string;
   muted: boolean;
-}
-
-/** Today as `YYYY-MM-DD` in local time, for the comparison with the recurring dates. */
-function localToday(now: Date): string {
-  const p = (n: number): string => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
 }
 
 const KINDS: DeadlineKind[] = [
@@ -115,6 +110,7 @@ function emptyDraft(): PolicyDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -205,7 +201,7 @@ export class AdminDeadlinesComponent {
 
   protected label(p: DeadlinePolicy | null): string {
     if (!p) return '';
-    return p.label[this.i18n.locale()] ?? p.label['de'] ?? p.key;
+    return i18nLabel(p.label, this.i18n.locale(), p.key);
   }
 
   protected kindLabel(kind: DeadlineKind): string {
@@ -246,11 +242,7 @@ export class AdminDeadlinesComponent {
   }
 
   private dateText(iso: string): string {
-    return new Date(iso).toLocaleDateString(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return dayMonthYear(iso, this.i18n.formatLocale());
   }
 
   protected openAdd(): void {

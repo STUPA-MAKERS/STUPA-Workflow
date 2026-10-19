@@ -34,10 +34,9 @@ import { openWindowState } from './open-window.util';
 import {
   assembleProtocolMarkdown,
   canReportOwn,
-  errorCode,
-  errorDetail,
   liveOpenedVote,
 } from './meetings-display.util';
+import { problemCode, problemDetail } from '@core/api/problem';
 
 /**
  * State and actions of the loaded meeting (detail route): meeting control,
@@ -251,7 +250,7 @@ export class MeetingSessionService implements OnDestroy {
         }
       },
       error: (err: unknown) => {
-        const code = errorCode(err);
+        const code = problemCode(err);
         if (code === 'early_open_unconfirmed') {
           this.earlyOpenAsk.set(true);
           return;
@@ -270,7 +269,7 @@ export class MeetingSessionService implements OnDestroy {
    * meeting may have changed in another tab.
    */
   private statusChangeFailed(err: unknown): void {
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
     const m = this.meeting();
@@ -370,7 +369,7 @@ export class MeetingSessionService implements OnDestroy {
   /** Show the server reason (for example 409) and reload the meeting. The vote
    *  may have changed on the server, for example to cancelled. */
   private voteActionFailed(err: unknown): void {
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
     const m = this.meeting();
@@ -530,7 +529,7 @@ export class MeetingSessionService implements OnDestroy {
       },
       error: (err: unknown) => {
         this.publicationSaving.set(false);
-        const detail = errorDetail(err);
+        const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);
       },
@@ -555,7 +554,7 @@ export class MeetingSessionService implements OnDestroy {
       error: (err: unknown) => {
         this.finalizing.set(false);
         // Render and compile errors (400) carry a concrete reason. Show it.
-        const detail = errorDetail(err);
+        const detail = problemDetail(err);
         this.toast.error(
           detail
             ? `${this.i18n.translate('meetings.toast.finalizeFailed')}: ${detail}`
@@ -639,7 +638,7 @@ export class MeetingSessionService implements OnDestroy {
     err: unknown,
     asLead: boolean,
   ): void {
-    const code = errorCode(err);
+    const code = problemCode(err);
     if (code === 'delegation_active') {
       if (asLead) {
         this.attendanceConflict.set(principalId);
@@ -649,7 +648,7 @@ export class MeetingSessionService implements OnDestroy {
     } else if (code === 'attendance_set_by_lead') {
       this.toast.error(this.i18n.translate('meetings.toast.attendanceSetByLead'));
     } else {
-      const detail = errorDetail(err);
+      const detail = problemDetail(err);
       const base = this.i18n.translate('meetings.toast.actionFailed');
       this.toast.error(detail ? `${base}: ${detail}` : base);
       return;

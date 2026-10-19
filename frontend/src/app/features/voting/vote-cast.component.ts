@@ -18,17 +18,19 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, ProblemDetail, Vote } from '@core/api/models';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  RowMenuComponent,
+  type RowMenuSection,
+  ScrollFadeDirective,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { RailStatusService } from '../../layout/rail-status.service';
-import { mediaQuerySignal } from '../../layout/media-query';
 import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
 import { VotePhoneHeaderComponent } from './phone-header/phone-header.component';
 import { VotePanelComponent } from './vote-panel/vote-panel.component';
@@ -36,7 +38,6 @@ import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote
 import { VotingPageService } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 type Phase = 'loading' | 'error' | 'ready';
 
@@ -111,7 +112,7 @@ export class VoteCastComponent implements OnDestroy {
   /** The list page around the pane. The pane also works without it (a test). */
   private readonly page = inject(VotingPageService, { optional: true });
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list sits beside the pane: the vote is a sheet. */
   readonly split = computed(() => this.page?.split() ?? false);
   readonly phase = signal<Phase>('loading');

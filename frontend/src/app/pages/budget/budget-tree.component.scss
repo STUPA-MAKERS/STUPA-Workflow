@@ -326,14 +326,6 @@
 .bt__states tbody tr + tr > * {
   border-top: 1px solid var(--color-border);
 }
-.bt__box {
-  width: 1.125rem;
-  height: 1.125rem;
-  accent-color: var(--color-accent);
-}
-
 .bt__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  --dialog-footer-gap: var(--space-2);
 }

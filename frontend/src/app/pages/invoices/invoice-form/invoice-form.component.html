@@ -9,17 +9,14 @@
   (submit)="submit($event)"
 >
   @if (layout() !== 'sheet') {
-    <header class="ff__head">
-      <div class="ff__titles">
-        <h2 class="ff__title" [id]="'if-title-' + mode()">{{ title() | t }}</h2>
-        @if (subtitle()) {
-          <p class="ff__subtitle">{{ subtitle() }}</p>
-        }
-      </div>
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" />
-      </app-button>
-    </header>
+    <header
+      class="ff__head"
+      appPaneFormHead
+      [heading]="title() | t"
+      [headingId]="'if-title-' + mode()"
+      [subtitle]="subtitle()"
+      (closed)="close()"
+    ></header>
   }
 
   <div class="ff__body" appScrollFade="y">
@@ -70,10 +67,7 @@
                 <span class="if__fileSize">{{ 'invoices.openFile' | t }}</span>
               </button>
             } @else {
-              <p class="ff__info">
-                <app-icon name="file" [size]="16" />
-                <span>{{ 'invoices.detail.noFile' | t }}</span>
-              </p>
+              <app-note icon="file" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.detail.noFile' | t }}</app-note>
             }
           }
         </section>
@@ -82,22 +76,15 @@
       <div class="ff__col if__fields">
         @if (mode() === 'create') {
           @if (h.importNotice() === 'parsed') {
-            <p class="ff__info if__ok">
-              <app-icon name="check" [size]="16" />
-              <span>{{ 'invoices.import.parsed' | t }}</span>
-            </p>
+            <app-note icon="check" kind="ok" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.import.parsed' | t }}</app-note>
           } @else if (h.importNotice() === 'manual') {
-            <p class="ff__info">
-              <app-icon name="info" [size]="16" />
-              <span>{{ 'invoices.import.manual' | t }}</span>
-            </p>
+            <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.import.manual' | t }}</app-note>
           }
           @if (h.importDuplicate() !== null) {
-            <div class="if__dup" role="alert">
-              <app-icon name="alert" [size]="18" />
-              <span class="if__dupText">{{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}</span>
-              <app-button variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
-            </div>
+            <app-note class="if__dup" icon="alert" kind="warn" [surface]="layout() === 'sheet' ? 3 : 2" role="alert">
+              {{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}
+              <app-button noteAction variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
+            </app-note>
           }
           <div class="ff__grid">
             <app-input
@@ -159,17 +146,15 @@
             />
           </div>
           <!-- A note can have more than one line: a textarea keeps the line breaks. -->
-          <label class="ff__box ff__box--area" for="invoice-note">
-            <span class="ff__label">{{ 'invoices.field.note' | t }}</span>
+          <app-textarea [label]="'invoices.field.note' | t">
             <textarea
               id="invoice-note"
-              class="ff__area"
               name="note"
               rows="2"
               [ngModel]="h.newNote()"
               (ngModelChange)="h.newNote.set($event)"
             ></textarea>
-          </label>
+          </app-textarea>
         } @else {
           <div class="ff__grid">
             <app-input
@@ -230,49 +215,38 @@
               (valueChange)="setStatus($event)"
             />
           </div>
-          <label class="ff__box ff__box--area" for="invoice-enote">
-            <span class="ff__label">{{ 'invoices.field.note' | t }}</span>
+          <app-textarea [label]="'invoices.field.note' | t">
             <textarea
               id="invoice-enote"
-              class="ff__area"
               name="enote"
               rows="2"
               [ngModel]="h.editNote()"
               (ngModelChange)="h.editNote.set($event)"
             ></textarea>
-          </label>
+          </app-textarea>
         }
       </div>
     </div>
   </div>
 
-  <footer class="ff__foot">
-    @if (mode() === 'edit') {
-      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
-      <app-button
-        variant="danger"
-        [iconOnly]="layout() === 'sheet'"
-        [ariaLabel]="'action.delete' | t"
-        (click)="remove.emit()"
-      >
-        <span class="ff__btn"
-          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
-        >
+  <footer
+    class="ff__foot"
+    appPaneFormFoot
+    [deletable]="mode() === 'edit'"
+    [compact]="layout() === 'sheet'"
+    (removed)="remove.emit()"
+    (cancelled)="close()"
+  >
+    @if (mode() === 'create') {
+      <app-button variant="fill" [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
+        <span class="ff__btn"><app-icon name="plus" />{{
+          (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
+        }}</span>
       </app-button>
+    } @else {
+      <app-button variant="fill" [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
+        'action.save' | t
+      }}</app-button>
     }
-    <div class="ff__footEnd">
-      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-      @if (mode() === 'create') {
-        <app-button variant="fill" [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="plus" />{{
-            (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
-          }}</span>
-        </app-button>
-      } @else {
-        <app-button variant="fill" [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
-          'action.save' | t
-        }}</app-button>
-      }
-    </div>
   </footer>
 </form>

@@ -1,12 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   computed,
-  effect,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
@@ -15,17 +12,21 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
-  FilterSelectComponent,
-  type FilterSelectOption,
   PageHeaderComponent,
-  RangeChipComponent,
-  type RangeValue,
-  SkeletonComponent,
 } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
+  ConfigDiffComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
+  InfiniteScrollDirective,
+  NoteComponent,
+  RangeChipComponent,
+  type RangeValue,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -36,8 +37,7 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
+import { expandSet } from '@shared/expand-set';
 
 const PAGE_SIZE = 50;
 
@@ -212,18 +212,6 @@ export interface AuditDataRow {
   known: boolean;
 }
 
-/** One changed field of a config diff: the old value (`-`) and the new value (`+`). */
-export interface AuditDiffLine {
-  key: string;
-  before: string | null;
-  after: string | null;
-}
-
-/** A diff value as code: a string in quotes, any other value as JSON. */
-function diffValue(v: unknown): string {
-  return v === undefined ? 'null' : JSON.stringify(v);
-}
-
 /** The state of the chain check at the top of the page. */
 type VerifyState =
   | { status: 'loading' }
@@ -252,13 +240,15 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
     NoteComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    DialogComponent,
+    ConfigDiffComponent,
+    ConfirmDialogComponent,
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,
@@ -281,7 +271,7 @@ export class AuditLogComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
   /** Ids of the expanded entries. Their detail area is visible. */
-  protected readonly open = signal<ReadonlySet<number>>(new Set());
+  protected readonly open = expandSet<number>();
 
   /** The `audit.revert` permission as a front-end gate. The backend stays authoritative. The
    *  value is reactive because the principal loads asynchronously. */
@@ -356,7 +346,6 @@ export class AuditLogComponent {
       : { kind: 'error', title: this.i18n.translate('admin.health.audit.broken'), sub: parts.join(' · ') };
   });
 
-  private readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   constructor() {
     this.api.listAuditActors().subscribe({
@@ -369,18 +358,6 @@ export class AuditLogComponent {
     });
     this.reload();
 
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const obs = new IntersectionObserver(
-        (items) => {
-          if (items.some((i) => i.isIntersecting)) this.loadMore();
-        },
-        { rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   private chipText(label: TranslationKey, options: FilterSelectOption[], value: string): string {
@@ -440,17 +417,11 @@ export class AuditLogComponent {
   }
 
   protected isOpen(id: number): boolean {
-    return this.open().has(id);
+    return this.open.has(id);
   }
 
   protected toggle(id: number): void {
-    this.open.update((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    if (this.isOpen(id)) {
+    if (this.open.toggle(id)) {
       const entry = this.entries().find((e) => e.id === id);
       if (entry) this.loadDiff(entry);
     }
@@ -544,7 +515,7 @@ export class AuditLogComponent {
     this.entries.set([]);
     this.cursor.set(null);
     this.hasMore.set(false);
-    this.open.set(new Set());
+    this.open.clear();
     this.load(true);
   }
 
@@ -639,17 +610,6 @@ export class AuditLogComponent {
           ? { key, label: this.i18n.translate(labelKey), value: fmt(v), known: true }
           : { key, label: key, value: fmt(v), known: false };
       });
-  }
-
-  /** The changed fields of a config diff, in the order changed, added, removed. */
-  protected diffLines(d: ConfigRevisionDiff): AuditDiffLine[] {
-    const diff = d.diff;
-    if (!diff) return [];
-    return [
-      ...diff.changed.map((c) => ({ key: c.key, before: diffValue(c.old), after: diffValue(c.new) })),
-      ...diff.added.map((a) => ({ key: a.key, before: null, after: diffValue(a.value) })),
-      ...diff.removed.map((r) => ({ key: r.key, before: diffValue(r.value), after: null })),
-    ];
   }
 }
 

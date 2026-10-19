@@ -16,6 +16,7 @@ import type { Uuid } from '@core/api/models';
 import {
   TodosApiService,
   type TodoBoard,
+  type TodoBoardKind,
   type TodoBoardSummary,
   type TodoCardDetail,
   type TodoLinkKind,
@@ -27,15 +28,18 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  ChipComponent,
   DatepickerComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
-  ToastService,
+  SelectFieldComponent,
+  type SelectFieldOption,
   type SelectOption,
+  TextareaComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL, sortedColumns } from '../todos.util';
 
@@ -50,18 +54,22 @@ export interface NewTodoLink {
 }
 
 /**
- * "Neues To-Do" (frame 5): the dialog of the board ("+ To-Do") and of the ⋮ of a TOP.
+ * "Neues To-Do" (frame 5): the dialog of the board ("+ To-Do"), of the ⋮ of a TOP and
+ * of a ticket ("To-Do aus Ticket anlegen", frame 33).
  *
- * Board and column start as the given board (or the board of the given Gremium), else
- * the first board that takes cards; the column as the given or the first one. The
- * person and the due date are optional. The given links go along and the picker adds
- * more.
+ * Board and column start as the given board (or the board of the given Gremium, or the
+ * first board of `boardKinds`), else the first board that takes cards; the column as the
+ * given or the first one. The person and the due date are optional. The given links go
+ * along, each with a × to take it off, and the picker adds more. The ticket dialog
+ * leaves out the description (`withDescription`).
  */
 @Component({
   selector: 'app-todo-new-dialog',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    ChipComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -88,8 +96,14 @@ export class TodoNewDialogComponent {
   readonly gremiumId = input<Uuid | null>(null);
   /** The column to start on. */
   readonly columnId = input<Uuid | null>(null);
+  /** Else the first board of these kinds, in this order. */
+  readonly boardKinds = input<readonly TodoBoardKind[]>([]);
   readonly initialTitle = input('');
   readonly initialLinks = input<readonly NewTodoLink[]>([]);
+  /** The title of the dialog. */
+  readonly heading = input<TranslationKey>('todos.new.title');
+  /** Offer the Markdown description. */
+  readonly withDescription = input(true);
   readonly created = output<TodoCardDetail>();
 
   readonly title = signal('');
@@ -166,9 +180,13 @@ export class TodoNewDialogComponent {
         this.boards.set(boards);
         const writable = boards.filter((b) => b.canWrite);
         const gid = this.gremiumId();
+        const byKind = this.boardKinds()
+          .map((kind) => writable.find((b) => b.kind === kind))
+          .find((b) => b !== undefined);
         const pick =
           writable.find((b) => b.id === this.boardId()) ??
           (gid ? writable.find((b) => b.gremiumId === gid) : undefined) ??
+          byKind ??
           writable[0];
         if (!pick) {
           this.noBoard.set(true);

@@ -1,7 +1,7 @@
 @if (tileLabels().length) {
   <p class="tt__labels">
     @for (label of tileLabels(); track label.id) {
-      <span class="tt__label" [attr.data-color]="label.color"><span class="tt__dot" aria-hidden="true"></span>{{ label.name }}</span>
+      <app-todo-label [label]="label" />
     }
   </p>
 }
@@ -30,10 +30,7 @@
     </span>
   }
   @if (due(); as due) {
-    <span class="tt__fact" [class.tt__fact--overdue]="due.tone === 'overdue'" [class.tt__fact--soon]="due.tone === 'soon'">
-      <app-icon name="cal" [size]="14" />
-      <span class="num">{{ due.date }}@if (due.note) { · {{ due.note }}}</span>
-    </span>
+    <app-todo-due class="tt__fact" [due]="due" />
   }
   @if (card().checklist.total) {
     <span class="tt__fact" role="img" [attr.aria-label]="'todos.tile.checklist' | t: { done: card().checklist.done, total: card().checklist.total }">
@@ -48,12 +45,6 @@
     </span>
   }
   <span class="tt__people">
-    @if (card().assignees.length) {
-      <app-avatar-stack [names]="names()" [principalIds]="ids()" [max]="3" size="xs" />
-    } @else {
-      <span class="tt__nobody" [attr.aria-label]="'todos.tile.nobody' | t" role="img">
-        <app-icon name="user" [size]="13" />
-      </span>
-    }
+    <app-todo-assignees [names]="names()" [ids]="ids()" />
   </span>
 </div>

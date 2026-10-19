@@ -1,10 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   type ElementRef,
   HostListener,
-  afterNextRender,
   computed,
   effect,
   inject,
@@ -16,20 +14,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
-  ToastService,
-  type SelectOption,
-} from '@stupa-makers/ui-kit';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import {
+  mediaQuery,
+  observeElementSize,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
+  ScrollFadeDirective,
+  type SelectOption,
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   COMPARE_OPS,
@@ -84,8 +83,6 @@ import { StateInspectorComponent, type GuardPriorityRow } from './state-inspecto
 import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /**
  * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
@@ -143,9 +140,9 @@ export class FlowEditorComponent {
   private readonly canvasWrap = viewChild<ElementRef<HTMLElement>>('canvasWrap');
 
   /** Wide viewport: the canvas and the inspector fill the window side by side. */
-  protected readonly wide = mediaQuerySignal(MEDIA.wide);
+  protected readonly wide = mediaQuery(MEDIA.wide);
   /** Phone: the header moves "Versionen" into a ⋮ menu. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   /** The inspector shows the version history instead of the selection. */
   protected readonly showVersions = signal(false);
@@ -257,17 +254,10 @@ export class FlowEditorComponent {
 
     // Measure the canvas box, so a small flow shows at its real size instead of
     // blown up to the full box.
-    const destroyRef = inject(DestroyRef);
-    afterNextRender(() => {
-      const el = this.canvasWrap()?.nativeElement;
-      if (!el || typeof ResizeObserver === 'undefined') return;
-      const ro = new ResizeObserver(([entry]) => {
-        const { width, height } = entry.contentRect;
-        this.canvasSize.set({ w: Math.round(width), h: Math.round(height) });
-      });
-      ro.observe(el);
-      destroyRef.onDestroy(() => ro.disconnect());
-    });
+    observeElementSize(
+      () => this.canvasWrap()?.nativeElement,
+      ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
+    );
 
     // The drill-down context must never point at a deleted group. Undo, redo or a
     // dissolve from another path can delete it. Fall back to the top level.

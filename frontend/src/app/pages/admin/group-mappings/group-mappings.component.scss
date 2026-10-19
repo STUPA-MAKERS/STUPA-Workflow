@@ -12,14 +12,6 @@
   gap: var(--space-2);
 }
 
-.gm__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  padding-inline: var(--space-1);
-}
 
 .gm__list {
   margin: 0;
@@ -72,11 +64,6 @@
 }
 .gm__dialogNote {
   font-size: var(--fs-sm);
-}
-.gm__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 @container (max-width: 36rem) {

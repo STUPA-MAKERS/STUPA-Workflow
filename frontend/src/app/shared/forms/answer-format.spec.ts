@@ -1,5 +1,5 @@
 import type { FormFieldDef } from '@core/api/models';
-import { formatAnswer, formatEuro, isEmptyAnswer } from './answer-format';
+import { formatAnswer, isEmptyAnswer } from './answer-format';
 import { normalizePositions, positionValue, positionsTotal, preferredOffer } from './positions';
 
 const env = { lang: 'de', yes: 'Ja', no: 'Nein' };
@@ -20,10 +20,15 @@ describe('answer-format', () => {
     }
   });
 
-  it('formats euro and refuses what is no number', () => {
-    expect(formatEuro(12.5, 'de')?.replace(/\s/g, ' ')).toBe('12,50 €');
-    expect(formatEuro('3', 'en')).toBe('€3.00');
-    for (const v of [null, undefined, '', true, 'abc', Infinity]) expect(formatEuro(v, 'de')).toBeNull();
+  it('formats a currency answer as euro and keeps what is no number', () => {
+    expect(formatAnswer(f('currency'), 12.5, env).replace(/\s/g, ' ')).toBe('12,50 €');
+    expect(formatAnswer(f('currency'), '3', { ...env, lang: 'en' })).toBe('€3.00');
+    expect(formatAnswer(f('currency'), 'abc', env)).toBe('abc');
+    expect(formatAnswer(f('currency'), true, env)).toBe('true');
+  });
+
+  it('formats the requested funding in euro like a currency field', () => {
+    expect(formatAnswer(f('funding'), 600, env)).toBe(formatAnswer(f('currency'), 600, env));
   });
 
   it('gives an empty answer as an empty string, whatever the type', () => {

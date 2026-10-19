@@ -5,12 +5,12 @@
   />
 
   <section class="dl__section" aria-labelledby="dl-active-title">
-    <header class="dl__head">
-      <h2 class="section-title" id="dl-active-title">{{ 'admin.deleg.active' | t }}</h2>
-      @if (!loading() && !loadError()) {
-        <span class="dl__count">{{ active().length }}</span>
-      }
-    </header>
+    <app-section-header
+      class="dl__head"
+      headingId="dl-active-title"
+      [heading]="'admin.deleg.active' | t"
+      [count]="!loading() && !loadError() ? active().length : null"
+    />
 
     @if (loading()) {
       <app-skeleton variant="rows" [count]="3" [label]="'admin.deleg.loading' | t" />

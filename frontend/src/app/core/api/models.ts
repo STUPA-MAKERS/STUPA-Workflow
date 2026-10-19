@@ -947,6 +947,8 @@ export type FieldType =
   | 'markdown'
   | 'computed'
   | 'positions'
+  // Requested funding, separate from the cost total of the positions.
+  | 'funding'
   | 'section';
 
 export interface FieldOption {

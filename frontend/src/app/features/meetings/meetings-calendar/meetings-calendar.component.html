@@ -3,14 +3,7 @@
        in both views, so they keep their order when the view changes. -->
   <app-page-header [pane]="true" [title]="'meetings.title' | t">
     <ng-container ngProjectAs="[actions]">
-      <app-meetings-view-switch value="calendar" (valueChange)="viewChange.emit($event)" />
-      <app-button
-        variant="text"
-        [iconOnly]="true"
-        [ariaLabel]="'meetings.overview.subscribe' | t"
-        [ariaPressed]="abo.isOpen()"
-        (click)="abo.toggle($event.currentTarget)"
-      ><app-icon name="cal" /></app-button>
+      <app-meetings-view-actions view="calendar" [abo]="abo" (viewChange)="viewChange.emit($event)" />
       <app-calendar-subscribe #abo />
     </ng-container>
   </app-page-header>
@@ -43,7 +36,7 @@
         [value]="query()"
         (valueChange)="query.set($event)"
       />
-      @if (showFilter()) {
+      @if (timeline.showGremiumFilter()) {
         <app-filter-select
           class="cal__chip"
           icon="building"
@@ -52,7 +45,7 @@
           [options]="timeline.filterGremiumOptions()"
           [value]="timeline.gremiumFilter()"
           (valueChange)="timeline.selectGremiumFilter($event)"
-          [text]="filterLabel()"
+          [text]="timeline.gremiumFilterLabel()"
           [active]="timeline.gremiumFilter() !== ''"
         />
       }

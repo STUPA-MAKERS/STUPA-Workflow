@@ -170,7 +170,7 @@ describe('TodoCardDetailComponent', () => {
     fireEvent.click(screen.getByRole('button', { name: /1 erledigte Punkte zeigen/ }));
     expect(screen.getByRole('checkbox', { name: 'Termin klären' })).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByText('1/2')).toBeInTheDocument();
-    expect(container.querySelector('.cd__bar-fill')).toHaveStyle({ width: '50%' });
+    expect(container.querySelector('.cd__checkBar .bar__seg--filled')).toHaveStyle({ flexBasis: '50%' });
     // The drawer closes with the ×; the pane-only link to the board is absent.
     expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Schließen' }));
@@ -648,7 +648,6 @@ describe('TodoCardDetailComponent', () => {
 
   it('shows no progress for an empty checklist and a read-only toggle does nothing', async () => {
     const { cmp, api, container } = await setup({ card: detail({ checklistItems: [], canWrite: false }) });
-    expect(cmp.progress()).toBe(0);
     expect(container.querySelector('.cd__progress')).toBeNull();
     cmp.toggleItem({ id: 'i-1', text: 'x', done: false, position: 0 });
     expect(api.patchCheckItem).not.toHaveBeenCalled();
@@ -998,7 +997,7 @@ describe('TodoCardDetailComponent', () => {
     const writeText = jest.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     fireEvent.click(screen.getByRole('button', { name: 'Link kopieren' }));
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r));
     expect(writeText).toHaveBeenCalledWith(`${location.origin}/todos?card=k-1`);
     expect(toast.success).toHaveBeenCalledWith('Link kopiert');
     writeText.mockReturnValueOnce(Promise.reject(new Error('denied')));
@@ -1007,6 +1006,7 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Der Link konnte nicht kopiert werden.');
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
     cmp.copyLink();
+    await new Promise((r) => setTimeout(r));
     expect(toast.error).toHaveBeenCalledTimes(2);
   });
 

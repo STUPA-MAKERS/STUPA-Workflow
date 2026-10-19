@@ -12,6 +12,7 @@ import {
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
+import { problemCode } from '@core/api/problem';
 import type { GuestsMode, MeetingDefaults, MeetingMember } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -21,14 +22,17 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
+  SegBarComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  type SelectOption,
   TimeInputComponent,
   ToastService,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
-import { longDate } from '../meetings-display.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
+import { longDate } from '@shared/date-format';
+import { personLabel } from '@shared/person-label.util';
 
 /**
  * "Sitzung anlegen" in two steps.
@@ -41,6 +45,7 @@ import { PublicJoinSettingsComponent } from '../public-join/public-join-settings
  * The Gremium list holds every Gremium for an admin and the Gremien with
  * `session.manage` for everybody else. The server refuses every other Gremium.
  */
+
 @Component({
   selector: 'app-create-meeting-dialog',
   standalone: true,
@@ -55,6 +60,7 @@ import { PublicJoinSettingsComponent } from '../public-join/public-join-settings
     DatepickerComponent,
     TimeInputComponent,
     InputComponent,
+    SegBarComponent,
   ],
   templateUrl: './create-meeting-dialog.component.html',
   styleUrl: './create-meeting-dialog.component.scss',
@@ -103,7 +109,7 @@ export class CreateMeetingDialogComponent {
       ...this.members()
         .filter((m) => m.canKeepProtocol)
         .map((m) => {
-          const label = m.displayName || m.email || this.i18n.translate('common.unnamed');
+          const label = personLabel(m, this.i18n);
           return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
         }),
     ];
@@ -206,7 +212,7 @@ export class CreateMeetingDialogComponent {
     const committee = this.gremiumOptions().find((o) => o.value === this.gremium())?.label ?? '';
     const suggestion = this.i18n.translate('meetings.create.namePrefill', {
       committee,
-      date: longDate(this.date().trim(), this.i18n.locale()),
+      date: longDate(this.date().trim(), this.i18n.formatLocale()) || this.date().trim(),
     });
     if (!this.title().trim() || this.title() === this.lastPrefill) {
       this.title.set(suggestion);
@@ -251,7 +257,7 @@ export class CreateMeetingDialogComponent {
         },
         error: (err: unknown) => {
           this.creating.set(false);
-          const code = (err as { error?: { code?: string } } | null)?.error?.code;
+          const code = problemCode(err);
           this.toast.error(
             this.i18n.translate(
               code === 'public_join_needs_no_quorum' ? 'guests.toast.needsNoQuorum' : 'meetings.toast.createFailed',

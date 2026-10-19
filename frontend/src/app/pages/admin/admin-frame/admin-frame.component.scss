@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -69,20 +70,8 @@
   padding-inline: 0;
 }
 
-.af__navBody.is-fade-start {
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--space-6));
-}
-.af__navBody.is-fade-end {
-  mask-image: linear-gradient(to top, transparent, #000 var(--space-6));
-}
-.af__navBody.is-fade-start.is-fade-end {
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--space-6),
-    #000 calc(100% - var(--space-6)),
-    transparent
-  );
+.af__navBody {
+  @include fade.fade-y(var(--space-6));
 }
 
 .af__hidden {
@@ -237,20 +226,8 @@
 .af--split .af__pageBody.is-fade-end:has(app-sticky-bar:not(.stb--off)) {
   mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
 }
-.af--split .af__pageBody.is-fade-start {
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--af-fade));
-}
-.af--split .af__pageBody.is-fade-end {
-  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
-}
-.af--split .af__pageBody.is-fade-start.is-fade-end {
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--af-fade),
-    #000 calc(100% - var(--af-fade)),
-    transparent
-  );
+.af--split .af__pageBody {
+  @include fade.fade-y(var(--af-fade));
 }
 /* A mask makes the body the containing block of every `position: fixed` element in it.
    An open dialog or side sheet of the page would then cover only the sheet and be cut by

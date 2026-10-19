@@ -34,19 +34,16 @@
         <div class="gr__config">
           <div class="gr__configHead">
             <span class="cap gr__configTitle" id="gr-config-title">{{ 'account.mcp.config' | t }}</span>
-            <app-button
+            <app-copy-button
               variant="text"
-              size="sm"
-              [ariaLabel]="(copied() ? 'account.mcp.copied' : 'account.mcp.copyConfig') | t"
-              (click)="copySetup()"
-            >
-              <app-icon [name]="copied() ? 'check' : 'copy'" />
-              {{ (copied() ? 'account.mcp.copied' : 'action.copy') | t }}
-            </app-button>
+              [text]="setupJson()"
+              [label]="'action.copy' | t"
+              [copiedLabel]="'account.mcp.copied' | t"
+              [ariaLabel]="'account.mcp.copyConfig' | t"
+            />
           </div>
           <pre class="gr__json mono"><code>{{ setupJson() }}</code></pre>
         </div>
-        <span class="sr-only" aria-live="polite">{{ copied() ? ('account.mcp.copied' | t) : '' }}</span>
 
         <p class="gr__url">
           {{ 'account.mcp.wired' | t }}:

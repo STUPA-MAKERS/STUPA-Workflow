@@ -10,9 +10,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule } from '@angular/forms';
-import { Subject, debounceTime, distinctUntilChanged, of, switchMap } from 'rxjs';
+import { of } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import {
   type Delegation,
@@ -25,16 +23,18 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  liveSearch,
+  SearchPillComponent,
   SwitchComponent,
   ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * "Vertretung einrichten" (board Teilnahme-Vertretung): the member picks who represents
@@ -57,7 +57,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   imports: [
     EmptyStateComponent,
     TruncatedDirective,
-    FormsModule,
+    SearchPillComponent,
     NgTemplateOutlet,
     TranslatePipe,
     LocalizedDatePipe,
@@ -89,7 +89,14 @@ export class DelegationDialogComponent {
   protected readonly busy = signal(false);
   /** The hits of the server search (externals allowed only), or `null`. */
   private readonly searched = signal<DelegationRecipient[] | null>(null);
-  private readonly query$ = new Subject<string>();
+  /** The server search for external substitutes, from the first character. */
+  private readonly remote = liveSearch<DelegationRecipient[] | null>({
+    minLength: 1,
+    run: (q) =>
+      this.api.recipients(this.context().meetingId, q).pipe(catchError(() => of(null))),
+    result: (list) => this.searched.set(list),
+    reset: () => this.searched.set(null),
+  });
 
   /** The substitutes of the member: no lead time until the start. */
   protected readonly substitutes = computed(() => this.context().recipients.filter((r) => r.viaPool));
@@ -118,21 +125,10 @@ export class DelegationDialogComponent {
         this.selected.set('');
         this.voting.set(false);
         this.query.set('');
+        this.remote.sync('');
         this.searched.set(null);
       });
     });
-    this.query$
-      .pipe(
-        debounceTime(250),
-        distinctUntilChanged(),
-        switchMap((q) =>
-          q.trim()
-            ? this.api.recipients(this.context().meetingId, q).pipe(catchError(() => of(null)))
-            : of(null),
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe((list) => this.searched.set(list));
   }
 
   /** The second line of a person: "Stellvertretung", "Mitglied" or "Extern". */
@@ -148,7 +144,7 @@ export class DelegationDialogComponent {
   protected search(q: string): void {
     this.query.set(q);
     // Without external substitutes the list of members is complete: filter it here.
-    if (this.context().delegationAllowExternal) this.query$.next(q);
+    if (this.context().delegationAllowExternal) this.remote.set(q);
   }
 
   protected pick(r: DelegationRecipient): void {

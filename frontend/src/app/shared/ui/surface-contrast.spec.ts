@@ -15,7 +15,16 @@ const TOKENS = readFileSync(
   'utf8',
 );
 const scss = (file: string) => readFileSync(join(__dirname, file), 'utf8');
+/** A stylesheet of a ui-kit component (`row-menu/row-menu.component.scss`). */
+const kit = (file: string) =>
+  readFileSync(join(__dirname, '../../../../vendor/ui-kit/src/lib', file), 'utf8');
+/** The row groups of the ui-kit, which `styles.scss` loads. */
+const kitRowgroup = () =>
+  readFileSync(join(__dirname, '../../../../vendor/ui-kit/src/styles/rowgroup.scss'), 'utf8');
 const globalStyles = () => readFileSync(join(__dirname, '../../../styles.scss'), 'utf8');
+/** The global skeleton styles of the ui-kit, which `styles.scss` uses. */
+const kitSkeleton = () =>
+  readFileSync(join(__dirname, '../../../../vendor/ui-kit/src/styles/skeleton.scss'), 'utf8');
 
 function channel(c: number): number {
   const s = c / 255;
@@ -59,7 +68,7 @@ describe('text on surface 3', () => {
   }
 
   it('the field label on surface 3 uses the muted text', () => {
-    expect(scss('field-group/field-row.component.scss')).toMatch(
+    expect(kit('field-group/field-row.component.scss')).toMatch(
       /:host-context\(\.rowgroup--bg3\) \.fld__label \{\s*color: var\(--color-text-muted\);/,
     );
   });
@@ -71,13 +80,13 @@ describe('text on surface 3', () => {
   });
 
   it('a muted status in any row group on surface 3 uses the muted text', () => {
-    expect(scss('../../../styles.scss')).toMatch(
+    expect(kitRowgroup()).toMatch(
       /\.rowgroup--bg3 app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
     );
   });
 
   it('the row menu (on surface 3) gives its section caption the muted text', () => {
-    const menu = scss('row-menu/row-menu.component.scss');
+    const menu = kit('row-menu/row-menu.component.scss');
     expect(menu).toMatch(/\.rm__menu \{[^}]*background: var\(--color-surface-3\);/);
     const cap = menu.match(/\.rm__cap \{([^}]*)\}/)?.[1] ?? '';
     expect(cap).toContain('color: var(--color-text-muted);');
@@ -87,16 +96,17 @@ describe('text on surface 3', () => {
   it('the skeleton blocks take a fill from the text colour, so they show on every surface', () => {
     // A block in a surface colour vanished on that surface (the row menu is surface 3);
     // a share of the text colour shows on all of them, and no menu needs an override.
-    expect(globalStyles()).toMatch(
+    expect(globalStyles()).toMatch(/\n@use 'skeleton';/);
+    expect(kitSkeleton()).toMatch(
       /\n\.skel \{[^}]*--skel-fill: color-mix\(in srgb, var\(--color-text\) 9%, transparent\);/,
     );
-    expect(scss('skeleton/skeleton.component.scss')).not.toMatch(/\n\.skel \{\s*background/);
-    expect(scss('row-menu/row-menu.component.scss')).not.toContain('.skel');
+    expect(kit('skeleton/skeleton.component.scss')).not.toMatch(/\n\.skel \{\s*background/);
+    expect(kit('row-menu/row-menu.component.scss')).not.toContain('.skel');
   });
 });
 
 describe('focus in the row menu (WCAG 2.4.7, 1.4.11)', () => {
-  const menu = scss('row-menu/row-menu.component.scss');
+  const menu = kit('row-menu/row-menu.component.scss');
 
   for (const theme of ['light', 'dark'] as const) {
     it(`${theme}: the focus ring shows on the item, the surface change alone does not`, () => {
@@ -135,7 +145,7 @@ describe('text on the selected row', () => {
   }
 
   it('a muted status in the sub line of a selected list item uses the muted text', () => {
-    expect(scss('list-item/list-item.component.scss')).toMatch(
+    expect(kit('list-item/list-item.component.scss')).toMatch(
       /\.li--on \.li__sub ::ng-deep app-status-text\.st--muted \{\s*color: var\(--color-text-muted\);/,
     );
   });
@@ -148,16 +158,16 @@ describe('a table on a shared sheet steps up one surface', () => {
   );
 
   it('the side sheet (surface 2) sets the context of surface 2', () => {
-    const sheet = scss('side-sheet/side-sheet.component.scss');
-    expect(sheet).toContain("@use 'surface';");
+    const sheet = kit('side-sheet/side-sheet.component.scss');
+    expect(sheet).toContain("@use '../../styles/surface';");
     expect(sheet).toMatch(
       /\n\.ss \{\s*@include surface\.context\(2\);[^}]*background: var\(--color-surface-2\);/,
     );
   });
 
   it('the wide detail pane of the list/detail layout sets the context of surface 1', () => {
-    const ld = scss('list-detail/list-detail-layout.component.scss');
-    expect(ld).toContain("@use 'surface';");
+    const ld = kit('list-detail/list-detail-layout.component.scss');
+    expect(ld).toContain("@use '../../styles/surface';");
     expect(ld).toMatch(/:host\(\.ld--split\) \.ld__detail \{\s*@include surface\.context\(1\);/);
   });
 

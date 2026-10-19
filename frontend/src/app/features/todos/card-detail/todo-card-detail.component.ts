@@ -34,36 +34,40 @@ import {
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { chatPeople } from '@shared/ui/chat/chat-mentions';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  AvatarComponent,
+  ButtonComponent,
+  ChipComponent,
+  copyText,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import {
-  ButtonComponent,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SegBarComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SkeletonComponent,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
@@ -72,15 +76,13 @@ import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfe
 import {
   LINK_ICON,
   eventText,
-  isoDay,
   linkSub,
   linkTitle,
-  longDay,
-  personName,
   relativeDays,
   splitUrl,
-  type Translate,
 } from '../todos.util';
+import { isoDay, weekdayDate } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 type CardTab = 'details' | 'activity';
 
@@ -127,6 +129,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ChipComponent,
     FormsModule,
     NgTemplateOutlet,
     RouterLink,
@@ -141,6 +144,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     MarkdownViewComponent,
     NoteComponent,
     RowMenuComponent,
+    SegBarComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     SkeletonComponent,
@@ -200,7 +204,7 @@ export class TodoCardDetailComponent {
    */
   readonly transferred = output<{ card: TodoCardDetail; fromBoardId: Uuid }>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly card = signal<TodoCardDetail | null>(null);
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -312,8 +316,7 @@ export class TodoCardDetailComponent {
   readonly createdParts = computed<string[]>(() => {
     const c = this.card();
     if (!c) return [];
-    const d = new Date(c.createdAt);
-    const day = Number.isNaN(d.getTime()) ? '' : longDay(isoDay(d), this.i18n.formatLocale());
+    const day = weekdayDate(c.createdAt, this.i18n.formatLocale());
     const by = this.t('todos.card.createdBy', { name: personName(c.createdBy, this.t) });
     return day ? [by, day] : [by];
   });
@@ -321,8 +324,7 @@ export class TodoCardDetailComponent {
   readonly archivedLine = computed(() => {
     const at = this.card()?.archivedAt;
     if (!at) return null;
-    const d = new Date(at);
-    return Number.isNaN(d.getTime()) ? null : longDay(isoDay(d), this.i18n.formatLocale());
+    return weekdayDate(at, this.i18n.formatLocale()) || null;
   });
 
   readonly canWrite = computed(() => {
@@ -369,10 +371,6 @@ export class TodoCardDetailComponent {
   readonly items = computed(() => [...(this.card()?.checklistItems ?? [])].sort((a, b) => a.position - b.position));
   readonly openItems = computed(() => this.items().filter((i) => !i.done));
   readonly doneItems = computed(() => this.items().filter((i) => i.done));
-  readonly progress = computed(() => {
-    const total = this.items().length;
-    return total ? Math.round((this.doneItems().length / total) * 100) : 0;
-  });
 
   readonly linkedKeys = computed(
     () => new Set((this.card()?.links ?? []).map((l) => linkKey(l.kind, l.targetId))),
@@ -1002,14 +1000,10 @@ export class TodoCardDetailComponent {
     if (!c) return;
     // The card only: the link stays valid when the card moves to another board.
     const url = `${location.origin}/todos?card=${c.id}`;
-    const clip = navigator.clipboard;
-    if (!clip) {
-      this.toast.error(this.t('todos.card.linkFailed'));
-      return;
-    }
-    clip.writeText(url).then(
-      () => this.toast.success(this.t('todos.card.linkCopied')),
-      () => this.toast.error(this.t('todos.card.linkFailed')),
+    void copyText(url).then((ok) =>
+      ok
+        ? this.toast.success(this.t('todos.card.linkCopied'))
+        : this.toast.error(this.t('todos.card.linkFailed')),
     );
   }
 

@@ -6,11 +6,8 @@ import type {
   VoteKind,
   VoteResult,
 } from '@core/api/models';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate } from '@core/i18n/translations';
 import { voteResultStatus, type StatusView } from '@shared/status-kind.util';
-
-/** The translate function of the I18nService. */
-type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 /** The abstention option of a single-seat election ballot. */
 export const ELECTION_ABSTAIN = 'abstain';

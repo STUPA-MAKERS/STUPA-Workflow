@@ -8,8 +8,7 @@ import {
   untracked,
 } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { ButtonComponent, DialogComponent, SwitchComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, DialogComponent, NoteComponent, SwitchComponent } from '@stupa-makers/ui-kit';
 
 /**
  * "Protokoll finalisieren?" for a gremium that publishes its protocols.

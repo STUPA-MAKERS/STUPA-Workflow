@@ -15,13 +15,18 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
-import { AvatarComponent, NoteComponent, SearchPillComponent, SkeletonComponent } from '@shared/ui';
 import {
+  AvatarComponent,
   ButtonComponent,
   CheckboxComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  ListItemComponent,
+  liveSearch,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
@@ -35,7 +40,7 @@ import type {
   MergePreview,
   MergeResult,
 } from '../../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The steps of the merge: pick the account that stays, check the preview, the result. */
 type MergeStep = 'pick' | 'preview' | 'done';
@@ -94,6 +99,7 @@ interface ConflictProblem {
     TranslatePipe,
     LocalizedDatePipe,
     AvatarComponent,
+    ListItemComponent,
     NoteComponent,
     SearchPillComponent,
     SkeletonComponent,
@@ -180,7 +186,7 @@ export class UserMergeComponent {
   }
 
   protected name(p: { displayName?: string | null; email?: string | null } | null): string {
-    return p?.displayName || p?.email || this.i18n.translate('admin.users.merge.unnamed');
+    return personLabel(p, this.i18n, { fallback: 'admin.users.merge.unnamed' });
   }
 
   protected errorKey(code: MergeErrorCode): TranslationKey {

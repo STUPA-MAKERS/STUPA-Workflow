@@ -1,7 +1,7 @@
 import type { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
-import { formatBytes as formatBytesIn } from '@shared/format-bytes';
 import type { AuditVerification, AuditVerificationTrigger } from '../admin.models';
+import { clock } from '@shared/date-format';
 
 /** The trigger of a stored chain check as words ("nächtliche Prüfung"). */
 const TRIGGER_KEYS: Record<AuditVerificationTrigger, TranslationKey> = {
@@ -23,7 +23,7 @@ function sameDay(a: Date, b: Date): boolean {
 export function formatWhen(at: string, i18n: I18nService, now: Date = new Date()): string {
   const date = new Date(at);
   const locale = i18n.formatLocale();
-  const time = new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(date);
+  const time = clock(date, locale);
   const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
   if (sameDay(date, now)) return i18n.translate('admin.health.todayAt', { time });
   if (sameDay(date, yesterday)) return i18n.translate('admin.health.yesterdayAt', { time });
@@ -43,12 +43,4 @@ export function triggerLabel(trigger: AuditVerificationTrigger, i18n: I18nServic
 /** The time a stored check ended, else the time it started. */
 export function checkedAt(v: AuditVerification): string {
   return v.finishedAt ?? v.startedAt;
-}
-
-/**
- * File size for a status line ("413 MB", "4,2 GB"). Archives are megabytes to gigabytes,
- * so bytes help nobody. One decimal below 10, else whole numbers.
- */
-export function formatBytes(bytes: number | null | undefined, i18n: I18nService): string {
-  return formatBytesIn(bytes, i18n.formatLocale(), 'storage');
 }

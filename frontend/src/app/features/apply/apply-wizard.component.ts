@@ -35,26 +35,27 @@ import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.compo
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { toFormlyFields, toFormlySections } from '@shared/forms/formly-mapper';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
-import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/field-group.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  FieldGroupComponent,
+  FieldRowComponent,
   IconComponent,
   InputComponent,
   MEDIA,
+  mediaQuery,
+  SkeletonComponent,
+  type Step,
   StepperComponent,
   ToastService,
-  type Step,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { AltchaComponent } from './altcha.component';
 import { DraftAttachmentsService } from './draft-attachments.service';
 import { DraftFilesComponent } from './draft-files/draft-files.component';
 import { FormlyDraftFilesType } from './draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The steps of the wizard. `contact` drops out for a signed-in user without PII fields. */
 export type StepKey = 'type' | 'details' | 'contact' | 'review';
@@ -158,7 +159,7 @@ export class ApplyWizardComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly drafts = inject(DraftAttachmentsService);
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   /**
    * True when a principal is logged in. The account then gives the identity: no e-mail

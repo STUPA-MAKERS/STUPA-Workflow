@@ -1,33 +1,25 @@
 @let i = invoice();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="id-title">
-  <header class="fd__head">
+  <header class="sheet-head fd__head">
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="id-title" class="sheet-title fd__title">{{ title() }}</h2>
-      @if (phone()) {
-        @if (canManage()) {
-          <app-button variant="tonal" size="sm" (click)="edit.emit()">
-            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
-          </app-button>
-        }
-      } @else {
-        @if (i.hasFile) {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'invoices.openFile' | t"
-            [title]="'invoices.openFile' | t"
-            (click)="openFile.emit()"
-          ><app-icon name="download" /></app-button>
-        }
-        @if (canManage()) {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'invoices.edit' | t"
-            [title]="'invoices.edit' | t"
-            (click)="edit.emit()"
-          ><app-icon name="edit" /></app-button>
-        }
+      @if (!phone() && i.hasFile) {
+        <app-button
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'invoices.openFile' | t"
+          [title]="'invoices.openFile' | t"
+          (click)="openFile.emit()"
+        ><app-icon name="download" /></app-button>
+      }
+      @if (canManage()) {
+        <app-sheet-action
+          icon="edit"
+          [label]="'action.edit' | t"
+          [ariaLabel]="'invoices.edit' | t"
+          [phone]="phone()"
+          (pressed)="edit.emit()"
+        />
       }
       @if (menu().length) {
         <app-row-menu [label]="'invoices.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
@@ -78,10 +70,7 @@
             </span>
           </button>
         } @else {
-          <p class="fd__hint">
-            <app-icon name="file" [size]="16" />
-            <span>{{ 'invoices.detail.noFile' | t }}</span>
-          </p>
+          <app-note icon="file">{{ 'invoices.detail.noFile' | t }}</app-note>
         }
       </section>
 

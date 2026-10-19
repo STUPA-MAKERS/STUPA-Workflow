@@ -19,7 +19,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { NgTemplateOutlet } from '@angular/common';
 import type { ElectionConfig, MyBallot, ProblemDetail } from '@core/api/models';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, observeElementSize } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
 import {
   candidateLabel,
@@ -264,13 +264,11 @@ export class BallotComponent {
         this.pending.set(null);
       });
     });
-    effect((onCleanup) => {
-      const el = this.bar()?.nativeElement;
-      if (!el || typeof ResizeObserver === 'undefined') return;
-      const observer = new ResizeObserver(() => this.barHeight.set(el.offsetHeight));
-      observer.observe(el);
-      onCleanup(() => observer.disconnect());
-    });
+    observeElementSize(
+      () => this.bar()?.nativeElement,
+      (size) => this.barHeight.set(size.height),
+      'border',
+    );
   }
 
   protected label(option: string): string {

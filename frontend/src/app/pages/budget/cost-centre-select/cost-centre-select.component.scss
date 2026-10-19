@@ -1,0 +1,258 @@
+// The closed field: the filled field of the ui-kit (`_field.scss`), the whole box is the
+// button. The open list: the option menu of the app (the kit `_option-menu.scss`) with a search
+// on top and the cost centres grouped by their top-level budget.
+@use 'field' as f;
+@use 'option-menu' as om;
+
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.ccs__box {
+  @include f.box;
+  @include f.box-labelled;
+}
+.ccs__box--open {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.ccs__label {
+  @include f.label;
+  right: 2.75rem;
+}
+.ccs__box:focus-within .ccs__label,
+.ccs__box--open .ccs__label {
+  @include f.label-focus;
+}
+.ccs__req {
+  color: var(--color-danger);
+}
+
+.ccs__trigger {
+  @include f.control;
+  @include f.control-labelled;
+  & {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding-right: var(--space-3);
+    text-align: start;
+    cursor: pointer;
+  }
+}
+.ccs__value {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+.ccs__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ccs__code {
+  flex: none;
+  color: var(--color-text-subtle);
+  font-size: var(--fs-small);
+}
+.ccs__placeholder {
+  color: var(--color-text-subtle);
+}
+.ccs__swatch {
+  display: inline-block;
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.ccs__chevron {
+  flex: none;
+  color: var(--color-text-muted);
+  transition: transform var(--motion-fast) var(--ease-standard);
+}
+.ccs__box--open .ccs__chevron {
+  transform: rotate(180deg);
+}
+
+// The card (a leg of a transfer): the label on top, the name on its own line, the path
+// key below it, then the projected lines. The whole card is the button.
+:host(.ccs--card) .ccs__box {
+  min-height: 0;
+  border-radius: var(--radius-xl);
+}
+:host(.ccs--card) .ccs__label {
+  top: var(--space-4);
+  left: 18px;
+}
+:host(.ccs--card) .ccs__trigger {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: auto;
+  padding: 2.5rem 18px var(--space-4);
+}
+:host(.ccs--card) .ccs__value {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+}
+:host(.ccs--card) .ccs__name {
+  flex: 1 1 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+:host(.ccs--card) .ccs__code {
+  flex-basis: 100%;
+  padding-inline-start: 20px;
+  font-weight: var(--fw-regular);
+}
+
+// The popover. It stays invisible until it has its place, so it never shows at 0/0.
+.ccs__menu {
+  @include om.menu;
+  @include om.motion;
+  & {
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+    visibility: hidden;
+  }
+}
+.ccs__menu--placed {
+  visibility: visible;
+}
+.ccs__layer {
+  @include om.layer;
+}
+
+.ccs__search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3);
+  padding: 0 var(--space-4);
+  height: 2.75rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-1);
+  color: var(--color-text-muted);
+}
+.ccs__search:focus-within {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+.ccs__search--sheet {
+  margin: 0 0 var(--space-3);
+  background: var(--color-surface-3);
+}
+.ccs__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+}
+.ccs__input::placeholder {
+  color: var(--color-text-subtle);
+}
+.ccs__input::-webkit-search-cancel-button {
+  display: none;
+}
+@media (max-width: 768px) {
+  .ccs__input {
+    font-size: 1rem;
+  }
+}
+
+.ccs__list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 var(--space-2) var(--space-2);
+}
+.ccs__group + .ccs__group {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: var(--border-width) solid var(--color-border);
+}
+
+.ccs__opt {
+  @include om.option;
+  & {
+    gap: var(--space-3);
+    min-height: 2.75rem;
+    padding: 6px var(--space-3) 6px calc(var(--space-3) + (var(--ccs-depth, 0) * 14px));
+    border-radius: var(--radius-md);
+    font-weight: var(--fw-regular);
+  }
+}
+.ccs__opt:hover {
+  @include om.option-hover;
+}
+.ccs__opt--active {
+  @include om.option-hover;
+}
+.ccs__opt[aria-selected='true'] {
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.ccs__opt[aria-selected='true'] .ccs__optName {
+  font-weight: var(--fw-semibold);
+}
+.ccs__opt--head {
+  font-weight: var(--fw-semibold);
+}
+.ccs__opt--head .ccs__optName {
+  color: var(--color-text);
+}
+.ccs__key {
+  flex: none;
+  min-width: 2.25rem;
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ccs__optName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+.ccs__hit {
+  border-radius: 3px;
+  background: var(--color-warning-subtle);
+  color: inherit;
+}
+.ccs__hit:empty {
+  display: none;
+}
+.ccs__free {
+  flex: none;
+  font-weight: var(--fw-regular);
+  color: var(--color-accent-text);
+  font-size: var(--fs-small);
+  white-space: nowrap;
+}
+.ccs__free--neg {
+  color: var(--color-danger);
+}
+.ccs__check {
+  @include om.check;
+}
+.ccs__trail {
+  padding: 8px var(--space-3) 2px calc(var(--space-3) + 14px);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.ccs__empty {
+  @include om.empty;
+}

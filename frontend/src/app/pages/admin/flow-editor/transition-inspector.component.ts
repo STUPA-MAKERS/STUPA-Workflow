@@ -4,13 +4,13 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   IconComponent,
-  InputComponent,
-  SwitchComponent,
+  SelectFieldComponent,
   type SelectOption,
+  SwitchComponent,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { TransitionDef } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /**
  * Inspector panel for the selected transition. It edits endpoints, labels, colour, the
@@ -22,11 +22,11 @@ import { FlowColorComponent } from './flow-color.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
-    InputComponent,
     SelectFieldComponent,
     SwitchComponent,
     FlowColorComponent,

@@ -13,9 +13,13 @@ import type { Attendance, MeetingStatus, SelfAttendanceStatus } from '@core/api/
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { StatusKind } from '@shared/status-kind.util';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { InputComponent, SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
+import {
+  InputComponent,
+  SegmentedComponent,
+  type SegmentedOption,
+  type StatusKind,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 
 let nextId = 0;
 

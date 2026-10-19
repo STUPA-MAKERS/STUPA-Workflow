@@ -1,0 +1,13 @@
+<app-button class="mh__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
+  <app-icon name="back" />
+</app-button>
+<div class="mh__titles">
+  <div class="mh__titleLine">
+    <h1 class="mh__title" [title]="heading()">{{ heading() }}</h1>
+    <app-status-text class="mh__status" [kind]="statusKind()">{{ statusText() }}</app-status-text>
+  </div>
+  @if (sub() !== null) {
+    <span class="mh__sub">{{ sub() }}</span>
+  }
+</div>
+<ng-content />

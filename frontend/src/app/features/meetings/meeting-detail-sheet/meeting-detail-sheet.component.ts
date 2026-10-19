@@ -19,14 +19,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import type { RowMenuItem, RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { RowMenuComponent } from '@shared/ui/row-menu/row-menu.component';
-import type { Seg } from '@shared/ui/seg-bar/seg-bar.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  type Seg,
+  SegBarComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { keeperNames } from '../keepers.util';
-import { meetingTimeText, voteMetaLine, weekdayDate } from '../meetings-display.util';
+import { majorityLabel, meetingTimeText, voteMetaLine } from '../meetings-display.util';
 import {
   type AgendaProgress,
   type AttendanceCounts,
@@ -35,8 +42,7 @@ import {
   openVoteOf,
   topsLabel,
 } from '../meetings-overview.util';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { weekdayDate } from '@shared/date-format';
 
 /** What the sheet loaded for the meeting. `null` = the request failed. */
 interface SheetData {
@@ -158,7 +164,7 @@ export class MeetingDetailSheetComponent {
     const index = this.agendaRows().findIndex((r) => r.item.id === v.agendaItemId);
     if (index >= 0) parts.push(this.i18n.translate('meetings.agenda.top', { n: index + 1 }));
     if (v.majorityRule) {
-      parts.push(this.i18n.translate(`vote.majority.${v.majorityRule}` as TranslationKey));
+      parts.push(majorityLabel(v.majorityRule, v.guestsVote, (k, p) => this.i18n.translate(k, p)));
     }
     return {
       ...v,

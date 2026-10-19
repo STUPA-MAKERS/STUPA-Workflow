@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 
 /**
  * The detail pane of `/applications` before a row is open. Only the side-by-side layout
@@ -10,8 +10,8 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   selector: 'app-applications-none',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, EmptyStateComponent],
+  imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './applications-none.component.html',
-  styleUrl: './applications-none.component.scss',
+  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
 })
 export class ApplicationsNoneComponent {}

@@ -1,0 +1,5 @@
+@if (names().length) {
+  <app-avatar-stack [names]="names()" [principalIds]="ids()" [max]="3" size="xs" />
+} @else {
+  <span class="tas__nobody" role="img" [attr.aria-label]="'todos.tile.nobody' | t"><app-icon name="user" [size]="13" /></span>
+}

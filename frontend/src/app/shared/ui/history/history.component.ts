@@ -7,11 +7,15 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  type IconName,
+  type StatusKind,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { StatusKind } from '../../status-kind.util';
-import { StatusTextComponent } from '../status-text/status-text.component';
+import { clock } from '@shared/date-format';
 
 /** One changed field of an event, for example of a new version. */
 export interface HistoryChange {
@@ -133,7 +137,6 @@ export class HistoryComponent {
   protected readonly days = computed<HistoryDay[]>(() => {
     const locale = this.i18n.formatLocale();
     const thisYear = new Date().getFullYear();
-    const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' });
     const dated: { e: HistoryEntry; d: Date }[] = [];
     const undated: HistoryEntry[] = [];
     for (const e of this.entries()) {
@@ -158,7 +161,7 @@ export class HistoryComponent {
         day = { key, label, entries: [] };
         days.push(day);
       }
-      const meta = [e.actor, time.format(d)].filter((p) => !!p).join(' · ');
+      const meta = [e.actor, clock(d, locale)].filter((p) => !!p).join(' · ');
       day.entries.push({ ...e, meta });
     }
     if (undated.length > 0) {

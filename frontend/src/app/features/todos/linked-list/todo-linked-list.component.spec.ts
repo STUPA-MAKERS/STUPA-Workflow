@@ -51,6 +51,21 @@ describe('TodoLinkedListComponent', () => {
     expect(screen.getByRole('region', { name: 'To-Dos' })).not.toHaveAttribute('aria-labelledby');
   });
 
+  it('shows the cards of the page without a read of its own', async () => {
+    const { api, fixture } = await setup(() => of([card({ id: 'k-8', title: 'Vom Server' })]), {
+      items: [card()],
+      avatarSize: 'xs',
+    });
+    expect(api.linked).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Raum buchen' })).toBeInTheDocument();
+    expect(document.querySelector('app-avatar')).toHaveClass('av--xs');
+    TestBed.inject(TodoLinkedRefresh).touch([{ kind: 'application', targetId: 'a-1' }]);
+    fixture.componentRef.setInput('items', [card({ id: 'k-2', title: 'Zweite' })]);
+    fixture.detectChanges();
+    expect(api.linked).not.toHaveBeenCalled();
+    expect(screen.getByRole('link', { name: 'Zweite' })).toBeInTheDocument();
+  });
+
   it('shows nothing without linked cards', async () => {
     const { container } = await setup(() => of([]));
     expect(container.querySelector('section')).toBeNull();

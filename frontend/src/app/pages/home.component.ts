@@ -5,12 +5,10 @@ import { BrandingService } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { IconComponent } from '@stupa-makers/ui-kit';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
+import { DateBlockComponent, IconComponent, NoteComponent } from '@stupa-makers/ui-kit';
 import type { PublicProtocolSummary } from '../features/public-protocols/public-protocols.models';
 import { PublicProtocolsService } from '../features/public-protocols/public-protocols.service';
-import { meetingDate } from '../features/public-protocols/public-protocols.util';
+import { parseDay } from '@shared/date-format';
 
 /** The number of protocols in the strip "Zuletzt veröffentlicht". */
 export const LATEST_COUNT = 3;
@@ -76,8 +74,8 @@ export class HomeComponent {
     });
   }
 
-  protected dateOf(p: PublicProtocolSummary): Date {
-    return meetingDate(p.date);
+  protected dateOf(p: PublicProtocolSummary): Date | null {
+    return parseDay(p.date);
   }
 
   /** The number of public agenda items of a protocol. */

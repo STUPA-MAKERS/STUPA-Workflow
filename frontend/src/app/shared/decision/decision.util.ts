@@ -1,5 +1,6 @@
 import type { DecisionProposal } from '@core/api/models';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate } from '@core/i18n/translations';
+import { formatMoney } from '@shared/format-money';
 
 /** At most this many conditions, each 1 to MAX_CONDITION_LENGTH characters (as the server). */
 export const MAX_CONDITIONS = 20;
@@ -23,8 +24,6 @@ export type DecisionDraftError =
   | 'decision.error.amountExceeds'
   | 'decision.error.conditionLength'
   | 'decision.error.conditionCount';
-
-type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
 
 /** A new draft: switched off, the amount set to the requested amount. */
 export function emptyDraft(requested: string | null | undefined): DecisionDraft {
@@ -86,17 +85,6 @@ export function toProposal(
   return { approvedAmount, conditions };
 }
 
-/** Format an amount as money in the given format locale, or `''` without a value. */
-export function formatMoney(
-  value: string | number | null | undefined,
-  locale: string,
-  currency: string | null = 'EUR',
-): string {
-  const n = typeof value === 'number' ? value : toNumber(value);
-  if (n === null) return '';
-  return new Intl.NumberFormat(locale, { style: 'currency', currency: currency ?? 'EUR' }).format(n);
-}
-
 /** The signed difference `approved − requested` as money ("−350,00 €"), or `''`. */
 export function formatDiff(
   requested: string | null | undefined,
@@ -108,8 +96,7 @@ export function formatDiff(
   const appr = toNumber(approved);
   if (req === null || appr === null || req === appr) return '';
   const diff = Math.round((appr - req) * 100) / 100;
-  const text = formatMoney(Math.abs(diff), locale, currency);
-  return `${diff < 0 ? '−' : '+'}${text}`;
+  return formatMoney(diff, locale, { currency, signed: true });
 }
 
 /** "1 Auflage" / "2 Auflagen". */
@@ -160,8 +147,8 @@ export function decisionHistoryLine(
   const n = decision.conditionCount;
   if (decision.amountDeviates) {
     const params = {
-      approved: formatMoney(decision.approvedAmount, locale, currency),
-      requested: formatMoney(decision.requestedAmount, locale, currency),
+      approved: formatMoney(decision.approvedAmount, locale, { currency }),
+      requested: formatMoney(decision.requestedAmount, locale, { currency }),
     };
     return n
       ? t('applications.history.decisionAmountConditions', {

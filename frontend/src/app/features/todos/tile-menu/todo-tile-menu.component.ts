@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, input, model, output } from '@angul
 import type { Uuid } from '@core/api/models';
 import type { TodoBoardKind, TodoCardTile, TodoColumn } from '@core/api/todos.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, SideSheetComponent } from '@stupa-makers/ui-kit';
 
 /** A long press on a tile asks for its menu: the card, its board and the columns in order. */
 export interface TileMenuRequest {

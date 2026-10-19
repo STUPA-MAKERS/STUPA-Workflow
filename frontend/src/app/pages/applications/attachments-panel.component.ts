@@ -9,7 +9,6 @@ import {
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
@@ -21,12 +20,19 @@ import type { Attachment, ScanState, Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   CheckboxComponent,
-  DialogComponent,
+  DropOverlayComponent,
+  EmptyStateComponent,
+  FileDropDirective,
+  FileViewerComponent,
+  type FileViewerItem,
   IconComponent,
+  matchesMedia,
+  MEDIA,
+  SelectionBarComponent,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
   ImageThumbComponent,
   inlineUrl,
@@ -34,9 +40,6 @@ import {
 } from '@shared/ui/image-thumb/image-thumb.component';
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { formatBytes } from './applications.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
-import { FileDropDirective } from '@shared/file-drop.directive';
 
 /**
  * Attachments panel.
@@ -49,6 +52,10 @@ import { FileDropDirective } from '@shared/file-drop.directive';
  * `scanned=true` means "scan done" only. The download shows the real result.
  * 200 means ready. 409 means quarantine, and the row becomes `quarantined`.
  * 410 means the link expired.
+ *
+ * The preview opens the full-screen kit viewer over every file of the panel that can
+ * preview (a clean image or PDF), so its arrows step through them. The panel fetches the
+ * URL of a file when the viewer reaches it, with the same 409/410 handling as a download.
  *
  * Two upload paths exist: the file picker for several files at once, and drag
  * and drop onto the panel (`appFileDrop`, with `app-drop-overlay`). A page that takes a
@@ -70,9 +77,10 @@ import { FileDropDirective } from '@shared/file-drop.directive';
     TranslatePipe,
     ButtonComponent,
     CheckboxComponent,
-    DialogComponent,
+    FileViewerComponent,
     IconComponent,
     ImageThumbComponent,
+    SelectionBarComponent,
     StatusTextComponent,
   ],
   templateUrl: './attachments-panel.component.html',
@@ -106,20 +114,31 @@ export class AttachmentsPanelComponent {
   readonly downloadingId = signal<Uuid | null>(null);
   readonly removingId = signal<Uuid | null>(null);
 
-  /** Inline preview of an image or a PDF in a large dialog. It needs no download. */
-  private readonly sanitizer = inject(DomSanitizer);
-  readonly previewing = signal<Attachment | null>(null);
+  /** The full-screen viewer over the files that preview. */
+  readonly viewerOpen = signal(false);
+  readonly viewerIndex = signal(0);
   readonly previewLoadingId = signal<Uuid | null>(null);
-  /** Raw signed URL for the img binding. Angular sanitizes URL contexts itself. */
-  readonly previewUrl = signal<string | null>(null);
-  readonly previewIsImage = computed(() =>
-    (this.previewing()?.mime ?? '').startsWith('image/'),
+  /** The inline URLs the viewer fetched since it opened, by attachment. */
+  private readonly previewUrls = signal<ReadonlyMap<Uuid, string>>(new Map());
+  /** The URL requests in flight while the viewer moves. */
+  private readonly fetching = new Set<Uuid>();
+  /** False on a coarse pointer: there a PDF goes to the system viewer, not into the frame. */
+  private readonly pdfInViewer = signal(true);
+  /** The files the viewer steps through, in the order of the list. */
+  readonly viewable = computed(() =>
+    this.attachments().filter(
+      (a) => this.canPreview(a) && (this.pdfInViewer() || a.mime !== 'application/pdf'),
+    ),
   );
-  /** An iframe needs an explicitly trusted resource URL. The signed URL comes
-   *  from our own API and stays app-relative, so the trust is safe. */
-  readonly previewFrameUrl = computed<SafeResourceUrl | null>(() => {
-    const url = this.previewUrl();
-    return url === null ? null : this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  /** A file whose URL is not fetched yet has an empty URL: the viewer shows its loading state. */
+  readonly viewerItems = computed<FileViewerItem[]>(() => {
+    const urls = this.previewUrls();
+    return this.viewable().map((a) => ({ name: a.filename, mime: a.mime, url: urls.get(a.id) ?? '' }));
+  });
+  /** The file the viewer shows, for its download action. */
+  readonly viewerFile = computed<Attachment | null>(() => {
+    const list = this.viewable();
+    return list[Math.min(Math.max(0, this.viewerIndex()), list.length - 1)] ?? null;
   });
 
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
@@ -197,6 +216,10 @@ export class AttachmentsPanelComponent {
 
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
+  }
+
+  clearSelection(): void {
+    this.selected.set(new Set());
   }
 
   toggleSelect(id: Uuid, checked: boolean): void {
@@ -286,46 +309,64 @@ export class AttachmentsPanelComponent {
     );
   }
 
-  /** Open the large preview dialog. It fetches a signed URL and renders inline.
-   *  The 409 and 410 handling matches download: quarantine and expired link. */
+  /** Open the viewer at this file. The URL request comes first, so a quarantined or
+   *  removed file shows its toast instead of the viewer. */
   openPreview(att: Attachment): void {
     if (this.previewLoadingId()) return;
+    const pdfInViewer = !this.coarsePointer();
     this.previewLoadingId.set(att.id);
     this.api.attachmentUrl(att.id).subscribe({
       next: (signed) => {
         this.previewLoadingId.set(null);
-        // With `inline=1` the download route answers with `Content-Disposition:
-        // inline`, so the iframe or img renders instead of starting a download.
-        const sep = signed.url.includes('?') ? '&' : '?';
-        const url = `${signed.url}${sep}inline=1`;
+        const url = inlineUrl(signed.url);
         // Mobile browsers such as Android Chrome cannot render a PDF in an iframe.
-        // Hand the PDF to the system viewer instead of showing an empty dialog.
-        if (att.mime === 'application/pdf' && this.coarsePointer()) {
+        // Hand the PDF to the system viewer instead.
+        if (att.mime === 'application/pdf' && !pdfInViewer) {
           this.openUrl(url);
           return;
         }
-        this.previewUrl.set(url);
-        this.previewing.set(att);
+        this.pdfInViewer.set(pdfInViewer);
+        const index = this.viewable().findIndex((a) => a.id === att.id);
+        if (index < 0) return;
+        this.previewUrls.set(new Map([[att.id, url]]));
+        this.viewerIndex.set(index);
+        this.viewerOpen.set(true);
       },
       error: (err: { status?: number }) => {
         this.previewLoadingId.set(null);
-        if (err.status === 409) {
-          this.attachments.update((list) =>
-            list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
-          );
-          this.toast.error(this.i18n.translate('applications.attachments.download.conflict'));
-        } else if (err.status === 410) {
-          this.toast.error(this.i18n.translate('applications.attachments.download.gone'));
-        } else {
-          this.toast.error(this.i18n.translate('applications.attachments.download.error'));
-        }
+        this.urlFailed(att, err.status);
       },
     });
   }
 
+  /** The arrows moved the viewer: fetch the URL of the file it shows now. */
+  onViewerIndex(index: number): void {
+    this.viewerIndex.set(index);
+    this.fetchViewerUrl();
+  }
+
   closePreview(): void {
-    this.previewing.set(null);
-    this.previewUrl.set(null);
+    this.viewerOpen.set(false);
+    this.previewUrls.set(new Map());
+    this.fetching.clear();
+  }
+
+  /** A failed request closes the viewer with the toast of a failed download. */
+  private fetchViewerUrl(): void {
+    const att = this.viewerFile();
+    if (!att || this.previewUrls().has(att.id) || this.fetching.has(att.id)) return;
+    this.fetching.add(att.id);
+    this.api.attachmentUrl(att.id).subscribe({
+      next: (signed) => {
+        if (!this.fetching.delete(att.id)) return;
+        this.previewUrls.update((urls) => new Map(urls).set(att.id, inlineUrl(signed.url)));
+      },
+      error: (err: { status?: number }) => {
+        if (!this.fetching.delete(att.id)) return;
+        this.closePreview();
+        this.urlFailed(att, err.status);
+      },
+    });
   }
 
   download(att: Attachment): void {
@@ -338,19 +379,24 @@ export class AttachmentsPanelComponent {
       },
       error: (err: { status?: number }) => {
         this.downloadingId.set(null);
-        if (err.status === 409) {
-          // The scan found something, so mark the row as quarantined for good.
-          this.attachments.update((list) =>
-            list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
-          );
-          this.toast.error(this.i18n.translate('applications.attachments.download.conflict'));
-        } else if (err.status === 410) {
-          this.toast.error(this.i18n.translate('applications.attachments.download.gone'));
-        } else {
-          this.toast.error(this.i18n.translate('applications.attachments.download.error'));
-        }
+        this.urlFailed(att, err.status);
       },
     });
+  }
+
+  /** 409: the scan found something, so the row is quarantined for good. 410: the link
+   *  expired. Anything else: a generic error. */
+  private urlFailed(att: Attachment, status?: number): void {
+    if (status === 409) {
+      this.attachments.update((list) =>
+        list.map((a) => (a.id === att.id ? { ...a, scanState: 'quarantined' as ScanState } : a)),
+      );
+      this.toast.error(this.i18n.translate('applications.attachments.download.conflict'));
+    } else if (status === 410) {
+      this.toast.error(this.i18n.translate('applications.attachments.download.gone'));
+    } else {
+      this.toast.error(this.i18n.translate('applications.attachments.download.error'));
+    }
   }
 
   remove(att: Attachment): void {
@@ -377,6 +423,6 @@ export class AttachmentsPanelComponent {
   /** Touch-first device without an iframe PDF viewer. A separate method makes it
    *  stubbable in tests. */
   protected coarsePointer(): boolean {
-    return window.matchMedia('(pointer: coarse)').matches;
+    return matchesMedia(MEDIA.coarse);
   }
 }

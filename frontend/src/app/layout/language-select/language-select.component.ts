@@ -1,11 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
 import { LocaleSwitchService } from '../locale-switch.service';
+import { FilterSelectComponent, type FilterSelectOption } from '@stupa-makers/ui-kit';
 
 /** The native name of each language, the same in every locale. */
 const LANGUAGE_NAME: Record<string, TranslationKey> = {

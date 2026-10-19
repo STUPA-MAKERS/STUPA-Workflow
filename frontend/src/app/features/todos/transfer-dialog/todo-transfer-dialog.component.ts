@@ -14,9 +14,13 @@ import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoBoard, type TodoBoardKind, type TodoBoardSummary } from '@core/api/todos.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { ButtonComponent, DialogComponent, type SelectOption } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DialogComponent,
+  EmptyStateComponent,
+  SelectFieldComponent,
+  type SelectOption,
+} from '@stupa-makers/ui-kit';
 import { canTransfer, sortedColumns } from '../todos.util';
 
 /** The target that the person picked in the dialog. */

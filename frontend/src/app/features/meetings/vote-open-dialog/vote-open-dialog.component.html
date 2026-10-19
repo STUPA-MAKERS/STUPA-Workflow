@@ -26,18 +26,16 @@
       />
       <hr class="vod__divider" />
     }
-    <label class="vod__field" for="vod-question">
-      <span class="vod__label">{{ (isElection() ? 'election.dialog.round' : 'meetings.vote.question') | t }}</span>
+    <app-textarea [label]="(isElection() ? 'election.dialog.round' : 'meetings.vote.question') | t">
       <textarea
         id="vod-question"
-        class="vod__textarea"
         [rows]="isElection() ? 1 : 3"
         name="question"
         [placeholder]="(isElection() ? 'election.dialog.roundPlaceholder' : 'meetings.vote.questionPlaceholder') | t"
         [ngModel]="question()"
         (ngModelChange)="setQuestion($event)"
       ></textarea>
-    </label>
+    </app-textarea>
 
     @if (isElection()) {
     <div class="vod__group">
@@ -72,8 +70,13 @@
               <span class="vod__candNo mono" aria-hidden="true">{{ i + 1 }}</span>
               <span class="vod__candName ell" [appTruncated]="c.name" #cut="appTruncated" [attr.title]="cut.truncated() ? c.name : null">{{ c.name }}</span>
               <span class="vod__candKind">{{ (c.principalId ? 'election.dialog.member' : 'election.dialog.free') | t }}</span>
-              <app-button variant="text" size="sm" [disabled]="first" [iconOnly]="true" [ariaLabel]="'election.dialog.up' | t: { name: c.name }" (click)="moveCandidate(i, -1)"><app-icon name="up" /></app-button>
-              <app-button variant="text" size="sm" [disabled]="last" [iconOnly]="true" [ariaLabel]="'election.dialog.down' | t: { name: c.name }" (click)="moveCandidate(i, 1)"><app-icon name="down" /></app-button>
+              <app-move-buttons
+                [upDisabled]="first"
+                [downDisabled]="last"
+                [upLabel]="'election.dialog.up' | t: { name: c.name }"
+                [downLabel]="'election.dialog.down' | t: { name: c.name }"
+                (move)="moveCandidate(i, $event)"
+              />
               <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="'election.dialog.remove' | t: { name: c.name }" (click)="removeCandidate(c.key)"><app-icon name="trash" /></app-button>
             </li>
           }

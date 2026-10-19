@@ -13,12 +13,11 @@ import {
   type TodoCardDetail,
   type TodoCardTile,
 } from '@core/api/todos.service';
-import { ToastService } from '@stupa-makers/ui-kit';
+import { LONG_PRESS_MS, ToastService } from '@stupa-makers/ui-kit';
 import { NO_FILTER } from '../../../features/todos/todos.util';
 import { TODAY, board, detail, tile } from '../../../../testing/todo-fixtures';
 import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
-import { LONG_PRESS_MS } from '@shared/long-press.directive';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
 import { COLLAPSED_KEY, TodoBoardRowsComponent, boardRows, rowDropId, type RowLead } from './todo-board-rows.component';
 

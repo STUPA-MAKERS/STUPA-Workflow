@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angul
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ExpensesComponent } from './expenses.component';
 import { ExpensesListState } from './expenses-list.state';
@@ -1848,7 +1849,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: null, kind: null, q: null, view: null },
+        queryParams: { budget: null, kind: null, q: null, view: null, new: null, invoice: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
@@ -1860,7 +1861,14 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: 'b-1', kind: 'income', q: 'flyer', view: null },
+        queryParams: {
+          budget: 'b-1',
+          kind: 'income',
+          q: 'flyer',
+          view: null,
+          new: null,
+          invoice: null,
+        },
       }),
     );
     nav.mockRestore();
@@ -2271,8 +2279,10 @@ describe('ExpensesListState.refresh', () => {
     state.onExport();
     const reqs = http.match((r) => r.url.endsWith('/expenses/export.xlsx'));
     expect(reqs.length).toBe(1);
+    const toast = jest.spyOn(TestBed.inject(ToastService), 'error');
     reqs[0].error(new ProgressEvent('err'));
     expect(state.exporting()).toBe(false);
+    expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
   });
 });
 
@@ -2651,7 +2661,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(await screen.findByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
     // An empty list leaves a neutral sheet beside it.
-    expect(fixture.nativeElement.querySelector('.exp__none--skeleton')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-detail-none .dn__ghost')).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.kind.set('income');
@@ -3067,12 +3077,13 @@ describe('ExpensesComponent (list/detail)', () => {
     fixture.detectChanges();
     const boxes = container.querySelectorAll<HTMLInputElement>('app-list-item input[type=checkbox]');
     expect(boxes.length).toBe(2);
+    expect(screen.getByRole('checkbox', { name: '„Plakate“ auswählen' })).not.toBeChecked();
     boxes[0].click();
     fixture.detectChanges();
     expect(c.detailView()).toBe('bulk');
     expect(screen.getByRole('heading', { name: '1 Buchungen ausgewählt' })).toBeInTheDocument();
     // The select-all box of the bar selects every row.
-    const all = screen.getByRole('checkbox', { name: 'Alle wählen' });
+    const all = screen.getByRole('checkbox', { name: /^Alle wählen/ });
     await userEvent.click(all);
     expect(c.selectedCount()).toBe(2);
     await userEvent.click(screen.getByRole('button', { name: 'Alle wählen' }));
@@ -3104,8 +3115,11 @@ describe('ExpensesComponent (list/detail)', () => {
     c.startSelecting();
     c.toggleSelect('e-1', true);
     fixture.detectChanges();
-    expect(screen.getByRole('heading', { name: '1 ausgewählt' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    const bar = screen.getByRole('toolbar', { name: 'Auswahl' });
+    expect(within(bar).getByRole('status')).toHaveTextContent('1 ausgewählt');
+    // The list pane keeps its name while the title row is the bar.
+    expect(screen.getByRole('region', { name: 'Buchungen' })).toBeInTheDocument();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Löschen' }));
     expect(c.bulkConfirm()).toBe('delete');
   });
 

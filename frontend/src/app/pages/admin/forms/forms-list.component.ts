@@ -6,25 +6,25 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { FabComponent, NoteComponent, PageHeaderComponent, StatusTextComponent } from '@shared/ui';
+import { FabComponent, PageHeaderComponent } from '@shared/ui';
 import {
   ButtonComponent,
   CellDirective,
   CheckboxComponent,
   type ColumnDef,
+  ConfirmDialogComponent,
   DataTableComponent,
   DialogComponent,
+  EmptyStateComponent,
   InputComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Edit state of the create dialog: title in DE and EN, Gremium, and budget flag. */
 interface NewForm {

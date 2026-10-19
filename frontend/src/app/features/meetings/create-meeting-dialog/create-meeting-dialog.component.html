@@ -6,10 +6,14 @@
 >
   <form class="cmd" (submit)="$event.preventDefault(); submit()">
     <div class="cmd__steps">
-      <span class="cmd__bar" aria-hidden="true">
-        <span class="cmd__seg cmd__seg--on"></span>
-        <span class="cmd__seg" [class.cmd__seg--on]="step() === 2"></span>
-      </span>
+      <app-seg-bar
+        class="cmd__bar"
+        size="thin"
+        aria-hidden="true"
+        [segments]="[{ value: 1, tone: 'filled' }, { value: step() === 2 ? 1 : 0, tone: 'filled' }]"
+        [total]="2"
+        [label]="'meetings.create.step' | t: { n: step(), m: 2 }"
+      />
       <span class="cmd__stepText">{{ 'meetings.create.step' | t: { n: step(), m: 2 } }}</span>
     </div>
 

@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'dot-parts' as dots;
 
 /* The open gremium. Side by side it is a sheet (surface 1, large radius) as high as the
    pane: the header and the tab bar stay, and only the body below them scrolls, down to
@@ -83,23 +84,10 @@
   display: none;
 }
 .gd__parts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-inline-start: calc(-1 * var(--gd-sep));
-  min-width: 0;
+  @include dots.list(var(--gd-sep));
 }
 .gd__part {
-  min-width: 0;
-  white-space: nowrap;
-}
-.gd__part::before {
-  display: inline-block;
-  width: var(--gd-sep);
-  color: var(--color-text-subtle);
-  text-align: center;
-  content: '·';
-  content: '·' / '';
+  @include dots.part(var(--gd-sep));
 }
 
 .gd__actions {

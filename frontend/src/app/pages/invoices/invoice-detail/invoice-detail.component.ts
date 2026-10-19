@@ -3,29 +3,34 @@ import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SegBarComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
   StatusTextComponent,
+} from '@stupa-makers/ui-kit';
+import {
   invoiceStatus,
 } from '@shared/ui';
 import type { Invoice, InvoiceBooking } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
   costCentreLabel,
-  daysUntil,
-  formatEur,
-  shortDate,
   signedEur,
   vatRate,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
+import { dayMonth, daysUntil } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
@@ -41,6 +46,8 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetActionComponent,
+    NoteComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
@@ -87,6 +94,7 @@ export class InvoiceDetailComponent {
     const i = this.invoice();
     if (i.status !== 'open' || !i.dueDate) return null;
     const days = daysUntil(i.dueDate);
+    if (days === null) return null;
     if (days > 0) {
       return {
         text: this.i18n.translate(days === 1 ? 'invoices.due.tomorrow' : 'invoices.due.inDays', { days }),
@@ -136,7 +144,7 @@ export class InvoiceDetailComponent {
   }
 
   money(value: string | number): string {
-    return formatEur(Number(value), this.i18n.locale());
+    return formatMoney(value, this.i18n.formatLocale());
   }
 
   cc(b: InvoiceBooking): CostCentreLabel {
@@ -145,11 +153,13 @@ export class InvoiceDetailComponent {
   }
 
   signed(b: InvoiceBooking): string {
-    return signedEur(b.kind, b.amount, this.i18n.locale());
+    return signedEur(b.kind, b.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** The booking a row opens: a sub-booking opens its parent, which the list shows. */

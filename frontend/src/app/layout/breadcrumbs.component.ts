@@ -4,10 +4,9 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { filter } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, TruncatedDirective } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
 import { PageFrameService } from './page-frame.service';
-import { TruncatedDirective } from '@shared/truncated.directive';
 
 interface Crumb {
   label: string;

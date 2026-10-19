@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { provideRouter, Router } from '@angular/router';
-import { render, screen } from '@testing-library/angular';
+import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, ErasureRequest, PrivacySettings } from '../admin.models';
@@ -236,7 +236,9 @@ describe('PrivacyComponent', () => {
     expect(api.downloadAuskunft).toHaveBeenCalledWith('user@x');
     expect(createObjectURL).toHaveBeenCalled();
     expect(clickSpy).toHaveBeenCalled();
-    expect(revokeObjectURL).toHaveBeenCalledWith('blob:url');
+    // The URL is revoked only after the click has started the download.
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    await waitFor(() => expect(revokeObjectURL).toHaveBeenCalledWith('blob:url'));
     expect(toast.success).toHaveBeenCalled();
     clickSpy.mockRestore();
   });

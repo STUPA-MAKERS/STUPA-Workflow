@@ -18,15 +18,10 @@
   gap: var(--space-2);
 }
 .gmm__head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding-inline: var(--space-1);
-}
-.gmm__shown {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
+  --sh-align: baseline;
+  --sh-wrap: nowrap;
+  --sh-gap: var(--space-4);
+  --sh-count-nums: normal;
 }
 
 .gmm__list {
@@ -58,23 +53,8 @@
 
 .gmm__more {
   align-self: flex-start;
-  min-height: 2rem;
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--color-accent-text);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  cursor: pointer;
-}
-.gmm__more:hover {
-  background: var(--color-surface-2);
-}
-.gmm__more:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
+  --button-padding-inline: var(--space-3);
+  --button-font-size: var(--fs-sm);
 }
 
 /* A narrow container: the e-mail goes under the name. */

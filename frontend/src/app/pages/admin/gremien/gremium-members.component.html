@@ -15,14 +15,16 @@
 
   <!-- Read-only. The OIDC group sync writes the memberships, not the admin. -->
   <section class="gmm__section" aria-labelledby="gmm-members-title">
-    <header class="gmm__head">
-      <h2 class="section-title" id="gmm-members-title">{{ 'admin.gremien.members' | t }}</h2>
-      @if (!loading() && members().length > preview) {
-        <span class="gmm__shown">{{
-          'admin.gremien.shownOf' | t: { shown: visible().length, total: members().length }
-        }}</span>
-      }
-    </header>
+    <app-section-header
+      class="gmm__head"
+      headingId="gmm-members-title"
+      [heading]="'admin.gremien.members' | t"
+      [count]="
+        !loading() && members().length > preview
+          ? ('admin.gremien.shownOf' | t: { shown: visible().length, total: members().length })
+          : null
+      "
+    />
 
     @if (loading()) {
       <app-skeleton variant="rows" [count]="5" [label]="'common.loading' | t" />
@@ -42,11 +44,11 @@
         }
       </ul>
       @if (members().length > preview) {
-        <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
-        <button
-          type="button"
+        <app-button
           class="gmm__more"
-          [attr.aria-expanded]="showAll()"
+          variant="text"
+          size="sm"
+          [ariaExpanded]="showAll()"
           (click)="showAll.set(!showAll())"
         >
           {{
@@ -54,7 +56,7 @@
               ? ('admin.gremien.showLess' | t)
               : ('admin.gremien.showAll' | t: { count: members().length })
           }}
-        </button>
+        </app-button>
       }
     }
   </section>

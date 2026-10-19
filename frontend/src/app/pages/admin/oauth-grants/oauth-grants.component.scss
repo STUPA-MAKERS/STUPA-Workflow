@@ -54,15 +54,6 @@
   gap: var(--space-1);
   min-width: 0;
 }
-.og__scope {
-  max-width: 100%;
-  overflow-wrap: anywhere;
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-3);
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-}
 .og__more {
   font-size: var(--fs-xs);
   color: var(--color-text-muted);

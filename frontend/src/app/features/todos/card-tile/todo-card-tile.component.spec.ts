@@ -34,7 +34,7 @@ describe('TodoCardTileComponent', () => {
     expect(screen.getByText('Sitzung')).toBeInTheDocument();
     expect(screen.queryByText('Dritte')).toBeNull();
     expect(screen.getByText('Sitzung · Sondersitzung · Di, 03.11.')).toBeInTheDocument();
-    expect(screen.getByText(/14\.10\. · überfällig/).closest('.tt__fact')).toHaveClass('tt__fact--overdue');
+    expect(screen.getByText(/14\.10\. · überfällig/).closest('.tt__fact')).toHaveClass('tdu--overdue');
     expect(screen.getByRole('img', { name: 'Checkliste 1 von 3' })).toHaveTextContent('1/3');
     expect(screen.getByRole('img', { name: '2 Kommentare' })).toHaveTextContent('2');
     expect(screen.getByRole('img', { name: 'Niemand zuständig' })).toBeInTheDocument();
@@ -55,12 +55,12 @@ describe('TodoCardTileComponent', () => {
 
   it('marks a date of tomorrow as soon and a later date plainly', async () => {
     const view = await setup(tile({ dueDate: '2026-10-17' }));
-    expect(screen.getByText(/17\.10\. · morgen/).closest('.tt__fact')).toHaveClass('tt__fact--soon');
+    expect(screen.getByText(/17\.10\. · morgen/).closest('.tt__fact')).toHaveClass('tdu--soon');
     view.fixture.componentRef.setInput('card', tile({ dueDate: '2026-10-30' }));
     view.fixture.detectChanges();
     const fact = screen.getByText('30.10.').closest('.tt__fact');
-    expect(fact).not.toHaveClass('tt__fact--soon');
-    expect(fact).not.toHaveClass('tt__fact--overdue');
+    expect(fact).not.toHaveClass('tdu--soon');
+    expect(fact).not.toHaveClass('tdu--overdue');
   });
 
   it('shows the people of the card and no counts without them', async () => {

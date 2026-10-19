@@ -14,40 +14,45 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
+import { problemDetail } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  IconComponent,
-  MEDIA,
-  SegmentedComponent,
-  type SegmentedOption,
-  type SelectOption,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  ConfirmDialogComponent,
+  downloadBlob,
+  DropOverlayComponent,
   EmptyStateComponent,
-  FabComponent,
+  FileDropDirective,
   FileDropZoneComponent,
+  IconComponent,
+  InfiniteScrollDirective,
   ListDetailLayoutComponent,
-  PageHeaderComponent,
   ListItemComponent,
+  MEDIA,
+  mediaQuery,
   RangeChipComponent,
   type RangeValue,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  ScrollFadeDirective,
   SearchPillComponent,
+  SegmentedComponent,
+  type SegmentedOption,
+  type SelectOption,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import {
+  FabComponent,
+  PageHeaderComponent,
   invoiceStatus,
 } from '@shared/ui';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { downloadBlob } from '@shared/download.util';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
@@ -58,15 +63,18 @@ import {
   type InvoiceSegmentCounts,
   type InvoiceStatus,
 } from '../budget/budget-tree.api';
-import { costCentreIndex, formatEur, monthGroups, shortDate } from '../budget/expense-display.util';
+import { costCentreIndex } from '../budget/expense-display.util';
 import { InvoiceDetailComponent } from './invoice-detail/invoice-detail.component';
 import {
   type InvoiceFormHost,
   InvoiceFormComponent,
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
-import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { debounced } from '@shared/debounced';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { dayMonth } from '@shared/date-format';
+import { groupByMonth } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 
@@ -111,11 +119,15 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
+    DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
+    DropOverlayComponent,
     EmptyStateComponent,
     FabComponent,
+    FileDropDirective,
     FileDropZoneComponent,
     IconComponent,
     InvoiceDetailComponent,
@@ -149,7 +161,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
   /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
   readonly split = computed(() => this.layout()?.collapsed() === false);
@@ -187,7 +199,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly importing = signal(false);
   /** True while a manual receipt upload runs in the create form. */
   readonly attaching = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
   /** Monotone request generation: a late answer of an older filter state is dropped. */
   private fetchEpoch = 0;
 
@@ -264,11 +275,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
   /** The rows by the month of their invoice date. */
   readonly groups = computed(() =>
-    monthGroups(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.locale()),
+    groupByMonth(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.formatLocale(), {
+      utc: true,
+    }),
   );
-
-  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
-  readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   /** Debounced search, about 250 ms. It drives the `q` param of the server query. */
   onSearch(value: string): void {
@@ -306,13 +316,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.reload();
   }
 
-  private debouncedReload(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), LIVE_SEARCH_DEBOUNCE_MS);
-  }
+  /** The search reloads after a pause; the component's end drops a waiting reload. */
+  private readonly debouncedReload = debounced(() => this.reload());
 
   ngOnDestroy(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
     this.frame.fill.set(false);
   }
 
@@ -322,9 +329,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly importNotice = signal<ImportNotice>(null);
   /** The number of an invoice that exists already (N31), or null. */
   readonly importDuplicate = signal<string | null>(null);
-
-  private dragDepth = 0;
-  readonly dragActive = signal(false);
 
   readonly statusOptions = computed<SelectOption[]>(() =>
     (['open', 'paid'] as const).map((v) => ({
@@ -460,20 +464,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
     effect(() => this.frame.fill.set(this.split()));
 
-    // Infinite scroll. Side by side the list scrolls inside its own box.
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const root = this.split() ? (this.scroller()?.nativeElement ?? null) : null;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((e) => e.isIntersecting)) this.loadMore();
-        },
-        { root, rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   /**
@@ -519,11 +509,13 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   }
 
   money(amount: string): string {
-    return formatEur(Number(amount), this.i18n.locale());
+    return formatMoney(amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** The title of a row: the supplier, else the number. */
@@ -635,48 +627,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   }
 
   // --- import ----------------------------------------------------------------------
-  /** A drag event that the drop zone handles itself. The page overlay leaves it alone, so
-   *  one drop never imports twice. */
-  private inDropZone(event: DragEvent): boolean {
-    const target = event.target as Element | null;
-    return !!target && typeof target.closest === 'function' && !!target.closest('app-file-drop-zone');
-  }
-
-  onDragEnter(event: DragEvent): void {
-    if (!this.canManage() || !this.hasFiles(event) || this.inDropZone(event)) return;
-    event.preventDefault();
-    this.dragDepth++;
-    this.dragActive.set(true);
-  }
-
-  onDragOver(event: DragEvent): void {
-    if (!this.canManage() || !this.hasFiles(event)) return;
-    event.preventDefault();
-  }
-
-  onDragLeave(event: DragEvent): void {
-    if (!this.dragActive() || this.inDropZone(event)) return;
-    event.preventDefault();
-    this.dragDepth = Math.max(0, this.dragDepth - 1);
-    if (this.dragDepth === 0) this.dragActive.set(false);
-  }
-
-  onDrop(event: DragEvent): void {
-    if (!this.canManage()) return;
-    if (this.inDropZone(event)) {
-      this.dragDepth = 0;
-      this.dragActive.set(false);
-      return;
-    }
-    event.preventDefault();
-    this.dragDepth = 0;
-    this.dragActive.set(false);
-    const file = event.dataTransfer?.files?.[0];
-    if (file) this.importFile(file);
-  }
-
-  private hasFiles(event: DragEvent): boolean {
-    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  /** Files dropped on the page (outside the drop zone). One import at a time. */
+  onFilesDropped(files: File[]): void {
+    if (this.canManage() && files[0]) this.importFile(files[0]);
   }
 
   onFilePicked(event: Event): void {
@@ -719,7 +672,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
           this.importNotice.set('manual');
           this.attachFile(file);
         } else {
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         }
       },
     });
@@ -762,7 +715,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       },
       error: (err) => {
         this.attaching.set(false);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.failureText(err));
       },
     });
   }
@@ -844,7 +797,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         },
       });
   }
@@ -891,7 +844,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         },
         error: (err) => {
           this.saving.set(false);
-          this.toast.error(this.problemDetail(err));
+          this.toast.error(this.failureText(err));
         },
       });
   }
@@ -910,7 +863,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       },
       error: (err) => {
         this.markingPaid.set(null);
-        this.toast.error(this.problemDetail(err));
+        this.toast.error(this.failureText(err));
       },
     });
   }
@@ -1000,8 +953,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     return this.i18n.translate('invoices.rowMenu', { number: i.number || i.supplier || '' });
   }
 
-  private problemDetail(err: unknown): string {
-    const detail = (err as { error?: { detail?: string } } | null)?.error?.detail;
-    return detail || this.i18n.translate('invoices.toast.failed');
+  private failureText(err: unknown): string {
+    return problemDetail(err) || this.i18n.translate('invoices.toast.failed');
   }
 }

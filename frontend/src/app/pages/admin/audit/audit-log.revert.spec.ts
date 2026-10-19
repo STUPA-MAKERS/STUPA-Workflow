@@ -107,10 +107,11 @@ describe('AuditLogComponent — config diff + revert', () => {
     );
     c.toggle(7);
     fixture.detectChanges();
-    const block = container.querySelector('.al__code');
+    // The shared diff in its compact form: one code block, no cards.
+    const block = container.querySelector('app-config-diff .cfg-diff-code');
     expect(block).not.toBeNull();
-    expect(container.querySelector('app-config-diff')).toBeNull();
-    const items = [...(block?.querySelectorAll('.al__codeItem') ?? [])].map((i) =>
+    expect(container.querySelector('app-config-diff .cfg-diff')).toBeNull();
+    const items = [...(block?.querySelectorAll('.cfg-diff-code__item') ?? [])].map((i) =>
       [...i.children].map((c) => (c.textContent ?? '').replace(/\s+/g, ' ').trim()),
     );
     expect(items).toEqual([
@@ -118,8 +119,8 @@ describe('AuditLogComponent — config diff + revert', () => {
       ['state:new', '+ nachher: {"x":1}'],
       ['state:old', '- vorher: "Z"'],
     ]);
-    expect(container.querySelector('.al__codeDel')).not.toBeNull();
-    expect(container.querySelector('.al__codeIns')).not.toBeNull();
+    expect(container.querySelector('.cfg-diff-code__del')).not.toBeNull();
+    expect(container.querySelector('.cfg-diff-code__ins')).not.toBeNull();
     // The revision id sits in the target line; "version" reads as "Revision".
     const details = container.querySelector('.al__details')?.textContent ?? '';
     expect(details).toContain('rev rev-2');
@@ -189,7 +190,7 @@ describe('AuditLogComponent — config diff + revert', () => {
     const { c, fixture, revertAuditEntry } = await setup({ entryOver: { targetType: 'role', targetId: 'r-1' } });
     (fixture.nativeElement.querySelector('.al__row') as HTMLElement).click();
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.al__code')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-config-diff .cfg-diff-code')).not.toBeNull();
     expect(screen.getByRole('link', { name: 'Ziel öffnen' })).toHaveAttribute('href', '/admin/roles');
     await userEvent.click(screen.getByRole('button', { name: 'Zurücknehmen' }));
     expect(c.confirmRevert()).not.toBeNull();

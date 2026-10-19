@@ -1,4 +1,5 @@
-@use '../scroll-fade' as fade;
+@use 'scroll-fade' as fade;
+@use 'dot-parts' as dots;
 
 /* The calendar view (board Sitzungen, variant C).
 
@@ -324,24 +325,10 @@
   min-width: 0;
 }
 .cal__parts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-inline-start: calc(-1 * var(--cal-sep));
-  min-width: 0;
+  @include dots.list(var(--cal-sep));
 }
 .cal__part {
-  min-width: 0;
-  white-space: nowrap;
-}
-.cal__part::before {
-  display: inline-block;
-  width: var(--cal-sep);
-  color: var(--color-text-subtle);
-  font-family: var(--font-sans);
-  text-align: center;
-  content: '·';
-  content: '·' / '';
+  @include dots.part(var(--cal-sep), $font: var(--font-sans));
 }
 .cal__actions {
   display: flex;

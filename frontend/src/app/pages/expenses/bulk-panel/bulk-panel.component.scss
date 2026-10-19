@@ -1,12 +1,13 @@
 @use '../../budget/finance-sheet';
 @use '../../budget/finance-form';
+@use '../../../shared/ui/surface-card' as sc;
 
 .bp--sheet {
-  --color-surface-sunken: var(--color-surface-3);
+  @include sc.raised-fields($muted-label: false);
 }
 /* The card is on surface 2: its fields step up one surface, so they stand out from it. */
 .bp__card {
-  --color-surface-sunken: var(--color-surface-3);
+  @include sc.raised-fields($muted-label: false);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -19,8 +20,8 @@
   background: transparent;
 }
 /* The tree below the cost-centre field is on the card (or the sheet), so it steps up too. */
-.bp__card .ff__tree {
-  background: var(--color-surface-3);
+.bp__card {
+  --ccp-tree-bg: var(--color-surface-3);
 }
 .bp__hint {
   margin: 0;
@@ -30,10 +31,6 @@
 .bp__end {
   display: flex;
   justify-content: flex-end;
-}
-.bp__sum {
-  color: var(--color-text);
-  font-weight: var(--fw-semibold);
 }
 .bp__action {
   display: flex;

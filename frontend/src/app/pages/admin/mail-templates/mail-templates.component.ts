@@ -4,28 +4,28 @@ import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   InputComponent,
+  ListItemComponent,
   MEDIA,
-  SegmentedComponent,
-  type SegmentedOption,
+  mediaQuery,
+  ScrollFadeDirective,
+  SkeletonComponent,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 
-const LANGS = ['de', 'en'] as const;
-type Lang = (typeof LANGS)[number];
+type Lang = ContentLang;
 
 /** The text fields of a template that the editor changes. */
 const TEXT_FIELDS = ['subjectI18n', 'bodyI18n', 'bodyHtmlI18n'] as const;
@@ -50,6 +50,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ListItemComponent,
     SkeletonComponent,
     EmptyStateComponent,
     FabComponent,
@@ -62,7 +63,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     IconComponent,
     InputComponent,
     PageHeaderComponent,
-    SegmentedComponent,
+    ContentLangSwitchComponent,
     StatusTextComponent,
   ],
   templateUrl: './mail-templates.component.html',
@@ -73,9 +74,8 @@ export class MailTemplatesComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly langOptions: SegmentedOption[] = LANGS.map((l) => ({ value: l, label: l.toUpperCase() }));
   /** Phone: a chip picks the template instead of the list column. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
   // Select by key, not by ID. A builtin template has no database ID.
@@ -116,10 +116,6 @@ export class MailTemplatesComponent {
       label: t.source === 'override' ? `${this.keyLabel(t.key)} · ${custom}` : this.keyLabel(t.key),
     }));
   });
-
-  setLang(value: string | null): void {
-    this.lang.set(value === 'en' ? 'en' : 'de');
-  }
 
   readonly placeholderList = computed<{ key: string; desc: string; token: string }[]>(() => {
     const d = this.draft();

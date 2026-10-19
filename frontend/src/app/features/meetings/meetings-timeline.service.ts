@@ -1,12 +1,12 @@
-import { Injectable, type OnDestroy, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { forkJoin } from 'rxjs';
+import { forkJoin, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import type { Meeting, Uuid } from '@core/api/models';
+import type { Meeting, MeetingPage, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
-import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { liveSearch } from '@stupa-makers/ui-kit';
 
 /** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
 export type MeetingChange =
@@ -29,7 +29,7 @@ export const PAST_PREVIEW = 3;
  * relevance-sorted list with offset paging. Provided by MeetingsComponent.
  */
 @Injectable()
-export class MeetingsTimelineService implements OnDestroy {
+export class MeetingsTimelineService {
   private readonly api = inject(ApiClient);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
@@ -87,6 +87,14 @@ export class MeetingsTimelineService implements OnDestroy {
     { value: '', label: this.i18n.translate('meetings.list.allCommittees') },
     ...this.filterGremien().map((g) => ({ value: g.id, label: g.name })),
   ]);
+  /** The Gremium chip shows only when there is more than one Gremium to pick. */
+  readonly showGremiumFilter = computed(() => this.filterGremien().length > 1);
+  /** The text of the Gremium chip. An unknown value (a Gremium that left the list) reads as "Alle Gremien". */
+  readonly gremiumFilterLabel = computed(() => {
+    const options = this.filterGremiumOptions();
+    const value = this.gremiumFilter();
+    return options.find((o) => o.value === value)?.label ?? options[0].label;
+  });
 
   /** Active search query (empty = normal past/upcoming timeline). */
   readonly searchQuery = signal('');
@@ -95,9 +103,15 @@ export class MeetingsTimelineService implements OnDestroy {
   private searchCursor: string | null = null;
   readonly searchHasMore = signal(false);
   readonly loadingSearch = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Sequence counter that lets the service discard late responses of stale queries. */
+  /** Sequence counter that lets the service discard late "load more" answers of stale queries. */
   private searchSeq = 0;
+  /** Header search from the first character: debounce, and a new query cancels the old request. */
+  private readonly search = liveSearch<MeetingPage>({
+    minLength: 1,
+    run: (q) => this.startSearch(q),
+    result: (page) => this.applySearchPage(page, true),
+    error: () => this.loadingSearch.set(false),
+  });
 
   readonly hasMorePast = computed(() => this.pastHasMore());
   readonly timelineEmpty = computed(
@@ -125,66 +139,62 @@ export class MeetingsTimelineService implements OnDestroy {
       });
   }
 
-  ngOnDestroy(): void {
-    if (this.searchTimer !== null) clearTimeout(this.searchTimer);
-  }
-
   /** Debounced (~250 ms) header search. An empty query returns to the timeline. */
   onSearch(value: string): void {
     this.searchQuery.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.runSearch(), LIVE_SEARCH_DEBOUNCE_MS);
+    this.search.set(value);
   }
 
-  private runSearch(): void {
-    const q = this.searchQuery().trim();
+  private startSearch(q: string): Observable<MeetingPage> | void {
+    ++this.searchSeq;
     this.searchCursor = null;
     this.searchItems.set([]);
     this.searchHasMore.set(false);
     if (!q) {
+      this.loadingSearch.set(false);
       this.loadList();
       return;
     }
     this.loadingSearch.set(true);
-    this.fetchSearch(true);
+    return this.searchPage(q);
   }
 
   loadMoreSearch(): void {
     if (this.loadingSearch() || !this.searchHasMore() || this.searchCursor === null) return;
     this.loadingSearch.set(true);
-    this.fetchSearch(false);
+    const seq = ++this.searchSeq;
+    this.searchPage(this.searchQuery().trim()).subscribe({
+      next: (page) => {
+        if (seq === this.searchSeq) this.applySearchPage(page, false);
+      },
+      error: () => {
+        if (seq === this.searchSeq) this.loadingSearch.set(false);
+      },
+    });
   }
 
-  private fetchSearch(initial: boolean): void {
-    const seq = ++this.searchSeq;
-    this.api
-      .listMeetingsTimeline({
-        direction: 'upcoming', // no effect in search mode: the backend collapses both
-        cursor: this.searchCursor,
-        limit: TIMELINE_PAGE,
-        gremiumId: this.gremiumFilter() || undefined,
-        q: this.searchQuery().trim(),
-      })
-      .subscribe({
-        next: (page) => {
-          if (seq !== this.searchSeq) return;
-          this.searchItems.update((cur) => (initial ? page.items : [...cur, ...page.items]));
-          this.searchCursor = page.nextCursor;
-          this.searchHasMore.set(page.nextCursor !== null);
-          this.loadingSearch.set(false);
-        },
-        error: () => {
-          if (seq !== this.searchSeq) return;
-          this.loadingSearch.set(false);
-        },
-      });
+  private searchPage(q: string): Observable<MeetingPage> {
+    return this.api.listMeetingsTimeline({
+      direction: 'upcoming', // no effect in search mode: the backend collapses both
+      cursor: this.searchCursor,
+      limit: TIMELINE_PAGE,
+      gremiumId: this.gremiumFilter() || undefined,
+      q,
+    });
+  }
+
+  private applySearchPage(page: MeetingPage, initial: boolean): void {
+    this.searchItems.update((cur) => (initial ? page.items : [...cur, ...page.items]));
+    this.searchCursor = page.nextCursor;
+    this.searchHasMore.set(page.nextCursor !== null);
+    this.loadingSearch.set(false);
   }
 
   /** Switch the Gremium filter and reload the timeline or the search. */
   selectGremiumFilter(id: string): void {
     this.gremiumFilter.set(id);
     if (this.searchActive()) {
-      this.runSearch();
+      this.search.refresh();
       return;
     }
     this.loadList();

@@ -196,7 +196,7 @@ describe('MeetingsCalendarComponent', () => {
     const view = await setup();
     load(view);
     const panel = screen.getByRole('complementary', { name: 'Gewählter Tag' });
-    expect(within(panel).getByRole('heading', { name: 'Di., 29.09.2026 · Heute' })).toBeInTheDocument();
+    expect(within(panel).getByRole('heading', { name: 'Di, 29.09.2026 · Heute' })).toBeInTheDocument();
     const card = within(panel).getByRole('article', { name: '34. Sitzung des Studierendenparlaments' });
     expect(within(card).getByText('seit 18:04')).toBeInTheDocument();
     expect(within(card).getByText('TOP 3 von 8')).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe('MeetingsCalendarComponent', () => {
     load(view);
     await userEvent.click(screen.getByRole('button', { name: /15\. September/ }));
     const panel = screen.getByRole('complementary');
-    expect(within(panel).getByRole('heading', { name: 'Di., 15.09.2026' })).toBeInTheDocument();
+    expect(within(panel).getByRole('heading', { name: 'Di, 15.09.2026' })).toBeInTheDocument();
     const card = within(panel).getByRole('article', { name: '33. Sitzung' });
     // A closed meeting has no beamer; no live facts.
     expect(within(card).queryByRole('button', { name: /Beamer/ })).toBeNull();
@@ -261,16 +261,16 @@ describe('MeetingsCalendarComponent', () => {
     monthReq(view.http).flush([]);
     view.fixture.detectChanges();
     // 31 does not exist in September: the last day.
-    expect(screen.getByRole('heading', { name: 'Mi., 30.09.2026' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Mi, 30.09.2026' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Voriger Monat' }));
     monthReq(view.http).flush([]);
     view.fixture.detectChanges();
-    expect(screen.getByRole('heading', { name: 'So., 30.08.2026' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'So, 30.08.2026' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Heute' }));
     monthReq(view.http).flush(MONTH);
     view.fixture.detectChanges();
     expect(screen.getByRole('heading', { name: 'September 2026' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Di., 29.09.2026 · Heute' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Di, 29.09.2026 · Heute' })).toBeInTheDocument();
   });
 
   it('moves the selected day with the arrow keys, Home and End', async () => {

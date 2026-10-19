@@ -15,15 +15,16 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { NoteComponent } from '@shared/ui';
 import {
   ButtonComponent,
   CheckboxComponent,
   DialogComponent,
   InputComponent,
+  NoteComponent,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { GREMIUM_PERMISSIONS, ROLE_KEY_PATTERN, type GremiumRole } from '../admin.models';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /** The form state of the dialog. */
 interface RoleDraft {
@@ -50,6 +51,7 @@ const NEW_ROLE_PERMISSIONS = ['vote.cast'];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     FormsModule,
     RouterLink,
     TranslatePipe,

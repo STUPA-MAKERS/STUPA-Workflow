@@ -3,11 +3,14 @@ import type { Attendance, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { StatusKind } from '@shared/status-kind.util';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { memberAttendanceKey } from '../meetings-display.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { personLabel } from '@shared/person-label.util';
+import {
+  AvatarComponent,
+  EmptyStateComponent,
+  type StatusKind,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 
 let nextId = 0;
 
@@ -51,7 +54,7 @@ export class ParticipantRosterComponent {
       const status = a.status;
       return {
         id: a.principalId,
-        name: a.displayName || a.email || this.i18n.translate('common.unnamed'),
+        name: personLabel(a, this.i18n),
         self: a.isSelf,
         keeper: a.principalId === this.protokollantId(),
         kind: status === 'present' ? 'accent' : status ? 'neutral' : 'muted',

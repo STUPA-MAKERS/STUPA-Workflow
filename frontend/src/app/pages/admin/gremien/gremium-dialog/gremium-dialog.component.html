@@ -142,21 +142,21 @@
     </div>
 
     @if (error()) {
-      <p class="gd__error" role="alert">{{ error() }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ error() }}</app-note>
     }
     <button type="submit" hidden></button>
   </form>
   }
 
   @if (confirmPublic()) {
-    <div dialog-footer class="gd__foot">
+    <div dialog-footer>
       <app-button variant="text" (click)="backFromConfirm()">{{ 'action.cancel' | t }}</app-button>
       <app-button variant="fill" [disabled]="previewLoading()" [loading]="saving()" (click)="confirmAndSave()">{{
         'admin.gremien.publicConfirm.confirm' | t
       }}</app-button>
     </div>
   } @else {
-  <div dialog-footer class="gd__foot">
+  <div dialog-footer>
     <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
     <app-button
       variant="fill"

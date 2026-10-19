@@ -27,16 +27,7 @@
   }
 
   @if (v.status === 'open') {
-    <div class="vc__progress">
-      <div class="vc__progressLine">
-        <span class="vc__progressText">{{ progressLabel() }}</span>
-        <span class="vc__pct mono">{{ percent() }} %</span>
-      </div>
-      <app-seg-bar size="fat" [segments]="[{ value: v.voted, tone: 'filled' }]" [total]="v.present" [label]="progressLabel()" />
-      @if (!showCounts()) {
-        <p class="vc__hint">{{ hiddenKey() | t }}</p>
-      }
-    </div>
+    <app-vote-progress size="fat" [voted]="v.voted" [total]="v.present" [secret]="!!v.secret" [hidden]="!showCounts()" />
   }
 
   @if (showCounts() && election(); as el) {

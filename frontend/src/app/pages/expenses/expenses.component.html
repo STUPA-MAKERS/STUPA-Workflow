@@ -7,16 +7,16 @@
       @if (phone() && selecting()) {
         <!-- Phone: while rows are selected the title row is the bar of the bulk actions
              (board Fin-Tel-Auswahl). -->
-        <header class="exp__selBar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'expenses.bulk.stop' | t"
-            (click)="stopSelecting()"
-          ><app-icon name="x" /></app-button>
-          <h1 id="exp-title" class="exp__selTitle" aria-live="polite">{{ selectionLabel() }}</h1>
+        <span id="exp-title" class="sr-only">{{ 'expenses.title' | t }}</span>
+        <app-selection-bar
+          inline
+          [count]="selectedCount()"
+          [countLabel]="selectionLabel()"
+          [clearLabel]="'expenses.bulk.stop' | t"
+          (cleared)="stopSelecting()"
+        >
           <ng-container *ngTemplateOutlet="bulkIcons" />
-        </header>
+        </app-selection-bar>
       } @else {
         <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
           <ng-container ngProjectAs="[actions]">
@@ -91,9 +91,7 @@
               [value]="kind()"
               (valueChange)="setKind($event)"
               [text]="kindChipLabel()"
-              [active]="kind() !== ''"
-              [icon]="kind() ? 'check' : null"
-              [chevron]="!kind()"
+              filled
             />
           }
           <app-range-chip
@@ -115,19 +113,16 @@
         @if (selecting() && tab() === 'bookings' && !phone()) {
           <!-- Board Fin-Buchungen-Auswahl: the selection bar in the column. One pane at a
                time it also holds the bulk actions; side by side they are in the sheet. -->
-          <div class="exp__selbar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
-            <!-- The box and its count are one label: the whole text toggles the selection. -->
-            <label class="exp__selAll">
-              <input
-                type="checkbox"
-                class="exp__check"
-                [attr.aria-label]="'expenses.bulk.selectAll' | t"
-                [checked]="allSelected()"
-                [indeterminate]="selectedCount() > 0 && !allSelected()"
-                (change)="toggleSelectAll(!allSelected())"
-              />
-              <span class="exp__selText" aria-live="polite">{{ selectionLabel() }}</span>
-            </label>
+          <app-selection-bar
+            inline
+            [count]="selectedCount()"
+            [countLabel]="selectionLabel()"
+            [allSelected]="allSelected()"
+            [selectAllLabel]="'expenses.bulk.selectAll' | t"
+            [clearLabel]="'expenses.bulk.stop' | t"
+            (selectAll)="toggleSelectAll($event)"
+            (cleared)="stopSelecting()"
+          >
             @if (split()) {
               <app-button variant="text" size="sm" (click)="toggleSelectAll(true)">{{
                 'expenses.bulk.selectAll' | t
@@ -135,13 +130,7 @@
             } @else {
               <ng-container *ngTemplateOutlet="bulkIcons" />
             }
-            <app-button
-              variant="text"
-              [iconOnly]="true"
-              [ariaLabel]="'expenses.bulk.stop' | t"
-              (click)="stopSelecting()"
-            ><app-icon name="x" /></app-button>
-          </div>
+          </app-selection-bar>
         } @else {
           <div class="exp__bar">
             <!-- The transfer list needs `budget.book`: a reader gets no views. -->
@@ -217,10 +206,10 @@
                       <span sub class="exp__sub">
                         <span class="mono">{{ day(t.paymentDate ?? t.createdAt) }}</span>
                         <span class="exp__dot" aria-hidden="true">·</span>
-                        <span class="exp__cc" [title]="from.name">@if (from.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="from.color"></span>}{{ from.name }}</span>
+                        <app-cost-centre-label class="exp__cc" [title]="from.name" [name]="from.name" [color]="from.color" />
                         <app-icon class="exp__arrow" name="arrow" [size]="13" />
                         <span class="sr-only">{{ 'expenses.transfers.to' | t }}</span>
-                        <span class="exp__cc" [title]="to.name">@if (to.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="to.color"></span>}{{ to.name }}</span>
+                        <app-cost-centre-label class="exp__cc" [title]="to.name" [name]="to.name" [color]="to.color" />
                       </span>
                       <span trail class="exp__trail">
                         <span class="mono exp__amount">{{ money(t.amount) }}</span>
@@ -245,7 +234,7 @@
             }
             </div>
             @if (transferHasMore()) {
-              <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+              <div class="exp__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMoreTransfers()" aria-hidden="true"></div>
               <div class="exp__more">
                 <app-button variant="text" size="sm" [loading]="transferLoadingMore()" (click)="loadMoreTransfers()">{{
                   'expenses.loadMore' | t
@@ -292,21 +281,22 @@
                       (activate)="onRowActivate(e)"
                     >
                       @if (selecting()) {
-                        <input
+                        <app-checkbox
                           lead
-                          type="checkbox"
-                          class="exp__check exp__check--row"
-                          [attr.aria-label]="'expenses.bulk.selectRow' | t: { description: e.description }"
-                          [checked]="isSelected(e.id)"
-                          (change)="toggleSelect(e.id, !isSelected(e.id))"
-                        />
+                          class="exp__rowCheck"
+                          [ngModel]="isSelected(e.id)"
+                          (ngModelChange)="toggleSelect(e.id, $event)"
+                          ><span class="sr-only">{{
+                            'expenses.bulk.selectRow' | t: { description: e.description }
+                          }}</span></app-checkbox
+                        >
                       }
                       <span sub class="exp__sub">
                         <app-status-text [kind]="e.kind === 'income' ? 'accent' : 'muted'">{{
                           (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
                         }}</app-status-text>
                         <span class="exp__dot" aria-hidden="true">·</span>
-                        <span class="exp__cc" [title]="cc.name">@if (cc.color) {<span class="exp__swatch" aria-hidden="true" [style.background]="cc.color"></span>}{{ cc.name }}</span>
+                        <app-cost-centre-label class="exp__cc" [title]="cc.name" [name]="cc.name" [color]="cc.color" />
                         @if (day(e.paymentDate ?? e.createdAt); as d) {
                           <span class="exp__dot" aria-hidden="true">·</span>
                           <span class="mono">{{ d }}</span>
@@ -348,7 +338,7 @@
             }
             </div>
             @if (hasMore()) {
-              <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+              <div class="exp__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
               <div class="exp__more">
                 <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
                   'expenses.loadMore' | t
@@ -424,34 +414,25 @@
           />
         }
         @case ('missing') {
-          <div class="exp__none">
-            <app-empty-state plain icon="search"
-              [fill]="true"
-              [heading]="'expenses.notFound' | t"
-              [body]="'expenses.notFoundBody' | t"
-            />
-          </div>
+          <app-detail-none
+            [surface]="split() ? 'sheet' : 'flat'"
+            [inset]="false"
+            icon="search"
+            [heading]="'expenses.notFound' | t"
+            [body]="'expenses.notFoundBody' | t"
+          />
         }
         @default {
           @if (split()) {
             @if (!loading() && !(tab() === 'transfers' ? transferItems().length : items().length)) {
               <!-- Board Fin-Buchungen-Leer: an empty list leaves a neutral sheet. -->
-              <div class="exp__none exp__none--skeleton" aria-hidden="true">
-                <span class="exp__ghost exp__ghost--title"></span>
-                <span class="exp__ghost exp__ghost--meta"></span>
-                <span class="exp__ghost exp__ghost--rule"></span>
-                <div class="exp__ghostCols">
-                  <span class="exp__ghost exp__ghost--card"></span>
-                  <span class="exp__ghost exp__ghost--card"></span>
-                </div>
-              </div>
+              <app-detail-none [inset]="false" [ghost]="true" />
             } @else {
-              <div class="exp__none">
-                <app-empty-state plain icon="receipt"
-                  [fill]="true"
-                  [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
-                />
-              </div>
+              <app-detail-none
+                [inset]="false"
+                icon="receipt"
+                [heading]="(tab() === 'transfers' ? 'expenses.transfers.none' : 'expenses.none') | t"
+              />
             }
           }
         }

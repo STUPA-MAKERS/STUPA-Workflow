@@ -2,10 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { VoteResult } from '@core/api/models';
-import { SegBarComponent, type SegTone } from '@shared/ui/seg-bar/seg-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { voteResultStatus, type StatusView } from '@shared/status-kind.util';
 import { voteOptionLabel } from '../meetings/meetings-display.util';
+import { SegBarComponent, type SegTone, StatusTextComponent } from '@stupa-makers/ui-kit';
 
 interface BarRow {
   option: string;

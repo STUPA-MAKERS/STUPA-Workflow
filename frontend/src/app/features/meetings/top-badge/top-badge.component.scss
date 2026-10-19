@@ -1,0 +1,25 @@
+:host {
+  display: grid;
+  place-items: center;
+  width: var(--tb-size, 2rem);
+  height: var(--tb-size, 2rem);
+  flex: none;
+  border-radius: 50%;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: var(--tb-font, 0.75rem);
+  font-weight: var(--fw-semibold);
+  font-variant-numeric: var(--tb-nums, tabular-nums);
+}
+:host(.tb--now) {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+/* A border, not an inset shadow: the browser snaps a border to whole device pixels on
+   every side, while a fractional shadow is anti-aliased per side and looks uneven. */
+:host(.tb--done) {
+  background: transparent;
+  color: var(--color-accent-text);
+  box-sizing: border-box;
+  border: 1.5px solid var(--color-accent);
+}

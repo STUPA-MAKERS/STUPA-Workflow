@@ -34,7 +34,7 @@
       >
         @if (renamingTopId() === item.id) {
           <div class="ap__rename">
-            <span class="ap__num" aria-hidden="true">{{ i + 1 }}</span>
+            <app-top-badge [number]="i + 1" decorative />
             <input
               class="ap__input"
               name="renameTop"
@@ -61,18 +61,7 @@
                   <app-icon name="grip" [size]="16" />
                 </span>
               }
-              <span
-                class="ap__num"
-                [class.ap__num--now]="isNow(item)"
-                [class.ap__num--done]="done"
-                aria-hidden="true"
-              >
-                @if (done) {
-                  <app-icon name="check" [size]="16" />
-                } @else {
-                  {{ i + 1 }}
-                }
-              </span>
+              <app-top-badge [number]="i + 1" [state]="done ? 'done' : isNow(item) ? 'now' : 'todo'" decorative />
             </span>
             @if (isNow(item) || done) {
               <span sub class="sr-only">{{ (isNow(item) ? 'meetings.dock.now' : 'meetings.dock.done') | t }}</span>

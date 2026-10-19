@@ -5,9 +5,7 @@
     [value]="range()"
     (valueChange)="setRange($event)"
     [text]="rangeText()"
-    [active]="range() !== ''"
-    [icon]="range() ? 'check' : null"
-    [chevron]="!range()"
+    filled
   />
   <app-filter-select
     [label]="'gremien.meetings.protocol' | t"
@@ -15,9 +13,7 @@
     [value]="protocol()"
     (valueChange)="setProtocol($event)"
     [text]="protocolText()"
-    [active]="protocol() !== ''"
-    [icon]="protocol() ? 'check' : null"
-    [chevron]="!protocol()"
+    filled
   />
   @if (!phone()) {
     <span class="gmt__grow"></span>
@@ -79,7 +75,7 @@
                   }
                 </span>
               }
-              <app-icon class="gmt__chev" name="right" [size]="17" />
+              <app-row-chevron />
             </span>
           </app-list-item>
         }

@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
-import { render, screen, waitFor } from '@testing-library/angular';
+import { render, screen, within, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { NEVER, of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -113,6 +113,23 @@ describe('BrandingEditorComponent', () => {
     // Many typed keys: the default 5 s is short on a busy runner.
   }, 15000);
 
+  it('gives a column and the legal links the same link rows', async () => {
+    const { fixture, container } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const lists = container.querySelectorAll('ul.br__links');
+    expect(lists).toHaveLength(2);
+    for (const list of lists) {
+      const row = list.querySelector('li.br__link')!;
+      expect(row.querySelector('input.br__linkLabel')).not.toBeNull();
+      expect(row.querySelector('input.br__linkUrl.mono')).toHaveAttribute('placeholder', 'https://');
+    }
+    const legal = c.draft().legalLinks.length;
+    await userEvent.click(within(lists[0] as HTMLElement).getByRole('button', { name: /^Link entfernen: / }));
+    expect(c.draft().footerColumns[0].links).toHaveLength(0);
+    expect(c.draft().legalLinks).toHaveLength(legal);
+  });
+
   it('switches the text fields to English', async () => {
     const { fixture } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,7 +146,7 @@ describe('BrandingEditorComponent', () => {
     expect(c.draft().freetexts.support.de).toBe('Bei Fragen: support@example.org');
     const label = screen.getAllByRole('textbox', { name: 'Bezeichnung (EN)' })[0];
     expect(label).toHaveValue('Imprint');
-    c.setLang('de');
+    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
     expect(c.lang()).toBe('de');
   });
 
@@ -288,8 +305,7 @@ describe('BrandingEditorComponent', () => {
     const c = fixture.componentInstance as any;
     const big = new File(['x'], 'big.png', { type: 'image/png' });
     Object.defineProperty(big, 'size', { value: 5 * 1024 * 1024 });
-    const input = { files: [big], value: 'x' } as unknown as HTMLInputElement;
-    c.onLogoSelected('imagemark', input);
+    c.onLogoSelected('imagemark', [big]);
     expect(toast.error).toHaveBeenCalledWith('Datei zu groß (max. 2 MB).');
   });
 
@@ -298,8 +314,7 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const before = JSON.stringify(c.draft().logos);
-    const input = { files: [], value: '' } as unknown as HTMLInputElement;
-    expect(() => c.onLogoSelected('imagemark', input)).not.toThrow();
+    expect(() => c.onLogoSelected('imagemark', [])).not.toThrow();
     expect(JSON.stringify(c.draft().logos)).toBe(before);
   });
 
@@ -308,8 +323,7 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const file = new File(['raw'], 'mark.png', { type: 'image/png' });
-    const input = { files: [file], value: 'mark.png' } as unknown as HTMLInputElement;
-    c.onLogoSelected('wordmark', input);
+    c.onLogoSelected('wordmark', [file]);
     await waitFor(() => expect(c.draft().logos.wordmark).toBeDefined());
     expect(c.draft().logos.wordmark.filename).toBe('mark.png');
     expect(c.draft().logos.wordmark.mime).toBe('image/png');

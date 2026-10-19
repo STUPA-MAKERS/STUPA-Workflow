@@ -12,8 +12,12 @@
   (ngModelChange)="keyChange.emit($event)"
 />
 <div class="ins__pair">
-  <app-input [label]="'admin.common.labelDe' | t" [ngModel]="state().label['de']" (ngModelChange)="labelChange.emit({ lang: 'de', value: $event })" />
-  <app-input [label]="'admin.common.labelEn' | t" [ngModel]="state().label['en']" (ngModelChange)="labelChange.emit({ lang: 'en', value: $event })" />
+  <app-i18n-input
+    [de]="state().label['de']"
+    (deChange)="labelChange.emit({ lang: 'de', value: $event })"
+    [en]="state().label['en']"
+    (enChange)="labelChange.emit({ lang: 'en', value: $event })"
+  />
 </div>
 
 <app-flow-color [value]="state().color" (changed)="colorChange.emit($event)" />
@@ -82,8 +86,7 @@
         <li class="si__row">
           <span class="si__rank mono">{{ i + 1 }}</span>
           <span class="si__name ell" [appTruncated]="g.label" #cut="appTruncated" [attr.title]="cut.truncated() ? g.label : null">{{ g.label }}</span>
-          <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="first" [ariaLabel]="'admin.flow.moveUp' | t" [title]="'admin.flow.moveUp' | t" (click)="guardMove.emit({ sig: g.sig, dir: -1 })"><app-icon name="up" /></app-button>
-          <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="'admin.flow.moveDown' | t" [title]="'admin.flow.moveDown' | t" (click)="guardMove.emit({ sig: g.sig, dir: 1 })"><app-icon name="down" /></app-button>
+          <app-move-buttons [upDisabled]="first" [downDisabled]="last" (move)="guardMove.emit({ sig: g.sig, dir: $event })" />
         </li>
       }
     </ol>

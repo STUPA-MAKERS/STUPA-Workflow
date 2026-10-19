@@ -12,24 +12,29 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import type { Attendance, AttendanceStatus, Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import type { StatusKind } from '@shared/status-kind.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { mediaQuerySignal } from '../../../layout/media-query';
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SideSheetComponent,
+  type StatusKind,
+  StatusTextComponent,
+  ToastService,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 import {
   type DelegationCardChange,
   MeetingDelegationCardComponent,
@@ -41,8 +46,7 @@ import { GuestListComponent } from '../guests/guest-list.component';
 import { GuestRequestsComponent } from '../guests/guest-requests.component';
 import { JoinLinkComponent } from '../public-join/join-link.component';
 import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -128,7 +132,7 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
   imports: [
     EmptyStateComponent,
     TruncatedDirective,
-    FormsModule,
+    SearchPillComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
@@ -153,7 +157,7 @@ export class AttendanceSheetComponent {
   private readonly toast = inject(ToastService);
 
   /** A phone opens the sheet from the bottom. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly open = model(false);
   readonly meeting = input.required<Meeting>();
@@ -332,7 +336,7 @@ export class AttendanceSheetComponent {
       this.conflictId() === a.principalId && a.status !== 'present' ? (delegation ?? 'unknown') : null;
     return {
       a,
-      name: a.displayName || a.email || '—',
+      name: personLabel(a, this.i18n, { fallbackText: '—' }),
       sub: sub.join(' · '),
       options,
       value: a.status ?? 'open',

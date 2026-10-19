@@ -5,11 +5,12 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  SelectFieldComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
   ACTION_TYPES,
@@ -20,10 +21,9 @@ import {
   type NotifyRecipient,
   type TransitionDef,
 } from '../admin.models';
-import { CostCentrePickerComponent } from './cost-centre-picker.component';
+import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import { GuardEditorComponent } from './guard-editor.component';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * Guard and actions of the selected transition. They follow the transition settings in

@@ -4,10 +4,13 @@ import type { ApplicationDecision } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { FieldGroupComponent } from '@shared/ui/field-group/field-group.component';
-import { FieldRowComponent } from '@shared/ui/field-group/field-group.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { formatDiff, formatMoney } from './decision.util';
+import { formatMoney } from '../format-money';
+import { formatDiff } from './decision.util';
+import {
+  FieldGroupComponent,
+  FieldRowComponent,
+  NoteComponent,
+} from '@stupa-makers/ui-kit';
 
 /**
  * The section "Beschluss" (F1): the decision on an application.
@@ -49,13 +52,15 @@ export class DecisionSectionComponent {
   );
 
   readonly requested = computed(() =>
-    formatMoney(this.decision().requestedAmount, this.i18n.formatLocale(), this.currency()),
+    formatMoney(this.decision().requestedAmount, this.i18n.formatLocale(), { currency: this.currency() }),
   );
 
   /** The approved amount; "as requested" shows the requested amount. */
   readonly approved = computed(() => {
     const d = this.decision();
-    return formatMoney(d.approvedAmount ?? d.requestedAmount, this.i18n.formatLocale(), this.currency());
+    return formatMoney(d.approvedAmount ?? d.requestedAmount, this.i18n.formatLocale(), {
+      currency: this.currency(),
+    });
   });
 
   readonly diff = computed(() => {

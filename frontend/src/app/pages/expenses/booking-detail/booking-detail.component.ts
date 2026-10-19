@@ -4,17 +4,20 @@ import type { Application } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SegBarComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
   SkeletonComponent,
   StatusTextComponent,
-  flowColorKind,
-  invoiceStatus,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
+import { flowColorKind, invoiceStatus } from '@shared/ui';
 import { simplifyPathKey } from '@shared/budget-path';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
 import {
@@ -24,14 +27,16 @@ import {
   costCentreTrail,
   findBudgetNode,
   findTopBudgetNode,
-  formatEur,
-  shortDate,
   signedEur,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
+import { CostCentreLabelComponent } from '../../budget/cost-centre-label/cost-centre-label.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
+import { dayMonth } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
@@ -46,6 +51,10 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetActionComponent,
+    SumRowComponent,
+    BookingRowComponent,
+    CostCentreLabelComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
@@ -101,21 +110,13 @@ export class BookingDetailComponent {
   /** "Buchung · HHJ 2026" (or "Unterbuchung"). */
   protected readonly amount = computed(() => {
     const e = this.expense();
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   });
 
   protected readonly paymentMethod = computed(() => {
     const m = this.expense().paymentMethod;
     return m ? this.i18n.translate(`expenses.paymentMethod.${m}`) : null;
   });
-
-  /** "Konrad Pfeiffer · 25.09.2026, 10:14": who booked it and when. */
-  protected readonly createdAt = computed(() =>
-    new Date(this.expense().createdAt).toLocaleString(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }),
-  );
 
   /** A parent booking: its amount is the sum of its sub-bookings. */
   protected readonly isParent = computed(() => (this.expense().childCount ?? 0) > 0);
@@ -133,7 +134,7 @@ export class BookingDetailComponent {
     return {
       id: e.applicationId,
       title: e.applicationTitle || this.i18n.translate('expenses.col.application'),
-      amount: loaded?.amount ? formatEur(Number(loaded.amount), this.i18n.locale()) : null,
+      amount: loaded?.amount ? formatMoney(loaded.amount, this.i18n.formatLocale()) : null,
       state: loaded?.state ?? null,
       stateKind: flowColorKind(loaded?.state?.color),
     };
@@ -185,7 +186,7 @@ export class BookingDetailComponent {
 
   protected readonly subSum = computed(() => {
     const e = this.expense();
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   });
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
@@ -231,15 +232,17 @@ export class BookingDetailComponent {
   }
 
   money(value: number | string): string {
-    return formatEur(Number(value), this.i18n.locale());
+    return formatMoney(value, this.i18n.formatLocale());
   }
 
   signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** "900,00 € von 2.890,00 € verbucht", the name of the bar. */

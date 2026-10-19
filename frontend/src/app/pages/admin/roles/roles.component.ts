@@ -2,31 +2,34 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { forkJoin, type Observable, of, switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
-  NoteComponent,
   PageHeaderComponent,
-  RowMenuComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  type RowMenuSection,
 } from '@shared/ui';
-import { keyParts } from '@shared/key-parts.util';
 import {
   ButtonComponent,
+  CapitalizePipe,
   CheckboxComponent,
+  ConfirmDialogComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  keyParts,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  SkeletonComponent,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { expandSet } from '@shared/expand-set';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -58,6 +61,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -88,7 +92,7 @@ export class AdminRolesComponent {
   private readonly savedRoles = signal<ReadonlyMap<string, Role>>(new Map());
   protected readonly savingRoles = signal(false);
   protected readonly permissions = signal<string[]>([]);
-  protected readonly expanded = signal<Set<string>>(new Set());
+  protected readonly expanded = expandSet<string>();
   protected readonly addOpen = signal(false);
   protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
   /** The trimmed draft key matches ROLE_KEY_PATTERN. The server refuses other keys with 422. */
@@ -122,7 +126,7 @@ export class AdminRolesComponent {
   }
 
   protected roleLabel(role: Role): string {
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+    return i18nLabel(role.label, this.i18n.locale(), role.key);
   }
 
   /** The admin role holds every right; its rights are read-only here. */
@@ -146,7 +150,7 @@ export class AdminRolesComponent {
   }
 
   protected isOpen(role: Role): boolean {
-    return this.expanded().has(role.id);
+    return this.expanded.has(role.id);
   }
 
   /** The ⋮ menu of a role that is not fixed: delete is its only action. */
@@ -179,12 +183,7 @@ export class AdminRolesComponent {
   }
 
   protected toggle(id: string): void {
-    this.expanded.update((set) => {
-      const next = new Set(set);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    this.expanded.toggle(id);
   }
 
   protected togglePerm(role: Role, perm: string, on: boolean): void {
@@ -306,7 +305,7 @@ export class AdminRolesComponent {
         this.creating.set(false);
         this.roles.update((list) => [...list, role]);
         this.keepSaved([role]);
-        this.expanded.update((set) => new Set(set).add(role.id));
+        this.expanded.open(role.id);
         this.addOpen.set(false);
         this.toast.success(this.i18n.translate('admin.roles.created'));
       },

@@ -43,25 +43,33 @@ import { DecisionSectionComponent } from '@shared/decision/decision-section.comp
 import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { flowColorKind } from '@shared/status-kind.util';
 import { HistoryComponent, type HistoryEntry } from '@shared/ui/history/history.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { mediaQuerySignal } from '../../layout/media-query';
-import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ButtonLinkComponent,
+  ConfirmDialogComponent,
+  DropOverlayComponent,
+  EmptyStateComponent,
+  FileDropDirective,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
-import { FileDropDirective } from '@shared/file-drop.directive';
-import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -115,6 +123,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ChatComponent,
     StatusTextComponent,
     ButtonComponent,
+    ButtonLinkComponent,
     IconComponent,
     AttachmentsPanelComponent,
     DropOverlayComponent,
@@ -142,7 +151,7 @@ export class StatusTimelineComponent {
   private readonly editRow = viewChild<ElementRef<HTMLButtonElement>>('editRow');
   private readonly pageTitle = viewChild<ElementRef<HTMLElement>>('pageTitle');
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly phase = signal<Phase>('loading');
   readonly application = signal<Application | null>(null);

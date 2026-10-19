@@ -11,7 +11,6 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { Subject, catchError, debounceTime, of, switchMap } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ApiClient } from '@core/api/api-client.service';
 import type { SearchHit, SearchKind, SearchResults } from '@core/api/models';
@@ -19,13 +18,17 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  HighlightComponent,
+  IconComponent,
+  type IconName,
+  isApplePlatform,
+  liveSearch,
+  StatusTextComponent,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 import { CommandPaletteService } from './command-palette.service';
-import { highlight, type TextPart } from './highlight';
 import { PageIndexService, type PageEntry } from './page-index.service';
-import { isApplePlatform } from './shortcut';
-import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** One row of the palette. A page comes from the client, a record from the server. */
 interface PaletteRow {
@@ -103,7 +106,7 @@ const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
+  imports: [HighlightComponent, TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
   templateUrl: './command-palette.component.html',
   styleUrl: './command-palette.component.scss',
 })
@@ -122,13 +125,24 @@ export class CommandPaletteComponent {
 
   readonly open = this.palette.isOpen;
   readonly query = signal('');
-  readonly loading = signal(false);
+  /**
+   * The record search: debounce, a new query cancels the request that is still out, and
+   * a query below the floor clears the previous answer at once.
+   */
+  private readonly search = liveSearch<SearchResults>({
+    minLength: MIN_QUERY,
+    debounceMs: DEBOUNCE_MS,
+    run: (q) => this.api.search(q),
+    result: (res) => this.showResults(res),
+    reset: () => this.showResults(EMPTY),
+    error: () => this.showResults(EMPTY),
+  });
+  readonly loading = this.search.pending;
   /** Index of the highlighted row, over the flattened list. */
   readonly active = signal(0);
 
   private readonly hits = signal<SearchHit[]>([]);
   private readonly truncated = signal(false);
-  private readonly typed = new Subject<string>();
   /** Where the focus was before the palette opened; it goes back there on close. */
   private returnFocus: HTMLElement | null = null;
 
@@ -190,29 +204,6 @@ export class CommandPaletteComponent {
   readonly showTruncated = computed(() => this.truncated() && this.rows().length > 0);
 
   constructor() {
-    this.typed
-      .pipe(
-        debounceTime(DEBOUNCE_MS),
-        // `switchMap` cancels the in-flight request: with a slow connection the answer
-        // to "ab" must never overwrite the answer to "abcd". The error is caught INSIDE,
-        // so one failed request does not end the search for the rest of the session.
-        switchMap((q) =>
-          this.api.search(q).pipe(
-            catchError(() => {
-              this.loading.set(false);
-              return of(EMPTY);
-            }),
-          ),
-        ),
-        takeUntilDestroyed(),
-      )
-      .subscribe((res) => {
-        this.hits.set(res.hits);
-        this.truncated.set(res.truncated);
-        this.loading.set(false);
-        this.active.set(0);
-      });
-
     // Every opening starts from a clean field, whoever opened it.
     this.palette.opened$.pipe(takeUntilDestroyed()).subscribe(() => this.reset());
 
@@ -229,7 +220,6 @@ export class CommandPaletteComponent {
   close(): void {
     if (!this.open()) return;
     this.palette.close();
-    this.loading.set(false);
     const target = this.returnFocus;
     this.returnFocus = null;
     if (target?.isConnected) target.focus();
@@ -238,17 +228,7 @@ export class CommandPaletteComponent {
   onQuery(value: string): void {
     this.query.set(value);
     this.active.set(0);
-    const q = value.trim();
-    if (q.length < MIN_QUERY) {
-      // Clear the previous answer straight away. Leaving it up while the user deletes
-      // characters shows results for a query they can no longer see.
-      this.hits.set([]);
-      this.truncated.set(false);
-      this.loading.set(false);
-      return;
-    }
-    this.loading.set(true);
-    this.typed.next(q);
+    this.search.set(value);
   }
 
   @HostListener('document:keydown', ['$event'])
@@ -300,11 +280,6 @@ export class CommandPaletteComponent {
     return this.rows().findIndex((r) => r.key === row.key);
   }
 
-  /** The parts of a text that match the query, for the highlight. */
-  parts(text: string): TextPart[] {
-    return highlight(text, this.query());
-  }
-
   /** A stable DOM id for a row. */
   optionId(row: PaletteRow): string {
     return `palette-option-${row.key.replace(/[^A-Za-z0-9_-]/g, '-')}`;
@@ -313,9 +288,14 @@ export class CommandPaletteComponent {
   private reset(): void {
     this.returnFocus = document.activeElement as HTMLElement | null;
     this.query.set('');
-    this.hits.set([]);
-    this.truncated.set(false);
-    this.loading.set(false);
+    this.search.sync('');
+    this.showResults(EMPTY);
+  }
+
+  /** Put an answer of the record search on screen. */
+  private showResults(res: SearchResults): void {
+    this.hits.set(res.hits);
+    this.truncated.set(res.truncated);
     this.active.set(0);
   }
 
