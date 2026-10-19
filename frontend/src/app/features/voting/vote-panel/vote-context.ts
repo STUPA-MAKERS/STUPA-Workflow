@@ -1,4 +1,4 @@
-import { type Observable, forkJoin, of } from 'rxjs';
+import { type Observable, combineLatest, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
 import type { ApiClient } from '@core/api/api-client.service';
 import type { Meeting, Uuid } from '@core/api/models';
@@ -25,11 +25,13 @@ export function loadVoteContext(
   agendaItemId: Uuid | null | undefined,
 ): Observable<VoteContext> {
   if (!meetingId) return of(NO_CONTEXT);
-  const meeting = api.getMeeting(meetingId, { quiet: true }).pipe(catchError(() => of(null)));
+  // Kept for the read ahead of the vote list; `combineLatest` paints the kept answers at
+  // once and again when a newer one arrives.
+  const meeting = api.getMeeting(meetingId, { quiet: true, detail: true }).pipe(catchError(() => of(null)));
   const agenda = agendaItemId
-    ? api.listAgenda(meetingId, { quiet: true }).pipe(catchError(() => of([])))
+    ? api.listAgenda(meetingId, { quiet: true, detail: true }).pipe(catchError(() => of([])))
     : of([]);
-  return forkJoin({ meeting, agenda }).pipe(
+  return combineLatest({ meeting, agenda }).pipe(
     map(({ meeting, agenda }) => {
       const ordered = [...agenda].sort((a, b) => a.position - b.position);
       const index = ordered.findIndex((item) => item.id === agendaItemId);

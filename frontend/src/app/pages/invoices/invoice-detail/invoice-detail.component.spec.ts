@@ -103,7 +103,7 @@ describe('InvoiceDetailComponent', () => {
     });
     expect(linked).toHaveBeenCalledWith('invoice', INVOICE.id);
     expect(screen.getByRole('heading', { name: 'To-Dos' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Rechnung prüfen' }).getAttribute('href')).toBe('/todos/b?card=k-1');
+    expect(screen.getByRole('link', { name: 'Rechnung prüfen' }).getAttribute('href')).toBe('/todos?card=k-1');
   });
 
   it('says how the due date stands', async () => {

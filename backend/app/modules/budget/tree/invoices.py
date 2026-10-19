@@ -157,14 +157,6 @@ class InvoiceOps(BudgetTreeServiceBase):
             conditions.append(BudgetExpense.budget_id.in_(visible))
         return exists().where(*conditions)
 
-    async def list_invoices(self) -> list[InvoiceOut]:
-        """List all invoices, newest issue date first.
-
-        Kept for compatibility. The booking-link dropdown needs the full list.
-        """
-        page = await self.list_invoices_paged(limit=10_000, offset=0)
-        return page.items
-
     async def list_invoices_paged(
         self,
         *,

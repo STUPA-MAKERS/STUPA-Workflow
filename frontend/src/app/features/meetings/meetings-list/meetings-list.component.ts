@@ -16,6 +16,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
+import { DelegationsApiService } from '@core/api/delegations.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -35,7 +37,10 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
-import { MeetingDetailSheetComponent } from '../meeting-detail-sheet/meeting-detail-sheet.component';
+import {
+  MeetingDetailSheetComponent,
+  meetingSheetReads,
+} from '../meeting-detail-sheet/meeting-detail-sheet.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
 import {
@@ -183,6 +188,16 @@ export class MeetingsListComponent {
   ]);
 
   constructor() {
+    // The shown meetings read their sheet ahead, so a click shows it at once.
+    prefetchDetails({
+      items: computed(() => {
+        const found = this.timeline.searchItems();
+        return found.length ? found : [...this.timeline.upcomingItems(), ...this.timeline.pastItems()];
+      }),
+      key: (m) => m.id,
+      reads: (m) =>
+        Object.values(meetingSheetReads(this.api, inject(DelegationsApiService), m)).filter((r) => r !== null),
+    });
     // A deep link to a meeting that is not in the first pages: read it once.
     effect(() => {
       const id = this.selParam();

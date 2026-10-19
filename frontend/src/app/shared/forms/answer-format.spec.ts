@@ -26,6 +26,10 @@ describe('answer-format', () => {
     for (const v of [null, undefined, '', true, 'abc', Infinity]) expect(formatEuro(v, 'de')).toBeNull();
   });
 
+  it('formats the requested funding in euro like a currency field', () => {
+    expect(formatAnswer(f('funding'), 600, env)).toBe(formatEuro(600, env.lang));
+  });
+
   it('gives an empty answer as an empty string, whatever the type', () => {
     expect(formatAnswer(f('currency'), '', env)).toBe('');
   });

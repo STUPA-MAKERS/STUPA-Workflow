@@ -68,9 +68,9 @@ TYPICAL FLOWS:
   extracted fields + `fileToken`) or `upload_invoice_file(file_path)`, then pass `fileToken`
   to `create_invoice`.
 - Application attachments: `list_attachments(application_id)` →
-  `upload_attachment(application_id, file_path, field_key?, is_comparison_offer?)` (a
-  local file: PDF, image or Office/OpenDocument, at most 10 MB; needs
-  `application.manage` and scope `applications:write`) → `scanned` is false until the
+  `upload_attachment(application_id, file_path, field_key?)` (a local file: PDF, image
+  or Office/OpenDocument, at most 10 MB; needs `application.manage` and scope
+  `applications:write`) → `scanned` is false until the
   virus scan is clean. `download_attachment(attachment_id, target_path)` writes the file
   to disk (409 while the scan runs); `delete_attachment` removes it.
 - To-dos: `todo_boards` → `todo_board(board_id)` (columns, cards; the `isDone` column is

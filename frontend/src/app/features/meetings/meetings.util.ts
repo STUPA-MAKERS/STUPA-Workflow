@@ -14,26 +14,6 @@ import { escapeHtml, markdownToSafeHtml } from '@shared/markdown/markdown.util';
 
 export { escapeHtml };
 
-/** Markdown snippet referencing an application (editor block `:::antrag`). */
-export function antragSnippet(applicationId: string, title: string | null): string {
-  const heading = title?.trim() ? title.trim() : applicationId;
-  return `\n:::antrag{#${applicationId}}\n### ${heading}\n:::\n`;
-}
-
-/**
- * TOP snippet from an agenda item: numbered TOP heading, plus the application
- * reference for application-bound TOPs. Freetext TOPs carry only the heading.
- */
-export function topSnippet(
-  position: number,
-  title: string | null,
-  applicationId: string | null,
-): string {
-  const heading = title?.trim() ? title.trim() : (applicationId ?? `TOP ${position}`);
-  const ref = applicationId ? `\n:::antrag{#${applicationId}}\n:::\n` : '';
-  return `\n## TOP ${position}: ${heading}\n${ref}`;
-}
-
 /**
  * First line of the vote callout: the marker and the bold question. The backend
  * writes the same line in `build_vote_snippet`, so a body that contains it already
@@ -155,12 +135,6 @@ export function electionSnippet(vote: MeetingVote): string {
     lines.push(`> Stichwahl (${round + 1}. Wahlgang) um ${result.runoff.seats} Posten: ${who}`);
   }
   return lines.join('\n');
-}
-
-/** Insert markdown at the caret position (or append at the end). */
-export function insertAt(text: string, snippet: string, caret: number | null): string {
-  if (caret === null || caret < 0 || caret > text.length) return text + snippet;
-  return text.slice(0, caret) + snippet + text.slice(caret);
 }
 
 /**

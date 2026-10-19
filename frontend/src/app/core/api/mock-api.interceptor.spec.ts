@@ -123,7 +123,7 @@ describe('mockApiInterceptor', () => {
     const { http } = setup(true);
     const client = TestBed.inject(HttpClient);
     const res = await firstValueFrom(client.post<Record<string, unknown>>('/api/apply/attachments', {}));
-    expect(res).toMatchObject({ mime: 'application/pdf', size: 1024, is_comparison_offer: false });
+    expect(res).toMatchObject({ mime: 'application/pdf', size: 1024 });
     expect(String(res['filename'])).toMatch(/^datei-\d+\.pdf$/);
     const form = new FormData();
     form.append('file', new File(['x'], 'ohne-typ'));
@@ -152,14 +152,11 @@ describe('mockApiInterceptor', () => {
   it('answers a draft upload with the file and a token, and a draft delete', async () => {
     const { api } = setup(true);
     const file = new File(['x'.repeat(10)], 'Angebot.pdf', { type: 'application/pdf' });
-    const res = await firstValueFrom(
-      api.uploadDraftAttachment(file, { isComparisonOffer: true, altcha: 'sol' }),
-    );
+    const res = await firstValueFrom(api.uploadDraftAttachment(file, { altcha: 'sol' }));
     expect(res.attachment).toMatchObject({
       filename: 'Angebot.pdf',
       mime: 'application/pdf',
       size: 10,
-      isComparisonOffer: true,
       scanState: 'scanning',
     });
     expect(res.draftToken).toBe('mock-draft-token');

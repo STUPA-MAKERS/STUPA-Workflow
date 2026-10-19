@@ -13,6 +13,7 @@ import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
+import { detailContext } from '@core/cache/cache.interceptor';
 import { skipLoading } from '@core/loading/loading.interceptor';
 
 /** A text per locale, for example the name of a gremium role (`{ de, en }`). */
@@ -210,9 +211,10 @@ export class GremienApiService {
     });
   }
 
+  /** Kept for the read ahead of the gremien list: the first tab of a gremium shows at once. */
   meetings(gremiumId: Uuid): Observable<GremiumMeeting[]> {
     return this.http.get<GremiumMeeting[]>(`${this.base}/gremien/${gremiumId}/meetings`, {
-      context: skipLoading(),
+      context: detailContext(),
     });
   }
 

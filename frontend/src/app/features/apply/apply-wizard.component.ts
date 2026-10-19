@@ -39,7 +39,6 @@ import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/f
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { renderMarkdown } from '../meetings/meetings.util';
 import {
-  BadgeComponent,
   ButtonComponent,
   IconComponent,
   InputComponent,
@@ -135,7 +134,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     AnswerViewComponent,
     FieldGroupComponent,
     FieldRowComponent,
-    BadgeComponent,
     ButtonComponent,
     IconComponent,
     InputComponent,

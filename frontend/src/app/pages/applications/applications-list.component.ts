@@ -31,6 +31,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import {
   ButtonComponent,
   CurrencyInputComponent,
@@ -79,6 +80,7 @@ import { ApplicationCaptureComponent } from './capture/application-capture.compo
 import { debounced } from '@shared/debounced';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { applicationReads } from './application-reads';
 
 /**
  * One filter of the list.
@@ -458,6 +460,8 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly busyRow = signal<Uuid | null>(null);
 
   constructor() {
+    // The shown rows read their detail ahead, so a click shows it at once.
+    prefetchDetails({ items: this.items, key: (a) => a.id, reads: (a) => applicationReads(a.id) });
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (types) => this.types.set(types),
       error: () => this.types.set([]),

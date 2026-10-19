@@ -50,7 +50,6 @@ def _att(**kw: Any) -> Attachment:
         "storage_key": "k1",
         "scanned": True,
         "scan_result": "clean",
-        "is_comparison_offer": False,
         "created_at": NOW,
     }
     base.update(kw)

@@ -23,9 +23,12 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.modules.admin.models import Gremium
+from app.modules.admin.models import ApplicationType, Gremium
+from app.modules.applications.models import Application
 from app.modules.audit.models import AuditEntry
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.flow.models import FlowVersion
+from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import (
     Meeting,
     MeetingAgendaItem,
@@ -253,6 +256,52 @@ async def test_public_list_and_detail_hide_names_and_non_public_tops(
         ours = [g for g in gremien if g["id"] == str(gremium_id)]
         assert ours and ours[0]["protocolCount"] == 1
         assert set(ours[0]) == {"id", "name", "slug", "protocolCount"}
+
+
+async def test_application_items_carry_the_application_title(
+    api: FastAPI, maker: async_sessionmaker[AsyncSession]
+) -> None:
+    storage = _Storage()
+    gremium_id, meeting_id, protocol_id = await _seed(maker, non_public_item=False)
+    tag = uuid.uuid4().hex[:8]
+    async with maker() as session:
+        app_type = ApplicationType(
+            gremium_id=gremium_id, key=f"t-{tag}", name_i18n={}, has_budget=False
+        )
+        session.add(app_type)
+        await session.flush()
+        form_version = FormVersion(application_type_id=app_type.id, version=1)
+        flow_version = FlowVersion(version=1)
+        session.add_all([form_version, flow_version])
+        await session.flush()
+        for position, data in ((1, {"title": "  Lastenrad  "}), (2, {})):
+            application = Application(
+                type_id=app_type.id,
+                form_version_id=form_version.id,
+                flow_version_id=flow_version.id,
+                data=data,
+            )
+            session.add(application)
+            await session.flush()
+            session.add(
+                MeetingAgendaItem(
+                    meeting_id=meeting_id, application_id=application.id, position=position
+                )
+            )
+        await session.commit()
+    await _finalize(maker, protocol_id, storage)
+
+    with TestClient(api) as client:
+        _enter(client, api, storage)
+        data = client.get(f"/api/public/protocols/{protocol_id}").json()
+        # The application title, as on the meeting page; without one the neutral heading.
+        assert [top["title"] for top in data["tops"]] == [
+            "Sommerfest",
+            "Lastenrad",
+            "Tagesordnungspunkt",
+        ]
+        pdf = client.get(f"/api/public/protocols/{protocol_id}/pdf").content.decode()
+        assert "# Lastenrad" in pdf
 
 
 async def test_hidden_protocols_answer_404_with_noindex(

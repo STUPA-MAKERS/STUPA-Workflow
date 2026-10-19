@@ -11,6 +11,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@core/loading/loading.interceptor';
+import { detailContext } from '@core/cache/cache.interceptor';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, Uuid } from '@core/api/models';
@@ -105,13 +106,14 @@ export class DelegationsApiService {
   private readonly http = inject(HttpClient);
   private readonly base = inject(API_BASE_URL);
 
-  list(meetingId?: Uuid): Observable<Delegation[]> {
+  /** `detail` keeps the answer for the read ahead of the meeting list (`prefetchDetails`). */
+  list(meetingId?: Uuid, opts: { detail?: boolean } = {}): Observable<Delegation[]> {
     const params = meetingId ? new HttpParams().set('meetingId', meetingId) : undefined;
     // The list has its own loading indicator, or it runs in the background on
     // the dashboard → suppress the global overlay.
     return this.http.get<Delegation[]>(`${this.base}/delegations`, {
       params,
-      context: skipLoading(),
+      context: opts.detail ? detailContext() : skipLoading(),
     });
   }
 
@@ -153,8 +155,11 @@ export class DelegationsApiService {
     );
   }
 
-  voteStatus(voteId: Uuid): Observable<VoteDelegationStatus> {
-    return this.http.get<VoteDelegationStatus>(`${this.base}/delegations/votes/${voteId}/status`);
+  /** `detail` keeps the answer for the read ahead of the vote list (`prefetchDetails`). */
+  voteStatus(voteId: Uuid, opts: { detail?: boolean } = {}): Observable<VoteDelegationStatus> {
+    return this.http.get<VoteDelegationStatus>(`${this.base}/delegations/votes/${voteId}/status`, {
+      context: opts.detail ? detailContext() : undefined,
+    });
   }
 
   substitutes(gremiumId: Uuid): Observable<DelegationSubstitute[]> {

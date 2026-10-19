@@ -1,3 +1,5 @@
+@use 'breakpoints' as bp;
+
 :host {
   display: block;
 }
@@ -89,6 +91,23 @@
 .hm__head:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
+}
+/* On a phone the trigger is the icon alone, so the sign-in button of the public header
+   stays inside the screen. The label stays for screen readers. */
+@include bp.phone {
+  .hm__head {
+    justify-content: center;
+    width: 40px;
+    padding: 0;
+  }
+  .hm__headLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }
 
 /* ------------------------------------------------------------------ panel */
