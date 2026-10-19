@@ -409,7 +409,7 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
 
     A runoff copies the question of its election, so its head line names the round
     („Frage (2. Wahlgang)“). Each round then has its own head line, which
-    `replace_vote_block` and `vote_in_body` match on.
+    `replace_vote_blocks` and `votes_in_body` match on.
     """
     head = _md_escape(view.question)
     if view.round > 1:
@@ -446,15 +446,6 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
                 f"> Stichwahl ({view.round + 1}. Wahlgang) um {view.runoff_seats} Posten: {target}"
             )
     return "\n".join(lines)
-
-
-def replace_vote_block(body: str, snippet: str) -> str:
-    """Replace the callout of a vote in `body` with `snippet`.
-
-    The head line of `snippet` (marker and bold question) finds the block; the block
-    runs over the following `>` lines. A body without the head stays as it is.
-    """
-    return replace_vote_blocks(body, [(snippet, snippet)])
 
 
 def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
@@ -513,17 +504,6 @@ def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
         i = stop
     out.extend(lines[i:])
     return "\n".join(out)
-
-
-def vote_in_body(body: str, snippet: str) -> bool:
-    """Report whether the body already carries the vote of `snippet`.
-
-    The protokollant inserts the same callout from the editor. The marker line with
-    the bold question identifies it, so the tally can differ (a re-count) and the
-    box still counts as present. For several votes of one item use `votes_in_body`,
-    because two votes with the same question share the head line.
-    """
-    return votes_in_body(body, [snippet])[0]
 
 
 def votes_in_body(body: str, snippets: list[str]) -> list[bool]:

@@ -145,7 +145,9 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
     (``number`` or ``currency``), because the promote target such as ``amount`` is a
     numeric column. ``visibleIf`` and ``compute`` may use whitelist operators only. A
     ``pattern`` must compile as a regex, because a broken pattern fails at answer runtime
-    with a 500.
+    with a 500. A form has at most one ``funding`` field, and only beside a ``positions``
+    field, because the funding is checked against the cost total and replaces it as the
+    amount.
 
     Raises:
         FormDefinitionError: The definition breaks one of these rules.
@@ -154,6 +156,14 @@ def validate_definition(fields: Sequence[FormFieldDef]) -> None:
     duplicates = sorted({k for k in keys if keys.count(k) > 1})
     if duplicates:
         raise FormDefinitionError(f"duplicate field keys: {duplicates}")
+
+    funding = [f.key for f in fields if f.type == "funding"]
+    if len(funding) > 1:
+        raise FormDefinitionError(f"a form has at most one funding field, got {funding}")
+    if funding and not any(f.type == "positions" for f in fields):
+        raise FormDefinitionError(
+            f"funding field {funding[0]!r} needs a positions field in the same form"
+        )
 
     for f in fields:
         if f.is_promoted and f.type not in _NUMERIC_TYPES:
@@ -254,6 +264,8 @@ def validate_answers(
     eval_ctx: dict[str, Any] = {**(context or {}), **result}
 
     # 2. Per field, in this order: visibility, then required, then type validation.
+    cost_total = Decimal("0")
+    funding: tuple[FormFieldDef, Any] | None = None
     for f in fields:
         if f.type in ("computed", "section"):
             continue  # a derived value or a pure structural marker, no answer value
@@ -265,6 +277,14 @@ def validate_answers(
                 errors.append(FieldError(field=f.key, msg="required"))
             continue
         _validate_value(f, value, errors)
+        if f.type == "positions":
+            cost_total += positions_total(value) or Decimal("0")
+        elif f.type == "funding":
+            funding = (f, value)
+
+    # 3. The requested funding never exceeds the cost total of the visible positions.
+    if funding is not None:
+        _check_funding_total(funding[0], funding[1], cost_total, errors)
 
     if errors:
         raise AnswerValidationError(errors)
@@ -306,6 +326,8 @@ def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -
         _validate_text(field, value, errors)
     elif t == "number" or t == "currency":
         _validate_number(field, value, errors)
+    elif t == "funding":
+        _validate_funding(field, value, errors)
     elif t == "date":
         _validate_date(field, value, errors)
     elif t == "select":
@@ -383,6 +405,32 @@ def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) 
         _err(errors, field.key, f"less than minimum {v.min}")
     if v.max is not None and num > Decimal(str(v.max)):
         _err(errors, field.key, f"greater than maximum {v.max}")
+
+
+def _validate_funding(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+    """Validate the requested funding: a finite number above 0.
+
+    The check against the cost total runs after all fields (`_check_funding_total`),
+    because the positions can come after the funding field.
+    """
+    before = len(errors)
+    _validate_number(field, value, errors)
+    if len(errors) == before and Decimal(str(value)) <= 0:
+        _err(errors, field.key, "must be greater than 0")
+
+
+def _check_funding_total(
+    field: FormFieldDef, value: Any, cost_total: Decimal, errors: list[FieldError]
+) -> None:
+    """Report a requested funding above the cost total.
+
+    The function skips a value that `_validate_funding` already rejected, so a bad
+    value gives one error, not two.
+    """
+    if any(e.field == field.key for e in errors):
+        return
+    if Decimal(str(value)) > cost_total:
+        _err(errors, field.key, f"greater than the cost total {cost_total}")
 
 
 def _validate_date(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
@@ -668,9 +716,16 @@ def extract_promoted(
     """Pull the promoted field values from ``data`` into ``{promote_target: value}``.
 
     The function normalizes a numeric promoted field such as ``amount`` to ``Decimal``.
+    A filled-in ``funding`` field is the ``amount``; otherwise the cost total is.
     """
     out: dict[str, Any] = {}
+    funding: Decimal | None = None
     for f in fields:
+        # A `funding` field replaces the cost total as the amount when the applicant
+        # filled it in. It wins over every other source of `amount`.
+        if f.type == "funding":
+            funding = _finite_decimal(data.get(f.key))
+            continue
         # A `positions` field promotes the position total into `amount` without an
         # isPromoted flag. The total is the sum of the preferred offers. Several
         # `positions` fields add up.
@@ -695,4 +750,17 @@ def extract_promoted(
             out[f.promote_target] = num
         else:
             out[f.promote_target] = value
+    if funding is not None:
+        out["amount"] = funding
     return out
+
+
+def _finite_decimal(value: Any) -> Decimal | None:
+    """Return ``value`` as a finite ``Decimal``, or ``None`` for an absent or bad value."""
+    if value is None or value == "" or isinstance(value, bool):
+        return None
+    try:
+        num = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    return num if num.is_finite() else None

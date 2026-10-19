@@ -256,11 +256,6 @@ export function serializeFlowGraph(graph: FlowGraph): string {
   return JSON.stringify(normalizeFlowGraph(graph), null, 2);
 }
 
-export function parseFlowGraph(json: string): FlowGraph {
-  const parsed = JSON.parse(json) as FlowGraph;
-  return normalizeFlowGraph(parsed);
-}
-
 // Auto-layout: Sugiyama-light with layers, barycenter, and centering.
 
 const COL_GAP = 240;

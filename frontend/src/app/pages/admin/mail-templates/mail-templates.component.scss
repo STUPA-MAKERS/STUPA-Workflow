@@ -52,6 +52,13 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+/* A dense side list: short names, one or two lines, never cut. */
+.mt__list {
+  --li-min-height: 2.75rem;
+  --li-pad-y: var(--space-2);
+  --li-pad-x: var(--space-3);
+  --li-gap: var(--space-2);
+}
 /* "angepasst" (app-status-text) is a status beside the name, so it takes the small size. */
 .mt__list app-status-text,
 .mt__headEnd app-status-text {

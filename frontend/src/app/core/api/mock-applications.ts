@@ -276,9 +276,9 @@ function transitions(d: DemoApp): TransitionOutWire[] {
 }
 
 const ATTACHMENTS: AttachmentOutWire[] = [
-  { id: 'att10000-0000-0000-0000-000000000001', filename: 'Angebot_Jugendherberge.pdf', mime: 'application/pdf', size: 236_000, scanned: true, is_comparison_offer: true },
-  { id: 'att10000-0000-0000-0000-000000000002', filename: 'Angebot_Busunternehmen.pdf', mime: 'application/pdf', size: 171_000, scanned: true, is_comparison_offer: true },
-  { id: 'att10000-0000-0000-0000-000000000003', filename: 'Programm_Wochenende.png', mime: 'image/png', size: 127_000, scanned: false, is_comparison_offer: false },
+  { id: 'att10000-0000-0000-0000-000000000001', filename: 'Angebot_Jugendherberge.pdf', mime: 'application/pdf', size: 236_000, scanned: true },
+  { id: 'att10000-0000-0000-0000-000000000002', filename: 'Angebot_Busunternehmen.pdf', mime: 'application/pdf', size: 171_000, scanned: true },
+  { id: 'att10000-0000-0000-0000-000000000003', filename: 'Programm_Wochenende.png', mime: 'image/png', size: 127_000, scanned: false },
 ];
 
 const DETAIL_PATH =

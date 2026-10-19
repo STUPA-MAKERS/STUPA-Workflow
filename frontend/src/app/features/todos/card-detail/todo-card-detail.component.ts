@@ -565,7 +565,8 @@ export class TodoCardDetailComponent {
       this.loadMembers(held.boardId);
     }
     const local = this.localSeq;
-    this.api.card(id).subscribe({
+    // `detail`: a list that read the card ahead (the tasks page) paints it at once.
+    this.api.card(id, { detail: fresh }).subscribe({
       next: (card) => {
         if (seq !== this.seq) return;
         if (held && (this.editing() || local !== this.localSeq)) {
@@ -592,7 +593,7 @@ export class TodoCardDetailComponent {
     this.membersOf = boardId;
     const held = this.cache?.members(boardId);
     if (held) this.members.set(held);
-    this.api.members(boardId).subscribe({
+    this.api.members(boardId, { detail: true }).subscribe({
       next: (list) => this.members.set(list),
       error: () => {
         this.membersOf = null;
@@ -997,7 +998,8 @@ export class TodoCardDetailComponent {
   copyLink(): void {
     const c = this.card();
     if (!c) return;
-    const url = `${location.origin}/todos/${c.boardId}?card=${c.id}`;
+    // The card only: the link stays valid when the card moves to another board.
+    const url = `${location.origin}/todos?card=${c.id}`;
     const clip = navigator.clipboard;
     if (!clip) {
       this.toast.error(this.t('todos.card.linkFailed'));

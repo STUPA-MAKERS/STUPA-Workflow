@@ -176,6 +176,9 @@
           @if (duplicates().length > 0) {
             <p class="fe__alert" role="alert">{{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}</p>
           }
+          @if (fundingIssue(); as issue) {
+            <p class="fe__alert" role="alert">{{ issue | t }}</p>
+          }
           @if (groups().length === 0) {
             <app-empty-state [heading]="'admin.forms.empty' | t" />
           }

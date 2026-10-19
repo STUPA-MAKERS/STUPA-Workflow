@@ -355,7 +355,7 @@ def _format_field(f: FormFieldDef, value: object, *, lang: str, currency: str) -
     if f.type == "multiselect" and isinstance(value, list):
         parts = [_option_label(f.options, v, lang) for v in value]
         return ", ".join(p for p in parts if p)
-    if f.type == "currency":
+    if f.type in ("currency", "funding"):
         num = to_decimal(value)
         return format_money(num, currency, lang) if num is not None else _format(value)
     if f.type == "daterange" and isinstance(value, dict):

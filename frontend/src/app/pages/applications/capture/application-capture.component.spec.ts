@@ -285,7 +285,6 @@ describe('ApplicationCaptureComponent', () => {
       mime: 'application/pdf',
       size: 1,
       scanned: false,
-      isComparisonOffer: false,
       scanState: 'scanning',
       fieldKey: null,
     };

@@ -28,9 +28,6 @@
               }
             </span>
           </div>
-          @if (file.isComparisonOffer) {
-            <app-badge class="df__tag" variant="neutral">{{ 'apply.files.offerTag' | t }}</app-badge>
-          }
           <button
             type="button"
             class="df__remove"
@@ -62,11 +59,6 @@
     (files)="onFiles($event)"
     (rejected)="onRejected($event)"
   />
-  @if (comparison()) {
-    <app-checkbox class="df__offer" [ngModel]="asOffer()" (ngModelChange)="asOffer.set($event)">
-      {{ 'apply.files.asOffer' | t }}
-    </app-checkbox>
-  }
   @if (error(); as e) {
     <p class="df__error" role="alert">{{ e }}</p>
   }

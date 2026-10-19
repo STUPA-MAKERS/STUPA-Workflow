@@ -4,7 +4,7 @@ The tests run against a real Postgres through testcontainers.
 
 An unconfirmed guest submission (`email_confirmed_at IS NULL`) stays invisible in
 `list_applications` and `list_tasks`. These tests prove that the `FilesService` read
-paths (`list_for_application`, `signed_url`, `download_bytes`) also answer 404 for a
+paths (`list_for_application`, `signed_url`, `download_stream`) also answer 404 for a
 principal or Gremium read (`allow_unconfirmed=False`). They do not hand out the
 separated PII, the attachments, of the unconfirmed submission. The owning applicant
 still reads them over a magic link, where `allow_unconfirmed` defaults to True.
@@ -37,7 +37,7 @@ pytestmark = pytest.mark.integration
 class _StubStorage:
     """In-memory `ObjectStorage` stub.
 
-    It lets `signed_url` and `download_bytes` pass the storage path without a 503. The
+    It lets `signed_url` and `download_stream` pass the storage path without a 503. The
     visibility gate is the subject of the test.
     """
 
@@ -67,6 +67,10 @@ class _StubStorage:
         self, key: str, *, expires_seconds: int, download_name: str | None = None
     ) -> str:
         return f"memory://{key}"
+
+
+async def _read(stream: AsyncIterator[bytes]) -> bytes:
+    return b"".join([chunk async for chunk in stream])
 
 
 @pytest.fixture
@@ -152,7 +156,6 @@ async def _add_clean_attachment(
         storage_key=storage_key,
         scanned=True,
         scan_result="clean",
-        is_comparison_offer=False,
     )
     svc.session.add(att)
     await svc.session.commit()
@@ -180,7 +183,7 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
     with pytest.raises(NotFoundError):
         await files.signed_url(attachment_id, allow_unconfirmed=False)
     with pytest.raises(NotFoundError):
-        await files.download_bytes(attachment_id, allow_unconfirmed=False)
+        await files.download_stream(attachment_id, allow_unconfirmed=False)
 
     # The owning applicant comes over a magic link. There `allow_unconfirmed` defaults to
     # True, so the attachments of the own unconfirmed application stay readable.
@@ -188,8 +191,9 @@ async def test_unconfirmed_guest_attachments_hidden_from_principal_reads(
     assert [a.id for a in listed] == [attachment_id]
     url = await files.signed_url(attachment_id)
     assert str(attachment_id) in url.url
-    data, name, mime = await files.download_bytes(attachment_id)
-    assert data == b"PII-payload" and name == "note.txt" and mime == "text/plain"
+    stream, name, mime, _ = await files.download_stream(attachment_id)
+    assert await _read(stream) == b"PII-payload"
+    assert name == "note.txt" and mime == "text/plain"
 
 
 async def test_confirmed_app_attachments_readable_by_principal(
@@ -210,5 +214,5 @@ async def test_confirmed_app_attachments_readable_by_principal(
     assert [a.id for a in listed] == [attachment_id]
     url = await files.signed_url(attachment_id, allow_unconfirmed=False)
     assert str(attachment_id) in url.url
-    data, _, _ = await files.download_bytes(attachment_id, allow_unconfirmed=False)
-    assert data == b"PII-payload"
+    stream, _, _, _ = await files.download_stream(attachment_id, allow_unconfirmed=False)
+    assert await _read(stream) == b"PII-payload"

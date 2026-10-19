@@ -9,6 +9,24 @@ import { LoadingService } from './loading.service';
  */
 export const SKIP_LOADING = new HttpContextToken<boolean>(() => false);
 
+/** Reads started inside {@link quietly} right now. */
+let quiet = 0;
+
+/**
+ * Start reads that do not count toward the bar, without a context on each call: a read
+ * ahead runs the same service calls as the detail it warms, and those set no
+ * `SKIP_LOADING`. The interceptor chain runs synchronously when a read is subscribed, so
+ * a counter around `start` reaches every GET it subscribes.
+ */
+export function quietly<T>(start: () => T): T {
+  quiet++;
+  try {
+    return start();
+  } finally {
+    quiet--;
+  }
+}
+
 /** Ready-made {@link HttpContext} that suppresses the global loading bar. */
 export function skipLoading(): HttpContext {
   return new HttpContext().set(SKIP_LOADING, true);
@@ -33,7 +51,7 @@ export function skipLoading(): HttpContext {
  * duration, including the auth and mock layers.
  */
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
-  if (req.method !== 'GET' || req.context.get(SKIP_LOADING)) {
+  if (req.method !== 'GET' || quiet > 0 || req.context.get(SKIP_LOADING)) {
     return next(req);
   }
   const loading = inject(LoadingService);

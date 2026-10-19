@@ -121,6 +121,10 @@ def ticket_link(
     return MailLink(url, "ticket")
 
 
-def todo_link(settings: Settings, board_id: UUID | str, card_id: UUID | str) -> MailLink:
-    """Return the link to a card: its board with the card drawer open."""
-    return MailLink(f"{_base(settings)}/todos/{board_id}?card={card_id}", "todo")
+def todo_link(settings: Settings, card_id: UUID | str) -> MailLink:
+    """Return the link to a card: the card id only.
+
+    The page opens the board the card is on at the click, so a mail stays valid when the
+    card moves to another board.
+    """
+    return MailLink(f"{_base(settings)}/todos?card={card_id}", "todo")

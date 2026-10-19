@@ -18,6 +18,7 @@
         @for (tpl of templates(); track tpl.key) {
           <app-list-item
             [title]="keyLabel(tpl.key)"
+            [wrap]="true"
             [selected]="selectedKey() === tpl.key"
             [attr.title]="tpl.key"
             (activate)="select(tpl.key)"

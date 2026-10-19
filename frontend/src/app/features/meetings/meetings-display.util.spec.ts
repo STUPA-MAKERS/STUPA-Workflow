@@ -6,20 +6,12 @@ import {
   errorCode,
   meetingDay,
   meetingTimeText,
-  attendanceBadgeVariant,
-  attendanceButtonVariant,
-  attendanceIcon,
-  attendanceKey,
   countEntries,
   errorDetail,
   liveOpenedVote,
   longDate,
   meetingLine,
   weekdayDate,
-  meetingStatusKey,
-  meetingTimeSuffix,
-  meetingStatusVariant,
-  memberAttendanceBadgeVariant,
   memberAttendanceKey,
   shortTime,
   voteOptionLabel,
@@ -50,13 +42,6 @@ const VOTE = (over: Partial<MeetingVote> = {}): MeetingVote => ({
 });
 
 describe('meetings-display.util', () => {
-  it('maps meeting status to badge variants and keys', () => {
-    expect(meetingStatusVariant('live')).toBe('success');
-    expect(meetingStatusVariant('closed')).toBe('info');
-    expect(meetingStatusVariant('planned')).toBe('info');
-    expect(meetingStatusKey('live')).toBe('meetings.status.live');
-  });
-
   it('maps vote status and results', () => {
     expect(voteStatusVariant('open')).toBe('success');
     expect(voteStatusVariant('closed')).toBe('info');
@@ -73,38 +58,17 @@ describe('meetings-display.util', () => {
   it('never maps a status to the neutral tag variant', () => {
     // `neutral` is a tag (a grey plate). A status shows as coloured text only.
     const variants = [
-      ...(['planned', 'live', 'closed'] as const).map(meetingStatusVariant),
       ...(['draft', 'open', 'closed', 'cancelled'] as const).map(voteStatusVariant),
       ...['passed', 'rejected', 'tie', null, undefined, 'unknown'].map(voteResultVariant),
-      ...(['present', 'excused', 'absent'] as const).flatMap((s) => [
-        attendanceBadgeVariant(s),
-        memberAttendanceBadgeVariant(s),
-      ]),
     ];
     expect(variants).not.toContain('neutral');
     expect(variants).not.toContain('accent');
-  });
-
-  it('maps attendance to keys, variants and icons', () => {
-    expect(attendanceKey('present')).toBe('meetings.attendance.present');
-    expect(attendanceButtonVariant('present')).toBe('primary');
-    expect(attendanceButtonVariant('excused')).toBe('secondary');
-    expect(attendanceButtonVariant('absent')).toBe('danger');
-    expect(attendanceIcon('present')).toBe('check');
-    expect(attendanceIcon('excused')).toBe('half');
-    expect(attendanceIcon('absent')).toBe('x');
-    expect(attendanceBadgeVariant('present')).toBe('success');
-    expect(attendanceBadgeVariant('excused')).toBe('warning');
-    expect(attendanceBadgeVariant('absent')).toBe('danger');
   });
 
   it('gives a member only the labels "Anwesend" and "Abwesend" (Z2)', () => {
     expect(memberAttendanceKey('present')).toBe('meetings.attendance.selfPresent');
     expect(memberAttendanceKey('excused')).toBe('meetings.attendance.selfExcused');
     expect(memberAttendanceKey('absent')).toBe('meetings.attendance.selfExcused');
-    expect(memberAttendanceBadgeVariant('present')).toBe('success');
-    expect(memberAttendanceBadgeVariant('excused')).toBe('warning');
-    expect(memberAttendanceBadgeVariant('absent')).toBe('warning');
   });
 
   it('lists tally entries and vote options with the count-key fallback', () => {
@@ -167,13 +131,6 @@ describe('meetings-display.util', () => {
     // Text that is not a time stays as it is. Garbage is better than a wrong time.
     expect(shortTime('bald')).toBe('bald');
     expect(shortTime('25:00:00')).toBe('25:00:00');
-  });
-
-  it('builds the ", HH:MM" suffix of a meeting date, or nothing', () => {
-    expect(meetingTimeSuffix('18:00:00')).toBe(', 18:00');
-    expect(meetingTimeSuffix('18:00')).toBe(', 18:00');
-    expect(meetingTimeSuffix(null)).toBe('');
-    expect(meetingTimeSuffix('  ')).toBe('');
   });
 
   it('builds a placeholder vote from a live vote_opened message', () => {

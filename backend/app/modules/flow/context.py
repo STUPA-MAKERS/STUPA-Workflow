@@ -32,6 +32,7 @@ from app.shared.guards import GuardContext
 _FIELD_TYPE_MAP: dict[str, str] = {
     "number": "number",
     "currency": "currency",
+    "funding": "currency",
     "date": "date",
     "checkbox": "bool",
     "boolean": "bool",

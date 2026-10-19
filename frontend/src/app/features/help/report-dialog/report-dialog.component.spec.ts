@@ -49,7 +49,6 @@ function fileOf(id: string, filename = `f${id}.png`, mime = 'image/png', extra: 
     mime,
     size: 2048,
     scanned: true,
-    isComparisonOffer: false,
     scanState: 'clean',
     fieldKey: null,
     ...extra,

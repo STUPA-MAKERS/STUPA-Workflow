@@ -14,13 +14,6 @@ export interface MediaImage {
   size: number;
 }
 
-/**
- * The canonical image reference in Markdown. It is the ONLY image source that a renderer
- * shows. Group 1 is the lowercase uuid.
- */
-export const MEDIA_IMAGE_PATH_RE =
-  /^\/api\/media\/images\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/;
-
 /** The raster types that the media upload accepts. SVG is never one of them. */
 export const MEDIA_IMAGE_TYPES: readonly string[] = [
   'image/png',

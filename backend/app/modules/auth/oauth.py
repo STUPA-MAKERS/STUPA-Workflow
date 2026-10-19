@@ -201,11 +201,6 @@ def hash_token(token: str) -> bytes:
     return hashlib.sha256(token.encode("utf-8")).digest()
 
 
-def tokens_match(token: str, expected_hash: bytes) -> bool:
-    """Compare a token against its stored hash in constant time."""
-    return hmac.compare_digest(hash_token(token), expected_hash)
-
-
 def verify_pkce_s256(verifier: str, challenge: str) -> bool:
     """Check `base64url(sha256(verifier)) == challenge` in constant time (RFC 7636 S256)."""
     digest = hashlib.sha256(verifier.encode("ascii")).digest()

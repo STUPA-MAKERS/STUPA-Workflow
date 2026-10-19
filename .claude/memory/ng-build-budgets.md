@@ -1,15 +1,26 @@
 ---
 name: ng-build-budgets
-description: Frontend has ng build bundle/style budgets that jest+tsc do NOT enforce — run npm run build before deploy
-metadata: 
+description: ng build enforces style budgets and AOT strict-template checks that jest and tsc do not. Run npm run build after CSS or template changes
+metadata:
   node_type: memory
   type: feedback
 ---
 
-`ng build` (the Docker `web` stage, `frontend/npm run build`) enforces **budgets** that `tsc --noEmit` and `jest` do NOT catch. A CSS-heavy component change can pass all local specs/typecheck/eslint and still **fail the Docker build**.
+`npm run build` (`ng build`) catches two classes of error that `npm run typecheck` (`tsc -p
+tsconfig.app.json --noEmit`) and `npm test` (jest) do not. CI (`.github/workflows/ci.yml`) and
+the Docker `web` stage (`deploy/web/Dockerfile`) both run the build, so a change can pass every
+local spec and still fail there.
 
-**Why:** angular.json budgets. `anyComponentStyle` errors at **28 kB** per component style block (warns at 20 kB). The initial bundle warns at 600 kB. 2026-06-13: a small timeline-CSS addition pushed `meetings.component.ts` styles to 18.07 kB → a hard build error under the then-lower cap (67 bytes over). `meetings.component` was the canary at the time. Check the current size of any component you touch against the live budget in `frontend/angular.json`.
+1. **Budgets** in `frontend/angular.json`: `anyComponentStyle` warns at 20 kB and errors at
+   28 kB per component style; the initial bundle warns at 1 MB and errors at 1.1 MB. A small
+   CSS addition to a large component can tip it over the limit.
+2. **AOT strict templates** (`strictTemplates: true`). `@if (sig())` does NOT narrow a later
+   `sig()` call in the template, so `{{ … | t: { n: formVersion() } }}` fails with
+   "number | null is not assignable". Write `@if (formVersion(); as v) { … { n: v } }`. The
+   build also warns on NG8102 (`?? ''` on a `Record` index) and NG8113 (unused standalone
+   imports).
 
-**How to apply:** after any non-trivial **component CSS** change (especially meetings.component), run `cd frontend && npm run build`. Do this before you declare the work done and before the user deploys. Do not rely on jest+tsc alone. Keep duplicated CSS DRY (e.g. dedupe gradients into a `--var`). We also fixed NG8102 (`?? ''` on a `Record` index is flagged) and NG8113 (unused standalone imports). `ng build` surfaces both as warnings.
-
-**ALSO: `ng build` runs AOT strict-template typecheck that `tsc -p tsconfig.app.json` does NOT.** 2026-06-13: `@if (sig())` does NOT narrow later `sig()` calls in the template. `{{ ... | t: { n: formVersion() } }}` failed (number|null not assignable) until we rewrote it as `@if (formVersion(); as v) { ... { n: v } }`. Rule: for any template change that touches nullable signals or i18n params, run `npm run build`, not just jest. Part of [[backlog-2026-06-13]].
+**How to apply:** after any non-trivial component CSS change, or any template change that
+touches nullable signals or i18n params, run `cd frontend && npm run build` before you call the
+work done. Keep duplicated CSS DRY (for example, move a repeated gradient into a custom
+property) to stay under the style budget.

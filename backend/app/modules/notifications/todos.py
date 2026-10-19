@@ -152,7 +152,7 @@ async def send_todo_mail(
             ",".join(sorted(str(r) for r in mail.recipients)),
             str(mail.event_id),
         ),
-        link=todo_link(settings, board.id, card.id),
+        link=todo_link(settings, card.id),
     )
 
 
@@ -205,5 +205,5 @@ async def send_todo_due(
         builtin_body=TODO_DUE_BODY,
         context={"cardTitle": card.title, "boardName": board.name, "dueDate": due.isoformat()},
         idempotency_parts=(TODO_DUE_KEY, str(card.id), due.isoformat()),
-        link=todo_link(settings, board.id, card.id),
+        link=todo_link(settings, card.id),
     )

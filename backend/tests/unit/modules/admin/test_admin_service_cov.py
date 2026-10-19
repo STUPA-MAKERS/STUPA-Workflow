@@ -42,7 +42,7 @@ from app.modules.admin.service.rbac import (
     _mapping_out,
     _principal_out,
 )
-from app.modules.admin.service.service_base import _iso, _parse_dt
+from app.modules.admin.service.service_base import _iso
 from app.modules.admin.service.webhooks import (
     _delivery_reason_class,
     _delivery_status_out,
@@ -256,29 +256,6 @@ def webhook_row(**kw: Any) -> Any:
     }
     base.update(kw)
     return Row(**base)
-
-
-def test_parse_dt_none() -> None:
-    assert _parse_dt(None) is None
-
-
-def test_parse_dt_naive_becomes_utc() -> None:
-    # The parser reads a naive input as UTC and returns an aware value.
-    assert _parse_dt("2026-06-07T10:00:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
-
-
-def test_parse_dt_aware_normalized_to_utc() -> None:
-    assert _parse_dt("2026-06-07T12:00:00+02:00") == datetime(
-        2026, 6, 7, 10, 0, tzinfo=UTC
-    )
-
-
-def test_parse_dt_invalid_raises_validation_problem() -> None:
-    with pytest.raises(ValidationProblem) as ei:
-        _parse_dt("not-a-date")
-    assert ei.value.status == 422
-    assert ei.value.errors is not None
-    assert ei.value.errors[0].field == "validFrom/validUntil"
 
 
 def test_iso_none_and_value() -> None:

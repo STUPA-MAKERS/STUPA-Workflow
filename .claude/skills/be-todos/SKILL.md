@@ -35,7 +35,8 @@ done (`completed_at`).
   under "Meine To-Dos"; `all_boards`: the meta-board "Alle"; both through
   `_board_rows(mine=...)`.
 - `links.py` — `LinkResolver`: `resolve` (one query per kind), `readable`, `search` (the
-  link picker, `PER_KIND` 5), `card_url`. The read rule of each kind is the gate of its
+  link picker, `PER_KIND` 5), `card_url` (`/todos?card=<id>`, the card id only, so a link
+  survives a transfer; mails use the same form). The read rule of each kind is the gate of its
   own module, so a link never shows more than that module's page:
   application `resolve_app_read` (confirmed only); meeting and agenda item
   `meeting_read_scope`; vote `voting.listing.read_scope` (the SQL form of

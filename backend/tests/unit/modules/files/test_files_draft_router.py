@@ -49,7 +49,6 @@ class _FakeDrafts:
             mime="application/pdf",
             size=4,
             scanned=False,
-            is_comparison_offer=bool(kw["is_comparison_offer"]),
             draftToken=str(kw["token"] or "new-token"),
             draftExpiresAt=datetime(2026, 10, 8, tzinfo=UTC),
         )
@@ -110,12 +109,11 @@ def test_anonymous_first_upload_with_altcha(
     r = client.post(
         "/api/apply/attachments",
         files={"file": ("a.pdf", b"%PDF", "application/pdf")},
-        data={"altcha": "solved", "field_key": "f", "is_comparison_offer": "true"},
+        data={"altcha": "solved", "field_key": "f"},
     )
     assert r.status_code == 201, r.text
     body = r.json()
     assert body["draftToken"] == "new-token"
-    assert body["is_comparison_offer"] is True
     assert "draftExpiresAt" in body
     assert drafts.uploads[0]["token"] is None
     assert drafts.uploads[0]["by"] == "applicant"

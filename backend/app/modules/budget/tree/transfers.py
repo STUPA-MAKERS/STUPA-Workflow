@@ -288,13 +288,6 @@ class TransferOps(ExpenseOps):
             for out, income in pairs
         ]
 
-    async def get_transfer(self, transfer_id: UUID) -> TransferRowOut:
-        """Read one transfer as a single row."""
-        out, income = await self._legs(transfer_id)
-        paths = await self._path_keys({out.budget_id, income.budget_id})
-        names = await self._actor_names({out.actor} if out.actor else set())
-        return self._row_out(out, income, paths, actor_name=names.get(out.actor or ""))
-
     async def update_transfer(
         self, transfer_id: UUID, payload: TransferUpdate
     ) -> TransferRowOut:
