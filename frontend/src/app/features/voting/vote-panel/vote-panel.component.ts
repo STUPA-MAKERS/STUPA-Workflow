@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, Vote } from '@core/api/models';
 import { ElectionResultComponent } from '../election-result/election-result.component';
 import { electionCaption, electionOf } from '../election.util';
@@ -19,6 +19,11 @@ import {
 import { VoteBarsComponent } from '../vote-bars.component';
 import { VoteProgressComponent } from '../vote-progress/vote-progress.component';
 import { NO_CONTEXT, type VoteContext } from './vote-context';
+import {
+  guestComposition,
+  secrecyLabel,
+  voteRulesParts,
+} from '../../meetings/meetings-display.util';
 
 /**
  * One vote as a card (board Arbeit-Abstimmungen) or as the phone page body (board
@@ -121,36 +126,27 @@ export class VotePanelComponent {
       : this.i18n.translate('voting.panel.where', { meeting: meeting.title, n: position });
   });
 
-  /** "Einfache Mehrheit · Quorum 12 · geheime Abstimmung". */
+  /** "Einfache Mehrheit · Quorum 12 · geheime Abstimmung" (the ballot form of the rules). */
   protected readonly rules = computed(() => {
     const v = this.vote();
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
     const election = this.election();
     if (election) {
       // "Wahl · 2 Posten · geheime Abstimmung".
-      const parts = [
-        electionCaption(election, v.round, (key, params) => this.i18n.translate(key, params)),
-      ];
-      if (this.secret()) parts.push(this.i18n.translate('meetings.vote.secretShort'));
+      const parts = [electionCaption(election, v.round, t)];
+      if (this.secret()) parts.push(secrecyLabel(true, t));
       return parts.join(' · ');
     }
-    // A vote with guests has no quorum: the majority of the cast votes decides (#17).
-    const family = this.guestsVote() ? 'vote.majorityCast' : 'vote.majority';
-    const parts = [
-      this.i18n.translate(
-        `${family}.${v.majorityRule ?? v.config.majorityRule ?? 'simple'}` as TranslationKey,
-      ),
-    ];
-    const quorum = v.quorum ?? v.config.quorum;
-    if (quorum) {
-      parts.push(
-        this.i18n.translate(
-          quorum.type === 'percent' ? 'meetings.vote.quorumPercent' : 'meetings.vote.quorumCount',
-          { n: quorum.value },
-        ),
-      );
-    }
-    if (this.secret()) parts.push(this.i18n.translate('meetings.vote.secretShort'));
-    return parts.join(' · ');
+    return voteRulesParts(
+      {
+        majorityRule: v.majorityRule ?? v.config.majorityRule ?? 'simple',
+        secret: this.secret(),
+        quorum: v.quorum ?? v.config.quorum,
+        guestsVote: this.guestsVote(),
+      },
+      t,
+      { ballot: true },
+    ).join(' · ');
   });
 
   /** Admitted guests vote too (public meeting, #17). */
@@ -161,12 +157,7 @@ export class VotePanelComponent {
   protected readonly composition = computed(() => {
     if (!this.guestsVote()) return null;
     const { presentMembers, presentGuests } = this.vote().tally;
-    if (presentMembers === null || presentMembers === undefined) return null;
-    if (presentGuests === null || presentGuests === undefined) return null;
-    return this.i18n.translate('guests.vote.composition', {
-      members: presentMembers,
-      guests: presentGuests,
-    });
+    return guestComposition(presentMembers, presentGuests, (k, p) => this.i18n.translate(k, p));
   });
 
   protected readonly question = computed(

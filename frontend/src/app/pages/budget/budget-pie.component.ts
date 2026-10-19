@@ -9,6 +9,7 @@ import {
 } from '@angular/core';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { MoneyPipe } from '@shared/pipes/money.pipe';
 
 /** A pie slice: label, value in currency units and colour (any CSS colour).
  *  An `id`, which is a cost centre id, makes the slice clickable for a drilldown. */
@@ -49,7 +50,7 @@ const GROW = 5; // radial growth on hover
   selector: 'app-budget-pie',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TruncatedDirective],
+  imports: [TruncatedDirective, MoneyPipe],
   templateUrl: './budget-pie.component.html',
   styleUrl: './budget-pie.component.scss',
 })
@@ -121,13 +122,6 @@ export class BudgetPieComponent {
       : 'none';
   }
 
-  protected money(value: number): string {
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: this.currency() || 'EUR',
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
 }
 
 /** SVG path of a donut segment between two angles (radians). */

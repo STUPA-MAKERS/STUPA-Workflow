@@ -8,6 +8,7 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
+import { errorStatus, problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -32,7 +33,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
+import { formatBytes } from '@shared/format-bytes';
 import {
   CD_BASE_VARIANTS,
   CD_LOGO_ACCEPT,
@@ -95,25 +96,6 @@ function emptyForm(): VariantForm {
   return { key: '', name: '', baseVariant: 'report' };
 }
 
-/** HTTP status of a failed request, or 0 when the error carries none. */
-function errorStatus(err: unknown): number {
-  if (typeof err === 'object' && err !== null && 'status' in err) {
-    const status = Number((err as { status: unknown }).status);
-    return Number.isFinite(status) ? status : 0;
-  }
-  return 0;
-}
-
-/** The problem+json `code` of a failed request, or '' when the error carries none. */
-function errorCode(err: unknown): string {
-  if (typeof err === 'object' && err !== null && 'error' in err) {
-    const body = (err as { error: unknown }).error;
-    if (typeof body === 'object' && body !== null && 'code' in body) {
-      return String((body as { code: unknown }).code);
-    }
-  }
-  return '';
-}
 
 /**
  * Corporate-design variants (board Admin-Dokument-Varianten): the logo sets a Gremium
@@ -279,7 +261,7 @@ export class AdminCdVariantsComponent {
   /** "Dateiname · 3 KB" of an upload, the name of a shipped logo. */
   logoDetail(logo: CdVariantLogo): string {
     if (logo.vendoredName) return logo.vendoredName;
-    return logo.size != null ? `${logo.fileName ?? '—'} · ${formatBytes(logo.size, this.i18n)}` : (logo.fileName ?? '—');
+    return logo.size != null ? `${logo.fileName ?? '—'} · ${formatBytes(logo.size, this.i18n.formatLocale())}` : (logo.fileName ?? '—');
   }
 
   /** The ⋮ menu of a variant. The row itself opens the edit. */
@@ -590,7 +572,7 @@ export class AdminCdVariantsComponent {
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
-        let key: TranslationKey = SQUARE_ERROR_KEYS[errorCode(err)] ?? 'admin.common.saveFailed';
+        let key: TranslationKey = SQUARE_ERROR_KEYS[problemCode(err)] ?? 'admin.common.saveFailed';
         if (key === 'admin.common.saveFailed' && status === 413) key = 'admin.cdVariants.logoTooLarge';
         else if (key === 'admin.common.saveFailed' && status === 415) key = 'admin.cdVariants.logoType';
         this.logoError.set(key);

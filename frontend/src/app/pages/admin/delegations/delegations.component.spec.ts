@@ -6,7 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
-import { DelegationsComponent, localToday } from './delegations.component';
+import { DelegationsComponent } from './delegations.component';
 
 function delegation(over: Partial<Delegation>): Delegation {
   return {
@@ -209,10 +209,6 @@ describe('DelegationsComponent', () => {
       makeAdmin({ listGremienOptions: jest.fn(() => throwError(() => ({ status: 500 }))) }),
     );
     expect(screen.queryByRole('heading', { name: 'Stellvertretungen' })).toBeNull();
-  });
-
-  it('formats today as a local date', () => {
-    expect(localToday(new Date(2026, 0, 5, 23, 30))).toBe('2026-01-05');
   });
 
   it('sorts rows of one date by title and guards the revoke', async () => {

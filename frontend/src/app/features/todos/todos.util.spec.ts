@@ -1,4 +1,4 @@
-import { formatMoney } from '@shared/decision/decision.util';
+import { formatMoney } from '@shared/format-money';
 import type { TodoEvent } from '@core/api/todos.service';
 import { de, type TranslationKey } from '@core/i18n/translations';
 import { TODAY, board, link, summary, tile } from '../../../testing/todo-fixtures';
@@ -6,22 +6,17 @@ import {
   NO_FILTER,
   applyMove,
   cardsOf,
-  daysUntil,
   defaultBoard,
   dropMove,
   dueInfo,
   eventText,
   filterActive,
   insertTile,
-  isoDay,
   linkLine,
   linkSub,
   linkTitle,
-  longDay,
   matchesFilter,
   moveRequest,
-  parseDay,
-  personName,
   relativeDays,
   removeTile,
   placeTile,
@@ -30,11 +25,11 @@ import {
   dropEnter,
   moveErrorText,
   replaceTile,
-  shortDay,
   sortedColumns,
   splitUrl,
-  type Translate,
 } from './todos.util';
+import type { Translate } from '@core/i18n/translations';
+import { personName } from '@shared/person-label.util';
 
 /** The German catalogue with its placeholders filled. */
 const t: Translate = (key: TranslationKey, params?: Record<string, string | number>) => {
@@ -55,42 +50,6 @@ function event(kind: TodoEvent['kind'], payload: Record<string, unknown> = {}, a
 
 describe('todos.util', () => {
   describe('days', () => {
-    it('writes and reads a local calendar day', () => {
-      expect(isoDay(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
-      expect(parseDay('2026-10-16')?.getHours()).toBe(12);
-      expect(parseDay('16.10.2026')).toBeNull();
-      expect(parseDay(null)).toBeNull();
-    });
-
-    it('counts calendar days and gives null for a bad day', () => {
-      expect(daysUntil('2026-10-17', TODAY)).toBe(1);
-      expect(daysUntil('2026-10-13', TODAY)).toBe(-3);
-      expect(daysUntil('x', TODAY)).toBeNull();
-      expect(daysUntil(TODAY, 'x')).toBeNull();
-    });
-
-    it('writes a short day with the year only for another year', () => {
-      expect(shortDay('2026-10-23', TODAY, 'de-DE')).toBe('23.10.');
-      expect(shortDay('2027-01-05', TODAY, 'de-DE')).toBe('05.01.2027');
-      expect(shortDay('2026-10-23', TODAY, 'en-GB')).toBe('23/10');
-      expect(shortDay('bad', TODAY, 'de-DE')).toBe('bad');
-    });
-
-    it('adds the closing dot where an engine leaves it out', () => {
-      const real = Intl.DateTimeFormat;
-      const spy = jest
-        .spyOn(Intl, 'DateTimeFormat')
-        .mockImplementation(() => ({ format: () => '23.10' }) as unknown as Intl.DateTimeFormat);
-      expect(shortDay('2026-10-23', TODAY, 'de-DE')).toBe('23.10.');
-      spy.mockRestore();
-      expect(Intl.DateTimeFormat).toBe(real);
-    });
-
-    it('writes a long day with the weekday', () => {
-      expect(longDay('2026-11-03', 'de-DE')).toBe('Di, 03.11.2026');
-      expect(longDay('bad', 'de-DE')).toBe('bad');
-    });
-
     it('colours a due date: overdue, today, tomorrow, later and done', () => {
       expect(dueInfo('2026-10-14', TODAY, 'de-DE', t)).toEqual({ date: '14.10.', note: 'überfällig', tone: 'overdue' });
       expect(dueInfo(TODAY, TODAY, 'de-DE', t)).toEqual({ date: '16.10.', note: 'heute', tone: 'soon' });

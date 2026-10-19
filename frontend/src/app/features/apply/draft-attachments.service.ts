@@ -3,6 +3,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import type { DraftAttachment, ProblemDetail, Uuid } from '@core/api/models';
+import { problemCode } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -419,10 +420,6 @@ export class DraftAttachmentsService {
 function isDraftFile(value: unknown): value is DraftFile {
   const f = value as Partial<DraftFile> | null;
   return !!f && typeof f.id === 'string' && typeof f.filename === 'string' && typeof f.size === 'number';
-}
-
-function problemCode(err: HttpErrorResponse): string | undefined {
-  return (err.error as ProblemDetail | null)?.code;
 }
 
 /** The reason of a refused upload as a translation key. */

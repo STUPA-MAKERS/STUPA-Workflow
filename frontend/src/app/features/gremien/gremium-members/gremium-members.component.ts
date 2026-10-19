@@ -23,9 +23,11 @@ import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.componen
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
-import { fileSlug, fullDate, localized, personName, roleRank, toCsv } from '../gremien.util';
+import { fileSlug, localized, roleRank, toCsv } from '../gremien.util';
+import { dayMonthYear } from '@shared/date-format';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { personLabel } from '@shared/person-label.util';
 
 export interface MemberGroup {
   readonly key: string;
@@ -117,7 +119,7 @@ export class GremiumMembersComponent {
   private readonly sorted = computed<MemberRow[]>(() => {
     const locale = this.i18n.locale();
     return this.members()
-      .map((member) => ({ member, name: personName(member.displayName ?? member.email), period: this.period(member) }))
+      .map((member) => ({ member, name: personLabel(member, this.i18n, { fallbackText: '—' }), period: this.period(member) }))
       .sort(
         (a, b) =>
           roleRank(a.member.roleKey) - roleRank(b.member.roleKey) ||
@@ -193,8 +195,8 @@ export class GremiumMembersComponent {
       r.name,
       r.member.email ?? '',
       localized(r.member.roleName, locale, r.member.roleKey),
-      fullDate(r.member.validFrom, locale),
-      fullDate(r.member.validUntil, locale),
+      dayMonthYear(r.member.validFrom, this.i18n.formatLocale()),
+      dayMonthYear(r.member.validUntil, this.i18n.formatLocale()),
     ]);
     const csv = toCsv([
       [t('gremien.members.colName'), t('gremien.members.colEmail'), t('gremien.members.colRole'), t('gremien.members.colFrom'), t('gremien.members.colUntil')],
@@ -206,10 +208,10 @@ export class GremiumMembersComponent {
 
   /** "seit 01.10.2025 · bis 30.09.2026", or '' without a term. */
   private period(m: GremiumMember): string {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const parts: string[] = [];
-    if (m.validFrom) parts.push(this.i18n.translate('gremien.members.since', { date: fullDate(m.validFrom, locale) }));
-    if (m.validUntil) parts.push(this.i18n.translate('gremien.members.until', { date: fullDate(m.validUntil, locale) }));
+    if (m.validFrom) parts.push(this.i18n.translate('gremien.members.since', { date: dayMonthYear(m.validFrom, locale) }));
+    if (m.validUntil) parts.push(this.i18n.translate('gremien.members.until', { date: dayMonthYear(m.validUntil, locale) }));
     return parts.join(' · ');
   }
 }

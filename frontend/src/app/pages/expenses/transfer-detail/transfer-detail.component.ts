@@ -8,10 +8,10 @@ import type { BudgetTransfer } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
   costCentreLabel,
-  formatEur,
 } from '../../budget/expense-display.util';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The detail of a transfer (board Fin-Uebertraege): "Übertrag · HHJ 2025", the
@@ -49,7 +49,7 @@ export class TransferDetailComponent {
     return costCentreLabel(this.costCentres(), t.toBudgetId, t.toPathKey);
   });
 
-  protected readonly amount = computed(() => formatEur(Number(this.transfer().amount), this.i18n.locale()));
+  protected readonly amount = computed(() => formatMoney(this.transfer().amount, this.i18n.formatLocale()));
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
     if (!this.canManage()) return [];

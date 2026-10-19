@@ -15,7 +15,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, IsoDateTime, Uuid } from '@core/api/models';
 import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
 import { IconComponent } from '@stupa-makers/ui-kit';
@@ -32,19 +32,19 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
 } from '@shared/ui/filter-select/filter-select.component';
-import { NO_FILTER, dueInfo, isoDay, matchesFilter, type DueTone, type Translate } from '../../features/todos/todos.util';
+import { NO_FILTER, dueInfo, matchesFilter, type DueTone } from '../../features/todos/todos.util';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { ApplicationsPageService } from '../applications/applications-page.service';
-import { groupByMonth, type MonthGroup } from '../applications/applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { liveSearch } from '@shared/live-search';
+import { calendarDaysSince, isoDay } from '@shared/date-format';
+import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { applicationReads } from '../applications/application-reads';
-
-const DAY_MS = 86_400_000;
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -242,7 +242,7 @@ export class TasksComponent implements OnDestroy {
   readonly groups = computed<MonthGroup<TaskRow>[]>(() =>
     this.hasTodos()
       ? [{ key: 'all', label: '', items: this.rows() }]
-      : groupByMonth(this.rows(), this.i18n.locale()),
+      : groupByMonth(this.rows(), (r) => r.createdAt, this.i18n.formatLocale()),
   );
 
   constructor() {
@@ -336,12 +336,7 @@ export class TasksComponent implements OnDestroy {
   /** The amount in the currency of the application, or null without an amount. */
   money(item: ApplicationListItem): string | null {
     if (item.amount === null || item.amount === undefined || item.amount === '') return null;
-    const n = Number(item.amount);
-    if (Number.isNaN(n)) return item.amount;
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: item.currency ?? 'EUR',
-    }).format(n);
+    return formatMoney(item.amount, this.i18n.formatLocale(), { currency: item.currency }) || item.amount;
   }
 
   /** The moment the task started to wait: the last status change, else the last change. */
@@ -356,13 +351,8 @@ export class TasksComponent implements OnDestroy {
    * shows "seit 1 Tag" at 09:00 today. A missing or invalid time gives a dash.
    */
   waitingSince(at: IsoDateTime | null | undefined): string {
-    if (!at) return '—';
-    const then = new Date(at);
-    if (Number.isNaN(then.getTime())) return '—';
-    const now = new Date(Date.now());
-    const day = (d: Date): number => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    // Round, not floor: a day with a DST change has 23 or 25 hours.
-    const days = Math.max(0, Math.round((day(now) - day(then)) / DAY_MS));
+    const days = calendarDaysSince(at, new Date(Date.now()));
+    if (days === null) return '—';
     if (days === 0) return this.i18n.translate('tasks.waiting.today');
     if (days === 1) return this.i18n.translate('tasks.waiting.one');
     return this.i18n.translate('tasks.waiting.other', { n: days });
