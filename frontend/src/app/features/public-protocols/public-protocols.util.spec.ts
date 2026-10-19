@@ -11,8 +11,10 @@ import {
   semesterLabel,
   shortDate,
   topCounts,
+  topParts,
   useNoindex,
 } from './public-protocols.util';
+import type { PublicDecision } from './public-protocols.models';
 
 const t = (key: string, params?: Record<string, string | number>) =>
   `${key}${params ? JSON.stringify(params) : ''}`;
@@ -79,5 +81,52 @@ describe('public protocols util', () => {
     expect(meta.getTag('name="robots"')?.content).toBe('noindex');
     fixture.destroy();
     expect(meta.getTag('name="robots"')).toBeNull();
+  });
+
+  describe('topParts', () => {
+    const motion = (question: string | null, inText = true): PublicDecision => ({
+      question,
+      counts: { yes: 1 },
+      result: 'passed',
+      majorityRule: 'simple',
+      secret: false,
+      inText,
+    });
+
+    it('cuts the callout of a decision out of the text, with its tally and conditions', () => {
+      const d = motion('Soll „A“ gefördert werden?');
+      const md = 'Text.\n> [!abstimmung] **Soll „A“ gefördert werden?**\n> yes: 1, no: 0\n> Auflage 1: x\nWeiter.';
+      expect(topParts(md, [d])).toEqual([
+        { kind: 'text', markdown: 'Text.' },
+        { kind: 'decision', decision: d },
+        { kind: 'text', markdown: 'Weiter.' },
+      ]);
+    });
+
+    it('matches an escaped question, the fallback head and a runoff round', () => {
+      const plain = motion(null);
+      const escaped = motion('Wahl *A*?');
+      const runoff: PublicDecision = { ...motion('Vorsitz'), kind: 'election', round: 2 };
+      const md = [
+        '> [!abstimmung] **Beschlussfrage**',
+        '',
+        '> [!Abstimmung] **Wahl \\*A\\*?**',
+        '',
+        '> [!abstimmung] **Vorsitz (2. Wahlgang)**',
+        '> Wahl · 1 Posten',
+      ].join('\n');
+      expect(topParts(md, [plain, escaped, runoff]).map((p) => p.kind)).toEqual([
+        'decision',
+        'decision',
+        'decision',
+      ]);
+    });
+
+    it('keeps a callout without a decision in the text, also one in a code fence', () => {
+      const md = '> [!abstimmung] **Fremd**\n> yes: 1\n```\n> [!abstimmung] **Q**\n```';
+      expect(topParts(md, [motion('Q'), motion('Fremd', false)])).toEqual([
+        { kind: 'text', markdown: md },
+      ]);
+    });
   });
 });

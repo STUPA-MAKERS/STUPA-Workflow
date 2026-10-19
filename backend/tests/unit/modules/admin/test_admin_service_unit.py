@@ -2,7 +2,7 @@
 
 ``create_global_flow_version`` validates the graph BEFORE it touches the DB. An invalid
 flow ends as 422 (``ValidationProblem``), not as 500. The service never touches the
-session, so these tests need no DB. The module also covers the date helpers.
+session, so these tests need no DB. The module also covers the ISO date helper.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import pytest
 
 from app.modules.admin.schemas import FlowVersionCreate
 from app.modules.admin.service import ConfigService
-from app.modules.admin.service.service_base import _iso, _parse_dt
+from app.modules.admin.service.service_base import _iso
 from app.shared.config_schemas import FlowGraph
 from app.shared.errors import ValidationProblem
 
@@ -57,22 +57,6 @@ def test_create_flow_version_unknown_guard_operator_is_422() -> None:
     )
     with pytest.raises(ValidationProblem):
         asyncio.run(_svc().create_global_flow_version(FlowVersionCreate(graph=graph), "admin"))
-
-
-def test_parse_dt_normalizes_to_aware_utc_and_none() -> None:
-    assert _parse_dt(None) is None
-    # A tz-aware input becomes aware UTC. The column is timestamptz since migration 0015.
-    assert _parse_dt("2026-06-07T12:00:00+02:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
-    # The parser reads a naive input as UTC and returns an aware value.
-    assert _parse_dt("2026-06-07T10:00:00") == datetime(2026, 6, 7, 10, 0, tzinfo=UTC)
-    # _iso emits the UTC offset.
-    assert _iso(_parse_dt("2026-06-07T10:00:00")) == "2026-06-07T10:00:00+00:00"
-
-
-def test_parse_dt_invalid_raises_422() -> None:
-    with pytest.raises(ValidationProblem) as ei:
-        _parse_dt("not-a-date")
-    assert ei.value.status == 422
 
 
 def test_iso_helper() -> None:

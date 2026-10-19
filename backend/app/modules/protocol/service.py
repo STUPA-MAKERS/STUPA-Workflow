@@ -45,12 +45,13 @@ from app.modules.admin.cd_resolver import (
     resolve_cd_variant_by_key,
 )
 from app.modules.admin.models import Gremium, MailList
+from app.modules.applications.models import Application
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.files.storage import ObjectStorage, StorageError
-from app.modules.livevote.agenda_service import agenda_order
+from app.modules.livevote.agenda_service import agenda_order, title_of
 from app.modules.livevote.keepers import agenda_positions, keeper_periods, principal_names
 from app.modules.livevote.models import Meeting, MeetingAgendaItem, MeetingAttendance
 from app.modules.livevote.roster import meeting_roster_filter, roster_filter
@@ -1047,10 +1048,31 @@ class ProtocolService:
         ).scalars().all()
         if not items:
             return ""
+        # An application item has no title of its own: it shows the title of its
+        # application, as on the meeting page.
+        app_ids = [
+            app_id
+            for item in items
+            if (app_id := getattr(item, "application_id", None)) is not None
+        ]
+        app_titles: dict[UUID, str | None] = {}
+        if app_ids:
+            app_titles = {
+                app_id: title_of(data)
+                for app_id, data in (
+                    await self.session.execute(
+                        select(Application.id, Application.data).where(
+                            Application.id.in_(app_ids)
+                        )
+                    )
+                ).all()
+            }
         voting = VotingService(self.session)
         blocks: list[str] = []
         for number, item in enumerate(items, start=1):
-            heading = (item.title or "Tagesordnungspunkt").strip()
+            app_id = getattr(item, "application_id", None)
+            own = app_titles.get(app_id) if app_id is not None else item.title
+            heading = (own or "Tagesordnungspunkt").strip()
             # Use a top-level `#` WITHOUT a "TOP n:" prefix. The typst service numbers
             # the sections itself as "TOP 1", "TOP 2" and so on. A `##` would get the
             # number "TOP 0.1", and a manual prefix would appear twice.

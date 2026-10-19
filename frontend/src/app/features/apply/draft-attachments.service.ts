@@ -156,7 +156,7 @@ export class DraftAttachmentsService {
    */
   upload(
     files: readonly File[],
-    opts: { fieldKey?: string | null; isComparisonOffer?: boolean } = {},
+    opts: { fieldKey?: string | null } = {},
   ): Promise<{ uploaded: DraftFile[]; failed: UploadFailure[] }> {
     const fieldKey = opts.fieldKey ?? null;
     const generation = this.generation;
@@ -165,7 +165,7 @@ export class DraftAttachmentsService {
       pending: { key: nextKey++, filename: file.name, size: file.size, fieldKey } satisfies PendingUpload,
     }));
     if (queued.length) this.pending.update((list) => [...list, ...queued.map((q) => q.pending)]);
-    const run = this.queue.then(() => this.runUploads(queued, fieldKey, opts.isComparisonOffer === true, generation));
+    const run = this.queue.then(() => this.runUploads(queued, fieldKey, generation));
     // `runUploads` catches every refusal and never rejects, so the queue never stalls.
     this.queue = run;
     return run;
@@ -174,7 +174,6 @@ export class DraftAttachmentsService {
   private async runUploads(
     queued: readonly { file: File; pending: PendingUpload }[],
     fieldKey: string | null,
-    isComparisonOffer: boolean,
     generation: number,
   ): Promise<{ uploaded: DraftFile[]; failed: UploadFailure[] }> {
     const uploaded: DraftFile[] = [];
@@ -190,7 +189,7 @@ export class DraftAttachmentsService {
           continue;
         }
         try {
-          const draft = await this.send(file, fieldKey, isComparisonOffer, generation);
+          const draft = await this.send(file, fieldKey, generation);
           if (!draft) continue;
           if (!this.inScope(draft)) {
             // The type changed during the upload: the new form has no such field.
@@ -345,15 +344,14 @@ export class DraftAttachmentsService {
   private async send(
     file: File,
     fieldKey: string | null,
-    isComparisonOffer: boolean,
     generation: number,
   ): Promise<DraftFile | null> {
     try {
-      return await this.sendOnce(file, fieldKey, isComparisonOffer, generation);
+      return await this.sendOnce(file, fieldKey, generation);
     } catch (err) {
       if (!(err instanceof HttpErrorResponse) || problemCode(err) !== TOKEN_INVALID) throw err;
       this.markFailed({ code: TOKEN_INVALID } as ProblemDetail);
-      return this.sendOnce(file, fieldKey, isComparisonOffer, generation);
+      return this.sendOnce(file, fieldKey, generation);
     }
   }
 
@@ -361,13 +359,12 @@ export class DraftAttachmentsService {
   private async sendOnce(
     file: File,
     fieldKey: string | null,
-    isComparisonOffer: boolean,
     generation: number,
   ): Promise<DraftFile | null> {
     const token = this._token();
     const altcha = !token && !this.auth.isAuthenticated() ? await this.altcha.solve() : null;
     const res = await firstValueFrom(
-      this.api.uploadDraftAttachment(file, { token, altcha, fieldKey, isComparisonOffer }),
+      this.api.uploadDraftAttachment(file, { token, altcha, fieldKey }),
     );
     if (generation !== this.generation) {
       void this.deleteQuietly([res.attachment.id], res.draftToken);

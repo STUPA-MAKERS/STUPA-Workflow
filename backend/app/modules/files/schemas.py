@@ -33,7 +33,6 @@ class AttachmentOut(BaseModel):
     mime: str
     size: int
     scanned: bool
-    is_comparison_offer: bool
 
 
 class DraftAttachmentOut(AttachmentOut):

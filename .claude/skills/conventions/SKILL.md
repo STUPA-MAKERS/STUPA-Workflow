@@ -12,11 +12,8 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 
 - **TDD: Red → Green → Refactor.** Write the failing test first, then minimal code, then clean up.
   No `skip`/`xfail` without a linked reason (issue).
-- **Finish the job:** branch → commit → push → PR, then watch CI and fix failures. See
-  `[[repo-ship-workflow]]`.
-- **Ask before design decisions** (`[[ask-all-design-decisions]]`). Otherwise execute autonomously
-  (`[[work-autonomously]]`). Track work with the todo tool (`[[always-track-todos]]`,
-  `[[track-side-requests]]`).
+- **Finish the job:** branch → commit → push → PR, then watch CI and fix failures.
+- **Ask before design decisions.** A fork with more than one reasonable answer goes to the user.
 
 ## Backend Definition of Done
 
@@ -30,7 +27,7 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
   See `[[admin-domain-rules]]`.
 - **Strictly typed inputs** — Enums/`Literal` instead of free strings. Validate query/body/path via
   Pydantic/`Annotated`. No open `str` status fields. Python ≥3.13, fully annotated, no bare `Any`
-  (`[[python-strong-typing]]`).
+  (basedpyright runs in `standard` mode).
 - **No `eval`** — flow/form guards run through a whitelist dispatch table (`app/shared/guards.py`,
   `app/shared/jsonlogic.py`), never `eval`.
 
@@ -49,8 +46,8 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
   dev).
 - **Run `npm run build`** after CSS changes — bundle/style budgets fail the Docker build but pass jest+tsc
   (`[[ng-build-budgets]]`).
-- UI conventions: `[[ui-patterns-and-backlog2]]`, `[[empty-state-convention]]`, `[[no-uuids-in-ui]]`,
-  `[[loading-overlay-convention]]`, `[[tailwind-preflight-off-borders]]`, `[[mobile-view-decisions]]`.
+- UI conventions: `[[empty-state-convention]]`, `[[no-uuids-in-ui]]`,
+  `[[loading-bar-convention]]`, `[[tailwind-preflight-off-borders]]`, `[[mobile-view-decisions]]`.
 
 ## Tests & coverage gates (CI blocks on these)
 
@@ -70,7 +67,9 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
   **no `--rev-id`**. The `0001…0017` chain stays as-is. Only new revisions get hash ids.
 - `alembic heads` MUST show exactly one head. `alembic upgrade head` MUST be green. Single-head is the
   one intended merge-conflict point.
-- Revision ids MUST be ≤ 32 chars (`alembic_version varchar(32)`) — `[[alembic-revision-id-limit]]`.
+- Revision ids MUST be ≤ 32 chars (`alembic_version varchar(32)`). A longer id passes `alembic heads`
+  locally, then fails the deploy at `UPDATE alembic_version` with `StringDataRightTruncationError`.
+  A hash id (12 chars) always fits; mind the length only for a hand-written id.
 - The `0001` baseline creates the whole schema via `Base.metadata.create_all` (single-source). Pure
   data/constraint migrations get their own revision. Details: `backend/migrations/README.md`.
 - **A migration that adds a table MUST be idempotent.** The baseline builds from

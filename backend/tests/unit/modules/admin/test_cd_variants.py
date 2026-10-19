@@ -8,7 +8,7 @@ The tests cover four areas.
    extension of the SNIFFED type.
 3. `CdVariantService`: CRUD, the immutable key, the 409 on a delete while a
    Gremium still references the variant, and the storage error paths.
-4. `resolve_cd_variant` for a vendored-only, an upload-only and a mixed variant.
+4. `resolve_cd_variant_by_key` for a vendored-only, an upload-only and a mixed variant.
 
 The session fake follows `test_admin_service_cov`: `execute` and `scalars` share
 one ordered queue, `scalar` and `get` have their own. Every audit write consumes
@@ -31,7 +31,7 @@ from app.modules.admin.cd_logos import (
     asset_file_name,
     sniff_cd_logo,
 )
-from app.modules.admin.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant
+from app.modules.admin.cd_resolver import cd_variant_key_for_gremium, resolve_cd_variant_by_key
 from app.modules.admin.models import CdVariant, CdVariantLogo, Gremium
 from app.modules.admin.schemas import (
     CdVariantCreate,
@@ -695,8 +695,8 @@ async def test_cd_variant_key_without_a_variant_is_none(gremium: Gremium | None)
 def _resolver_session(
     variant: CdVariant, logos: list[CdVariantLogo]
 ) -> FakeSession:
-    """`scalar` answers the gremium lookup, `get` the variant, `scalars` the logos."""
-    return FakeSession([res(*logos)], scalars=[variant.id], gets=[variant])
+    """`scalar` answers the variant lookup by key, `scalars` the logos."""
+    return FakeSession([res(*logos)], scalars=[variant])
 
 
 async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
@@ -706,8 +706,8 @@ async def test_resolve_vendored_only_variant_loads_no_asset() -> None:
         logo_row(variant_id=variant.id, slot="footer", vendored_name="STUPA"),
     ]
     storage = FakeStorage()
-    out = await resolve_cd_variant(
-        _resolver_session(variant, logos), storage, uuid.uuid4()  # type: ignore[arg-type]
+    out = await resolve_cd_variant_by_key(
+        _resolver_session(variant, logos), storage, variant.key  # type: ignore[arg-type]
     )
     assert out is not None
     assert out.base_variant == "protocol"
@@ -726,8 +726,8 @@ async def test_resolve_upload_only_variant_returns_names_and_bytes() -> None:
     )
     storage = FakeStorage()
     storage.objects["cd-logos/a/wappen.svg"] = (SVG, "image/svg+xml")
-    out = await resolve_cd_variant(
-        _resolver_session(variant, [logo]), storage, uuid.uuid4()  # type: ignore[arg-type]
+    out = await resolve_cd_variant_by_key(
+        _resolver_session(variant, [logo]), storage, variant.key  # type: ignore[arg-type]
     )
     assert out is not None
     name = asset_file_name(logo.id, "wappen.svg", "image/svg+xml")
@@ -754,10 +754,10 @@ async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:
     )
     storage = FakeStorage()
     storage.objects["cd-logos/a/mark.png"] = (PNG, "image/png")
-    out = await resolve_cd_variant(
+    out = await resolve_cd_variant_by_key(
         _resolver_session(variant, [uploaded, vendored, footer]),  # type: ignore[arg-type]
         storage,
-        uuid.uuid4(),
+        variant.key,
     )
     assert out is not None
     name = asset_file_name(uploaded.id, "mark.png", "image/png")
@@ -766,19 +766,19 @@ async def test_resolve_mixed_variant_keeps_the_slot_order() -> None:
     assert out.assets == {name: PNG}
 
 
-async def test_resolve_without_a_gremium_id_is_none() -> None:
-    assert await resolve_cd_variant(FakeSession(), FakeStorage(), None) is None  # type: ignore[arg-type]
+async def test_resolve_without_a_key_is_none() -> None:
+    assert await resolve_cd_variant_by_key(FakeSession(), FakeStorage(), None) is None  # type: ignore[arg-type]
 
 
-async def test_resolve_gremium_without_a_variant_is_none() -> None:
+async def test_resolve_unknown_key_is_none() -> None:
     session = FakeSession(scalars=[None])
-    assert await resolve_cd_variant(session, FakeStorage(), uuid.uuid4()) is None  # type: ignore[arg-type]
+    assert await resolve_cd_variant_by_key(session, FakeStorage(), "gone") is None  # type: ignore[arg-type]
 
 
 async def test_resolve_unknown_base_variant_falls_back_to_report() -> None:
     variant = variant_row(key="x", base_variant="something-else")
-    out = await resolve_cd_variant(
-        _resolver_session(variant, []), FakeStorage(), uuid.uuid4()  # type: ignore[arg-type]
+    out = await resolve_cd_variant_by_key(
+        _resolver_session(variant, []), FakeStorage(), variant.key  # type: ignore[arg-type]
     )
     assert out is not None and out.base_variant == "report"
 
@@ -790,8 +790,8 @@ async def test_resolve_without_storage_fails_loudly() -> None:
         variant_id=variant.id, slot="title", object_key="cd-logos/a/x.png", mime="image/png"
     )
     with pytest.raises(ServiceUnavailableError):
-        await resolve_cd_variant(
-            _resolver_session(variant, [logo]), None, uuid.uuid4()  # type: ignore[arg-type]
+        await resolve_cd_variant_by_key(
+            _resolver_session(variant, [logo]), None, variant.key  # type: ignore[arg-type]
         )
 
 
@@ -805,6 +805,6 @@ async def test_resolve_storage_error_is_unavailable() -> None:
         variant_id=variant.id, slot="title", object_key="cd-logos/a/x.png", mime="image/png"
     )
     with pytest.raises(ServiceUnavailableError):
-        await resolve_cd_variant(
-            _resolver_session(variant, [logo]), Failing(), uuid.uuid4()  # type: ignore[arg-type]
+        await resolve_cd_variant_by_key(
+            _resolver_session(variant, [logo]), Failing(), variant.key  # type: ignore[arg-type]
         )

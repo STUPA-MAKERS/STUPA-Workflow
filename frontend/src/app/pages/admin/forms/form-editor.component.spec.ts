@@ -211,6 +211,14 @@ describe('FormEditorComponent', () => {
     expect(c.groups()[0].fields[0].promoteTarget).toBeUndefined();
   });
 
+  it('blocks saving a funding field without cost positions and names the problem', async () => {
+    const { c } = await setup(
+      draft([{ key: 'foerderung', type: 'funding', label: { de: 'Förderung', en: '' } }]),
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('braucht Kostenpositionen');
+    expect(c.formValid()).toBe(false);
+  });
+
   it('switches to preview mode', async () => {
     await setup(draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' }, required: true }]));
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));

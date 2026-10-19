@@ -819,15 +819,6 @@ async def test_delete_expense_transfer_pair() -> None:
     assert sess.deleted == [pair_a, pair_b]
 
 
-async def test_list_invoices_compat() -> None:
-    inv = _invoice(file_key="invoices/x/a.pdf", file_name="a.pdf")
-    sess = fake_session(counts(1, 1), result(0), result(inv))  # counts, count, rows
-    svc = BudgetTreeService(sess)
-    out = await svc.list_invoices()
-    assert len(out) == 1
-    assert out[0].has_file is True   # file_object_key is set
-
-
 async def test_list_invoices_paged_all_filters_and_search() -> None:
     inv = _invoice()
     sess = _pg_session(counts(2, 2), result(2), result(inv))  # counts, count, rows
@@ -1975,33 +1966,19 @@ def _transfer_pair(*, transfer_id=None, src=None, dst=None, fy=None, actor=None)
     return tid, out, income
 
 
-async def test_get_transfer_joins_both_legs() -> None:
-    tid, out, income = _transfer_pair(actor="u")
-    sess = fake_session(
-        result(out, income),  # _legs
-        result((out.budget_id, "VS-1"), (income.budget_id, "VS-2")),  # _path_keys
-        result(sub_ref("u", "Uwe", None)),  # _actor_names
-    )
-    row = await BudgetTreeService(sess).get_transfer(tid)
-    assert row.transfer_id == tid
-    assert row.expense_id == out.id and row.income_id == income.id
-    assert row.from_path_key == "VS-1" and row.to_path_key == "VS-2"
-    assert row.actor_name == "Uwe"
-
-
-async def test_get_transfer_missing_leg_404() -> None:
+async def test_delete_transfer_missing_income_leg_404() -> None:
     # A single booking without its counterpart is not a transfer entity.
     _tid, out, _income = _transfer_pair()
     svc = BudgetTreeService(fake_session(result(out)))
     with pytest.raises(NotFoundError):
-        await svc.get_transfer(uuid.uuid4())
+        await svc.delete_transfer(uuid.uuid4())
 
 
-async def test_get_transfer_missing_expense_leg_404() -> None:
+async def test_delete_transfer_missing_expense_leg_404() -> None:
     _tid, _out, income = _transfer_pair()
     svc = BudgetTreeService(fake_session(result(income)))
     with pytest.raises(NotFoundError):
-        await svc.get_transfer(uuid.uuid4())
+        await svc.delete_transfer(uuid.uuid4())
 
 
 async def test_path_keys_empty_set_skips_query() -> None:

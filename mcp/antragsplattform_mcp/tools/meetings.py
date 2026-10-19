@@ -758,9 +758,8 @@ async def list_attachments(application_id: str) -> dict:
     """List the file attachments of an application.
 
     Each entry holds `id`, `filename`, `mime` (the type that the server sniffed),
-    `size`, `scanned` and `is_comparison_offer`. `scanned` stays false until the
-    ClamAV scan reports clean; only then does `download_attachment` work. Upload with
-    `upload_attachment`. A caller without the PII right does not see the files of the
+    `size` and `scanned`. `scanned` stays false until the ClamAV scan reports clean;
+    only then does `download_attachment` work. Upload with `upload_attachment`. A caller without the PII right does not see the files of the
     `isPII` form fields.
     """
     return await api().get(f"/applications/{application_id}/attachments")
@@ -772,15 +771,13 @@ async def upload_attachment(
     file_path: str,
     filename: str | None = None,
     field_key: str | None = None,
-    is_comparison_offer: bool = False,
 ) -> dict:
     """Upload a local file as an attachment of an application.
 
     `POST /applications/{id}/attachments` (multipart field `file`). `file_path` is a
     path on the machine of the MCP server. `filename` overrides the name that the
     platform stores (the extension must still fit the content). `field_key` binds the
-    file to a form field of type file; `is_comparison_offer` marks a comparison offer
-    (Vergleichsangebot).
+    file to a form field of type file.
 
     Allowed: PDF, PNG, JPEG, GIF, WebP and the Office/OpenDocument types (doc, docx,
     xls, xlsx, ppt, pptx, odt, ods, odp), at most 10 MB. The server sniffs the content:
@@ -793,10 +790,10 @@ async def upload_attachment(
 
     Returns:
         The attachment: `id`, `filename`, `mime`, `size`, `scanned` (false: the virus
-        scan still runs, the file cannot be downloaded yet) and `is_comparison_offer`.
+        scan still runs, the file cannot be downloaded yet).
     """
     name, data, mime = _attachment_part(file_path, filename)
-    form: dict[str, str] = {"is_comparison_offer": "true" if is_comparison_offer else "false"}
+    form: dict[str, str] = {}
     if field_key is not None:
         form["field_key"] = field_key
     return await api().post(

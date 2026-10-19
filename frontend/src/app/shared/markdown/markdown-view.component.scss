@@ -55,6 +55,12 @@
   border-left: 3px solid var(--color-border-strong);
   color: var(--color-text-muted);
 }
+.mdv blockquote > :first-child {
+  margin-top: 0;
+}
+.mdv blockquote > :last-child {
+  margin-bottom: 0;
+}
 .mdv a {
   color: var(--color-primary);
 }
