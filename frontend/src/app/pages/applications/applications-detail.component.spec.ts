@@ -650,6 +650,14 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.error()).toBe(true);
     expect(cmp.notFound()).toBe(false);
     expect(screen.getByText('Antrag konnte nicht geladen werden.')).toBeInTheDocument();
+    // "Erneut versuchen" reads the application again.
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    detectChanges();
+    expect(cmp.error()).toBe(false);
+    expect(cmp.loading()).toBe(true);
+    http.expectOne(url('')).flush({ title: 'Boom' }, { status: 500, statusText: 'Server Error' });
+    detectChanges();
+    expect(cmp.error()).toBe(true);
     flushTypes(http);
     http.verify();
   });
@@ -724,7 +732,7 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [403, 'Sie dürfen diesen Übergang nicht ausführen.'],
+    [403, 'Du darfst diesen Übergang nicht ausführen.'],
     [409, 'Statuswechsel nicht möglich (Status hat sich geändert oder Bedingung nicht erfüllt).'],
     [500, 'Statuswechsel fehlgeschlagen.'],
   ])('maps a failed transition %s to its toast (and refreshes)', async (status, message) => {
@@ -939,8 +947,8 @@ describe('ApplicationsDetailComponent', () => {
   });
 
   it.each([
-    [422, 'Zuordnung nicht möglich – Kostenstelle/Haushaltsjahr prüfen.'],
-    [403, 'Sie dürfen diesen Übergang nicht ausführen.'],
+    [422, 'Zuordnung nicht möglich — Kostenstelle/Haushaltsjahr prüfen.'],
+    [403, 'Du darfst diesen Übergang nicht ausführen.'],
     [500, 'Statuswechsel fehlgeschlagen.'],
   ])('maps a failed budget assignment %s to its toast', async (status, message) => {
     const { http, detectChanges, cmp, toast } = await setup();
@@ -1730,7 +1738,11 @@ describe('ApplicationsDetailComponent', () => {
     await new Promise((r) => setTimeout(r));
     detectChanges();
 
-    await userEvent.click(screen.getByRole('button', { name: /Speichern/ }));
+    // "Speichern" shows after the first change of a field.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByRole('textbox', { name: /Titel/ }), 'e');
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     http
       .expectOne((r) => r.method === 'PATCH' && r.url === '/api/applications/app-1')
       .flush(

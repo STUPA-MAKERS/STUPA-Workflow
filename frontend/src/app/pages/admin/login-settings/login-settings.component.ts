@@ -7,7 +7,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import { FabComponent } from '@shared/ui/fab/fab.component';
+import { InputComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { type LoginSettings, MAX_SESSION_DAYS } from '../admin.models';
 
@@ -58,7 +59,7 @@ function draftOf(s: LoginSettings): Draft {
     TranslatePipe,
     LocalizedDatePipe,
     PageHeaderComponent,
-    ButtonComponent,
+    FabComponent,
     InputComponent,
     NoteComponent,
     SkeletonComponent,
@@ -90,7 +91,7 @@ export class LoginSettingsComponent {
   protected readonly pwaError = computed(() => (this.pwa() === null ? this.rangeText() : ''));
 
   /** The body of the PUT, or `null` while a field is invalid. */
-  private readonly body = computed<LoginSettingsBody | null>(() => {
+  protected readonly body = computed<LoginSettingsBody | null>(() => {
     const web = this.web();
     const pwa = this.pwa();
     if (web === null || pwa === null) return null;

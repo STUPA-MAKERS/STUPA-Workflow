@@ -72,14 +72,24 @@ describe('AdminRolesComponent', () => {
     expect(inst.isLocked({ key: 'member' })).toBe(false);
   });
 
-  it('marks admin and member as fixed, without a delete button (N40)', async () => {
+  it('marks admin and member as fixed, without a delete menu (N40)', async () => {
     const { inst } = await setup();
     expect(inst.isFixed({ key: 'admin' })).toBe(true);
     expect(inst.isFixed({ key: 'member' })).toBe(true);
     expect(inst.isFixed({ key: 'referent' })).toBe(false);
     expect(screen.getAllByText('fest')).toHaveLength(2);
-    // Only the referent row has a delete button.
-    expect(screen.getAllByRole('button', { name: /^Rolle löschen/ })).toHaveLength(1);
+    // Only the referent row has a ⋮ menu, and delete is its one item.
+    const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
+    expect(menus).toHaveLength(1);
+    expect(menus[0]).toHaveAccessibleName('Weitere Aktionen: Referent');
+    await userEvent.click(menus[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rolle löschen' }));
+    expect(inst.confirmRole()).toEqual(ROLES[2]);
+  });
+
+  it('breaks a permission key only after a dot or an underscore', async () => {
+    const { inst } = await setup();
+    expect(inst.permParts('application.force_status')).toEqual(['application.', 'force_', 'status']);
   });
 
   it('opens and closes a row with its toggle', async () => {
@@ -89,7 +99,7 @@ describe('AdminRolesComponent', () => {
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(inst.isOpen(ROLES[2])).toBe(true);
-    expect(screen.getByRole('button', { name: 'Namen speichern' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Bezeichnung (DE)' })).toBeInTheDocument();
     await userEvent.click(toggle);
     expect(inst.isOpen(ROLES[2])).toBe(false);
   });
@@ -112,7 +122,7 @@ describe('AdminRolesComponent', () => {
     for (const name of ['Anträge', 'Budget', 'Sitzungen und Abstimmungen', 'Verwaltung', 'Sicherheit und Daten', 'Weitere']) {
       expect(screen.getByRole('group', { name })).toBeInTheDocument();
     }
-    expect(within(screen.getByRole('group', { name: 'Weitere' })).getByText('x.new')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Weitere' })).getByRole('checkbox', { name: 'x.new' })).toBeInTheDocument();
     expect(screen.queryByText('vote.cast')).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'budget.view' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'application.read' })).not.toBeChecked();
@@ -135,7 +145,7 @@ describe('AdminRolesComponent', () => {
     const { inst, api } = await setup();
     inst.togglePerm(ROLES[2], 'removed.key', true);
     inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-ref'), 'flow.configure', true);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-ref'));
+    inst.saveRoles();
     expect(api.saveRolePermissions).toHaveBeenCalledWith('r-ref', ['flow.configure']);
   });
 
@@ -166,9 +176,9 @@ describe('AdminRolesComponent', () => {
 
   it('creates a role from the dialog', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: /Globale Rolle hinzufügen/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Rolle anlegen' }));
     await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'kultur');
-    await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     expect(api.createRole).toHaveBeenCalledWith({ key: 'kultur', label: {}, permissions: [] });
   });
 
@@ -183,20 +193,38 @@ describe('AdminRolesComponent', () => {
     expect(role.permissions).toContain('flow.configure');
   });
 
-  it('saveRole persists and replaces the role; success toast', async () => {
-    const { inst, api, toast } = await setup();
+  it('"Speichern" replaces "Rolle anlegen" while a role has changes, and saves them', async () => {
+    const { fixture, inst, api, toast } = await setup();
+    expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     inst.togglePerm(ROLES[1], 'flow.configure', true);
     inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-member'), 'application.read', false);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Rolle anlegen' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['flow.configure']);
-    expect(toast.success).toHaveBeenCalled();
+    expect(api.renameRole).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
   });
 
-  it('saveRole error path shows an error toast', async () => {
+  it('a right switched on and off again is no change', async () => {
+    const { inst } = await setup();
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-member'), 'flow.configure', false);
+    expect(inst.rolesDirty()).toBe(false);
+  });
+
+  it('a failed save of the rights shows an error toast and keeps the change', async () => {
     const api = makeApi({ saveRolePermissions: jest.fn(() => throwError(() => new Error('x'))) });
     const { inst, toast } = await setup(api);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    inst.saveRoles();
     expect(toast.error).toHaveBeenCalled();
+    expect(inst.rolesDirty()).toBe(true);
+    expect(inst.savingRoles()).toBe(false);
   });
 
   it('nameDraft returns label-derived default then the patched draft', async () => {
@@ -210,21 +238,37 @@ describe('AdminRolesComponent', () => {
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'Mitglied!', en: 'Member!' });
   });
 
-  it('renameRole persists and updates the role; success toast', async () => {
+  it('saves a new name with "Speichern" and updates the role', async () => {
     const { inst, api, toast } = await setup();
     inst.patchName(ROLES[1], 'de', 'Mitglied');
     inst.patchName(ROLES[1], 'en', 'Member');
-    inst.renameRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    expect(inst.rolesDirty()).toBe(true);
+    inst.saveRoles();
     expect(api.renameRole).toHaveBeenCalledWith('r-member', { de: 'Mitglied', en: 'Member' });
+    expect(api.saveRolePermissions).not.toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalled();
     const updated = inst.roles().find((r: Role) => r.id === 'r-member');
     expect(updated.label).toEqual({ de: 'Mitglied', en: 'Member' });
+    expect(inst.rolesDirty()).toBe(false);
   });
 
-  it('renameRole error path shows an error toast', async () => {
+  it('saves the rights before the name of the same role', async () => {
+    const { inst, api } = await setup();
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    inst.patchName(ROLES[1], 'de', 'Mitglied');
+    inst.saveRoles();
+    expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['application.read', 'flow.configure']);
+    expect(api.renameRole).toHaveBeenCalledWith('r-member', { de: 'Mitglied', en: 'member' });
+    expect(api.saveRolePermissions.mock.invocationCallOrder[0]).toBeLessThan(
+      api.renameRole.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('a failed rename shows an error toast', async () => {
     const api = makeApi({ renameRole: jest.fn(() => throwError(() => new Error('x'))) });
     const { inst, toast } = await setup(api);
-    inst.renameRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    inst.patchName(ROLES[1], 'de', 'Neu');
+    inst.saveRoles();
     expect(toast.error).toHaveBeenCalled();
   });
 

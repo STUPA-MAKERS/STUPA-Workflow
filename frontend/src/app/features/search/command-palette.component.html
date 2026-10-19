@@ -1,7 +1,14 @@
 @if (open()) {
-  <div class="pal__scrim" (click)="close()"></div>
+  <div class="pal__scrim" animate.enter="pal--fade-in" animate.leave="pal--fade-out" (click)="close()"></div>
 
-  <div class="pal" role="dialog" aria-modal="true" [attr.aria-label]="'search.title' | t">
+  <div
+    class="pal"
+    role="dialog"
+    aria-modal="true"
+    [attr.aria-label]="'search.title' | t"
+    animate.enter="pal--entering"
+    animate.leave="pal--fade-out"
+  >
     <div class="pal__field">
       <app-icon class="pal__glass" name="search" [size]="22" />
       <input

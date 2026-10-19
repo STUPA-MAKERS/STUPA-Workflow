@@ -2,13 +2,8 @@
   <section class="gs" aria-labelledby="mw-title">
     <header class="gs__head">
       <div class="gs__text">
-        <h2 class="gs__title" id="mw-title">{{ 'admin.meetingWindow.title' | t }}</h2>
+        <h2 class="section-title" id="mw-title">{{ 'admin.meetingWindow.title' | t }}</h2>
       </div>
-      @if (loadState() === 'ok' && !loading()) {
-        <app-button variant="tonal" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
-          {{ 'action.save' | t }}
-        </app-button>
-      }
     </header>
 
     @if (loading()) {

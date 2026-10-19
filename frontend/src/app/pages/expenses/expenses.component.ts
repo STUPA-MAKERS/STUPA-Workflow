@@ -23,7 +23,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   MEDIA,
   SegmentedComponent,
@@ -32,6 +31,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import {
   EmptyStateComponent,
+  FabComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   ListDetailLayoutComponent,
@@ -82,6 +82,7 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
 import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
 import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
 import { TransferFormComponent } from './transfer-form/transfer-form.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -122,14 +123,15 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     PageHeaderComponent,
     BookingDetailComponent,
     BookingFormComponent,
     BulkPanelComponent,
     ButtonComponent,
     CostCentreTreeComponent,
-    DialogComponent,
     EmptyStateComponent,
+    FabComponent,
     FilterSelectComponent,
     FormsModule,
     IconComponent,
@@ -911,7 +913,7 @@ export class ExpensesComponent implements OnDestroy {
     const main: RowMenuItem[] = [];
     if (this.canManage()) {
       main.push({ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' });
-      main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'add' });
+      main.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
     if (e.invoiceId) {
       main.push({
@@ -923,7 +925,7 @@ export class ExpensesComponent implements OnDestroy {
     const sections: RowMenuSection[] = main.length ? [{ items: main }] : [];
     if (this.canManage()) {
       sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
     }
     return sections;
@@ -940,7 +942,7 @@ export class ExpensesComponent implements OnDestroy {
   readonly transferMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
     {
-      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
     },
   ]);
 

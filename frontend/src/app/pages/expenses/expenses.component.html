@@ -13,24 +13,14 @@
             [iconOnly]="true"
             [ariaLabel]="'expenses.bulk.stop' | t"
             (click)="stopSelecting()"
-          ><app-icon name="x" [size]="20" /></app-button>
+          ><app-icon name="x" /></app-button>
           <h1 id="exp-title" class="exp__selTitle" aria-live="polite">{{ selectionLabel() }}</h1>
           <ng-container *ngTemplateOutlet="bulkIcons" />
         </header>
       } @else {
         <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
           <ng-container ngProjectAs="[actions]">
-            @if (phone()) {
-              @if (canManage()) {
-                <app-button size="sm" data-testid="exp-add" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
-                  <span class="exp__btn"
-                    ><app-icon name="add" [size]="16" />{{
-                      (tab() === 'transfers' ? 'expenses.transferShort' : 'expenses.addShort') | t
-                    }}</span
-                  >
-                </app-button>
-              }
-            } @else {
+            @if (!phone()) {
               @if (canExport() && tab() === 'bookings') {
                 <app-button
                   variant="text"
@@ -39,7 +29,7 @@
                   [ariaLabel]="'expenses.export' | t"
                   [title]="'expenses.export' | t"
                   (click)="onExport()"
-                ><app-icon name="download" [size]="21" /></app-button>
+                ><app-icon name="download" /></app-button>
               }
               @if (tab() === 'bookings') {
                 <app-row-menu
@@ -150,7 +140,7 @@
               [iconOnly]="true"
               [ariaLabel]="'expenses.bulk.stop' | t"
               (click)="stopSelecting()"
-            ><app-icon name="x" [size]="18" /></app-button>
+            ><app-icon name="x" /></app-button>
           </div>
         } @else {
           <div class="exp__bar">
@@ -237,7 +227,7 @@
                         <span class="exp__menuSlot">
                           @if (!split()) {
                             <span class="exp__chev" aria-hidden="true">
-                              <app-icon name="chevron-right" [size]="17" />
+                              <app-icon name="right" [size]="17" />
                             </span>
                           }
                           <app-row-menu
@@ -336,7 +326,7 @@
                             <span class="exp__menuSlot">
                               @if (!split()) {
                                 <span class="exp__chev" aria-hidden="true">
-                                  <app-icon name="chevron-right" [size]="17" />
+                                  <app-icon name="right" [size]="17" />
                                 </span>
                               }
                               @if (menu.length) {
@@ -369,11 +359,12 @@
         }
       </div>
 
-      @if (canManage() && !phone() && !selecting() && formMode() === null) {
-        <button type="button" class="exp__fab" (click)="tab() === 'transfers' ? openTransfer() : openCreate()">
-          <app-icon [name]="tab() === 'transfers' ? 'repeat' : 'plus'" [size]="22" />
-          {{ (tab() === 'transfers' ? 'expenses.transferNew' : 'expenses.add') | t }}
-        </button>
+      @if (canManage() && !selecting() && formMode() === null) {
+        <app-fab
+          [label]="(tab() === 'transfers' ? 'fab.transfer' : 'fab.expense') | t"
+          [contained]="split()"
+          (activate)="tab() === 'transfers' ? openTransfer() : openCreate()"
+        />
       }
     </section>
 
@@ -472,7 +463,7 @@
 <ng-template #emptyList let-key>
   <app-empty-state [heading]="key | t">
     @if (activeFilterCount() > 0) {
-      <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
+      <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'expenses.filter.reset' | t }}</app-button>
     }
   </app-empty-state>
 </ng-template>
@@ -487,7 +478,7 @@
     [title]="'expenses.bulk.reassign' | t"
     [disabled]="bulkBusy() || !selectedCount()"
     (click)="openBulkReassign()"
-  ><app-icon name="repeat" [size]="19" /></app-button>
+  ><app-icon name="repeat" /></app-button>
   @if (canExport()) {
     <app-button
       variant="text"
@@ -496,17 +487,16 @@
       [title]="'expenses.bulk.export' | t"
       [disabled]="bulkBusy() || !selectedCount()"
       (click)="runBulkExport()"
-    ><app-icon name="download" [size]="19" /></app-button>
+    ><app-icon name="download" /></app-button>
   }
   <app-button
     variant="text"
-    class="exp__danger"
     [iconOnly]="true"
     [ariaLabel]="'expenses.bulk.deleteSelected' | t"
     [title]="bulkDeleteReason() ?? ('expenses.bulk.deleteSelected' | t)"
     [disabled]="bulkBusy() || !selectedCount() || bulkDeleteBlocked()"
     (click)="askBulkDelete()"
-  ><app-icon name="delete" [size]="19" /></app-button>
+  ><app-icon name="trash" /></app-button>
 </ng-template>
 
 <!-- The form of a booking or a transfer: in the detail pane, or in a bottom sheet on a
@@ -608,49 +598,29 @@
   <app-sub-booking-dialog [sub]="sub" [saving]="saving()" />
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmDelete()"
   [title]="'expenses.delete.title' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="exp__confirm">
-    {{ 'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' } }}
-  </p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{
-      'expenses.delete.confirm' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'expenses.delete.body' | t: { description: confirmDelete()?.description ?? '' }"
+  [busy]="saving()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDeleteTransfer() !== null"
   [title]="'expenses.transfers.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="closeDeleteTransfer()"
->
-  <p class="exp__confirm">{{ 'expenses.transfers.deleteBody' | t }}</p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="closeDeleteTransfer()">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="transferSaving()" (click)="doDeleteTransfer()">{{
-      'action.delete' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'expenses.transfers.deleteBody' | t"
+  [busy]="transferSaving()"
+  (confirm)="doDeleteTransfer()"
+  (cancel)="closeDeleteTransfer()"
+/>
 
-<app-dialog
+<app-confirm-dialog
   [open]="bulkConfirm() === 'delete'"
   [title]="'expenses.bulk.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="bulkConfirm.set(null)"
->
-  <p class="exp__confirm">{{ 'expenses.bulk.deleteBody' | t: { count: selectedCount() } }}</p>
-  <div dialog-footer class="exp__footer">
-    <app-button variant="text" (click)="bulkConfirm.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="bulkBusy()" (click)="runBulkDelete()">{{
-      'expenses.bulk.deleteConfirm' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'expenses.bulk.deleteBody' | t: { count: selectedCount() }"
+  [busy]="bulkBusy()"
+  (confirm)="runBulkDelete()"
+  (cancel)="bulkConfirm.set(null)"
+/>

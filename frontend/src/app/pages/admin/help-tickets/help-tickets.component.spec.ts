@@ -119,17 +119,18 @@ describe('HelpTicketsComponent', () => {
     expect(screen.getByRole('heading', { name: 'Hilfe & Tickets' })).toBeInTheDocument();
     expect(wikiField().value).toBe(STORED.wikiUrl);
     expect(sw('Meldungen ohne Konto erlauben')).toHaveAttribute('aria-checked', 'true');
-    expect(sw('Neue Meldungen per Mail')).toHaveAttribute('aria-checked', 'true');
+    expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
     expect(sw('Erledigte Meldungen anonymisieren')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /nach 12 Monaten/ })).toBeInTheDocument();
-    expect(save()).toBeDisabled();
-    expect(discard()).toBeDisabled();
+    // Nothing changed: neither "Speichern" nor "Verwerfen" shows.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
 
   it('saves the switches, the link and the months', async () => {
     const { api, toast, fixture } = await setup();
     await userEvent.click(sw('Meldungen ohne Konto erlauben'));
-    await userEvent.click(sw('Neue Meldungen per Mail'));
+    await userEvent.click(sw('Neue Meldungen per E-Mail'));
     await userEvent.clear(wikiField());
     await userEvent.type(wikiField(), '  https://wiki.example.org/neu  ');
     const c = fixture.componentInstance as unknown as { setMonths(v: string): void };
@@ -144,7 +145,7 @@ describe('HelpTicketsComponent', () => {
     });
     expect(toast.success).toHaveBeenCalledWith('Gespeichert.');
     fixture.detectChanges();
-    expect(save()).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('turns the anonymization off and on again with the last months', async () => {
@@ -197,21 +198,21 @@ describe('HelpTicketsComponent', () => {
 
   it('puts the stored values back on Verwerfen', async () => {
     const { fixture } = await setup();
-    await userEvent.click(sw('Neue Meldungen per Mail'));
+    await userEvent.click(sw('Neue Meldungen per E-Mail'));
     await userEvent.click(discard());
     fixture.detectChanges();
-    expect(sw('Neue Meldungen per Mail')).toHaveAttribute('aria-checked', 'true');
-    expect(discard()).toBeDisabled();
+    expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
 
   it('names a failed save and keeps the draft', async () => {
     const api = makeApi();
     api.putHelpTickets.mockReturnValueOnce(throwError(() => new Error('x')));
     const { toast } = await setup({ api });
-    await userEvent.click(sw('Neue Meldungen per Mail'));
+    await userEvent.click(sw('Neue Meldungen per E-Mail'));
     await userEvent.click(save());
     expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-    expect(sw('Neue Meldungen per Mail')).toHaveAttribute('aria-checked', 'false');
+    expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'false');
     expect(save()).toBeEnabled();
   });
 
@@ -220,7 +221,7 @@ describe('HelpTicketsComponent', () => {
     const pending = new Subject<HelpTicketsSettings>();
     api.putHelpTickets.mockReturnValueOnce(pending);
     const { fixture } = await setup({ api });
-    await userEvent.click(sw('Neue Meldungen per Mail'));
+    await userEvent.click(sw('Neue Meldungen per E-Mail'));
     const c = fixture.componentInstance as unknown as { save(): void; discard(): void };
     c.save();
     c.save();

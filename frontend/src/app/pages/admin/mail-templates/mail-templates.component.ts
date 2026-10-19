@@ -20,9 +20,21 @@ import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 
 const LANGS = ['de', 'en'] as const;
 type Lang = (typeof LANGS)[number];
+
+/** The text fields of a template that the editor changes. */
+const TEXT_FIELDS = ['subjectI18n', 'bodyI18n', 'bodyHtmlI18n'] as const;
+
+/** Two i18n maps hold the same texts. A missing language is the same as an empty text. */
+function sameTexts(a: Record<string, string>, b: Record<string, string>): boolean {
+  const langs = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...langs].every((l) => (a[l] ?? '') === (b[l] ?? ''));
+}
 
 /**
  * Mail-template editor at `/admin/mail-templates` (board Admin-Mail-Vorlagen). Needs the
@@ -38,7 +50,9 @@ type Lang = (typeof LANGS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SkeletonComponent,
     EmptyStateComponent,
+    FabComponent,
     ScrollFadeDirective,
     FormsModule,
     UpperCasePipe,
@@ -49,6 +63,7 @@ type Lang = (typeof LANGS)[number];
     InputComponent,
     PageHeaderComponent,
     SegmentedComponent,
+    StatusTextComponent,
   ],
   templateUrl: './mail-templates.component.html',
   styleUrl: './mail-templates.component.scss',
@@ -66,11 +81,20 @@ export class MailTemplatesComponent {
   // Select by key, not by ID. A builtin template has no database ID.
   readonly selectedKey = signal<string | null>(null);
   readonly draft = signal<MailTemplate | null>(null);
+  /** The list has not arrived yet. */
+  readonly loading = signal(true);
   readonly lang = signal<Lang>('de');
   readonly saving = signal(false);
   readonly resetting = signal(false);
   readonly previewing = signal(false);
   readonly preview = signal<MailPreview | null>(null);
+
+  /** The open template has changes that are not saved. Only then the page shows "Speichern". */
+  readonly dirty = computed(() => {
+    const d = this.draft();
+    const saved = d && this.templates_().find((t) => t.key === d.key);
+    return !!saved && TEXT_FIELDS.some((f) => !sameTexts(d[f], saved[f]));
+  });
 
   /**
    * Localize a template key: `deadline_approaching` becomes "Deadline reminder".
@@ -110,10 +134,14 @@ export class MailTemplatesComponent {
   constructor() {
     this.api.listMailTemplates().subscribe({
       next: (t) => {
+        this.loading.set(false);
         this.templates_.set(t);
         if (t.length && !this.selectedKey()) this.select(t[0].key);
       },
-      error: () => this.toast.error(this.i18n.translate('admin.mailTemplates.loadFailed')),
+      error: () => {
+        this.loading.set(false);
+        this.toast.error(this.i18n.translate('admin.mailTemplates.loadFailed'));
+      },
     });
   }
 

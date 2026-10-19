@@ -92,6 +92,21 @@
   }
 }
 
+/* A phone: a header whose only action is a ⋮ menu keeps the menu on the title row, at
+   its end. The title wraps beside it; the menu never takes a line of its own. The menu
+   is projected content, so the match goes through ::ng-deep. It finds the menu as the
+   only child of the slot, or as the only child of the one wrapper a page puts there. */
+@media (max-width: 768px) {
+  :host ::ng-deep .ph__bar:has(> .ph__actions > app-row-menu:only-child),
+  :host ::ng-deep .ph__bar:has(> .ph__actions > :only-child > app-row-menu:only-child) {
+    flex-wrap: nowrap;
+  }
+  :host ::ng-deep .ph__bar:has(> .ph__actions > app-row-menu:only-child) > .ph__text,
+  :host ::ng-deep .ph__bar:has(> .ph__actions > :only-child > app-row-menu:only-child) > .ph__text {
+    flex-basis: 0;
+  }
+}
+
 /* The slot stays in the flow only when a page fills it. An empty slot would
    otherwise take the gap and push the title off center. */
 .ph__actions:empty {

@@ -177,7 +177,8 @@ describe('SubstitutePoolComponent', () => {
 
   it('removes an entry at once', async () => {
     const { delegations, toast } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Eintrag entfernen: Sam' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Sam' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Eintrag entfernen' }));
     expect(delegations.removeSubstitute).toHaveBeenCalledWith('s-2');
     expect(screen.queryByText('Sam')).toBeNull();
     expect(toast.success).toHaveBeenCalledWith('Eintrag entfernt.');
@@ -188,7 +189,8 @@ describe('SubstitutePoolComponent', () => {
       removeSubstitute: jest.fn(() => throwError(() => ({ status: 403 }))),
     });
     const { toast } = await setup({ delegations });
-    await userEvent.click(screen.getByRole('button', { name: 'Eintrag entfernen: Sam' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Sam' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Eintrag entfernen' }));
     expect(screen.getByText('Sam')).toBeInTheDocument();
     expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
   });
@@ -290,14 +292,14 @@ describe('SubstitutePoolComponent', () => {
   });
 
   it('names a failed load and an empty pool', async () => {
-    await setup({
-      delegations: makeDelegations({
-        substitutes: jest.fn(() => throwError(() => ({ status: 403 }))),
-      }),
-    });
+    const substitutes = jest.fn(() => throwError(() => ({ status: 403 })));
+    const { fixture } = await setup({ delegations: makeDelegations({ substitutes }) });
     expect(screen.getByRole('alert')).toHaveTextContent(
       'Die Stellvertretungen konnten nicht geladen werden.',
     );
+    screen.getByRole('button', { name: 'Erneut versuchen' }).click();
+    fixture.detectChanges();
+    expect(substitutes).toHaveBeenCalledTimes(2);
   });
 
   it('names a failed load and an empty pool (2)', async () => {

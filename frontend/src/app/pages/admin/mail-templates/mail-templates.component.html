@@ -1,4 +1,4 @@
-<section class="mt">
+<section class="mt admin-page">
   <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t" />
 
   <div class="mt__layout">
@@ -12,6 +12,9 @@
       />
     } @else {
       <nav class="mt__list" appScrollFade="y" [attr.aria-label]="'admin.mailTemplates.title' | t">
+        @if (loading()) {
+          <app-skeleton variant="lines" [count]="8" />
+        }
         @for (tpl of templates(); track tpl.key) {
           <button
             type="button"
@@ -23,11 +26,13 @@
           >
             <span class="mt__itemLabel">{{ keyLabel(tpl.key) }}</span>
             @if (tpl.source === 'override') {
-              <span class="mt__custom">{{ 'admin.mailTemplates.customized' | t }}</span>
+              <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
           </button>
         } @empty {
-          <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
+          @if (!loading()) {
+            <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
+          }
         }
       </nav>
     }
@@ -38,7 +43,7 @@
           <h2 class="mt__title" id="mt-title">{{ keyLabel(d.key) }}</h2>
           <span class="mt__headEnd">
             @if (d.source === 'override') {
-              <span class="mt__custom">{{ 'admin.mailTemplates.customized' | t }}</span>
+              <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
             <app-segmented width="equal" [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.mailTemplates.lang' | t" />
           </span>
@@ -69,7 +74,7 @@
 
         @if (placeholderList().length) {
           <div class="mt__block">
-            <h3 class="cap mt__cap">{{ 'admin.mailTemplates.placeholders' | t }}</h3>
+            <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.placeholders' | t }}</h3>
             <ul class="mt__chips">
               @for (p of placeholderList(); track p.key) {
                 <li><code class="mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
@@ -80,7 +85,7 @@
 
         @if (preview(); as pv) {
           <div class="mt__block">
-            <h3 class="cap mt__cap">{{ 'admin.mailTemplates.previewHeading' | t }} ({{ pv.lang | uppercase }})</h3>
+            <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.previewHeading' | t }} ({{ pv.lang | uppercase }})</h3>
             <div class="mt__preview">
               <p class="mt__previewSubj">{{ pv.subject }}</p>
               <p class="mt__previewText">{{ pv.text }}</p>
@@ -97,16 +102,23 @@
           }
           <span class="mt__actionsEnd">
             <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
-              <app-icon name="eye" [size]="18" /> {{ 'admin.mailTemplates.preview' | t }}
-            </app-button>
-            <app-button variant="fill" [loading]="saving()" (click)="save()">
-              <app-icon name="check" [size]="18" /> {{ 'action.save' | t }}
+              <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
             </app-button>
           </span>
         </div>
       </section>
+    } @else if (loading()) {
+      <!-- The shape of the editor: the head, the subject, the texts. -->
+      <div class="mt__editor">
+        <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
+        <app-skeleton variant="panel" />
+      </div>
     } @else {
       <app-empty-state plain icon="mail" fill [heading]="'admin.mailTemplates.selectHint' | t" />
     }
   </div>
+
+  @if (dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" (activate)="save()" />
+  }
 </section>

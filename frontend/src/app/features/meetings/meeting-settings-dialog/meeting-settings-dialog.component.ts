@@ -28,6 +28,7 @@ import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { errorCode, errorDetail } from '../meetings-display.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The longest meeting title that the server accepts (`MEETING_TITLE_MAX`). */
 export const MEETING_TITLE_MAX = 200;
@@ -49,6 +50,7 @@ export const MEETING_TITLE_MAX = 200;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ConfirmDialogComponent,
     FormsModule,
     TranslatePipe,
     DialogComponent,

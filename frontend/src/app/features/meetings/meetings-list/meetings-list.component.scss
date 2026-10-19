@@ -137,41 +137,6 @@
   padding-inline: var(--space-2);
 }
 
-/* "Neue Sitzung": at the end of the list pane side by side, else fixed at the end of the
-   screen. */
-.mtl__fab {
-  position: fixed;
-  right: var(--space-4);
-  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font: inherit;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  box-shadow: var(--shadow-elevated);
-  cursor: pointer;
-}
-.mtl__fab:hover {
-  filter: brightness(1.08);
-}
-.mtl__fab:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.mtl--split .mtl__fab {
-  position: absolute;
-  right: var(--space-4);
-  bottom: var(--space-4);
-}
-
 /* ------------------------------------------------------------------ detail pane */
 .mtl__detail {
   display: flex;

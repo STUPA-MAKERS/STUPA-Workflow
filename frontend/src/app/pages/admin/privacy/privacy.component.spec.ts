@@ -1,6 +1,6 @@
 import { of, throwError } from 'rxjs';
 import { provideRouter, Router } from '@angular/router';
-import { render, screen, fireEvent } from '@testing-library/angular';
+import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { AdminPrincipal, ErasureRequest, PrivacySettings } from '../admin.models';
@@ -134,7 +134,8 @@ describe('PrivacyComponent', () => {
   it('executes an open erasure after confirmation and reloads', async () => {
     const api = makeApi();
     const { toast } = await setup(api);
-    await userEvent.click(screen.getAllByRole('button', { name: /^Ausführen: / })[0]);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Ausführen' }));
     const confirm = screen.getAllByRole('button', { name: 'Ausführen' });
     await userEvent.click(confirm[confirm.length - 1]);
     expect(api.executeErasure).toHaveBeenCalledWith('er-1');
@@ -425,6 +426,22 @@ describe('PrivacyComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  it('shows "Speichern" only while the retention has a change', async () => {
+    const api = makeApi({
+      putPrivacySettings: jest.fn(() => of<PrivacySettings>({ defaultRetentionMonths: 36 })),
+    });
+    const { fixture } = await setup(api);
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    const field = screen.getByDisplayValue('24');
+    await userEvent.clear(field);
+    await userEvent.type(field, '36');
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(api.putPrivacySettings).toHaveBeenCalledWith({ defaultRetentionMonths: 36 });
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
   it('toasts an error when saving the retention fails', async () => {
     const api = makeApi({ putPrivacySettings: jest.fn(() => throwError(() => new Error('x'))) });
     const { fixture, toast } = await setup(api);
@@ -439,8 +456,7 @@ describe('PrivacyComponent', () => {
 
   it('names the request in each row button and leaves a closed row without actions', async () => {
     const { container } = await setup();
-    expect(screen.getByRole('button', { name: 'Ablehnen: a@x' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ausführen: a@x' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Aktionen: a@x' })).toBeInTheDocument();
     // The done row renders nothing in its actions cell, so the card leaves the label out.
     const cells = [...container.querySelectorAll('td[data-label="Aktionen"]')];
     expect(cells).toHaveLength(2);
@@ -451,7 +467,8 @@ describe('PrivacyComponent', () => {
   it('wires the reject action button click through the queue row', async () => {
     // This covers the rendered template and the openReject path that opens the dialog.
     const { container } = await setup();
-    fireEvent.click(screen.getByRole('button', { name: /^Ablehnen: / }));
+    await userEvent.click(screen.getByRole('button', { name: /^Aktionen: / }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Ablehnen' }));
     expect(container.querySelector('textarea')).toBeInTheDocument();
   });
 

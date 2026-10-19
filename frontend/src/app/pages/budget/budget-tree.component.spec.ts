@@ -219,13 +219,13 @@ describe('BudgetTreeComponent', () => {
     c.width.set(904);
     expect(keys()).toEqual(expect.arrayContaining(['expended', 'income']));
     expect(c.hiddenAmounts(TREE[0])).toEqual([]);
-    c.width.set(820);
+    c.width.set(780);
     expect(keys()).not.toContain('income');
     expect(keys()).toContain('expended');
     // Intl puts a no-break space before the currency sign.
     const plain = (t: string): string => t.replace(/\u00a0/g, ' ');
     expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Einnahmen 0 €']);
-    c.width.set(700);
+    c.width.set(680);
     expect(keys()).not.toContain('expended');
     expect(c.hiddenAmounts(TREE[0]).map(plain)).toEqual(['Ausgegeben 50 €', 'Einnahmen 0 €']);
     // The lines are text in the cell, so a keyboard or touch user reads them too.
@@ -309,20 +309,21 @@ describe('BudgetTreeComponent', () => {
     fixture.detectChanges();
     expect(c.isNegative(neg)).toBe(true);
     expect(c.amount(neg, 'available')).toContain('10');
-    expect(screen.getByText(/N · inaktiv/)).toBeInTheDocument();
+    expect(screen.getByText('Inaktiv')).toBeInTheDocument();
     c.selectedFyId.set('other');
     expect(c.isNegative(neg)).toBe(false);
     expect(c.amount(neg, 'allocated')).toBe('—');
   });
 
-  it('offers the row actions in a menu on a phone', async () => {
-    const { c } = await setup();
+  it('opens the edit on a row click and offers the other row actions in a menu', async () => {
+    const { c, fixture } = await setup();
     const sections = c.rowMenu();
-    expect(sections[0].items.map((i: { id: string }) => i.id)).toEqual(['edit', 'limit', 'child']);
-    expect(sections[0].items[1].disabledReason).toBeNull();
+    expect(sections[0].items.map((i: { id: string }) => i.id)).toEqual(['limit', 'child']);
+    expect(sections[0].items[0].disabledReason).toBeNull();
     c.selectedFyId.set('');
-    expect(c.rowMenu()[0].items[1].disabledReason).toBe('Noch kein Haushaltsjahr');
-    c.onRowMenu(TREE[0], { id: 'edit', label: '' });
+    expect(c.rowMenu()[0].items[0].disabledReason).toBe('Noch kein Haushaltsjahr');
+    await userEvent.click(screen.getByText('VS-Mittel'));
+    fixture.detectChanges();
     expect(c.editNode()).toBe(TREE[0]);
     c.onRowMenu(TREE[0], { id: 'limit', label: '' });
     expect(c.limitNode()).toBe(TREE[0]);
@@ -737,8 +738,8 @@ describe('BudgetTreeComponent', () => {
 
   it('moves the focus to the key field of the inline sub cost centre row', async () => {
     const { fixture } = await setup();
-    const plus = screen.getByRole('button', { name: 'Unter-Kostenstelle anlegen: VS-Mittel' });
-    await userEvent.click(plus);
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen: VS-Mittel' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Unter-Kostenstelle anlegen' }));
     fixture.detectChanges();
     await fixture.whenStable();
     const form = document.querySelector('.bt__child');
@@ -799,10 +800,11 @@ describe('BudgetTreeComponent', () => {
     const { c, http, toast, fixture } = await setup();
     c.deleteNode(); // nothing to confirm yet
     http.verify();
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen: Dezentrale Einrichtungen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen: Dezentrale Einrichtungen' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Löschen' }));
     fixture.detectChanges();
     expect(c.nodeDelete()).toBe(TREE[0].children[0]);
-    expect(screen.getByText('„Dezentrale Einrichtungen“ (VS-800) löschen?')).toBeInTheDocument();
+    expect(screen.getByText('„Dezentrale Einrichtungen“ (VS-800) wird gelöscht. Das lässt sich nicht rückgängig machen.')).toBeInTheDocument();
     c.deleteNode();
     http.expectOne((r) => r.url.endsWith('/budgets/b-800') && r.method === 'DELETE').flush(null);
     expect(toast.success).toHaveBeenCalled();
@@ -1339,12 +1341,17 @@ describe('BudgetTreeComponent', () => {
     expect(c.fyRowId(FY)).toBe('fy-1');
   });
 
-  it('offers an edit and a delete button per fiscal year in the manage dialog', async () => {
+  it('opens the edit of a fiscal year on a row click and offers the delete in a menu', async () => {
     const { c, fixture } = await setup();
     c.openFy();
     fixture.detectChanges();
-    expect(screen.getByRole('button', { name: 'Haushaltsjahr bearbeiten: 2026' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Haushaltsjahr löschen: 2026' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen: 2026' }));
+    expect(await screen.findByRole('menuitem', { name: 'Haushaltsjahr löschen' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    c.onFyMenu(FY, { id: 'delete', label: '' });
+    expect(c.fyDelete()).toBe(FY);
+    c.openFyEdit(FY);
+    expect(c.fyEdit()).toBe(FY);
   });
 
   it('nests no second main landmark inside the shell main', async () => {
@@ -1362,10 +1369,10 @@ describe('BudgetTreeComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
-    it('keeps one primary action in the header and puts the row actions in a menu', async () => {
+    it('floats "Budget anlegen" and puts the header and row actions in menus', async () => {
       const { fixture } = await setup();
       expect(screen.queryByRole('toolbar')).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Budget$/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Budget anlegen' }).closest('app-fab')).not.toBeNull();
       expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Aktionen: VS-Mittel' })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Kostenstelle bearbeiten: VS-Mittel' })).not.toBeInTheDocument();
@@ -1393,8 +1400,8 @@ describe('BudgetTreeComponent', () => {
       const { c, fixture } = await setup();
       const host = fixture.nativeElement as Element;
       expect(watchers.has(host)).toBe(true);
-      watchers.get(host)!([{ contentRect: { width: 720 } } as ResizeObserverEntry], {} as ResizeObserver);
-      expect(c.width()).toBe(720);
+      watchers.get(host)!([{ contentRect: { width: 690 } } as ResizeObserverEntry], {} as ResizeObserver);
+      expect(c.width()).toBe(690);
       expect(c.hidden().has('expended')).toBe(true);
       fixture.destroy();
       expect(disconnect).toHaveBeenCalled();

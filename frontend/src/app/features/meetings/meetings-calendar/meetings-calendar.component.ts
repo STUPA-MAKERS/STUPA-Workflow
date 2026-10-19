@@ -23,6 +23,7 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
 import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.component';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import type { RowMenuItem, RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
@@ -63,6 +64,7 @@ import { beamerUrl } from '../../voting/beamer-link.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -103,7 +105,9 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
+    FabComponent,
     SheetBarComponent,
     PageHeaderComponent,
     TranslatePipe,
@@ -420,6 +424,11 @@ export class MeetingsCalendarComponent {
   /** The translated text of a key, for templates that build a label. */
   t(key: TranslationKey, params?: Record<string, string | number>): string {
     return this.i18n.translate(key, params);
+  }
+
+  /** Read the days of the grid again after a failed read. */
+  retry(): void {
+    this.load(this.range(), this.timeline.gremiumFilter());
   }
 
   private load(range: { from: string; to: string }, gremium: string): void {

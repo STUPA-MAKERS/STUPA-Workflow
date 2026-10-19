@@ -211,3 +211,28 @@ app-status-text.pal__rowSub {
     display: none;
   }
 }
+
+/* Motion: the palette drops in from above and grows to its size; it fades out faster. */
+.pal--entering {
+  animation: pal-in var(--motion-fast) var(--ease-enter);
+}
+.pal--fade-in {
+  animation: pal-fade var(--motion-fast) var(--ease-standard);
+}
+.pal--fade-out {
+  pointer-events: none;
+  animation: pal-fade var(--motion-xs) var(--ease-exit) reverse forwards;
+}
+@keyframes pal-in {
+  from {
+    opacity: 0;
+    /* The individual properties, so the centring transform of .pal stays. */
+    translate: 0 calc(var(--motion-shift-sm) * -1);
+    scale: var(--motion-scale-in);
+  }
+}
+@keyframes pal-fade {
+  from {
+    opacity: 0;
+  }
+}

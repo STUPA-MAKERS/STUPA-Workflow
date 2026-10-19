@@ -25,10 +25,11 @@ import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { dayMonth, monthLabel } from '../gremien.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The gap between the cell and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
@@ -77,10 +78,10 @@ export const ATTENDANCE_STATE: Record<GremiumAttendanceState, StatusView> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
-    ButtonComponent,
     AvatarComponent,
     SideSheetComponent,
     SkeletonComponent,

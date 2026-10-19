@@ -38,11 +38,14 @@ import { mediaQuerySignal } from '../../layout/media-query';
 import { AdminApiService } from '../admin/admin-api.service';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** A visible tree row: a node, its depth and whether it has children. */
 interface Row {
@@ -66,12 +69,12 @@ const AMOUNT_WIDTH = '6rem';
 
 /**
  * From this page width on, the table shows all five amounts. The fixed columns (five
- * amounts, colour, four row actions) take about 690 px; the rest, at least 180 px, is
- * the name column. The sheet beside the admin navigation is 904 px wide at 1440 px.
+ * amounts, colour, the ⋮ menu) take about 620 px; the rest, at least 180 px, is the
+ * name column. The sheet beside the admin navigation is 904 px wide at 1440 px.
  */
-const FULL_TABLE_MIN = 870;
+const FULL_TABLE_MIN = 800;
 /** From this page width on, the table leaves out only "Einnahmen". */
-const MID_TABLE_MIN = 780;
+const MID_TABLE_MIN = 700;
 
 /** The cutoff day must exist in every month (backend: 1..28). */
 const MAX_CUTOFF_DAY = 28;
@@ -100,6 +103,8 @@ const MAX_CUTOFF_DAY = 28;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
+    ConfirmDialogComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -118,6 +123,7 @@ const MAX_CUTOFF_DAY = 28;
     RowMenuComponent,
     SegmentedComponent,
     SelectFieldComponent,
+    StatusTextComponent,
     SwitchComponent,
   ],
   templateUrl: './budget-tree.component.html',
@@ -308,8 +314,9 @@ export class BudgetTreeComponent {
     if (!hidden.has('income')) cols.push(money('income', 'budget.tree.col.income'));
     cols.push(
       money('available', 'budget.tree.col.available'),
-      { key: 'color', label: t('budget.tree.col.color'), width: '2.75rem' },
-      { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '9.5rem', card: 'actions', sticky: 'end' },
+      { key: 'color', label: t('budget.tree.col.color'), width: '4rem' },
+      // Only the ⋮ menu: the row itself opens the edit.
+      { key: 'actions', label: t('budget.tree.col.actions'), align: 'end', width: '3.5rem', card: 'actions', sticky: 'end' },
     );
     return cols;
   });
@@ -328,7 +335,7 @@ export class BudgetTreeComponent {
         key: 'actions',
         label: this.i18n.translate('budget.tree.col.actions'),
         align: 'end',
-        width: '6rem',
+        width: '3.5rem',
         card: 'actions',
       });
     }
@@ -448,7 +455,6 @@ export class BudgetTreeComponent {
     return [
       {
         items: [
-          { id: 'edit', label: t('budget.tree.editNode'), icon: 'edit' },
           {
             id: 'limit',
             label: t('budget.tree.setLimit'),
@@ -462,41 +468,39 @@ export class BudgetTreeComponent {
     ];
   });
 
-  /** The phone menu of a fiscal year: the same two actions as the icon buttons. */
+  /** The ⋮ menu of a fiscal year. The row itself opens the edit. */
   readonly fyMenu = computed<RowMenuSection[]>(() => [
     {
       items: [
-        { id: 'edit', label: this.i18n.translate('budget.tree.fyEdit'), icon: 'edit' },
         { id: 'delete', label: this.i18n.translate('budget.tree.fyDelete'), icon: 'trash', danger: true },
       ],
     },
   ]);
 
   onFyMenu(fy: FiscalYear, item: RowMenuItem): void {
-    if (item.id === 'edit') this.openFyEdit(fy);
-    else if (item.id === 'delete') this.askFyDelete(fy);
+    if (item.id === 'delete') this.askFyDelete(fy);
   }
 
   onRowMenu(node: BudgetTreeNode, item: RowMenuItem): void {
-    if (item.id === 'edit') this.openEditNode(node);
-    else if (item.id === 'limit') this.openLimit(node);
+    if (item.id === 'limit') this.openLimit(node);
     else if (item.id === 'child') this.startAddChild(node);
     else this.askDeleteNode(node);
   }
 
-  /** The header menu on a phone: the toolbar actions except "Budget anlegen". */
+  /**
+   * The header ⋮ menu: the page actions beside the one main action "Haushaltsjahr
+   * anlegen". A phone has no room for the button, so the menu holds that action too.
+   * "Budget anlegen" is the floating button.
+   */
   readonly headerMenu = computed<RowMenuSection[]>(() => {
     const t = (k: TranslationKey): string => this.i18n.translate(k);
     const noTop = this.selectedTopId() ? null : t('budget.tree.pickHint');
-    return [
-      {
-        items: [
-          { id: 'states', label: t('budget.tree.stateConfig'), disabledReason: noTop },
-          { id: 'cutoff', label: t('budget.tree.stichtagTitle'), disabledReason: noTop },
-          { id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop },
-        ],
-      },
+    const items: RowMenuItem[] = [
+      { id: 'states', label: t('budget.tree.stateConfig'), disabledReason: noTop },
+      { id: 'cutoff', label: t('budget.tree.stichtagTitle'), disabledReason: noTop },
     ];
+    if (this.phone()) items.push({ id: 'fy', label: t('budget.tree.fyTitle'), icon: 'cal', disabledReason: noTop });
+    return [{ items }];
   });
 
   onHeaderMenu(item: RowMenuItem): void {

@@ -51,6 +51,8 @@
       <div
         #panel
         class="hm hm--popover"
+        animate.enter="motion-pop-in"
+        animate.leave="motion-pop-out"
         role="region"
         [id]="panelId"
         [attr.aria-label]="'help.title' | t"

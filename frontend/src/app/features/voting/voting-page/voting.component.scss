@@ -163,14 +163,9 @@
   color: var(--color-text-muted);
 }
 
-.vl__status {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.vl__status--error {
-  color: var(--color-danger);
+/* The note starts at the edge of the filters and the rows. */
+.vl__loadError {
+  margin: var(--space-4) 0;
 }
 .vl__more {
   display: flex;

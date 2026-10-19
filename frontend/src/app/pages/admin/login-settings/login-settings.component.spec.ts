@@ -54,8 +54,8 @@ describe('LoginSettingsComponent', () => {
     expect(pwaField().value).toBe('180');
     // A setting that nobody changed has no change date.
     expect(screen.queryByText(/Zuletzt geändert/)).not.toBeInTheDocument();
-    // Nothing changed yet: the save is off.
-    expect(saveButton()).toBeDisabled();
+    // Nothing changed yet: the page shows no "Speichern".
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('saves both lifetimes and shows the change date', async () => {
@@ -69,7 +69,7 @@ describe('LoginSettingsComponent', () => {
     expect(toast.success).toHaveBeenCalled();
     expect(screen.getByText(/Zuletzt geändert am/)).toBeInTheDocument();
     // The saved values are the new baseline.
-    expect(saveButton()).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('refuses a lifetime outside 1 to 400 and names the range', async () => {

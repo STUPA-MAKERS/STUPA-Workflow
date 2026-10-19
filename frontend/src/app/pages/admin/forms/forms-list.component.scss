@@ -2,12 +2,6 @@
   display: block;
 }
 
-.fl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
 /* The name opens the form editor. It is the title of the row, not an accent link. */
 .fl__name {
   display: block;
@@ -36,33 +30,10 @@
   gap: var(--space-1);
 }
 
-/* The edit link has the size and the look of the icon button beside it. */
-.fl__iconLink {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-}
-.fl__iconLink:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
-}
-.fl__iconLink:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 0;
-}
-
 .fl__form {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-}
-
-.fl__confirm {
-  margin: 0;
 }
 
 .fl__foot {

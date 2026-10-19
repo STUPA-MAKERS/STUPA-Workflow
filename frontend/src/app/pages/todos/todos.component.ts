@@ -36,6 +36,7 @@ import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { liveSearch } from '@shared/live-search';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   FilterSelectComponent,
   type FilterSelectOption,
@@ -84,6 +85,7 @@ import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;
@@ -143,10 +145,12 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     CdkScrollable,
     TranslatePipe,
     ButtonComponent,
     EmptyStateComponent,
+    FabComponent,
     FilterSelectComponent,
     IconComponent,
     PageHeaderComponent,

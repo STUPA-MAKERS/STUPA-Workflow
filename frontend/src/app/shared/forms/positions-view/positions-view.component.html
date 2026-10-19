@@ -42,7 +42,12 @@
         </button>
 
         @if (isOpen(i)) {
-          <div class="pv__body" [id]="id + '-' + i">
+          <div
+            class="pv__body"
+            [id]="id + '-' + i"
+            animate.enter="motion-expand-in"
+            animate.leave="motion-expand-out"
+          >
             @if (p.offers.length) {
               <ul class="pv__offers" [attr.aria-label]="'forms.positions.offers' | t">
                 @for (o of p.offers; track $index) {

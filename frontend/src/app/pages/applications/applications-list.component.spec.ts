@@ -371,7 +371,7 @@ describe('ApplicationsListComponent', () => {
       const req = http.expectOne(LIST);
       expect(req.request.params.get('offset')).toBe('1');
       harness.detectChanges();
-      expect(screen.getByText('Weitere Anträge werden geladen …')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Mehr laden' })).toHaveAttribute('aria-busy', 'true');
       req.flush(page([ROWS[1]], 2, 1));
       harness.detectChanges();
       expect(screen.getAllByRole('listitem')).toHaveLength(2);
@@ -961,9 +961,11 @@ describe('ApplicationsListComponent', () => {
       expect(router.url).toBe('/applications/app-1?type=t1');
     });
 
-    it('links "Antrag stellen" to the wizard', async () => {
-      await start();
-      expect(screen.getByRole('link', { name: 'Antrag stellen' })).toHaveAttribute('href', '/apply');
+    it('opens the wizard from the floating "Antrag stellen"', async () => {
+      const { router } = await start();
+      const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      await userEvent.click(screen.getByRole('button', { name: 'Antrag stellen' }));
+      expect(nav).toHaveBeenCalledWith('/apply');
     });
 
     it('keeps every loaded page when the detail changes an application', async () => {
@@ -1201,8 +1203,8 @@ describe('ApplicationsListComponent', () => {
       await userEvent.click(del);
       harness.detectChanges();
       http.verify();
-      const dialog = screen.getByRole('dialog', { name: 'Antrag löschen' });
-      expect(dialog).toHaveTextContent('„Flyer für die Hochschulgruppen-Messe“ endgültig löschen?');
+      const dialog = screen.getByRole('dialog', { name: 'Antrag löschen?' });
+      expect(dialog).toHaveTextContent('„Flyer für die Hochschulgruppen-Messe“ wird gelöscht.');
       const confirm = within(dialog).getAllByRole('button', { name: 'Löschen' }).pop()!;
       await userEvent.click(confirm);
       cmp.confirmDelete();

@@ -15,10 +15,7 @@
 }
 
 .fe {
-  display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: var(--space-5);
   min-width: 0;
 }
 .fe--wide {
@@ -153,6 +150,15 @@
   }
 }
 
+/* While the flow loads, the empty graph stays hidden under the placeholder. The SVG keeps
+   its box, so the canvas measures its real size. */
+.fe__canvas--loading {
+  visibility: hidden;
+}
+.fe__canvasSkel {
+  position: absolute;
+  inset: var(--space-4);
+}
 .fe__canvas {
   display: block;
   width: 100%;

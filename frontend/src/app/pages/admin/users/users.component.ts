@@ -17,15 +17,16 @@ import {
   SearchPillComponent,
   StickyBarComponent,
   SkeletonComponent,
+  StatusTextComponent,
 } from '@shared/ui';
-import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../admin.models';
 import type { FilterSelectOption, RowMenuItem, RowMenuSection } from '@shared/ui';
 import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 
-/** The choices of the chip "Letzter Login" (F3): older than n days, or never. */
+/** The choices of the chip "Letzte Anmeldung" (F3): older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
 export type LastLoginFilter = (typeof LAST_LOGIN_FILTERS)[number];
 /** The choices of the chip "Hat SSO-Gruppen". */
@@ -73,7 +74,7 @@ export function principalFilters(
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
-    ButtonComponent,
+    StatusTextComponent,
     AvatarComponent,
     EmptyStateComponent,
     NoteComponent,
@@ -134,13 +135,12 @@ export class UsersComponent {
   /** "Rechte entziehen …" needs its own permission (admin only by default, F3). */
   protected readonly canRevoke = computed(() => this.auth.can('admin.users.revoke_groups'));
   /** A row has a ⋮ menu when at least one of its actions is allowed. */
-  protected readonly hasMenu = computed(() => this.canMerge() || this.canErase() || this.canRevoke());
   /** The old account of the open merge dialog. Null: the dialog is closed. */
   protected readonly mergeSource = signal<AdminPrincipal | null>(null);
   /** The person of the open revoke dialog. Null: the dialog is closed. */
   protected readonly revokeSource = signal<AdminPrincipal | null>(null);
 
-  /** The chip "Letzter Login". */
+  /** The chip "Letzte Anmeldung". */
   protected readonly lastLoginFilter = signal<LastLoginFilter>('');
   /** The chip "Hat SSO-Gruppen". */
   protected readonly groupFilter = signal<GroupFilter>('');
@@ -156,7 +156,7 @@ export class UsersComponent {
       label: this.i18n.translate(`admin.users.filter.groups.${value || 'all'}`),
     })),
   );
-  /** The chip text: "Letzter Login: über 90 Tage", or only the name while it is off. */
+  /** The chip text: "Letzte Anmeldung: über 90 Tage", or only the name while it is off. */
   protected readonly lastLoginText = computed(() => this.chipText('admin.users.filter.lastLogin', this.lastLoginFilter(), this.lastLoginOptions()));
   protected readonly groupText = computed(() => this.chipText('admin.users.filter.groups', this.groupFilter(), this.groupOptions()));
 
@@ -265,6 +265,18 @@ export class UsersComponent {
 
   /** The row menu of an account that is not merged. */
   protected menuFor(p: AdminPrincipal): RowMenuSection[] {
+    // Activate or deactivate first, the destructive actions after it.
+    const state: RowMenuItem =
+      p.active === false
+        ? { id: 'activate', label: this.i18n.translate('admin.users.activate'), icon: 'power' }
+        : {
+            id: 'deactivate',
+            label: this.i18n.translate('admin.users.deactivate'),
+            icon: 'power',
+            disabledReason: this.isSelf(p)
+              ? this.i18n.translate('admin.users.cannotDeactivateSelf')
+              : null,
+          };
     const items: RowMenuItem[] = [];
     if (this.canMerge()) {
       items.push({
@@ -296,10 +308,12 @@ export class UsersComponent {
         disabledReason: this.isSelf(p) ? this.i18n.translate('admin.users.erase.notSelf') : null,
       });
     }
-    return [{ items }];
+    return [{ items: [state] }, { items }];
   }
 
   protected onMenu(item: RowMenuItem, p: AdminPrincipal): void {
+    if (item.id === 'activate') this.setActive(p, true);
+    if (item.id === 'deactivate') this.setActive(p, false);
     if (item.id === 'merge') this.mergeSource.set(p);
     if (item.id === 'revoke') this.revokeSource.set(p);
     // The privacy page holds the one erasure path with its confirmation (D1).

@@ -62,7 +62,7 @@ const SPEC: Spec = {
       id: 'b1000000-0000-0000-0000-000000000010',
       key: '100',
       name: 'Referate',
-      // AStA decides on the Referate; Fachschaften below are decided by the StuPa.
+      // AStA decides on the Referate; Fachschaften below are decided by the STUPA.
       decision: 'g-asta',
       cur: [40000, 6000, 15000, 0, 2400],
       children: [

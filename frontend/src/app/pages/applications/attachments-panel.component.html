@@ -26,7 +26,7 @@
         (click)="fileInput.click()"
       >
         <span class="att__btn">
-          <app-icon name="upload" [size]="15" />
+          <app-icon name="upload" />
           {{ (uploading() ? 'applications.attachments.uploading' : 'applications.attachments.upload') | t }}
         </span>
       </app-button>
@@ -95,7 +95,7 @@
                 [disabled]="previewLoadingId() !== null && previewLoadingId() !== att.id"
                 (click)="openPreview(att)"
               >
-                <app-icon name="eye" [size]="18" />
+                <app-icon name="eye" />
               </app-button>
             }
             <app-button
@@ -107,7 +107,7 @@
               [loading]="downloadingId() === att.id"
               (click)="download(att)"
             >
-              <app-icon name="download" [size]="18" />
+              <app-icon name="download" />
             </app-button>
             @if (deleteAllowed()) {
               <app-button
@@ -119,7 +119,7 @@
                 [loading]="removingId() === att.id"
                 (click)="remove(att)"
               >
-                <app-icon name="trash" [size]="18" />
+                <app-icon name="trash" />
               </app-button>
             }
           </div>

@@ -5,9 +5,6 @@
 }
 
 .mt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -86,14 +83,10 @@
 .mt__itemLabel {
   min-width: 0;
 }
-.mt__custom {
-  flex: none;
+/* "angepasst" (app-status-text) is a status beside the name, so it takes the small size. */
+.mt__item app-status-text,
+.mt__headEnd app-status-text {
   font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  color: var(--color-accent-text);
-}
-.mt__item--on .mt__custom {
-  color: inherit;
 }
 .mt__editor {
   display: flex;

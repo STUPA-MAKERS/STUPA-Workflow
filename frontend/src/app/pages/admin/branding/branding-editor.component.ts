@@ -21,18 +21,16 @@ import {
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  MEDIA,
   SegmentedComponent,
   type SegmentedOption,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { formatBytes } from '../admin-health/admin-health.util';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
@@ -46,6 +44,7 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { renderMarkdown } from '../../../features/meetings/meetings.util';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /** The language of the texts in the editor. */
 type TextLang = 'de' | 'en';
@@ -57,7 +56,8 @@ type FreetextKey = (typeof FREETEXTS)[number];
 /**
  * Branding and site-config editor (board Admin-Branding).
  *
- * The header saves the draft ("Entwurf speichern") and activates it ("Entwurf
+ * The floating button "Speichern" saves the draft and shows only while the screen holds
+ * edits that the server does not have. The header activates the draft ("Entwurf
  * aktivieren"); the line under it names the active version and whether the draft holds
  * changes that are not active yet. The left column holds the app name, the three logo
  * slots (Wortmarke, Bildmarke, Favicon; a file with a MIME and a size guard, by drop or
@@ -82,13 +82,14 @@ type FreetextKey = (typeof FREETEXTS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
+    SkeletonComponent,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
     InputComponent,
     NoteComponent,
-    RowMenuComponent,
     SegmentedComponent,
     SwitchComponent,
     VersionHistoryComponent,
@@ -116,6 +117,8 @@ export class BrandingEditorComponent {
   private readonly savedRev = signal(0);
   /** The screen holds edits that are not saved yet. */
   protected readonly dirty = computed(() => this.editRev() !== this.savedRev());
+  /** The save of the draft runs. */
+  protected readonly savingDraft = signal(false);
   /** The slot a file is dragged over, for the drop look. */
   protected readonly dropSlot = signal<LogoSlot | null>(null);
 
@@ -136,21 +139,6 @@ export class BrandingEditorComponent {
   protected readonly canActivate = computed(
     () => (this.hasDraftChanges() || this.dirty()) && this.linkErrors().length === 0,
   );
-
-  /** Phone: the header keeps "Entwurf speichern"; the activate is in a menu. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  protected readonly phoneMenu = computed<RowMenuSection[]>(() => [
-    {
-      items: [
-        {
-          id: 'activate',
-          label: this.i18n.translate('admin.brand.activate'),
-          icon: 'check',
-          disabledReason: this.canActivate() ? null : this.i18n.translate('admin.brand.nothingToActivate'),
-        },
-      ],
-    },
-  ]);
 
   /** Version sidebar. Reload it after an activate or a restore. */
   protected readonly history = viewChild(VersionHistoryComponent);
@@ -381,19 +369,24 @@ export class BrandingEditorComponent {
 
   protected saveDraft(): void {
     const d = this.draft();
-    if (!d) return;
+    if (!d || this.savingDraft()) return;
     if (this.linkErrors().length > 0) {
       this.toast.error(this.i18n.translate('admin.brand.badUrl'));
       return;
     }
     const rev = this.editRev();
+    this.savingDraft.set(true);
     this.api.saveBrandingDraft(d).subscribe({
       next: (cfg) => {
+        this.savingDraft.set(false);
         this.hasDraftChanges.set(cfg.hasDraftChanges);
         this.markSaved(rev);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => {
+        this.savingDraft.set(false);
+        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+      },
     });
   }
 

@@ -82,7 +82,7 @@ describe('WebhooksComponent', () => {
 
   it('validates the URL but allows saving without any event (triggers optional)', async () => {
     const { saveWebhook } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Webhook hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Webhook anlegen' }));
 
     // An empty field is not yet wrong, but the save stays off.
     expect(screen.queryByText('Bitte eine gültige http(s)-URL angeben.')).not.toBeInTheDocument();
@@ -212,8 +212,8 @@ describe('WebhooksComponent', () => {
 
   it('renders a delete control that opens the confirm dialog', async () => {
     await setup(HOOKS);
-    const remove = screen.getByRole('button', { name: 'Entfernen: A' });
-    await userEvent.click(remove);
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: A' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Entfernen' }));
     expect(screen.getByText(/„A“ wird mit seiner Zustellhistorie gelöscht/)).toBeInTheDocument();
   });
 
@@ -375,7 +375,7 @@ describe('WebhooksComponent', () => {
     expect(c.canManage()).toBe(false);
     // The diagnosis route needs the permission, so it is never called.
     expect(listWebhookDeliveryStatus).not.toHaveBeenCalled();
-    expect(screen.queryByRole('button', { name: 'Webhook hinzufügen' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Webhook anlegen' })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bearbeiten/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Entfernen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Zustellstatus' })).toBeNull();

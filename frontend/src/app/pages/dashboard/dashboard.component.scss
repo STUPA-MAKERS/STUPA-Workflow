@@ -76,7 +76,6 @@
 }
 .dash__btn:focus-visible,
 .dash__more:focus-visible,
-.dash__fab:focus-visible,
 .dash__me:focus-visible,
 .dash__iconBtn:focus-visible,
 .dash__budget:focus-visible {
@@ -242,13 +241,9 @@
   color: var(--color-warning);
 }
 
-.dash__state {
-  margin: 0;
-  padding: var(--space-4);
-  color: var(--color-text-muted);
-}
-.dash__state--error {
-  color: var(--color-danger);
+/* The note starts at the edge of the filters and the rows. */
+.dash__loadError {
+  margin: var(--space-4) 0;
 }
 
 /* Empty tab: the empty state, and for a new user the card "Antrag stellen" beside it. */
@@ -517,27 +512,6 @@
 }
 
 /* ------------------------------------------------------------------ phone */
-
-/* The floating apply button stands above the bottom bar. The route data `fab` makes the
-   shell keep the foot of the page free for it, below the footer (shell.component.scss). */
-.dash__fab {
-  position: fixed;
-  right: var(--space-4);
-  bottom: calc(var(--app-bottom-inset, 0px) + var(--space-4));
-  z-index: var(--z-sticky);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 56px;
-  padding: 0 var(--space-5) 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-  box-shadow: var(--shadow-elevated);
-}
 
 :host(.dash--phone) {
   gap: var(--space-5);

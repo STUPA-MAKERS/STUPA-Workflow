@@ -615,6 +615,8 @@ export const MERGE_AREAS = [
   'sessions',
   'memberships',
   'calendar',
+  'tickets',
+  'todos',
 ] as const;
 export type MergeArea = (typeof MERGE_AREAS)[number];
 

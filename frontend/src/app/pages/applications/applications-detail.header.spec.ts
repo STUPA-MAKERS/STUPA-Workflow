@@ -440,7 +440,8 @@ describe('ApplicationsDetailComponent — header', () => {
       expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
       const bar = document.querySelector('.ad__editBar') as HTMLElement;
       expect(bar.textContent).toContain('Antrag bearbeiten');
-      expect(within(bar).getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
+      // "Speichern" is the floating button, and it shows only after a change.
+      expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();
       await userEvent.click(within(bar).getByRole('button', { name: 'Abbrechen' }));
       detectChanges();
       expect(cmp.editing()).toBe(false);

@@ -311,7 +311,7 @@ describe('TodosComponent', () => {
     cmp.reload();
     harness.detectChanges();
     expect(cmp.error()).toBe(true);
-    fireEvent.click(screen.getByTestId('td-retry'));
+    fireEvent.click(screen.getByRole('button', { name: 'Erneut versuchen' }));
     harness.detectChanges();
     expect(cmp.board()).not.toBeNull();
   });
@@ -708,7 +708,7 @@ describe('TodosComponent', () => {
     const before = cmp.board()!.cards.length;
     cmp.onCreated(detail({ id: 'k-x', boardId: 'b-2' }));
     expect(cmp.board()!.cards).toHaveLength(before);
-    fireEvent.click(screen.getByTestId('td-fab'));
+    fireEvent.click(screen.getByRole('button', { name: 'To-Do anlegen' }));
     expect(cmp.newOpen()).toBe(true);
     expect(cmp.newColumn()).toBeNull();
     cmp.newCard('c-2');
@@ -1189,7 +1189,7 @@ describe('TodosComponent', () => {
 
     it('opens "+ To-Do" on the personal board and puts the new card in its row', async () => {
       const { cmp, api, settle, harness } = await start(`/todos/${ALL_BOARDS}`, { all: boards() });
-      fireEvent.click(screen.getByTestId('td-fab'));
+      fireEvent.click(screen.getByRole('button', { name: 'To-Do anlegen' }));
       await settle();
       expect(cmp.newOpen()).toBe(true);
       const dialog = harness.routeDebugElement!.query((d) => d.name === 'app-todo-new-dialog');
@@ -1282,7 +1282,7 @@ describe('TodosComponent', () => {
       cmp.onPhoneMenu({ id: 'archive', label: '' });
       expect(cmp.archiveOpen()).toBe(true);
       cmp.onPhoneMenu({ id: 'odd', label: '' });
-      fireEvent.click(screen.getByTestId('td-fab'));
+      fireEvent.click(screen.getByRole('button', { name: 'To-Do anlegen' }));
       expect(cmp.newOpen()).toBe(true);
       expect(TestBed.inject(PageFrameService).fill()).toBe(false);
     });

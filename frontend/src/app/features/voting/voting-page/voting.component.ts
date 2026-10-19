@@ -43,6 +43,7 @@ import { groupByMonth } from '../../../pages/applications/applications.util';
 import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -120,6 +121,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     PageHeaderComponent,
     RouterOutlet,
     TranslatePipe,
@@ -367,7 +369,7 @@ export class VotingComponent implements OnDestroy {
   // --- loading ------------------------------------------------------------
 
   /** Load page 0 after a filter change. The rows stay until the new ones arrive. */
-  private reload(): void {
+  protected reload(): void {
     this.loading.set(this.items().length === 0);
     this.reloading.set(this.items().length > 0);
     this.error.set(false);

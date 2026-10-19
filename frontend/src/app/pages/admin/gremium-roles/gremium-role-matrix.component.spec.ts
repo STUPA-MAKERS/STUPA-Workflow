@@ -150,24 +150,46 @@ describe('GremiumRoleMatrixComponent', () => {
     const api = makeApi();
     await setup({ api, perms: [] });
     for (const box of screen.getAllByRole('checkbox')) expect(box).toBeDisabled();
-    expect(screen.queryByRole('button', { name: /Gremium-Rolle hinzufügen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Gremium-Rolle anlegen/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /^Bearbeiten:/ })).toBeNull();
     expect(screen.queryByText('stupa-vorstand, stupa-sprecher')).toBeNull();
     expect(api.listRoleMappings).not.toHaveBeenCalled();
   });
 
+  it('moves the add action to the floating button on the roles page', async () => {
+    const { container } = await setup({ inputs: { heading: false, fab: true } });
+    expect(container.querySelector('.rm__head')).toBeNull();
+    expect(screen.getAllByRole('button', { name: /Gremium-Rolle anlegen/ })).toHaveLength(1);
+    await userEvent.click(screen.getByRole('button', { name: 'Gremium-Rolle anlegen' }));
+    expect(screen.getByRole('textbox', { name: /Schlüssel/ })).toBeInTheDocument();
+  });
+
+  it('shows no floating button without admin.gremium_roles', async () => {
+    await setup({ perms: [], inputs: { heading: false, fab: true } });
+    expect(screen.queryByRole('button', { name: 'Gremium-Rolle anlegen' })).toBeNull();
+  });
+
   it('keeps the delete of a forced role disabled', async () => {
     await setup();
-    expect(screen.getByRole('button', { name: 'Rolle löschen: Vorstand' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Vorstand' }));
+    expect(await screen.findByRole('menuitem', { name: 'Rolle löschen' })).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Protokoll' }));
+    expect(await screen.findByRole('menuitem', { name: 'Rolle löschen' })).not.toHaveAttribute(
+      'aria-disabled',
+    );
   });
 
   it('deletes an own role after the confirmation', async () => {
     const api = makeApi();
     const { counts } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' }));
-    const dialog = screen.getByRole('dialog', { name: 'Gremium-Rolle löschen' });
-    await userEvent.click(within(dialog).getByText('Rolle löschen'));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Protokoll' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rolle löschen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Gremium-Rolle löschen?' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
     expect(api.deleteGremiumRole).toHaveBeenCalledWith('gr-p');
     expect(screen.queryByRole('rowheader', { name: /^Protokoll/ })).toBeNull();
     expect(counts).toEqual([3]);
@@ -176,8 +198,9 @@ describe('GremiumRoleMatrixComponent', () => {
   it('names a role in use when the server answers 409', async () => {
     const api = makeApi({ deleteGremiumRole: jest.fn(() => throwError(() => ({ status: 409 }))) });
     const { toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: 'Rolle löschen: Protokoll' }));
-    await userEvent.click(within(screen.getByRole('dialog')).getByText('Rolle löschen'));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Protokoll' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rolle löschen' }));
+    await userEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Löschen' }));
     expect(toast.error).toHaveBeenCalledWith(
       'Eine Mitgliedschaft oder eine Gruppen-Zuordnung verwendet die Rolle noch.',
     );
@@ -186,7 +209,7 @@ describe('GremiumRoleMatrixComponent', () => {
   it('adds a role through the dialog and edits one', async () => {
     const api = makeApi();
     const { counts, toast } = await setup({ api });
-    await userEvent.click(screen.getByRole('button', { name: /Gremium-Rolle hinzufügen/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Gremium-Rolle anlegen/ }));
     await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'beisitz');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.createGremiumRole).toHaveBeenCalledWith(
@@ -213,7 +236,7 @@ describe('GremiumRoleMatrixComponent', () => {
     await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: Protokoll' }));
     await userEvent.click(screen.getByText('Rolle löschen', { selector: '.btn__label' }));
-    expect(screen.getByRole('dialog', { name: 'Gremium-Rolle löschen' })).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'Gremium-Rolle löschen?' })).toBeInTheDocument();
   });
 
   it('names a failed load', async () => {

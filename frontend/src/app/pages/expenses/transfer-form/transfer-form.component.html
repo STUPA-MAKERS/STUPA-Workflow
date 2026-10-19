@@ -19,7 +19,7 @@
         }
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" [size]="20" />
+        <app-icon name="x" />
       </app-button>
     </header>
   }
@@ -36,7 +36,7 @@
               <div class="ff__box">
                 <span class="ff__label" [id]="'tf-' + which">{{
                   (which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t
-                }} *</span>
+                }} <span class="text-danger" aria-hidden="true">*</span></span>
                 <button
                   type="button"
                   class="ff__pick"
@@ -56,7 +56,7 @@
                       'expenses.field.costCentrePlaceholder' | t
                     }}</span>
                   }
-                  <app-icon [name]="picking() === which ? 'chevron-up' : 'chevron-down'" [size]="18" />
+                  <app-icon [name]="picking() === which ? 'up' : 'down'" [size]="18" />
                 </button>
               </div>
               @if (picking() === which) {
@@ -221,18 +221,18 @@
         (click)="remove.emit()"
       >
         <span class="ff__btn"
-          ><app-icon name="delete" [size]="16" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
+          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
         >
       </app-button>
     }
     <div class="ff__footEnd">
       <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
       @if (mode() === 'create') {
-        <app-button [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="repeat" [size]="16" />{{ 'expenses.transferConfirm' | t }}</span>
+        <app-button variant="fill" [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
+          <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.transferConfirm' | t }}</span>
         </app-button>
       } @else {
-        <app-button [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
+        <app-button variant="fill" [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
           'action.save' | t
         }}</app-button>
       }

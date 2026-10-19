@@ -151,12 +151,18 @@ export class GremiumMembersComponent {
       next: (r) => this.gremiumRoles.set(r),
       error: () => this.gremiumRoles.set([]),
     });
+    this.loadMembers();
+  }
+
+  /** Load the memberships. A failure, for example a 403, shows, never an empty list. */
+  protected loadMembers(): void {
+    this.loading.set(true);
+    this.failed.set(false);
     this.api.listGremiumMemberships(this.gremiumId).subscribe({
       next: (m) => {
         this.memberships.set(m);
         this.loading.set(false);
       },
-      // Show the failure, for example a 403, and never an empty list.
       error: () => {
         this.memberships.set([]);
         this.failed.set(true);

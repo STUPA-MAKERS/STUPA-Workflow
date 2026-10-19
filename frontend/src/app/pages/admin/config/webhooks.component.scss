@@ -3,9 +3,6 @@
 }
 
 .wh {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -104,9 +101,6 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);
 }
-.wh__statusTitle {
-  margin: 0;
-}
 .wh__grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -154,9 +148,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
   gap: var(--space-2) var(--space-4);
-}
-.wh__confirm {
-  margin: 0;
 }
 .wh__foot {
   display: flex;

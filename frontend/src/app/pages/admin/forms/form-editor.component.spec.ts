@@ -132,10 +132,12 @@ describe('FormEditorComponent', () => {
   });
 
   it('saves a normalized form version with the description', async () => {
-    const { createFormVersion } = await setup(
+    const { c, createFormVersion } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }], { de: 'Hallo', en: '' }),
     );
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    // Nothing changed: the page shows no "Speichern"; the save itself still works.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    c.save();
     expect(createFormVersion).toHaveBeenCalledTimes(1);
     const [typeId, fields, description] = createFormVersion.mock.calls[0];
     expect(typeId).toBe('f1');
@@ -155,6 +157,7 @@ describe('FormEditorComponent', () => {
     c.addQuestion(1, 'currency');
     c.groups()[1].fields[0].key = 'amount';
     c.groups()[1].fields[0].label.de = 'Betrag';
+    fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     const fields = createFormVersion.mock.calls[0][1];
     expect(fields).toEqual([
@@ -182,11 +185,18 @@ describe('FormEditorComponent', () => {
     const c = fixture.componentInstance as any;
     expect(c.hasBudget()).toBe(false);
     c.hasBudget.set(true);
+    fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(updateApplicationType).toHaveBeenCalledTimes(1);
     expect(updateApplicationType.mock.calls[0][1]).toEqual(
       expect.objectContaining({ hasBudget: true }),
     );
+    // The saved state is the new baseline: "Speichern" goes away.
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    c.hasBudget.set(false);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeInTheDocument();
   });
 
   it('defaults the promoted field metric to a valid target (amount)', async () => {
@@ -913,7 +923,15 @@ describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
   });
 
   it('save creates a form version with every group and question', async () => {
-    const { createFormVersion } = await setup(draft(TWO_GROUPS));
+    const { c, fixture, createFormVersion } = await setup(draft(TWO_GROUPS));
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    c.moveQuestion({ gi: 0, qi: 0 }, 1);
+    c.moveQuestion({ gi: 0, qi: 1 }, -1);
+    fixture.detectChanges();
+    // A move and its way back leave the form as it was.
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    c.setGroupTitle(0, 'de', 'Neu');
+    fixture.detectChanges();
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(createFormVersion).toHaveBeenCalledTimes(1);
     const fields = createFormVersion.mock.calls[0][1] as FormFieldDef[];

@@ -49,12 +49,15 @@ import type { ChatEdit, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/c
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { mediaQuerySignal } from '../../layout/media-query';
-import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 type Phase = 'loading' | 'expired' | 'error' | 'ready';
 
@@ -78,8 +81,9 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
  *   applicant's own entries read "Du".
  *
  * "Angaben bearbeiten" turns the page into the edit form with a bar "Speichern legt
- * Version n+1 an". The focus then goes to the title of the bar; "Abbrechen" and a
- * save bring it back to the row. The magic link keeps working without an end when the
+ * Version n+1 an" and "Abbrechen"; the floating "Speichern" shows after the first change
+ * of a field. The focus then goes to the title of the bar; "Abbrechen" and a save bring
+ * it back to the row. The magic link keeps working without an end when the
  * platform gives links no lifetime; the page then says so (only after the public
  * config loaded, and as the current setting: the verify response has no expiry of the
  * link).
@@ -92,6 +96,9 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SkeletonComponent,
+    FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     ReactiveFormsModule,
     RouterLink,
@@ -104,7 +111,6 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ChatComponent,
     StatusTextComponent,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
     AttachmentsPanelComponent,
     TranslatePipe,
@@ -152,6 +158,8 @@ export class StatusTimelineComponent {
   editModel: Record<string, unknown> = {};
   editForm = new FormGroup({});
   readonly saving = signal(false);
+  /** A field of the edit form changed. Only then the page shows "Speichern". */
+  readonly editDirty = signal(false);
   /** Magic-link scope: `view` locks editing regardless of status (old links only). */
   private readonly editScope = signal(true);
 
@@ -501,6 +509,7 @@ export class StatusTimelineComponent {
     // The answers are JSON, so a JSON copy is a deep copy (jsdom has no structuredClone).
     this.editModel = JSON.parse(JSON.stringify(app.data)) as Record<string, unknown>;
     this.editForm = new FormGroup({});
+    this.editDirty.set(false);
     this.editing.set(true);
     window.scrollTo({ top: 0 });
     this.focusAfterRender(() => this.editTitle());

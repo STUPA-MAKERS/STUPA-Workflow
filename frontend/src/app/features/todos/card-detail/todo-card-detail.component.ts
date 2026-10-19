@@ -861,7 +861,7 @@ export class TodoCardDetailComponent {
 
   cancelRename(item: TodoCheckItem): void {
     this.editingItem.set(null);
-    this.focusSoon(`[data-rename="${item.id}"]`);
+    this.focusSoon(`[data-rename="${item.id}"] button`);
   }
 
   renameItem(item: TodoCheckItem): void {

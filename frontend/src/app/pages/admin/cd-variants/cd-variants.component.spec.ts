@@ -129,7 +129,7 @@ describe('AdminCdVariantsComponent', () => {
     await setup();
     await screen.findByText('StuPa');
     const hint =
-      'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in einen normalen Upload um.';
+      'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in eine normal hochgeladene Datei um.';
     // Two bundled logos (HSRT, STUPA), none for the upload.
     const lines = screen.getAllByText(hint).filter((el) => el.classList.contains('cdv__logoHint'));
     expect(lines).toHaveLength(2);
@@ -170,8 +170,26 @@ describe('AdminCdVariantsComponent', () => {
     expect(screen.queryByText('HSRT')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Logos anzeigen/ }));
     expect(c.isExpanded('cd-1')).toBe(true);
-    // Only an upload has a download link.
-    expect(screen.getAllByRole('link', { name: /^Datei herunterladen/ })).toHaveLength(1);
+    // Each logo row has one ⋮ menu; only an upload offers the download.
+    expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: (HSRT|wappen\.png)/ })).toHaveLength(2);
+    expect(c.logoMenu('title', 0, false, TITLE_LOGO)[0].items.map((i: { id: string }) => i.id)).toEqual(['down']);
+    expect(c.logoMenu('title', 1, true, TITLE_UPLOAD)[0].items.map((i: { id: string }) => i.id)).toEqual(['up', 'download']);
+  });
+
+  it('runs the logo menu: move, download, remove', async () => {
+    const { c } = await setup();
+    const move = jest.spyOn(c, 'moveLogo').mockImplementation(() => undefined);
+    const remove = jest.spyOn(c, 'removeLogo').mockImplementation(() => undefined);
+    c.onLogoMenu({ id: 'up', label: '' }, VARIANT, 'title', 1, TITLE_UPLOAD);
+    expect(move).toHaveBeenLastCalledWith(VARIANT, 'title', 1, -1);
+    c.onLogoMenu({ id: 'down', label: '' }, VARIANT, 'title', 0, TITLE_LOGO);
+    expect(move).toHaveBeenLastCalledWith(VARIANT, 'title', 0, 1);
+    const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    c.onLogoMenu({ id: 'download', label: '' }, VARIANT, 'title', 1, TITLE_UPLOAD);
+    expect(click).toHaveBeenCalledTimes(1);
+    click.mockRestore();
+    c.onLogoMenu({ id: 'remove', label: '' }, VARIANT, 'title', 0, TITLE_LOGO);
+    expect(remove).toHaveBeenCalledWith(VARIANT, TITLE_LOGO);
   });
 
   it('adds a logo from the card into the slot that the dialog picks', async () => {
@@ -204,11 +222,11 @@ describe('AdminCdVariantsComponent', () => {
 
   it('creates a variant through the dialog and generates the key from the name', async () => {
     const { api, c, toast } = await setup();
-    await userEvent.click(screen.getByRole('button', { name: 'Variante hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Variante anlegen' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'AStA Vorstand');
     expect(c.form().key).toBe('asta-vorstand');
     await pickOption(screen.getByLabelText(/Basis-Variante/), 'Protokoll');
-    await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     expect(api.createCdVariant).toHaveBeenCalledWith({
       key: 'asta-vorstand',
       name: 'AStA Vorstand',
@@ -329,7 +347,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.deleting()).toBe(false);
     expect(c.confirmDelete()).not.toBeNull(); // the dialog keeps the message
     expect(toast.error).toHaveBeenCalledWith(
-      'Diese Variante ist noch einem Gremium zugewiesen. Ändern Sie zuerst das Gremium.',
+      'Diese Variante ist noch einem Gremium zugewiesen. Ändere zuerst das Gremium.',
     );
   });
 
@@ -604,12 +622,11 @@ describe('AdminCdVariantsComponent', () => {
     expect(heads[0].getAttribute('src')).toBe('/api/admin/cd-variant-logos/l-sq/square');
     expect(heads[1]).toHaveTextContent('HI');
     expect(heads[1]).toHaveAttribute('title', 'Kein quadratisches Logo');
-    // The square row comes first and has no move buttons.
+    // The square row comes first and its menu has no move items.
     const rows = container.querySelectorAll('.cdv__logo');
     expect(rows[0]).toHaveTextContent('Quadratisch 1:1');
-    expect(rows[0].querySelector('.cdv__moveGap')).not.toBeNull();
     expect(rows[0].querySelector('img.cdv__thumb')).not.toBeNull();
-    expect(rows[1].querySelector('.cdv__moveGap')).toBeNull();
+    expect(c.logoMenu('square', 0, true, square)[0].items.map((i: { id: string }) => i.id)).toEqual(['download']);
     expect(c.initials('STUPA')).toBe('ST');
   });
 

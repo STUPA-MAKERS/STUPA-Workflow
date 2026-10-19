@@ -1,25 +1,14 @@
-<section class="bt">
+<section class="bt admin-page">
   <app-page-header [flush]="true" [title]="'budget.tree.title' | t">
     <ng-container ngProjectAs="[actions]">
-      @if (phone()) {
-        <app-button variant="fill" (click)="openTop()">
-          <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTopShort' | t }}
-        </app-button>
-        <app-row-menu [label]="'budget.tree.moreActions' | t" [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
-      } @else {
-        <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStateConfig()">
-          {{ 'budget.tree.stateConfig' | t }}
-        </app-button>
-        <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openStichtag()">
-          {{ 'budget.tree.stichtagTitle' | t }}
-        </app-button>
+      <!-- One main action; the other page actions sit in the ⋮ menu. A phone has only
+           the menu. -->
+      @if (!phone()) {
         <app-button variant="tonal" [disabled]="!selectedTopId()" (click)="openFy()">
-          <app-icon name="cal" [size]="16" /> {{ 'budget.tree.fyTitle' | t }}
-        </app-button>
-        <app-button variant="fill" (click)="openTop()">
-          <app-icon name="plus" [size]="18" /> {{ 'budget.tree.createTop' | t }}
+          <app-icon name="cal" /> {{ 'budget.tree.fyTitle' | t }}
         </app-button>
       }
+      <app-row-menu [label]="'budget.tree.moreActions' | t" [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
     </ng-container>
   </app-page-header>
 
@@ -64,6 +53,8 @@
         [rows]="rows()"
         [rowKey]="rowId"
         [isExpanded]="childExpanded"
+        [clickable]="true"
+        (rowClick)="openEditNode($any($event).node)"
       >
         <ng-template appCell="node" let-row>
           @let n = $any(row).node;
@@ -74,21 +65,22 @@
                 class="bt__fold"
                 [attr.aria-expanded]="!isCollapsed(n.id)"
                 [attr.aria-label]="('budget.tree.fold' | t) + ': ' + n.name"
-                (click)="toggleCollapse(n.id)"
+                (click)="$event.stopPropagation(); toggleCollapse(n.id)"
+                (keydown.enter)="$event.stopPropagation()"
               >
-                <app-icon [name]="isCollapsed(n.id) ? 'chevron-right' : 'chevron-down'" [size]="16" />
+                <app-icon [name]="isCollapsed(n.id) ? 'right' : 'down'" [size]="16" />
               </button>
             } @else {
               <span class="bt__foldGap" aria-hidden="true"></span>
             }
             <span class="bt__nodeText">
-              <span class="bt__name ell" [class.bt__name--inactive]="!n.active" [title]="n.name">{{ n.name }}</span>
-              <span class="bt__path mono">
-                {{ n.pathKey }}
+              <span class="bt__nameLine">
+                <span class="bt__name">{{ n.name }}</span>
                 @if (!n.active) {
-                  · {{ 'budget.tree.inactive' | t }}
+                  <app-status-text kind="muted">{{ 'common.inactive' | t }}</app-status-text>
                 }
               </span>
+              <span class="bt__path mono">{{ n.pathKey }}</span>
             </span>
           </span>
         </ng-template>
@@ -121,29 +113,14 @@
         </ng-template>
         <ng-template appCell="actions" let-row>
           @let n = $any(row).node;
-          @if (phone()) {
+          <!-- The row opens the edit; the menu keeps its clicks and keys to itself. -->
+          <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + n.name"
               [sections]="rowMenu()"
               (selected)="onRowMenu(n, $event)"
             />
-          } @else {
-            <span class="bt__actions">
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.editNode' | t) + ': ' + n.name" [title]="'budget.tree.editNode' | t" (click)="openEditNode(n)"><app-icon name="edit" /></app-button>
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [disabled]="!selectedFyId()"
-                [ariaLabel]="('budget.tree.setLimit' | t) + ': ' + n.name"
-                [title]="(selectedFyId() ? 'budget.tree.setLimit' : 'budget.tree.noFy') | t"
-                (click)="openLimit(n)"
-                ><app-icon name="euro"
-              /></app-button>
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.addChild' | t) + ': ' + n.name" [title]="'budget.tree.addChild' | t" (click)="startAddChild(n)"><app-icon name="plus" /></app-button>
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.delete' | t) + ': ' + n.name" [title]="'budget.tree.delete' | t" (click)="askDeleteNode(n)"><app-icon name="trash" /></app-button>
-            </span>
-          }
+          </span>
         </ng-template>
 
         <ng-template appRowDetail>
@@ -166,9 +143,9 @@
               />
               <span class="bt__childActions">
                 <app-button type="submit" variant="fill" size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()">
-                  {{ 'budget.tree.add' | t }}
+                  {{ 'budget.tree.create' | t }}
                 </app-button>
-                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'budget.tree.cancel' | t }}</app-button>
+                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'action.cancel' | t }}</app-button>
               </span>
             </form>
           }
@@ -178,6 +155,8 @@
       <app-empty-state shape="table" [heading]="'budget.tree.pickHint' | t" />
     }
   }
+
+  <app-fab [label]="'fab.budget' | t" (activate)="openTop()" />
 </section>
 
 <!-- Set the allocation of one cost centre for the selected fiscal year. -->
@@ -185,7 +164,7 @@
   [open]="!!limitNode()"
   [title]="'budget.tree.limitTitle' | t"
   [subtitle]="limitNode() ? limitNode()!.pathKey + ' · ' + limitNode()!.name : ''"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeLimit()"
 >
   @if (limitNode()) {
@@ -199,7 +178,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeLimit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeLimit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!limitValue().trim()" (click)="saveLimit()">{{ 'budget.tree.setLimit' | t }}</app-button>
   </div>
 </app-dialog>
@@ -209,7 +188,7 @@
   [open]="!!editNode()"
   [title]="'budget.tree.editNode' | t"
   [subtitle]="editNode()?.pathKey ?? ''"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeEditNode()"
 >
   @if (editNode()) {
@@ -298,7 +277,7 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeEditNode()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeEditNode()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!editKey().trim() || !editName().trim() || editColorInvalid()" (click)="saveEditNode()">{{
       'budget.tree.save' | t
     }}</app-button>
@@ -306,26 +285,21 @@
 </app-dialog>
 
 <!-- Delete a cost centre. A node with sub cost centres or allocations gives 409. -->
-<app-dialog
+<app-confirm-dialog
   [open]="!!nodeDelete()"
   [title]="'budget.tree.deleteTitle' | t"
-  [closeLabel]="'budget.tree.cancel' | t"
-  (closed)="closeDeleteNode()"
+  [body]="nodeDelete() ? ('budget.tree.deleteConfirm' | t: { name: nodeDelete()!.name, path: nodeDelete()!.pathKey }) : ''"
+  [disabled]="nodeDeleteBlocked()"
+  (confirm)="deleteNode()"
+  (cancel)="closeDeleteNode()"
 >
-  @if (nodeDelete(); as node) {
-    <p class="bt__confirm">{{ 'budget.tree.deleteConfirm' | t: { name: node.name, path: node.pathKey } }}</p>
-  }
   @if (nodeDeleteBlocked()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'budget.tree.deleteBlocked' | t }}</app-note>
   }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeDeleteNode()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="danger" [disabled]="nodeDeleteBlocked()" (click)="deleteNode()">{{ 'budget.tree.delete' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>
 
 <!-- Create a top budget. -->
-<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeTop()">
+<app-dialog [open]="topOpen()" [title]="'budget.tree.createTop' | t" [closeLabel]="'action.close' | t" (closed)="closeTop()">
   <form id="bt-top-form" class="bt__form" (submit)="createTop($event)">
     <div class="bt__pair">
       <app-input
@@ -356,9 +330,9 @@
     </div>
   </form>
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeTop()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeTop()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!newTop().key.trim() || !newTop().name.trim()" (click)="createTop($event)">{{
-      'budget.tree.add' | t
+      'budget.tree.create' | t
     }}</app-button>
   </div>
 </app-dialog>
@@ -368,7 +342,7 @@
   [open]="fyOpen()"
   [title]="'budget.tree.fyTitle' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeFy()"
 >
   <form id="bt-fy-form" class="bt__form" (submit)="createFiscalYear($event)">
@@ -382,31 +356,28 @@
   </form>
 
   <section class="bt__fyManage" [attr.aria-label]="'budget.tree.fyExisting' | t">
-    <h3 class="sec">{{ 'budget.tree.fyExisting' | t }}</h3>
+    <h3 class="section-title">{{ 'budget.tree.fyExisting' | t }}</h3>
     @if (fiscalYears().length) {
       <app-data-table
         surface="rowgroup"
         [columns]="fyColumns()"
         [rows]="fiscalYears()"
         [rowKey]="fyRowId"
+        [clickable]="canStructure()"
+        (rowClick)="openFyEdit($any($event))"
       >
         <ng-template appCell="display" let-fy><span class="bt__fyName">{{ $any(fy).display }}</span></ng-template>
         <ng-template appCell="active" let-fy>
-          <span [class.bt__muted]="!$any(fy).active">{{ ($any(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t }}</span>
+          <app-status-text [kind]="$any(fy).active ? 'accent' : 'muted'">{{ ($any(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t }}</app-status-text>
         </ng-template>
         <ng-template appCell="actions" let-fy>
-          @if (phone()) {
+          <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + $any(fy).display"
               [sections]="fyMenu()"
               (selected)="onFyMenu($any(fy), $event)"
             />
-          } @else {
-            <span class="bt__actions">
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyEdit' | t) + ': ' + $any(fy).display" (click)="openFyEdit($any(fy))"><app-icon name="edit" /></app-button>
-              <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('budget.tree.fyDelete' | t) + ': ' + $any(fy).display" (click)="askFyDelete($any(fy))"><app-icon name="trash" /></app-button>
-            </span>
-          }
+          </span>
         </ng-template>
       </app-data-table>
     } @else {
@@ -415,14 +386,14 @@
   </section>
 
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFy()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="fill" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.add' | t }}</app-button>
+    <app-button variant="text" (click)="closeFy()">{{ 'action.cancel' | t }}</app-button>
+    <app-button variant="fill" [disabled]="!newFy().year" (click)="createFiscalYear($event)">{{ 'budget.tree.create' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Correct a fiscal year. Only the year and the active flag change. The server derives
      the start and the end date again from the budget cutoff. -->
-<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyEdit()">
+<app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'action.close' | t" (closed)="closeFyEdit()">
   @if (fyEdit()) {
     <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
       <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" />
@@ -432,32 +403,32 @@
     </form>
   }
   <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFyEdit()">{{ 'budget.tree.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeFyEdit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
 
 <!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
      applications still hang on the year. That reason stays visible in the dialog. -->
-<app-dialog [open]="!!fyDelete()" [title]="'budget.tree.fyDeleteTitle' | t" [closeLabel]="'budget.tree.cancel' | t" (closed)="closeFyDelete()">
-  @if (fyDelete(); as fy) {
-    <p class="bt__confirm">{{ 'budget.tree.fyDeleteConfirm' | t: { year: fy.display } }}</p>
-  }
+<app-confirm-dialog
+  [open]="!!fyDelete()"
+  [title]="'budget.tree.fyDeleteTitle' | t"
+  [body]="fyDelete() ? ('budget.tree.fyDeleteConfirm' | t: { year: fyDelete()!.display }) : ''"
+  [disabled]="!!fyDeleteBlocked()"
+  (confirm)="doFyDelete()"
+  (cancel)="closeFyDelete()"
+>
   @if (fyDeleteBlocked(); as reason) {
     <app-note kind="error" icon="alert" role="alert">{{ reason }}</app-note>
   }
-  <div dialog-footer class="bt__foot">
-    <app-button variant="text" (click)="closeFyDelete()">{{ 'budget.tree.cancel' | t }}</app-button>
-    <app-button variant="danger" [disabled]="!!fyDeleteBlocked()" (click)="doFyDelete()">{{ 'budget.tree.fyDelete' | t }}</app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>
 
 <!-- Set the fiscal-year cutoff of the selected budget. A field saves on change. -->
 <app-dialog
   [open]="stichtagOpen()"
   [title]="'budget.tree.stichtagTitle' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeStichtag()"
 >
   <form id="bt-stichtag-form" class="bt__form" (submit)="$event.preventDefault()">
@@ -498,7 +469,7 @@
   [open]="stateConfigOpen()"
   [title]="'budget.tree.stateConfig' | t"
   [subtitle]="selectedTopLabel()"
-  [closeLabel]="'budget.tree.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeStateConfig()"
 >
   @if (stateOptions().length) {

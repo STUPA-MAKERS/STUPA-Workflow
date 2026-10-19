@@ -3,9 +3,6 @@
 }
 
 .gm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
   container-type: inline-size;
 }
 
@@ -70,8 +67,7 @@
 .gm__groupInput ::ng-deep input {
   font-family: var(--font-mono);
 }
-.gm__dialogNote,
-.gm__dialogText {
+.gm__dialogNote {
   margin: 0;
 }
 .gm__dialogNote {

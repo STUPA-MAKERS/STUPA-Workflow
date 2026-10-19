@@ -3,7 +3,7 @@
 <app-dialog
   [open]="open()"
   [title]="'applications.share.title' | t"
-  [closeLabel]="'applications.detail.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   @if (freshUrl(); as url) {
@@ -76,8 +76,8 @@
   }
 
   <div dialog-footer>
-    <app-button variant="text" size="sm" (click)="close()">{{ 'applications.share.close' | t }}</app-button>
-    <app-button variant="fill" size="sm" [loading]="creating()" (click)="create()">
+    <app-button variant="text" (click)="close()">{{ 'applications.share.close' | t }}</app-button>
+    <app-button variant="fill" [loading]="creating()" (click)="create()">
       {{ 'applications.share.create' | t }}
     </app-button>
   </div>

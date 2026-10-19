@@ -48,9 +48,12 @@ describe('NotificationSettingsComponent', () => {
     });
   });
 
-  it('keeps save disabled until something changed', async () => {
-    await setup();
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+  it('shows "Speichern" only while something changed', async () => {
+    const { fixture } = await setup();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    fireEvent.input(screen.getByLabelText(/Erinnern nach/), { target: { value: '3' } });
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeEnabled();
   });
 
   it('shows an error state and stops loading when the GET fails', async () => {

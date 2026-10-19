@@ -58,7 +58,7 @@ export function attendanceButtonVariant(
 }
 
 export function attendanceIcon(status: AttendanceStatus): IconName {
-  return status === 'present' ? 'check' : status === 'excused' ? 'half' : 'remove';
+  return status === 'present' ? 'check' : status === 'excused' ? 'half' : 'x';
 }
 
 export function attendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {

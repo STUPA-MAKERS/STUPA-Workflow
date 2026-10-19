@@ -40,7 +40,7 @@
                 [disabled]="first"
                 [ariaLabel]="'decision.conditionUp' | t: { n: i + 1 }"
                 (click)="moveCondition(i, -1)"
-              ><app-icon name="up" [size]="16" /></app-button>
+              ><app-icon name="up" /></app-button>
               <app-button
                 variant="text"
                 size="sm"
@@ -48,14 +48,14 @@
                 [disabled]="last"
                 [ariaLabel]="'decision.conditionDown' | t: { n: i + 1 }"
                 (click)="moveCondition(i, 1)"
-              ><app-icon name="down" [size]="16" /></app-button>
+              ><app-icon name="down" /></app-button>
               <app-button
                 variant="text"
                 size="sm"
                 [iconOnly]="true"
                 [ariaLabel]="'decision.conditionRemove' | t: { n: i + 1 }"
                 (click)="removeCondition(i)"
-              ><app-icon name="x" [size]="16" /></app-button>
+              ><app-icon name="x" /></app-button>
             </span>
           </div>
         }
@@ -63,7 +63,7 @@
           <p class="dec__error" role="alert">{{ err }}</p>
         }
         <app-button class="dec__add" variant="text" size="sm" [disabled]="!canAdd()" (click)="addCondition()">
-          <app-icon name="plus" [size]="16" />
+          <app-icon name="plus" />
           {{ 'decision.conditionAdd' | t }}
         </app-button>
       </div>

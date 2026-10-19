@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import { CheckboxComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { CheckboxComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { SideSheetComponent, type SheetSide } from '@shared/ui/side-sheet/side-sheet.component';
 
@@ -27,7 +27,7 @@ interface MultiOption {
   selector: 'app-formly-multiselect',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, CheckboxComponent, SideSheetComponent, TranslatePipe],
+  imports: [FormsModule, CheckboxComponent, IconComponent, SideSheetComponent, TranslatePipe],
   template: `
     <div class="field">
       <div class="field__box" [class.field__box--invalid]="showError">
@@ -52,7 +52,7 @@ interface MultiOption {
             {{ summary || props.placeholder || ('formly.select.placeholder' | t) }}
           </span>
         </button>
-        <svg class="field__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+        <app-icon class="field__chevron" name="down" [size]="18" />
       </div>
       @if (props.description && !showError) {
         <p class="field__hint" [id]="controlId + '-hint'">{{ props.description }}</p>

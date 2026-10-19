@@ -19,17 +19,9 @@
   gap: var(--space-2) var(--space-4);
   min-height: 2.5rem;
 }
-.rm__title {
-  margin: 0;
-}
 /* Without a heading the button sits at the end. */
 .rm__add:only-child {
   margin-inline-start: auto;
-}
-
-.rm__error {
-  margin: 0;
-  color: var(--color-danger);
 }
 
 /* The matrix: the role column, one column per right of the catalogue, the actions. All
@@ -39,7 +31,7 @@
 }
 .rm__row {
   display: grid;
-  grid-template-columns: minmax(10rem, 2fr) repeat(5, minmax(4.25rem, 1fr)) 5rem;
+  grid-template-columns: minmax(10rem, 2fr) repeat(5, minmax(4.25rem, 1fr)) 3rem;
   align-items: center;
   min-height: 3.75rem;
   padding: var(--space-1) var(--space-2) var(--space-1) var(--space-4);
@@ -91,11 +83,8 @@
 .rm__name {
   font-weight: var(--fw-semibold);
 }
-.rm__forced {
-  flex: none;
+.rm__nameLine app-status-text {
   font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  color: var(--color-text-muted);
 }
 /* A group keeps its exact spelling from the IdP; a long one wraps and is never cut. */
 .rm__groups {
@@ -176,15 +165,6 @@
   gap: var(--space-1);
 }
 
-.rm__dialogText {
-  margin: 0;
-}
-.rm__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 /* A narrow container: no header; the role and its actions on the first line, the rights
    as chips with their names below (board Schmal-Verwaltung-Gremien). The matrix is about
    49rem wide at a 960px viewport and about 54rem at 1440px, so 51rem puts the first in
@@ -213,7 +193,7 @@
     padding-block: 0;
   }
   .rm__act {
-    flex: 0 0 5rem;
+    flex: 0 0 var(--control-height);
     order: 1;
   }
   .rm__cell {

@@ -1,11 +1,5 @@
-<section class="ls">
-  <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t">
-    @if (loadState() === 'ok' && !loading()) {
-      <app-button actions variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="save()">
-        {{ 'action.save' | t }}
-      </app-button>
-    }
-  </app-page-header>
+<section class="ls admin-page">
+  <app-page-header [flush]="true" [title]="'admin.loginSettings.title' | t" />
 
   @if (loading()) {
     <app-skeleton variant="lines" [count]="3" [label]="'common.loading' | t" />
@@ -42,6 +36,10 @@
 
     @if (saved()?.updatedAt; as at) {
       <p class="ls__meta">{{ 'admin.loginSettings.updatedAt' | t: { date: (at | ldate: 'medium') } }}</p>
+    }
+
+    @if (dirty()) {
+      <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!body()" (activate)="save()" />
     }
   }
 </section>

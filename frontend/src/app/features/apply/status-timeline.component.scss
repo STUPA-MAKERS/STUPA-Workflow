@@ -4,11 +4,6 @@
   display: block;
 }
 
-.sp__loading {
-  color: var(--color-text-muted);
-  font-size: var(--fs-sm);
-}
-
 /* The page: header, then rows + answers beside the history (wide), else stacked. */
 .sp {
   display: flex;
@@ -177,6 +172,10 @@
 .sp__editText strong:focus {
   outline: none;
 }
+/* The end of the form keeps room for the floating "Speichern" (56px and 16px around it). */
+.sp__edit {
+  padding-bottom: calc(56px + 2 * var(--space-4));
+}
 .sp__edit ::ng-deep :is(input, textarea, select, button, [role='alert']) {
   scroll-margin-top: 5rem;
 }
@@ -194,10 +193,6 @@
   --chat-composer-surface: transparent;
   --chat-composer-bleed: var(--space-4);
 }
-.sp__dialogText {
-  margin: 0;
-}
-
 /* The end states (expired link, not found): one card in the free space. */
 .sp__end {
   display: flex;

@@ -139,8 +139,9 @@ describe('DelegationsComponent', () => {
   it('revokes after the confirmation and removes the row', async () => {
     const api = makeApi();
     const { toast } = await setup(api);
-    await userEvent.click(screen.getByRole('button', { name: 'Widerrufen: Alice → Bob' }));
-    const dialog = screen.getByRole('dialog', { name: 'Vertretung widerrufen' });
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Alice → Bob' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Widerrufen' }));
+    const dialog = screen.getByRole('dialog', { name: 'Vertretung widerrufen?' });
     expect(dialog).toHaveTextContent(
       'Die Vertretung von Alice durch Bob in „Sitzung A“ wird gelöscht.',
     );
@@ -154,7 +155,8 @@ describe('DelegationsComponent', () => {
   it('keeps the row and names a failed revoke', async () => {
     const api = makeApi({ revoke: jest.fn(() => throwError(() => ({ status: 403 }))) });
     const { toast } = await setup(api);
-    await userEvent.click(screen.getByRole('button', { name: 'Widerrufen: Alice → Bob' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Alice → Bob' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Widerrufen' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByText('Widerrufen'));
     expect(toast.error).toHaveBeenCalledWith('Widerruf fehlgeschlagen.');
     expect(screen.getByText('Sitzung A')).toBeInTheDocument();
@@ -163,7 +165,8 @@ describe('DelegationsComponent', () => {
   it('cancels a revoke', async () => {
     const api = makeApi();
     await setup(api);
-    await userEvent.click(screen.getByRole('button', { name: 'Widerrufen: Alice → Bob' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: Alice → Bob' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Widerrufen' }));
     await userEvent.click(within(screen.getByRole('dialog')).getByText('Abbrechen'));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(api.revoke).not.toHaveBeenCalled();

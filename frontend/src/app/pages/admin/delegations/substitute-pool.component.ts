@@ -14,7 +14,7 @@ import { type DelegationSubstitute, DelegationsApiService } from '@core/api/dele
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent, SkeletonComponent } from '@shared/ui';
+import { AvatarComponent, RowMenuComponent, SkeletonComponent, type RowMenuSection } from '@shared/ui';
 import {
   ButtonComponent,
   DialogComponent,
@@ -29,6 +29,7 @@ import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -56,6 +57,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     ScrollFadeDirective,
     FormsModule,
@@ -64,6 +66,7 @@ const SEARCH_LIMIT = 8;
     ButtonComponent,
     DialogComponent,
     IconComponent,
+    RowMenuComponent,
     SelectFieldComponent,
     SkeletonComponent,
   ],
@@ -89,6 +92,10 @@ export class SubstitutePoolComponent {
   protected readonly removing = signal<ReadonlySet<string>>(new Set());
 
   // --- add dialog -------------------------------------------------------------
+  /** The ⋮ menu of a pool entry: remove is its only action. */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'remove', label: this.i18n.translate('admin.substitutes.remove'), icon: 'trash', danger: true }] },
+  ]);
   protected readonly addOpen = signal(false);
   protected readonly candidates = signal<AdminPrincipal[]>([]);
   /**
@@ -122,6 +129,11 @@ export class SubstitutePoolComponent {
       untracked(() => this.load(id, own));
     });
     inject(DestroyRef).onDestroy(() => this.loads?.unsubscribe());
+  }
+
+  /** Load the pool again after a failed load. */
+  protected retry(): void {
+    this.load(this.gremiumId(), this.members() === null);
   }
 
   private load(id: Uuid, ownMembers: boolean): void {

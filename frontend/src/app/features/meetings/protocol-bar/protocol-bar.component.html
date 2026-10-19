@@ -17,13 +17,13 @@
   <div class="pb__actions">
     @if (canFinalize()) {
       <app-button variant="fill" size="sm" [loading]="finalizing()" (click)="finalize.emit()">
-        <app-icon name="send" [size]="15" />
+        <app-icon name="send" />
         {{ 'meetings.protocol.finalize' | t }}
       </app-button>
     }
     @if (canPublish()) {
       <app-button variant="text" size="sm" [loading]="publicationSaving()" (click)="togglePublication()">
-        <app-icon [name]="publication() === 'withheld' ? 'globe' : 'eyeslash'" [size]="15" />
+        <app-icon [name]="publication() === 'withheld' ? 'globe' : 'eyeslash'" />
         {{ (publication() === 'withheld' ? 'meetings.protocolBar.publish' : 'meetings.protocolBar.withhold') | t }}
       </app-button>
     }

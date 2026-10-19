@@ -1,9 +1,5 @@
-<section class="cdv">
-  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t">
-    <app-button actions variant="fill" (click)="openCreate()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.cdVariants.add' | t }}
-    </app-button>
-  </app-page-header>
+<section class="cdv admin-page">
+  <app-page-header [flush]="true" [title]="'admin.cdVariants.title' | t" />
 
   @if (loading()) {
     <app-skeleton variant="rows" [count]="3" [label]="'admin.cdVariants.loading' | t" />
@@ -14,7 +10,7 @@
       <ul class="rowgroup cdv__list" [attr.aria-label]="'admin.cdVariants.title' | t">
         @for (v of variants(); track v.id) {
           <li class="cdv__variant">
-            <div class="cdv__head">
+            <div class="cdv__head hitrow">
               @if (squareLogo(v); as sq) {
                 <img class="cdv__square" [src]="squareUrl(sq)" alt="" width="40" height="40" (error)="thumbFailed(sq)" />
               } @else {
@@ -22,12 +18,19 @@
               }
               <span class="cdv__text">
                 <span class="cdv__titleLine">
-                  <strong class="cdv__name">{{ v.name }}</strong>
+                  <button
+                    type="button"
+                    class="hitrow__open cdv__name"
+                    [attr.aria-label]="('admin.common.edit' | t) + ': ' + v.name"
+                    (click)="openEdit(v)"
+                  >
+                    {{ v.name }}
+                  </button>
                   <span class="cdv__key mono">{{ v.key }}</span>
                 </span>
                 <span class="cdv__usage">{{ usage(v) }}</span>
               </span>
-              <span class="cdv__actions">
+              <span class="cdv__actions hitrow__keep">
                 <button
                   type="button"
                   class="cdv__toggle"
@@ -38,12 +41,11 @@
                   {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
                   <span class="cdv__count">({{ v.logos.length }})</span>
                 </button>
-                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.edit' | t) + ': ' + v.name" [title]="'admin.common.edit' | t" (click)="openEdit(v)">
-                  <app-icon name="edit" />
-                </app-button>
-                <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.common.remove' | t) + ': ' + v.name" [title]="'admin.common.remove' | t" (click)="askDelete(v)">
-                  <app-icon name="trash" />
-                </app-button>
+                <app-row-menu
+                  [sections]="variantMenu()"
+                  [label]="('ui.rowMenu.trigger' | t) + ': ' + v.name"
+                  (selected)="askDelete(v)"
+                />
               </span>
             </div>
 
@@ -72,32 +74,11 @@
                             }
                           </span>
                           <span class="cdv__logoActions">
-                            @if (slot === 'square') {
-                              <!-- One square logo per variant: nothing to move. -->
-                              <span class="cdv__moveGap" aria-hidden="true"></span>
-                            } @else {
-                              <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="i === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, -1)">
-                                <app-icon name="chevron-up" />
-                              </app-button>
-                              <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + logoLabel(logo)" (click)="moveLogo(v, slot, i, 1)">
-                                <app-icon name="chevron-down" />
-                              </app-button>
-                            }
-                            @if (logo.fileName) {
-                              <a
-                                class="cdv__iconLink"
-                                [href]="fileUrl(logo)"
-                                [attr.aria-label]="('admin.cdVariants.download' | t) + ': ' + logoLabel(logo)"
-                                [attr.title]="'admin.cdVariants.download' | t"
-                                download
-                                ><app-icon name="download" [size]="18"
-                              /></a>
-                            } @else {
-                              <span class="cdv__iconGap" aria-hidden="true"></span>
-                            }
-                            <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.cdVariants.removeLogo' | t) + ': ' + logoLabel(logo)" (click)="removeLogo(v, logo)">
-                              <app-icon name="trash" />
-                            </app-button>
+                            <app-row-menu
+                              [sections]="logoMenu(slot, i, last, logo)"
+                              [label]="('ui.rowMenu.trigger' | t) + ': ' + logoLabel(logo)"
+                              (selected)="onLogoMenu($event, v, slot, i, logo)"
+                            />
                           </span>
                         </li>
                       }
@@ -107,7 +88,7 @@
                   <app-empty-state shape="file" rows="2" [heading]="'admin.cdVariants.noLogos' | t" />
                 }
                 <app-button class="cdv__add" variant="text" size="sm" (click)="openLogoDialog(v)">
-                  <app-icon name="plus" [size]="16" /> {{ 'admin.cdVariants.addLogo' | t }}
+                  <app-icon name="plus" /> {{ 'admin.cdVariants.addLogo' | t }}
                 </app-button>
               </div>
             }
@@ -118,12 +99,14 @@
       <app-empty-state [heading]="'admin.cdVariants.empty' | t" />
     }
   }
+
+  <app-fab [label]="'fab.cdVariant' | t" (activate)="openCreate()" />
 </section>
 
 <app-dialog
   [open]="dialogOpen()"
   [title]="(editingId() ? 'admin.cdVariants.edit' : 'admin.cdVariants.create') | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
 >
   <form id="cdv-form" class="cdv__form" (submit)="submit($event)">
@@ -157,7 +140,7 @@
   <div dialog-footer class="cdv__foot">
     <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!canSave()" [loading]="saving()" (click)="submit($event)">
-      {{ (editingId() ? 'action.save' : 'admin.common.add') | t }}
+      {{ (editingId() ? 'action.save' : 'admin.common.create') | t }}
     </app-button>
   </div>
 </app-dialog>
@@ -166,7 +149,7 @@
   [open]="logoDraft() !== null"
   [title]="'admin.cdVariants.addLogo' | t"
   [subtitle]="logoDraft() ? ('admin.cdVariants.variantOf' | t: { name: logoDraft()?.variantName ?? '' }) : ''"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeLogoDialog()"
 >
   @if (logoDraft(); as draft) {
@@ -200,7 +183,7 @@
           }
         </span>
         <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.click()">
-          <app-icon name="upload" [size]="16" />
+          <app-icon name="upload" />
           {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
         </app-button>
       </div>
@@ -231,20 +214,15 @@
   </div>
 </app-dialog>
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.cdVariants.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
+  [body]="'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' }"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
 >
-  <p class="cdv__confirm">{{ 'admin.cdVariants.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}</p>
   @if (deleteError(); as err) {
     <app-note kind="error" icon="alert" role="alert">{{ err | t }}</app-note>
   }
-  <div dialog-footer class="cdv__foot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">
-      {{ 'admin.common.remove' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+</app-confirm-dialog>

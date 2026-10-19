@@ -3,7 +3,7 @@
   [open]="open()"
   [title]="title() | t"
   [subtitle]="gremiumName()"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="close()"
 >
   <form class="rd" (submit)="$event.preventDefault(); save()">
@@ -55,7 +55,7 @@
 
     @if (showGroups()) {
       <section class="rd__groups" aria-labelledby="rd-groups-title">
-        <h3 class="cap rd__cap" id="rd-groups-title">{{ 'admin.gremiumRoles.groups' | t }}</h3>
+        <h3 class="section-title rd__cap" id="rd-groups-title">{{ 'admin.gremiumRoles.groups' | t }}</h3>
         <div class="rd__groupBox">
           <span class="rd__groupText">
             @if (isMemberRole()) {

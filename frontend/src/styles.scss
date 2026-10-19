@@ -25,6 +25,68 @@
   color: var(--color-accent-text);
 }
 
+// An admin page (every page under /admin and the cost centres): the header, then the
+// blocks of the page, one gap apart. The pages set `app-page-header [flush]`, so this gap
+// is the only space between the title and the first block, and it is the same on every
+// page.
+.admin-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+// The heading of a section of an admin page, of a card on such a page, or of a block in
+// a detail or a dialog. One look for all of them; the surrounding layout sets the space.
+.section-title {
+  margin: 0;
+  font-size: var(--fs-h3);
+  line-height: 1.375rem;
+  font-weight: var(--fw-semibold);
+  color: var(--color-text);
+}
+
+// A row that opens with a click (the edit of an admin row). The control in it
+// (`.hitrow__open`, a button around the name) stretches over the row with its ::after, so
+// a click anywhere on the row opens it. The controls of the row (`.hitrow__keep`, the ⋮
+// menu) sit above the stretched area and keep their own click.
+.hitrow {
+  position: relative;
+}
+.hitrow:hover {
+  background: var(--color-surface-3);
+}
+.rowgroup--bg3 > .hitrow:hover {
+  background: var(--color-surface-4);
+}
+.hitrow__open {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.hitrow__open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--hitrow-radius, 4px);
+}
+.hitrow__open:focus-visible {
+  outline: none;
+}
+.hitrow__open:focus-visible::after {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+.hitrow__keep {
+  position: relative;
+  z-index: 1;
+}
+
 // A group of rows that reads as one block (`app-field-group`, the days of a history, a
 // short list on a sheet): the rows sit 2px apart on their own surface, and only the outer
 // corners are round. The rows sit on surface 2, which suits the page and a sheet on
@@ -306,7 +368,7 @@ td:first-child > .skel--bar {
   }
 }
 .skel-in {
-  animation: skel-in 150ms var(--ease-standard, ease) 300ms both;
+  animation: skel-in var(--motion-fast) var(--ease-standard) var(--skeleton-delay) both;
 }
 @keyframes skel-in {
   from {
@@ -319,7 +381,7 @@ td:first-child > .skel--bar {
 .skel-stale {
   opacity: 0.55;
   pointer-events: none;
-  transition: opacity 150ms var(--ease-standard, ease) 300ms;
+  transition: opacity var(--motion-fast) var(--ease-standard) var(--skeleton-delay);
 }
 .skel-progress {
   position: absolute;
@@ -331,7 +393,7 @@ td:first-child > .skel--bar {
   border-radius: 2px;
   background: color-mix(in srgb, var(--color-accent) 25%, transparent);
   pointer-events: none;
-  animation: skel-in 150ms var(--ease-standard, ease) 300ms both;
+  animation: skel-in var(--motion-fast) var(--ease-standard) var(--skeleton-delay) both;
 }
 .skel-progress::after {
   content: '';
@@ -395,5 +457,150 @@ td:first-child > .skel--bar {
 @container (max-width: 32rem) {
   .fe-form .fe-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Route motion (`core/motion/motion.ts`). The router names the kind of a navigation on
+   `<html data-motion>` while its view transition runs; only then is the content a group
+   of its own, so the frame (rail, bottom bar) stays still.
+   - section: the old content fades out fast, the new one fades in and rises (fade-through).
+   - push: on a phone, the new page slides in from the end over the old one, which recedes.
+   - pop: the reverse, faster.
+   Reduced motion skips the transition in the router. */
+:root[data-motion] .main {
+  view-transition-name: main;
+}
+/* The bottom bar is a group of its own, so the moving content never paints over it. */
+:root[data-motion] .bb {
+  view-transition-name: bottom-bar;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: var(--motion-base);
+  animation-timing-function: var(--ease-standard);
+}
+::view-transition-group(main) {
+  animation-duration: var(--motion-base);
+}
+:root[data-motion='section']::view-transition-old(main) {
+  animation: vt-fade-out var(--motion-xs) var(--ease-exit) both;
+}
+:root[data-motion='section']::view-transition-new(main) {
+  animation: vt-rise-in var(--motion-base) var(--ease-enter) var(--motion-xs) both;
+}
+:root[data-motion='push']::view-transition-old(main) {
+  animation: vt-recede var(--motion-slow) var(--ease-standard) both;
+}
+:root[data-motion='push']::view-transition-new(main) {
+  /* The page on top is opaque, so the receding one never shows through its gaps. */
+  background: var(--color-bg);
+  animation: vt-from-end var(--motion-slow) var(--ease-standard) both;
+}
+:root[data-motion='pop']::view-transition-old(main) {
+  z-index: 1;
+  background: var(--color-bg);
+  animation: vt-to-end var(--motion-base) var(--ease-exit) both;
+}
+:root[data-motion='pop']::view-transition-new(main) {
+  animation: vt-recede var(--motion-base) var(--ease-standard) reverse both;
+}
+@keyframes vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes vt-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-shift-sm));
+  }
+}
+@keyframes vt-recede {
+  to {
+    opacity: 0.6;
+    transform: translateX(-25%);
+  }
+}
+@keyframes vt-from-end {
+  from {
+    transform: translateX(100%);
+  }
+}
+@keyframes vt-to-end {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Motion utilities for `animate.enter` / `animate.leave` (Angular keeps a leaving element
+   until its animation ends). Global, so every component can bind them by name.
+   - `.motion-expand-in` / `.motion-expand-out`: a section that opens below its toggle. It
+     grows from height 0 where the browser can animate to `auto`, and fades in after a
+     short delay; closing fades first, then the height goes.
+   - `.motion-rise-in`: a new entry in a list (a chat message, a row): it fades in and
+     rises by --motion-shift-sm.
+   - `.motion-fade-out`: an entry that goes. */
+.motion-expand-in,
+.motion-expand-out {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+}
+.motion-expand-in {
+  animation: motion-expand-in var(--motion-base) var(--ease-standard);
+}
+.motion-expand-out {
+  animation: motion-expand-out var(--motion-base) var(--ease-standard) forwards;
+}
+/* A popover that is not an option menu (account, help): it grows from its anchor edge and
+   fades in; it fades out faster, without moving. */
+.motion-pop-in {
+  animation: motion-pop-in var(--motion-fast) var(--ease-enter);
+}
+.motion-pop-out {
+  pointer-events: none;
+  animation: motion-fade-out var(--motion-xs) var(--ease-exit) forwards;
+}
+@keyframes motion-pop-in {
+  from {
+    opacity: 0;
+    scale: var(--motion-scale-in);
+  }
+}
+.motion-rise-in {
+  animation: motion-rise-in var(--motion-base) var(--ease-enter);
+}
+.motion-fade-out {
+  pointer-events: none;
+  animation: motion-fade-out var(--motion-xs) var(--ease-exit) forwards;
+}
+@keyframes motion-expand-in {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  45% {
+    opacity: 0;
+  }
+}
+@keyframes motion-expand-out {
+  45% {
+    opacity: 0;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+@keyframes motion-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-shift-sm));
+  }
+}
+@keyframes motion-fade-out {
+  to {
+    opacity: 0;
   }
 }

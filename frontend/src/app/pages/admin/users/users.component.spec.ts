@@ -157,7 +157,7 @@ describe('UsersComponent', () => {
 
   it('shows the OIDC groups of each user, or a placeholder', async () => {
     await setup();
-    expect(screen.getAllByText('SSO-Gruppen (letzter Login)')).toHaveLength(2);
+    expect(screen.getAllByText('SSO-Gruppen (letzte Anmeldung)')).toHaveLength(2);
     expect(screen.getByText('stupa-referat')).toBeInTheDocument();
     expect(screen.getByText('unmapped')).toBeInTheDocument();
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
@@ -308,16 +308,19 @@ describe('UsersComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
-  it('deactivates from the row, and the own account only with a reason', async () => {
-    const { api } = await setup(makeApi(), makeAuth('kc|sam'));
-    const own = screen.getAllByRole('button', { name: /^Deaktivieren: / });
+  it('deactivates from the row menu, and the own account only with a reason', async () => {
+    const { api, inst } = await setup(makeApi(), makeAuth('kc|sam'));
+    // Every row has a ⋮ menu that names its person; there is no button beside it.
+    const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
+    expect(menus[0]).toHaveAccessibleName('Weitere Aktionen: Alex Admin');
+    expect(screen.queryByRole('button', { name: /^Deaktivieren/ })).toBeNull();
     // Alex can be deactivated; Sam is the signed-in user.
-    expect(own[0]).toBeEnabled();
-    expect(own[1]).toBeDisabled();
-    expect(own[1]).toHaveAttribute('title', 'Du kannst dein eigenes Konto nicht deaktivieren.');
-    // The button names its person, so a list of the buttons tells the rows apart.
-    expect(own[0]).toHaveAccessibleName('Deaktivieren: Alex Admin');
-    await userEvent.click(own[0]);
+    const alex = inst.menuFor(PRINCIPALS[0])[0].items[0];
+    expect(alex).toMatchObject({ id: 'deactivate', label: 'Deaktivieren', disabledReason: null });
+    const sam = inst.menuFor(PRINCIPALS[1])[0].items[0];
+    expect(sam.disabledReason).toBe('Du kannst dein eigenes Konto nicht deaktivieren.');
+    await userEvent.click(menus[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Deaktivieren' }));
     expect(api.setPrincipalActive).toHaveBeenCalledWith('p-1', false);
   });
 
@@ -325,10 +328,12 @@ describe('UsersComponent', () => {
     const api = makeApi({
       listPrincipals: jest.fn(() => of([{ ...PRINCIPALS[1], active: false }])),
     });
-    const { container } = await setup(api);
+    const { container, inst } = await setup(api);
     expect(container.querySelector('.au__row--off')).not.toBeNull();
-    expect(screen.getByText('deaktiviert')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: /^Aktivieren: / }));
+    expect(container.querySelector('app-status-text.st--muted')?.textContent?.trim()).toBe('Inaktiv');
+    const item = inst.menuFor({ ...PRINCIPALS[1], active: false })[0].items[0];
+    expect(item).toMatchObject({ id: 'activate', label: 'Aktivieren' });
+    inst.onMenu(item, { ...PRINCIPALS[1], active: false });
     expect(api.setPrincipalActive).toHaveBeenCalledWith('p-3', true);
   });
 
@@ -363,25 +368,26 @@ describe('UsersComponent', () => {
       const { container } = await setup(api, makeAuth(null, true, true));
       expect(screen.getByText('zusammengeführt in Alex Admin')).toBeInTheDocument();
       expect(screen.getByText('zusammengeführt in Konto ohne Namen')).toBeInTheDocument();
-      expect(screen.queryByText('deaktiviert')).toBeNull();
+      expect(screen.queryByText('Inaktiv')).toBeNull();
       expect(container.querySelectorAll('.au__row--off')).toHaveLength(2);
       expect(screen.queryByRole('button', { name: /Aktivieren|Deaktivieren|Weitere Aktionen/ })).toBeNull();
     });
 
-    it('without admin.users.merge the row has no menu', async () => {
-      await setup(makeApi(), makeAuth(null));
-      expect(screen.queryByRole('button', { name: /^Weitere Aktionen/ })).toBeNull();
+    it('without admin.users.merge the menu holds only the activation', async () => {
+      const { inst } = await setup(makeApi(), makeAuth(null));
+      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen/ })).toHaveLength(2);
+      expect(inst.menuFor(PRINCIPALS[1])[1].items).toEqual([]);
     });
 
     it('the row menu opens the merge dialog; the own account cannot be merged', async () => {
       const { inst } = await setup(makeApi(), makeAuth('kc|alex', true, true));
       const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
       expect(menus).toHaveLength(2);
-      const own = inst.menuFor(PRINCIPALS[0])[0].items[0];
+      const own = inst.menuFor(PRINCIPALS[0])[1].items[0];
       expect(own.disabledReason).toBe(
         'Dein eigenes Konto kannst du nicht in ein anderes Konto zusammenführen.',
       );
-      const other = inst.menuFor(PRINCIPALS[1])[0].items[0];
+      const other = inst.menuFor(PRINCIPALS[1])[1].items[0];
       expect(other).toMatchObject({ id: 'merge', danger: true, disabledReason: null });
       inst.onMenu({ id: 'other', label: 'x' }, PRINCIPALS[1]);
       expect(inst.mergeSource()).toBeNull();
@@ -392,7 +398,7 @@ describe('UsersComponent', () => {
     it('"Konto löschen (DSGVO)" needs privacy.manage and opens the privacy page (D1)', async () => {
       const { inst, fixture } = await setup(makeApi(), makeAuth(null, true, false, true));
       expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
-      const items = inst.menuFor(PRINCIPALS[1])[0].items;
+      const items = inst.menuFor(PRINCIPALS[1])[1].items;
       expect(items.map((i: { id: string }) => i.id)).toEqual(['erase']);
       expect(items[0]).toMatchObject({ label: 'Konto löschen (DSGVO)', danger: true, disabledReason: null });
       const router = fixture.debugElement.injector.get(Router);
@@ -403,7 +409,7 @@ describe('UsersComponent', () => {
 
     it('the own account cannot be erased: the action has a reason', async () => {
       const { inst } = await setup(makeApi(), makeAuth('kc|alex', true, false, true));
-      const own = inst.menuFor(PRINCIPALS[0])[0].items[0];
+      const own = inst.menuFor(PRINCIPALS[0])[1].items[0];
       expect(own.id).toBe('erase');
       expect(own.disabledReason).toBe(
         'Dein eigenes Konto kannst du nicht löschen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
@@ -412,7 +418,7 @@ describe('UsersComponent', () => {
 
     it('with both permissions the menu holds merge and erase', async () => {
       const { inst } = await setup(makeApi(), makeAuth(null, true, true, true));
-      expect(inst.menuFor(PRINCIPALS[1])[0].items.map((i: { id: string }) => i.id)).toEqual(['merge', 'erase']);
+      expect(inst.menuFor(PRINCIPALS[1])[1].items.map((i: { id: string }) => i.id)).toEqual(['merge', 'erase']);
     });
 
     it('a merge reloads the list', async () => {
@@ -443,11 +449,11 @@ describe('UsersComponent', () => {
     it('the chips filter the list on the server', async () => {
       const { api, inst } = await setup(makeApi(), revokeAuth());
       expect(screen.getByRole('group', { name: 'Personen filtern' })).toBeInTheDocument();
-      expect(inst.lastLoginText()).toBe('Letzter Login');
+      expect(inst.lastLoginText()).toBe('Letzte Anmeldung');
       api.listPrincipals.mockClear();
       inst.setLastLoginFilter('never');
       expect(api.listPrincipals).toHaveBeenLastCalledWith('', { includeNever: true });
-      expect(inst.lastLoginText()).toBe('Letzter Login: nie');
+      expect(inst.lastLoginText()).toBe('Letzte Anmeldung: nie');
       inst.setGroupFilter('yes');
       expect(api.listPrincipals).toHaveBeenLastCalledWith('', { includeNever: true, hasGroups: true });
       expect(inst.groupText()).toBe('Hat SSO-Gruppen: Ja');
@@ -471,11 +477,11 @@ describe('UsersComponent', () => {
     it('the row menu offers "Rechte entziehen …" only for a person with access', async () => {
       const api = makeApi({ listPrincipals: jest.fn(() => of(WITH_ACCESS)) });
       const { inst } = await setup(api, revokeAuth());
-      // A row without an item for this user has no (empty) menu.
-      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(1);
-      const item = inst.menuFor(WITH_ACCESS[0])[0].items[0];
+      // Every row has a menu: the activation is always in it.
+      expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
+      const item = inst.menuFor(WITH_ACCESS[0])[1].items[0];
       expect(item).toMatchObject({ id: 'revoke', label: 'Rechte entziehen …', danger: true, disabledReason: null });
-      expect(inst.menuFor(WITH_ACCESS[1])[0].items).toEqual([]);
+      expect(inst.menuFor(WITH_ACCESS[1])[1].items).toEqual([]);
       inst.onMenu(item, WITH_ACCESS[0]);
       expect(inst.revokeSource()).toEqual(WITH_ACCESS[0]);
       api.listPrincipals.mockClear();
@@ -485,7 +491,7 @@ describe('UsersComponent', () => {
 
     it('the own account cannot lose its rights: the action has a reason', async () => {
       const { inst } = await setup(makeApi(), revokeAuth('kc|alex'));
-      const own = inst.menuFor(WITH_ACCESS[0])[0].items[0];
+      const own = inst.menuFor(WITH_ACCESS[0])[1].items[0];
       expect(own.disabledReason).toBe(
         'Deine eigenen Rechte kannst du nicht entziehen. Bitte eine andere Administratorin oder einen anderen Administrator darum.',
       );

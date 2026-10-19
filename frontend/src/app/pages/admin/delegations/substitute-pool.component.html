@@ -3,11 +3,11 @@
      Mitglieder → Stellvertretung". -->
 <section class="sp" aria-labelledby="sp-title">
   <header class="sp__head">
-    <h2 class="sec" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
+    <h2 class="section-title" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
     <span class="sp__actions">
       <ng-content select="[poolActions]" />
       <app-button variant="text" size="sm" (click)="openAdd()">
-        <app-icon name="plus" [size]="16" /> {{ 'admin.substitutes.add' | t }}
+        <app-icon name="plus" /> {{ 'admin.substitutes.add' | t }}
       </app-button>
     </span>
   </header>
@@ -15,7 +15,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="2" [label]="'common.loading' | t" />
   } @else if (failed()) {
-    <p class="sp__error" role="alert">{{ 'admin.substitutes.loadFailed' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'admin.substitutes.loadFailed' | t }}</app-note>
   } @else if (entries().length) {
     <ul class="rowgroup sp__list" aria-labelledby="sp-title">
       @for (s of entries(); track s.id) {
@@ -31,17 +31,11 @@
               <span class="sp__name">{{ entryName(s) }}</span>
             </span>
           </span>
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [disabled]="removing().has(s.id)"
-            [ariaLabel]="('admin.substitutes.remove' | t) + ': ' + entryName(s)"
-            [title]="'admin.substitutes.remove' | t"
-            (click)="remove(s)"
-          >
-            <app-icon name="trash" />
-          </app-button>
+<app-row-menu
+            [sections]="rowMenu()"
+            [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
+            (selected)="remove(s)"
+          />
         </li>
       }
     </ul>
@@ -54,7 +48,7 @@
 <app-dialog
   [open]="addOpen()"
   [title]="'admin.substitutes.add' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="addOpen.set(false)"
 >
   <form class="sp__form" (submit)="$event.preventDefault(); add()">
@@ -116,7 +110,7 @@
   <div dialog-footer class="sp__foot">
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!selected()" [loading]="adding()" (click)="add()">{{
-      'admin.substitutes.addAction' | t
+      'admin.common.add' | t
     }}</app-button>
   </div>
 </app-dialog>

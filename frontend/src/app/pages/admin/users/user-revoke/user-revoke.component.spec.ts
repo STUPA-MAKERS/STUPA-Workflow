@@ -174,7 +174,7 @@ describe('UserRevokeComponent', () => {
     expect(api.previewPrincipalRevoke).toHaveBeenCalledWith('p-12');
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(screen.getAllByText('Tobias Kern').length).toBeGreaterThan(0);
-    expect(screen.getByText(/^Letzter Login .+ \(vor \d+ Monaten\)$/)).toBeInTheDocument();
+    expect(screen.getByText(/^Letzte Anmeldung .+ \(vor \d+ Monaten\)$/)).toBeInTheDocument();
     expect(screen.getByText('Gremien (2)')).toBeInTheDocument();
     expect(screen.getByText('Globale Rollen (2)')).toBeInTheDocument();
     expect(screen.getByText('Mitgliedschaft als Mitglied')).toBeInTheDocument();
@@ -232,7 +232,7 @@ describe('UserRevokeComponent', () => {
       ),
     });
     await setup(api);
-    expect(screen.getByText(/Kommt beim nächsten Start oder Login zurück/)).toBeInTheDocument();
+    expect(screen.getByText(/Kommt beim nächsten Start oder bei der nächsten Anmeldung zurück/)).toBeInTheDocument();
   });
 
   it('starts with everything checked and names the count on the danger button', async () => {

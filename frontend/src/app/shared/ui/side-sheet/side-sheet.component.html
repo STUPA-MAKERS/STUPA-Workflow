@@ -1,9 +1,17 @@
 @if (open()) {
-  <div class="ss__scrim" aria-hidden="true" (click)="close()"></div>
+  <div
+    class="ss__scrim"
+    aria-hidden="true"
+    animate.enter="ss__scrim--entering"
+    animate.leave="ss__scrim--leaving"
+    (click)="close()"
+  ></div>
   <div
     #pane
     [class]="'ss ss--' + side()"
     [class.ss--dragging]="dragging()"
+    animate.enter="ss--entering"
+    animate.leave="ss--leaving"
     [style.transform]="dragY() ? 'translateY(' + dragY() + 'px)' : null"
     role="dialog"
     aria-modal="true"
@@ -25,15 +33,15 @@
       <header class="ss__head">
         <h2 class="ss__title" [id]="id">{{ heading() }}</h2>
         <ng-content select="[sheet-actions]" />
-        <button
-          type="button"
+        <app-button
           class="ss__close"
-          [attr.aria-label]="'action.close' | t"
-          [title]="'action.close' | t"
+          variant="text"
+          [iconOnly]="true"
+          [ariaLabel]="'action.close' | t"
           (click)="close()"
         >
-          <app-icon name="x" [size]="20" />
-        </button>
+          <app-icon name="x" />
+        </app-button>
       </header>
     </div>
     <div

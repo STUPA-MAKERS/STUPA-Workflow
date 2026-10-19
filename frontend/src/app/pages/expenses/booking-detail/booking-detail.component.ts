@@ -198,7 +198,7 @@ export class BookingDetailComponent {
     const e = this.expense();
     const items: RowMenuItem[] = [];
     if (this.canManage() && !e.parentExpenseId) {
-      items.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'add' });
+      items.push({ id: 'sub', label: this.i18n.translate('expenses.sub.add'), icon: 'plus' });
     }
     const inv = this.invoice();
     if (inv && inv.id === e.invoiceId && inv.hasFile) {
@@ -207,7 +207,7 @@ export class BookingDetailComponent {
     const sections: RowMenuSection[] = items.length ? [{ items }] : [];
     if (this.canManage()) {
       sections.push({
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       });
     }
     return sections;
@@ -227,7 +227,7 @@ export class BookingDetailComponent {
   protected readonly subMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
     {
-      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
     },
   ]);
 

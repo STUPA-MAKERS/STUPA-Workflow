@@ -22,7 +22,6 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
@@ -30,10 +29,11 @@ import {
   type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, ErasureRequest } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The picker shows this many hits. A longer list means: type more. */
 const PERSON_HITS = 6;
@@ -57,6 +57,8 @@ const PERSON_HITS = 6;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,
@@ -106,10 +108,15 @@ export class PrivacyComponent {
   protected readonly confirmPrincipal = signal(false);
 
   protected readonly retentionMonths = signal<number | null>(null);
+  /** The retention as the server has it; `retentionDirty` compares against it. */
+  private readonly savedRetention = signal<number | null>(null);
+  protected readonly retentionSaving = signal(false);
+  /** The retention has a change that is not saved. Only then the page shows "Speichern". */
+  protected readonly retentionDirty = computed(
+    () => this.savedRetention() !== null && this.retentionMonths() !== this.savedRetention(),
+  );
 
-  /** A phone shows cards: the actions of a request go into the ⋮ menu of its card. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  /** The ⋮ menu of an open request on a phone: the same two actions as the buttons. */
+  /** The ⋮ menu of an open request. */
   protected readonly rowMenu = computed<RowMenuSection[]>(() => [
     {
       items: [
@@ -133,7 +140,7 @@ export class PrivacyComponent {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '13rem',
+      width: '3.5rem',
       card: 'actions',
     },
   ]);
@@ -143,7 +150,7 @@ export class PrivacyComponent {
 
   constructor() {
     this.reload();
-    this.api.getPrivacySettings().subscribe((s) => this.retentionMonths.set(s.defaultRetentionMonths));
+    this.api.getPrivacySettings().subscribe((s) => this.applyRetention(s.defaultRetentionMonths));
     // `?person=<sub>` comes from the row action in Verwaltung → Benutzer. The search
     // matches the `sub` too; only an exact match is taken.
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((qp) => {
@@ -260,15 +267,26 @@ export class PrivacyComponent {
     });
   }
 
+  private applyRetention(months: number): void {
+    this.savedRetention.set(months);
+    this.retentionMonths.set(months);
+  }
+
+  /** "Speichern" and Enter in the field: send the retention. */
   protected saveRetention(): void {
     const months = this.retentionMonths();
-    if (months == null || months < 1) return;
+    if (months == null || months < 1 || !this.retentionDirty() || this.retentionSaving()) return;
+    this.retentionSaving.set(true);
     this.api.putPrivacySettings({ defaultRetentionMonths: months }).subscribe({
       next: (s) => {
-        this.retentionMonths.set(s.defaultRetentionMonths);
+        this.retentionSaving.set(false);
+        this.applyRetention(s.defaultRetentionMonths);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
+      error: () => {
+        this.retentionSaving.set(false);
+        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
+      },
     });
   }
 }

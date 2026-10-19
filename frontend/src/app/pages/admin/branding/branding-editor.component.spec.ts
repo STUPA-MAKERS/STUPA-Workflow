@@ -2,7 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { render, screen, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -27,8 +27,10 @@ async function setup() {
 }
 
 /** The version line under the header (the version list below repeats the number). */
+/** The version (the `meta` of the header) and the draft note under the header. */
 function stateLine(container: Element): string {
-  return container.querySelector('.br__state')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  const text = (sel: string) => container.querySelector(sel)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  return [text('.ph__meta'), text('.br__state')].filter(Boolean).join(' · ');
 }
 
 function emptyBranding(): Branding {
@@ -172,13 +174,16 @@ describe('BrandingEditorComponent', () => {
     expect(screen.getByTestId('preview-footer')).toHaveTextContent('About');
   });
 
-  it('saving a draft enables activation and bumps the version', async () => {
+  it('shows "Speichern" only for unsaved edits; a saved draft can be activated', async () => {
     const { container } = await setup();
     const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });
     expect(activate).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await userEvent.type(screen.getByRole('textbox', { name: 'Kurzname (PWA)' }), 'AP');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(stateLine(container)).toMatch(/^Version 1\s*·\s*Nicht aktivierter Entwurf$/);
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(activate).toBeEnabled();
 
     await userEvent.click(activate);
@@ -243,7 +248,7 @@ describe('BrandingEditorComponent', () => {
     expect(c.isBadUrl('javascript:alert(1)')).toBe(true);
     fixture.detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent('javascript:alert(1)');
-    expect(screen.getByRole('button', { name: 'Entwurf speichern' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
     c.saveDraft();
     expect(toast.error).toHaveBeenCalledWith(
       'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
@@ -328,9 +333,9 @@ describe('BrandingEditorComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
-      const internal = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
       expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
-      expect(screen.getByRole('textbox', { name: 'Extern – Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
+      expect(screen.getByRole('textbox', { name: 'Extern: Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
         'placeholder',
         expect.stringMatching(/persönlichen Link/),
       );
@@ -342,16 +347,16 @@ describe('BrandingEditorComponent', () => {
       const { fixture, api } = await setupWithStub({});
       await fixture.whenStable();
       fixture.detectChanges();
-      const internal = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
       await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
       expect(screen.getByTestId('submitted-preview-internal').innerHTML).toContain('<strong>sehr</strong>');
       expect(screen.getByTestId('submitted-preview-internal').querySelector('b')).toBeNull();
       expect(screen.getAllByText('Standardtext')).toHaveLength(1);
       await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-      const en = screen.getByRole('textbox', { name: 'Intern – angemeldet mit Konto (EN)' });
+      const en = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (EN)' });
       expect(en).toHaveValue('');
       expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
-      await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       const saved = api.saveBrandingDraft.mock.calls[0][0] as Branding;
       expect(saved.freetexts.submittedInternal).toEqual({ de: 'Danke **sehr** <b>x</b>' });
       expect(saved.freetexts.submittedExternal).toEqual({});
@@ -378,6 +383,11 @@ describe('BrandingEditorComponent', () => {
     expect(c.slotLabel('favicon').length).toBeGreaterThan(0);
   });
 
+  it('shows the shape of the editor until the config arrives', async () => {
+    await setupWithStub({ getSiteConfig: jest.fn(() => NEVER) });
+    expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
+  });
+
   it('patch is a no-op without a draft', async () => {
     const { fixture } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: null as unknown as Branding })) });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -402,7 +412,7 @@ describe('BrandingEditorComponent', () => {
     await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'));
     await userEvent.click(sw);
     await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'));
-    await userEvent.click(screen.getByRole('button', { name: /Entwurf speichern/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.saveBrandingDraft).toHaveBeenCalledWith(
       expect.objectContaining({ gravatarEnabled: false }),
     );
@@ -465,7 +475,8 @@ describe('BrandingEditorComponent', () => {
     expect(activate).toBeDisabled();
 
     // Save once, then edit again: the server holds the older draft.
-    await userEvent.click(screen.getByRole('button', { name: 'Entwurf speichern' }));
+    await userEvent.click(screen.getByRole('switch', { name: /Gravatar-Bilder zeigen/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     await userEvent.type(screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' }), 'Gruß');
     expect(activate).toBeEnabled();
 
@@ -520,17 +531,15 @@ describe('BrandingEditorComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
-    it('keeps the save in the header and moves the activate into a menu', async () => {
-      const { fixture, api } = await setupWithStub({});
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const c = fixture.componentInstance as any;
-      expect(screen.getByRole('button', { name: 'Entwurf speichern' })).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Entwurf aktivieren' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Weitere Aktionen' })).toBeInTheDocument();
-      expect(c.phoneMenu()[0].items[0].disabledReason).toBe('Erst einen geänderten Entwurf speichern.');
-      c.saveDraft();
-      expect(c.phoneMenu()[0].items[0].disabledReason).toBeNull();
+    it('keeps the activate in the header and shows "Speichern" only for unsaved edits', async () => {
+      const { api } = await setupWithStub({});
+      const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });
+      expect(activate).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+      await userEvent.click(screen.getByRole('switch', { name: /Gravatar-Bilder zeigen/ }));
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
       expect(api.saveBrandingDraft).toHaveBeenCalled();
+      expect(activate).toBeEnabled();
     });
   });
 });

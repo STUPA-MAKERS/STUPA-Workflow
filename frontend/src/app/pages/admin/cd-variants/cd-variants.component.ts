@@ -11,9 +11,15 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import {
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+} from '@shared/ui/row-menu/row-menu.component';
 import {
   ButtonComponent,
   DialogComponent,
@@ -53,6 +59,7 @@ import {
   variantInitials,
 } from './cd-variants.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -127,6 +134,8 @@ function errorCode(err: unknown): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,
@@ -139,6 +148,7 @@ function errorCode(err: unknown): string {
     SelectFieldComponent,
     SkeletonComponent,
     PageHeaderComponent,
+    RowMenuComponent,
   ],
   templateUrl: './cd-variants.component.html',
   styleUrl: './cd-variants.component.scss',
@@ -256,7 +266,7 @@ export class AdminCdVariantsComponent {
     return logo.vendoredName ?? logo.fileName ?? '—';
   }
 
-  /** "Basis: Protokoll · genutzt von StuPa, AStA" for the card of a variant. */
+  /** "Basis: Protokoll · genutzt von STUPA, AStA" for the card of a variant. */
   usage(variant: CdVariant): string {
     const base = this.i18n.translate('admin.cdVariants.baseLine', { base: this.baseLabel(variant.baseVariant) });
     const names = this.usedBy().get(variant.id) ?? [];
@@ -270,6 +280,47 @@ export class AdminCdVariantsComponent {
   logoDetail(logo: CdVariantLogo): string {
     if (logo.vendoredName) return logo.vendoredName;
     return logo.size != null ? `${logo.fileName ?? '—'} · ${formatBytes(logo.size, this.i18n)}` : (logo.fileName ?? '—');
+  }
+
+  /** The ⋮ menu of a variant. The row itself opens the edit. */
+  protected readonly variantMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'delete', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true }] },
+  ]);
+
+  /**
+   * The ⋮ menu of a logo: move up and down inside its slot (not for the one square logo,
+   * not past the ends), download an upload, remove.
+   */
+  logoMenu(slot: CdLogoSlot, index: number, last: boolean, logo: CdVariantLogo): RowMenuSection[] {
+    const move: RowMenuItem[] = [];
+    if (slot !== 'square') {
+      if (index > 0) move.push({ id: 'up', label: this.i18n.translate('admin.common.moveUp'), icon: 'up' });
+      if (!last) move.push({ id: 'down', label: this.i18n.translate('admin.common.moveDown'), icon: 'down' });
+    }
+    const file: RowMenuItem[] = logo.fileName
+      ? [{ id: 'download', label: this.i18n.translate('admin.cdVariants.download'), icon: 'download' }]
+      : [];
+    return [
+      { items: [...move, ...file] },
+      { items: [{ id: 'remove', label: this.i18n.translate('admin.cdVariants.removeLogo'), icon: 'trash', danger: true }] },
+    ];
+  }
+
+  onLogoMenu(item: RowMenuItem, variant: CdVariant, slot: CdLogoSlot, index: number, logo: CdVariantLogo): void {
+    if (item.id === 'up') this.moveLogo(variant, slot, index, -1);
+    if (item.id === 'down') this.moveLogo(variant, slot, index, 1);
+    if (item.id === 'download') this.download(logo);
+    if (item.id === 'remove') this.removeLogo(variant, logo);
+  }
+
+  /** The server answers the file as `attachment`, so a plain link click downloads it. */
+  private download(logo: CdVariantLogo): void {
+    const a = document.createElement('a');
+    a.href = this.fileUrl(logo);
+    a.download = logo.fileName ?? '';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
   /** Download URL of an uploaded logo. The server always answers `attachment`. */

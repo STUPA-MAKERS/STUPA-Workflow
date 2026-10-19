@@ -1,7 +1,7 @@
 import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import { of, throwError } from 'rxjs';
+import { NEVER, of, throwError } from 'rxjs';
 import { AdminApiService } from '../admin-api.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
@@ -55,10 +55,17 @@ describe('MailTemplatesComponent', () => {
     expect(screen.getByText(/name/)).toBeInTheDocument();
   });
 
-  it('saves edits and renders a preview', async () => {
-    const { api } = await setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    expect(api.upsertMailTemplate).toHaveBeenCalled();
+  it('shows "Speichern" only after an edit, saves it and renders a preview', async () => {
+    const { api, view } = await setup();
+    await screen.findByRole('button', { name: /Anmelde-Link/ });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await userEvent.type(screen.getByDisplayValue('Anmeldung'), ' neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(api.upsertMailTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ subjectI18n: expect.objectContaining({ de: 'Anmeldung neu' }) }),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
     expect(api.previewMailPayload).toHaveBeenCalled();
     expect(await screen.findByText('Hallo Anzeigename')).toBeInTheDocument();
@@ -71,6 +78,13 @@ describe('MailTemplatesComponent', () => {
     };
     const { toast } = await setup(api);
     expect(toast.error).toHaveBeenCalledWith('Vorlagen konnten nicht geladen werden.');
+    expect(document.querySelector('app-skeleton')).toBeNull();
+  });
+
+  it('shows placeholders, not the empty states, while the list loads', async () => {
+    await setup({ ...setupApi(), listMailTemplates: jest.fn(() => NEVER) });
+    expect(screen.getByRole('status')).toHaveTextContent('Wird geladen …');
+    expect(screen.queryByText('Keine Vorlagen vorhanden.')).toBeNull();
   });
 
   it('patches the subject of the active language into the draft', async () => {

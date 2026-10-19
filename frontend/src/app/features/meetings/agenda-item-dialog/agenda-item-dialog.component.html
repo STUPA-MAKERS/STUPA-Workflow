@@ -1,7 +1,8 @@
 <app-dialog
   [open]="open()"
   [title]="'meetings.agenda.dialogTitle' | t"
-  [closeLabel]="'action.cancel' | t"
+  [closeLabel]="'action.close' | t"
+  size="form"
   (closed)="cancel()"
 >
   <form class="aid" (submit)="$event.preventDefault(); submit()">
@@ -117,7 +118,7 @@
       <app-empty-state shape="choice"
         [heading]="(kind() === 'todo' ? 'meetings.agenda.noTodoMatch' : 'meetings.agenda.noMatch') | t: { q: activeQuery() }"
       >
-        <app-button variant="tonal" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
+        <app-button variant="text" size="sm" (click)="clearSearch()">{{ 'invoices.filter.reset' | t }}</app-button>
       </app-empty-state>
     } @else {
       <app-empty-state shape="choice"

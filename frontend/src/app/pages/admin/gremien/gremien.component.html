@@ -1,12 +1,8 @@
-<section class="grem">
+<section class="grem admin-page">
   <app-page-header
     [flush]="true"
     [title]="'admin.gremien.title' | t"
-  >
-    <app-button actions variant="fill" (click)="openCreate()">
-      <app-icon name="plus" [size]="18" /> {{ 'admin.gremien.create' | t }}
-    </app-button>
-  </app-page-header>
+  />
 
   @if (canMappings()) {
     <app-note>
@@ -19,7 +15,7 @@
   @if (loading()) {
     <app-skeleton variant="rows" [count]="4" [label]="'admin.gremien.loading' | t" />
   } @else if (loadError()) {
-    <p class="grem__error" role="alert">{{ 'admin.gremien.error' | t }}</p>
+    <app-note kind="error" icon="alert" role="alert" retryable (retry)="reload(true)">{{ 'admin.gremien.error' | t }}</app-note>
   } @else if (gremien().length) {
     <ul class="rowgroup grem__list" [attr.aria-label]="'admin.gremien.title' | t">
       @for (g of gremien(); track g.id) {
@@ -40,10 +36,7 @@
                     <span class="grem__label ell" [title]="g.name">{{ g.name }}</span>
                     <span class="grem__slug mono">{{ g.slug }}</span>
                     @if (g.protocolsPublic) {
-                      <span class="grem__tag">
-                        <app-icon name="globe" [size]="13" />
-                        {{ 'admin.gremien.publicTag' | t }}
-                      </span>
+                      <app-status-text kind="accent">{{ 'admin.gremien.publicTag' | t }}</app-status-text>
                     }
                   </span>
                   @if (counts(g); as c) {
@@ -53,32 +46,11 @@
               </button>
             </h2>
             <span class="grem__actions">
-              <a
-                class="grem__link"
-                [routerLink]="['/admin/gremien', g.id, 'members']"
-                [attr.aria-label]="('admin.gremien.members' | t) + ': ' + g.name"
-                >{{ 'admin.gremien.members' | t }}</a
-              >
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="('admin.gremien.editAction' | t) + ': ' + g.name"
-                [title]="'admin.gremien.editAction' | t"
-                (click)="openEdit(g)"
-              >
-                <app-icon name="edit" />
-              </app-button>
-              <app-button
-                variant="text"
-                size="sm"
-                [iconOnly]="true"
-                [ariaLabel]="('admin.gremien.deleteAction' | t) + ': ' + g.name"
-                [title]="'admin.gremien.deleteAction' | t"
-                (click)="askDelete(g)"
-              >
-                <app-icon name="trash" />
-              </app-button>
+              <app-row-menu
+                [sections]="rowMenu()"
+                [label]="('ui.rowMenu.trigger' | t) + ': ' + g.name"
+                (selected)="onRowMenu($event, g)"
+              />
               <!-- A native button: the disclosure needs aria-expanded on the button itself. -->
               <button
                 type="button"
@@ -93,7 +65,7 @@
                 [attr.aria-controls]="'grem-body-' + g.id"
                 (click)="toggle(g)"
               >
-                <app-icon [name]="isOpen(g) ? 'chevron-up' : 'chevron-down'" [size]="20" />
+                <app-icon [name]="isOpen(g) ? 'up' : 'down'" [size]="20" />
               </button>
             </span>
           </div>
@@ -101,7 +73,7 @@
           @if (isOpen(g)) {
             <div class="grem__body" [id]="'grem-body-' + g.id">
               <section class="grem__settings" [attr.aria-labelledby]="'grem-set-' + g.id">
-                <h3 class="cap grem__cap" [id]="'grem-set-' + g.id">
+                <h3 class="section-title" [id]="'grem-set-' + g.id">
                   {{ 'admin.gremien.settings' | t }}
                 </h3>
                 <dl class="grem__grid">
@@ -128,6 +100,8 @@
   } @else {
     <app-empty-state [heading]="'admin.gremien.empty' | t" />
   }
+
+  <app-fab [label]="'fab.gremium' | t" (activate)="openCreate()" />
 </section>
 
 <app-gremium-dialog
@@ -139,21 +113,11 @@
   (baseSaved)="onBaseSaved($event)"
 />
 
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
   [title]="'admin.gremien.deleteTitle' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="grem__confirm">
-    {{ 'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' } }}
-  </p>
-  <div dialog-footer class="grem__dialogFoot">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{
-      'action.cancel' | t
-    }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="doDelete()">{{
-      'admin.gremien.deleteAction' | t
-    }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'admin.gremien.deleteConfirm' | t: { name: confirmDelete()?.name ?? '' }"
+  [busy]="deleting()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

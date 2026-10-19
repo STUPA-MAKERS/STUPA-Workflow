@@ -38,7 +38,7 @@
           [ariaLabel]="'gremien.members.export' | t"
           [disabled]="loading() || !groups().length"
           (click)="exportCsv()"
-        ><app-icon name="download" [size]="20" /></app-button>
+        ><app-icon name="download" /></app-button>
       }
     </div>
   </div>
@@ -47,10 +47,7 @@
 @if (loading()) {
   <app-skeleton variant="rows" [count]="5" [label]="'gremien.members.loading' | t" />
 } @else if (error()) {
-  <div class="gmb__status" role="alert">
-    <span>{{ 'gremien.members.error' | t }}</span>
-    <app-button variant="text" size="sm" (click)="load()">{{ 'gremien.list.retry' | t }}</app-button>
-  </div>
+  <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'gremien.members.error' | t }}</app-note>
 } @else if (!groups().length) {
   @if (filterActive()) {
     <app-empty-state shape="person" rows="3" [heading]="'gremien.members.noMatch' | t" />

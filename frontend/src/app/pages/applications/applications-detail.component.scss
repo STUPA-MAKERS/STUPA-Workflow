@@ -153,15 +153,13 @@
 }
 .ad--stale > :not(.skel-progress) {
   opacity: 0.55;
-  transition: opacity 150ms var(--ease-standard, ease) 300ms;
+  transition: opacity var(--motion-fast) var(--ease-standard) var(--skeleton-delay);
 }
 .ad__progress {
   inset-inline: var(--radius-2xl);
 }
-.ad__error {
-  margin: 0;
-  padding: var(--space-5) 0;
-  color: var(--color-danger);
+.ad__loadError {
+  margin: var(--space-5) 0;
 }
 
 /* ------------------------------------------------------------------ header */
@@ -326,8 +324,8 @@
   --ad-gutter: var(--layout-gutter);
 }
 /* The bar of the edit mode takes the place of the header (board Anträge-Bearbeiten).
-   It stays at the top while the form scrolls below it, so Abbrechen and Speichern are
-   always in reach (DECISIONS: the header controls of a pane stay fixed). Side by side
+   It stays at the top while the form scrolls below it, so Abbrechen is always in reach
+   ("Speichern" is the floating button) (DECISIONS: the header controls of a pane stay fixed). Side by side
    the pane scrolls, one pane at a time the page scrolls; `top: 0` holds the bar at the
    top of either. */
 .ad__editBar {
@@ -397,8 +395,10 @@
   font-size: var(--fs-md);
 }
 /* The fields of the form: the global `.fe-form` grid (styles.scss). */
+/* The end of the form keeps room for the floating "Speichern" (56px and 16px around it). */
 .ad__edit {
   min-width: 0;
+  padding-bottom: calc(56px + 2 * var(--space-4));
 }
 
 /* ------------------------------------------------------------------ comments */

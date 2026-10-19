@@ -551,7 +551,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
     expect(cmp.comments()[0].body).toBe('Korrigiert');
 
     fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
-    const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen' });
+    const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
     const del = http.expectOne(url('/comments/c1'));
     expect(del.request.method).toBe('DELETE');
@@ -575,7 +575,7 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
   it('deletes an own comment after the confirmation', async () => {
     const { http, detectChanges, cmp } = await loaded(undefined, [OWN]);
     fireEvent.click(screen.getByRole('button', { name: 'Nachricht löschen' }));
-    const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen' });
+    const dialog = screen.getByRole('dialog', { name: 'Nachricht löschen?' });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Löschen' }));
     const del = http.expectOne(url('/comments/c2'));
     expect(del.request.method).toBe('DELETE');

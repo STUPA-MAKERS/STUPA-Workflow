@@ -14,10 +14,9 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { SkeletonComponent } from '@shared/ui';
+import { RowMenuComponent, type RowMenuSection, SkeletonComponent, StatusTextComponent } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -32,6 +31,9 @@ import {
 } from '../admin.models';
 import { GremiumRoleDialogComponent } from './gremium-role-dialog.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 let nextId = 0;
 
@@ -55,13 +57,17 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
+    FabComponent,
     TranslatePipe,
     CapitalizePipe,
     ButtonComponent,
-    DialogComponent,
     IconComponent,
+    RowMenuComponent,
     SkeletonComponent,
+    StatusTextComponent,
     GremiumRoleDialogComponent,
   ],
   templateUrl: './gremium-role-matrix.component.html',
@@ -77,6 +83,8 @@ export class GremiumRoleMatrixComponent implements OnInit {
   readonly gremiumName = input('');
   /** Show the section heading (the gremien page). The roles page has its own title. */
   readonly heading = input(true);
+  /** The add action is the floating button of the page (the roles page), not a header button. */
+  readonly fab = input(false);
   /** The row surface: 2 on a page, 3 inside a gremium row on surface 2. */
   readonly surface = input<2 | 3>(2);
   /** The number of roles after a create or a delete. */
@@ -108,7 +116,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
     this.load();
   }
 
-  private load(): void {
+  protected load(): void {
     const id = this.gremiumId();
     this.loading.set(true);
     this.failed.set(false);
@@ -233,6 +241,26 @@ export class GremiumRoleMatrixComponent implements OnInit {
     }
     this.dialogRole.set(undefined);
     this.toast.success(this.i18n.translate('admin.gremiumRoles.saved'));
+  }
+
+  /**
+   * The ⋮ menu of a role: delete is its only action. The row itself opens the edit. A
+   * required role (`forced`) cannot be deleted, and the item says why.
+   */
+  protected rowMenu(r: GremiumRole): RowMenuSection[] {
+    return [
+      {
+        items: [
+          {
+            id: 'delete',
+            label: this.i18n.translate('admin.gremiumRoles.delete'),
+            icon: 'trash',
+            danger: true,
+            disabledReason: r.forced ? this.i18n.translate('admin.gremiumRoles.forced') : null,
+          },
+        ],
+      },
+    ];
   }
 
   protected askDelete(r: GremiumRole): void {

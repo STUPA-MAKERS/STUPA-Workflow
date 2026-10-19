@@ -1,12 +1,5 @@
-<section class="fl">
-  <!-- Create posts an application type, so the button needs admin.types. -->
-  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t">
-    @if (canCreate()) {
-      <app-button actions variant="fill" (click)="openCreate()">
-        <app-icon name="plus" [size]="18" /> {{ 'admin.forms.add' | t }}
-      </app-button>
-    }
-  </app-page-header>
+<section class="fl admin-page">
+  <app-page-header [flush]="true" [title]="'admin.forms.listTitle' | t" />
 
   @if (loadError()) {
     <app-note kind="error" icon="alert" role="alert">{{ 'admin.forms.overviewError' | t }}</app-note>
@@ -19,9 +12,18 @@
         [columns]="columns()"
         [rows]="types()"
         [rowKey]="rowId"
+        [clickable]="true"
+        (rowClick)="open($any($event))"
       >
         <ng-template appCell="name" let-t>
-          <a class="fl__name ell" [routerLink]="['/admin/forms', $any(t).id]" [title]="name($any(t))">{{ name($any(t)) }}</a>
+          <a
+            class="fl__name ell"
+            [routerLink]="['/admin/forms', $any(t).id]"
+            [title]="name($any(t))"
+            (click)="$event.stopPropagation()"
+            (keydown.enter)="$event.stopPropagation()"
+            >{{ name($any(t)) }}</a
+          >
         </ng-template>
         <ng-template appCell="gremium" let-t>
           <span class="fl__muted">{{ gremiumName($any(t).gremiumId) }}</span>
@@ -40,33 +42,14 @@
           <span class="fl__version mono">{{ versionLabel($any(t)) }}</span>
         </ng-template>
         <ng-template appCell="actions" let-t>
-          @if (phone()) {
-            <app-row-menu
-              [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
-              [sections]="rowMenu()"
-              (selected)="onRowMenu($any(t), $event)"
-            />
-          } @else {
-            <span class="fl__actions">
-              <a
-                class="fl__iconLink"
-                [routerLink]="['/admin/forms', $any(t).id]"
-                [attr.aria-label]="('admin.forms.edit' | t) + ': ' + name($any(t))"
-                [attr.title]="'admin.forms.edit' | t"
-                ><app-icon name="edit" [size]="18"
-              /></a>
-              @if (canDelete()) {
-                <app-button
-                  variant="text"
-                  size="sm"
-                  [iconOnly]="true"
-                  [ariaLabel]="('admin.forms.delete' | t) + ': ' + name($any(t))"
-                  [title]="'admin.forms.delete' | t"
-                  (click)="askDelete($any(t))"
-                >
-                  <app-icon name="trash" />
-                </app-button>
-              }
+          <!-- The row opens the editor; the menu keeps its clicks and keys to itself. -->
+          @if (canDelete()) {
+            <span class="fl__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
+              <app-row-menu
+                [label]="('admin.common.actions' | t) + ': ' + name($any(t))"
+                [sections]="rowMenu()"
+                (selected)="askDelete($any(t))"
+              />
             </span>
           }
         </ng-template>
@@ -75,12 +58,17 @@
       <app-empty-state shape="table" [heading]="'admin.forms.overviewEmpty' | t" />
     }
   }
+
+  <!-- Create posts an application type, so the button needs admin.types. -->
+  @if (canCreate()) {
+    <app-fab [label]="'fab.form' | t" (activate)="openCreate()" />
+  }
 </section>
 
 <app-dialog
   [open]="dialogOpen()"
   [title]="'admin.forms.create' | t"
-  [closeLabel]="'admin.common.cancel' | t"
+  [closeLabel]="'action.close' | t"
   (closed)="closeDialog()"
 >
   <form id="fl-form" class="fl__form" (submit)="submit($event)">
@@ -107,25 +95,19 @@
     >{{ 'admin.forms.hasBudget' | t }}</app-checkbox>
   </form>
   <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="closeDialog()">{{ 'admin.common.cancel' | t }}</app-button>
+    <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!form().nameDe.trim()" [loading]="saving()" (click)="submit($event)">
-      {{ 'admin.forms.add' | t }}
+      {{ 'admin.common.create' | t }}
     </app-button>
   </div>
 </app-dialog>
 
 <!-- Delete an application type. This action needs the admin.types_delete permission. -->
-<app-dialog
+<app-confirm-dialog
   [open]="confirmDelete() !== null"
-  [title]="'admin.forms.delete' | t"
-  [closeLabel]="'admin.common.cancel' | t"
-  (closed)="cancelDelete()"
->
-  <p class="fl__confirm">{{ 'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() } }}</p>
-  <div dialog-footer class="fl__foot">
-    <app-button variant="text" (click)="cancelDelete()">{{ 'admin.common.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="deleting()" (click)="confirmDeleteType()">
-      {{ 'admin.forms.delete' | t }}
-    </app-button>
-  </div>
-</app-dialog>
+  [title]="'admin.forms.deleteTitle' | t"
+  [body]="'admin.forms.deleteConfirm' | t: { name: confirmDeleteName() }"
+  [busy]="deleting()"
+  (confirm)="confirmDeleteType()"
+  (cancel)="cancelDelete()"
+/>

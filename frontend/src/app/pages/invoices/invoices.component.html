@@ -16,9 +16,6 @@
         <ng-container ngProjectAs="[actions]">
           @if (canManage()) {
             @if (phone()) {
-              <app-button size="sm" data-testid="inv-add" (click)="openCreate()">
-                <span class="inv__btn"><app-icon name="add" [size]="16" />{{ 'invoices.addShort' | t }}</span>
-              </app-button>
               <app-row-menu [label]="'invoices.moreActions' | t" [sections]="phoneMenu()" (selected)="onHeaderMenu($event)" />
             } @else {
               <app-button
@@ -28,7 +25,7 @@
                 [ariaLabel]="'invoices.import' | t"
                 [title]="'invoices.import' | t"
                 (click)="fileInput.click()"
-              ><app-icon name="upload" [size]="21" /></app-button>
+              ><app-icon name="upload" /></app-button>
             }
           }
         </ng-container>
@@ -111,7 +108,7 @@
         } @else if (!items().length) {
           <app-empty-state [heading]="'invoices.empty' | t">
             @if (activeFilterCount() > 0) {
-              <app-button variant="tonal" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
+              <app-button variant="text" size="sm" (click)="resetFilters()">{{ 'invoices.filter.reset' | t }}</app-button>
             }
           </app-empty-state>
         } @else {
@@ -155,7 +152,7 @@
                         <span class="inv__menuSlot">
                           @if (!split()) {
                             <span class="inv__chev" aria-hidden="true">
-                              <app-icon name="chevron-right" [size]="17" />
+                              <app-icon name="right" [size]="17" />
                             </span>
                           }
                           @if (menu.length) {
@@ -187,11 +184,8 @@
       </div>
 
       <!-- The form in the detail has its own primary action, so the FAB hides while it is open. -->
-      @if (canManage() && !phone() && formMode() === null) {
-        <button type="button" class="inv__fab" (click)="openCreate()">
-          <app-icon name="plus" [size]="22" />
-          {{ 'invoices.add' | t }}
-        </button>
+      @if (canManage() && formMode() === null) {
+        <app-fab [label]="'fab.invoice' | t" [contained]="split()" (activate)="openCreate()" />
       }
     </section>
 
@@ -282,17 +276,11 @@
   </app-side-sheet>
 }
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmDelete()"
   [title]="'invoices.delete.title' | t"
-  [closeLabel]="'action.cancel' | t"
-  (closed)="confirmDelete.set(null)"
->
-  <p class="inv__confirm">
-    {{ 'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' } }}
-  </p>
-  <div dialog-footer class="inv__footer">
-    <app-button variant="text" (click)="confirmDelete.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" [loading]="saving()" (click)="doDelete()">{{ 'invoices.delete.confirm' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'invoices.delete.body' | t: { number: confirmDelete()?.number || confirmDelete()?.supplier || '' }"
+  [busy]="saving()"
+  (confirm)="doDelete()"
+  (cancel)="confirmDelete.set(null)"
+/>

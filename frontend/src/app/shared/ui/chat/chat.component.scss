@@ -400,7 +400,7 @@
   background: var(--color-surface-3);
   box-shadow: var(--shadow-sm);
   opacity: 0;
-  transition: opacity 120ms ease;
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
 /* Over a message of another person (a moderator) the actions sit at the bubble's start,
    so a short bubble does not push them over the avatar. */

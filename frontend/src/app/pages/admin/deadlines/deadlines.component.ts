@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
   ButtonComponent,
@@ -13,7 +14,6 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  MEDIA,
   type SelectOption,
   TimeInputComponent,
   ToastService,
@@ -21,15 +21,14 @@ import {
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   RowMenuComponent,
-  type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { DeadlineKind, DeadlinePolicy } from '../admin.models';
 import { GuestSettingsComponent } from './guest-settings/guest-settings.component';
 import { MeetingWindowSettingsComponent } from './meeting-window/meeting-window.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The text of the "Frist" cell, with a tooltip and the muted look for a past schedule. */
 export interface DeadlineValue {
@@ -108,13 +107,16 @@ function emptyDraft(): PolicyDraft {
  * Below the table, `app-meeting-window-settings` holds the open window of meetings (the
  * earliest open and the early open that asks first), and `app-guest-settings` holds the
  * settings for applications without an account (Z1): the discard window and the
- * lifetime of the personal link.
+ * lifetime of the personal link. While one of the two sections has changes, the floating
+ * button is "Speichern" for them instead of "Frist anlegen".
  */
 @Component({
   selector: 'app-admin-deadlines',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,
@@ -151,6 +153,16 @@ export class AdminDeadlinesComponent {
   protected readonly editingId = signal<string | null>(null);
   protected readonly confirmDelete = signal<DeadlinePolicy | null>(null);
 
+  private readonly meetingWindow = viewChild(MeetingWindowSettingsComponent);
+  private readonly guestSettings = viewChild(GuestSettingsComponent);
+  /** The settings sections below the table that have changes that are not saved. */
+  private readonly dirtySections = computed(() =>
+    [this.meetingWindow(), this.guestSettings()].filter((s) => !!s && s.dirty()),
+  );
+  protected readonly settingsDirty = computed(() => this.dirtySections().length > 0);
+  protected readonly settingsSaving = computed(() => this.dirtySections().some((s) => s?.saving()));
+  protected readonly settingsValid = computed(() => this.dirtySections().every((s) => s?.valid()));
+
   protected readonly kindOptions: SelectOption[] = KINDS.map((k) => ({
     value: k,
     label: this.kindLabel(k),
@@ -166,25 +178,19 @@ export class AdminDeadlinesComponent {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '6rem',
+      width: '3.5rem',
       card: 'actions',
     },
   ]);
   protected readonly rowId = (r: unknown): string => (r as DeadlinePolicy).id;
-  /** A phone shows cards: the actions of a policy go into the ⋮ menu of its card. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  /** The ⋮ menu of a policy: remove is its only action. The row itself opens the edit. */
   protected readonly rowMenu = computed<RowMenuSection[]>(() => [
-    {
-      items: [
-        { id: 'edit', label: this.i18n.translate('admin.common.edit'), icon: 'edit' },
-        { id: 'remove', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true },
-      ],
-    },
+    { items: [{ id: 'remove', label: this.i18n.translate('admin.common.remove'), icon: 'trash', danger: true }] },
   ]);
 
-  protected onRowMenu(policy: DeadlinePolicy, index: number, item: RowMenuItem): void {
-    if (item.id === 'edit') this.openEdit(index);
-    else if (item.id === 'remove') this.askDelete(policy);
+  /** "Speichern": send every settings section that has changes. */
+  protected saveSettings(): void {
+    for (const s of this.dirtySections()) s?.save();
   }
 
   constructor() {

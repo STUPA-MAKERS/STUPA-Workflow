@@ -67,7 +67,7 @@ export class TransferDetailComponent {
     if (!this.canManage()) return [];
     return [
       {
-        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'delete', danger: true }],
+        items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
       },
     ];
   });

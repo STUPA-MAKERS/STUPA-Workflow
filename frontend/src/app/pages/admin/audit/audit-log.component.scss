@@ -3,9 +3,6 @@
 }
 
 .al {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -68,10 +65,6 @@
   text-decoration: underline;
 }
 
-.al__error {
-  margin: 0;
-  color: var(--color-danger);
-}
 .al__list {
   margin: 0;
   padding: 0;
@@ -81,7 +74,10 @@
 /* The whole row opens the details. */
 .al__row {
   display: grid;
-  grid-template-columns: 10.5rem minmax(8rem, 1fr) minmax(6rem, 0.8fr) minmax(8rem, 1.4fr) 1rem;
+  /* The action has the largest share, and a long one wraps to a second line instead of
+     being cut. Every row is a grid of its own, so the tracks use fixed shares and the
+     columns line up from row to row. */
+  grid-template-columns: 10.5rem minmax(10rem, 1.3fr) minmax(6rem, 0.8fr) minmax(8rem, 1fr) 1rem;
   align-items: center;
   gap: var(--space-4);
   width: 100%;

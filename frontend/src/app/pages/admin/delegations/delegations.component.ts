@@ -10,18 +10,17 @@ import {
   FilterSelectComponent,
   type FilterSelectOption,
   PageHeaderComponent,
+  RowMenuComponent,
+  type RowMenuSection,
   SkeletonComponent,
 } from '@shared/ui';
-import {
-  ButtonComponent,
-  DialogComponent,
-  IconComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
+import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
 export function localToday(now = new Date()): string {
@@ -34,7 +33,7 @@ export function localToday(now = new Date()): string {
  *
  * "Aktive Vertretungen": the delegations of the meetings from today on (or without a
  * date), newest meeting last, each with meeting, date, from → to, the tags "Stimmrecht"
- * and "Pool", and "Widerrufen" (danger, with a confirmation). An admin may revoke at any
+ * and "Pool", and "Widerrufen" in the ⋮ menu (danger, with a confirmation). An admin may revoke at any
  * time. The delegations of past meetings stay behind "Frühere Vertretungen".
  *
  * "Stellvertretungen": the substitute pool of one gremium (`app-substitute-pool`); the
@@ -46,16 +45,17 @@ export function localToday(now = new Date()): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
+    ConfirmDialogComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
-    ButtonComponent,
-    DialogComponent,
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,
+    RowMenuComponent,
     SkeletonComponent,
     SubstitutePoolComponent,
   ],
@@ -93,6 +93,11 @@ export class DelegationsComponent {
         (a.meetingTitle ?? '').localeCompare(b.meetingTitle ?? ''),
     );
   }
+
+  /** The ⋮ menu of a delegation row: revoke is its only action. */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'revoke', label: this.i18n.translate('admin.deleg.revoke'), icon: 'x', danger: true }] },
+  ]);
 
   protected readonly active = computed(() =>
     this.sort(
@@ -151,7 +156,7 @@ export class DelegationsComponent {
     });
   }
 
-  private reload(): void {
+  protected reload(): void {
     this.loading.set(true);
     this.loadError.set(false);
     this.api.list().subscribe({

@@ -165,16 +165,6 @@
   content: '\00a0·';
 }
 
-/* No grants: one muted line in the row group, the height of a row. */
-.gr__dialogText {
-  margin: 0 0 var(--space-4);
-}
-.gr__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 @include bp.phone {
   .gr__mcp {
     padding: var(--space-4);

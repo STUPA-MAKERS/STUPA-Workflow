@@ -15,7 +15,7 @@
         <h2 class="ff__title" id="cap-title">{{ 'applications.capture.title' | t }}</h2>
       </div>
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" [size]="20" />
+        <app-icon name="x" />
       </app-button>
     </header>
   }
@@ -189,13 +189,13 @@
   <footer class="ff__foot">
     <div class="ff__footEnd">
       <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-      <app-button
+      <app-button variant="fill"
         data-testid="cap-submit"
         [disabled]="!canSubmit()"
         [loading]="saving()"
         (click)="submit($event)"
       >
-        <span class="ff__btn"><app-icon name="send" [size]="16" />{{
+        <span class="ff__btn"><app-icon name="send" />{{
           (layout() === 'sheet' ? 'applications.capture.submitShort' : 'applications.capture.submit') | t
         }}</span>
       </app-button>

@@ -58,7 +58,7 @@
             <span lead class="ap__lead">
               @if (canChangeAgenda()) {
                 <span class="ap__grip" aria-hidden="true" [title]="'meetings.agenda.dragHandle' | t">
-                  <app-icon name="menu" [size]="16" />
+                  <app-icon name="grip" [size]="16" />
                 </span>
               }
               <span
@@ -103,3 +103,12 @@
 @if (todoOpen()) {
   <app-todo-new-dialog [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }
+
+<app-confirm-dialog
+  [open]="removing() !== null"
+  [title]="'meetings.agenda.removeTitle' | t"
+  [body]="'meetings.agenda.removeConfirm' | t: { title: removing() ? title(removing()!) : '' }"
+  [confirmLabel]="'action.remove' | t"
+  (confirm)="confirmRemove()"
+  (cancel)="removing.set(null)"
+/>
