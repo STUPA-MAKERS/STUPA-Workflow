@@ -85,9 +85,13 @@ def _money(value: object) -> str | None:
     return str(value) if value is not None else None
 
 
-def card_url(board_id: uuid.UUID, card_id: uuid.UUID) -> str:
-    """The app route of a card: the board with the drawer open."""
-    return f"/todos/{board_id}?card={card_id}"
+def card_url(card_id: uuid.UUID) -> str:
+    """The app route of a card: the card id only.
+
+    The page reads the card and opens its board with the drawer, so the link stays valid
+    when the card moves to another board.
+    """
+    return f"/todos?card={card_id}"
 
 
 class LinkResolver:
@@ -430,7 +434,7 @@ class LinkResolver:
                 out[card.id] = Resolved(
                     accessible=True,
                     title=card.title,
-                    url=card_url(board.id, card.id),
+                    url=card_url(card.id),
                     detail=TodoLinkDetail(
                         board_name=board.name, column_name=column.name, is_done=column.is_done
                     ),

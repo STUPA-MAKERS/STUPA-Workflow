@@ -137,7 +137,6 @@ class _Drafts:
         data: bytes,
         by: str,
         field_key: str | None,
-        is_comparison_offer: bool,
     ) -> DraftAttachmentOut:
         try:
             sniffed = backend_mime.validate_upload(filename, data)
@@ -162,7 +161,6 @@ class _Drafts:
             mime=sniffed,
             size=len(data),
             scanned=False,
-            is_comparison_offer=is_comparison_offer,
             draftToken=token,
             draftExpiresAt=NOW + timedelta(days=7),
         )

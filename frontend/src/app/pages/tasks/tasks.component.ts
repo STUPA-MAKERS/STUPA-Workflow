@@ -41,6 +41,8 @@ import { NoteComponent } from '@shared/ui/note/note.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { liveSearch } from '@shared/live-search';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
+import { applicationReads } from '../applications/application-reads';
 
 const DAY_MS = 86_400_000;
 
@@ -244,6 +246,29 @@ export class TasksComponent implements OnDestroy {
   );
 
   constructor() {
+    // The shown rows read their detail ahead, so a click shows it at once.
+    prefetchDetails({
+      items: this.rows,
+      key: (r) => r.item.id,
+      reads: (r) => applicationReads(r.item.id),
+      when: this.showApplications,
+    });
+    // The people of a board are read once for all its cards.
+    const boards = new Set<Uuid>();
+    prefetchDetails({
+      items: this.todoRows,
+      key: (r) => r.item.id,
+      reads: (r) => {
+        const board = r.item.boardId;
+        const first = !boards.has(board);
+        boards.add(board);
+        return [
+          this.todosApi.card(r.item.id, { detail: true }),
+          ...(first ? [this.todosApi.members(board, { detail: true })] : []),
+        ];
+      },
+      when: this.showTodos,
+    });
     this.page.listPath.set(['/tasks']);
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (t) => this.types.set(t),

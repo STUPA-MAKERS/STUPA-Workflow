@@ -75,8 +75,7 @@ HIT_URL: Mapping[SearchKind, str] = {
     # `sub` and not the row id: it is what the principal search matches on.
     "principal": "/admin/users?q={id}",
     "ticket": "/tickets/{id}",
-    # The fallback only: the source builds `/todos/{boardId}?card={id}` per hit, because
-    # the card opens on its own board.
+    # The card only: the page opens the board the card is on now.
     "todo": "/todos?card={id}",
 }
 
@@ -341,7 +340,7 @@ class SearchService:
                 id=str(card.id),
                 title=card.title,
                 subtitle=f"{board.name} · {column.name}",
-                url=card_url(board.id, card.id),
+                url=card_url(card.id),
             )
             for card, board, column in rows
         ]

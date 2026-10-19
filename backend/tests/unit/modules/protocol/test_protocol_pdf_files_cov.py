@@ -684,7 +684,6 @@ def _attachment(session: NotifSession, **kw: object) -> Attachment:
         storage_key="k/doc.pdf",
         scanned=False,
         scan_result=None,
-        is_comparison_offer=False,
     )
     att.id = uuid.uuid4()
     for key, value in kw.items():
@@ -699,13 +698,11 @@ async def test_list_for_application_returns_outs() -> None:
     a1 = Attachment(
         application_id=uuid.uuid4(), filename="a.pdf", mime="application/pdf",
         size=1, storage_key="k1", scanned=True, scan_result=SETTINGS and "clean",
-        is_comparison_offer=False,
     )
     a1.id = uuid.uuid4()
     a2 = Attachment(
         application_id=uuid.uuid4(), filename="b.pdf", mime="application/pdf",
         size=2, storage_key="k2", scanned=False, scan_result=None,
-        is_comparison_offer=True,
     )
     a2.id = uuid.uuid4()
     session._scalars = [[a1, a2]]
@@ -713,7 +710,7 @@ async def test_list_for_application_returns_outs() -> None:
         uuid.uuid4()
     )
     assert [o.filename for o in out] == ["a.pdf", "b.pdf"]
-    assert out[1].is_comparison_offer is True
+    assert out[1].scanned is False
 
 
 async def test_list_for_application_empty() -> None:
@@ -854,10 +851,10 @@ def test_max_bytes_clamps_to_model_cap() -> None:
     assert svc.max_bytes == min(SETTINGS.attachment_max_bytes, MAX_ATTACHMENT_BYTES)
 
 
-async def test_upload_with_field_key_and_comparison_offer(
+async def test_upload_with_field_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An upload with field_key and is_comparison_offer sets both on the row."""
+    """An upload with field_key sets it on the row."""
     audits: list[dict[str, object]] = []
 
     async def _record(session: object, **kw: object) -> None:
@@ -876,13 +873,12 @@ async def test_upload_with_field_key_and_comparison_offer(
         data=b"%PDF-1.4 fake",
         by="p",
         field_key="kostenaufstellung",
-        is_comparison_offer=True,
     )
-    assert out.is_comparison_offer is True
+    assert out.filename == "offer.pdf"
     added = [a for a in session.added if isinstance(a, Attachment)]
     assert added and added[0].field_key == "kostenaufstellung"
     assert len(queue.enqueued) == 1
     # The audit records only that a field key exists, never the client text.
     assert audits[0]["data"]["hasFieldKey"] is True  # type: ignore[index]
     assert "fieldKey" not in audits[0]["data"]  # type: ignore[operator]
-    assert audits[0]["data"]["isComparisonOffer"] is True  # type: ignore[index]
+    assert "isComparisonOffer" not in audits[0]["data"]  # type: ignore[operator]

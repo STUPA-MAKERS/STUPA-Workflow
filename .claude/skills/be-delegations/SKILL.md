@@ -11,7 +11,7 @@ description: Meeting-bound vote and representation delegations (MeetingDelegatio
 
 **Key files:**
 - `models.py` — `MeetingDelegation` (one outgoing delegation per meeting and delegator), `DelegationSubstitute` (pool entries).
-- `pool.py` — **the only source of the pool**: `substitutes_for(session, gremium, member)` (the personal entries for the member + the gremium-wide entries), `substitute_gremien(principal_id)` / `substitute_gremien_for_sub(sub)` (one statement). Never query the pool table directly elsewhere.
+- `pool.py` — **the only source of the pool**: `substitutes_for(session, gremium, member)` (the personal entries for the member + the gremium-wide entries), `substitute_gremien_for_sub(sub)` (one statement). Never query the pool table directly elsewhere.
 - `schemas.py` — camelCase DTOs (`DelegationCreate/Out`, `SubstituteCreate/Out`, `MeetingDelegationContext`, `RecipientOut`, `VoteDelegationStatus`).
 - `service.py` — `DelegationService` (security core: gates, eligibility, chain prevention, deadlines, audit) + module-level `voting_delegation_check` and `meeting_start_utc`.
 - `router.py` — the `/delegations` router, mounted at `/api/delegations` by `main.py`. It holds the self-service and the admin views. It mails the delegate on a grant and on a revoke.
@@ -43,6 +43,6 @@ description: Meeting-bound vote and representation delegations (MeetingDelegatio
 - **Deadlines:** a non-pool delegation runs until `meeting_start − delegation_lead_minutes`. A pool delegation runs until the meeting starts. Both work only while the meeting is `planned`. A meeting without a date has the status gate only (`meeting_start_utc` returns None). Times are tz-aware UTC. The meeting date and time are stored naive in `settings.local_timezone`.
 - **PII guard (#sec-audit):** `_assert_can_view_gremium` gates the context, the recipients and the substitute list. Only these may see roster or pool names: the `admin` role, `admin.delegations`, `meeting.view_all`, Gremium members, pool members, and `session.manage` holders for that Gremium (through the scope-capped `gremium_ids_for`, as is the pool manage gate). Everyone else gets 403. The external typeahead escapes LIKE metacharacters (`_escape_like`).
 - **Two permission tiers:** `admin.delegations` gives the full cross-Gremium view and manage. `session.manage` (Gremium role) manages only the substitute pool of that Gremium.
-- Errors are RFC-9457 `ProblemDetail`. The statuses follow the create docstring: 403 gate/recipient/eligibility, 404 meeting/principal, 409 duplicate, 422 window/chain/self. Related memory: [[delegation-rework]].
+- Errors are RFC-9457 `ProblemDetail`. The statuses follow the create docstring: 403 gate/recipient/eligibility, 404 meeting/principal, 409 duplicate, 422 window/chain/self.
 
 **Related:** be-voting, be-livevote, be-auth, be-admin, be-audit, be-notifications

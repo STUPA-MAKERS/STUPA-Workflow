@@ -1,10 +1,7 @@
 import type { MeetingVote } from '@core/api/models';
 import {
-  antragSnippet,
   escapeHtml,
-  insertAt,
   renderMarkdown,
-  topSnippet,
   voteSnippet,
   voteSnippetHead,
   votesInText,
@@ -32,41 +29,6 @@ describe('escapeHtml', () => {
     expect(escapeHtml(`<script>"x"&'y'`)).toBe(
       '&lt;script&gt;&quot;x&quot;&amp;&#39;y&#39;',
     );
-  });
-});
-
-describe('antragSnippet', () => {
-  it('embeds the application id as an editor block with the title heading', () => {
-    const snip = antragSnippet('app-1', 'Mein Antrag');
-    expect(snip).toContain(':::antrag{#app-1}');
-    expect(snip).toContain('### Mein Antrag');
-    expect(snip.trimEnd().endsWith(':::')).toBe(true);
-  });
-
-  it('falls back to the id when no title is given', () => {
-    expect(antragSnippet('app-9', null)).toContain('### app-9');
-  });
-});
-
-describe('topSnippet', () => {
-  it('numbers a freetext TOP heading without an application reference', () => {
-    const snip = topSnippet(1, 'Begrüßung', null);
-    expect(snip).toContain('## TOP 1: Begrüßung');
-    expect(snip).not.toContain(':::antrag');
-  });
-
-  it('appends the application shortcode for an application TOP', () => {
-    const snip = topSnippet(2, 'Förderantrag', 'app-7');
-    expect(snip).toContain('## TOP 2: Förderantrag');
-    expect(snip).toContain(':::antrag{#app-7}');
-  });
-
-  it('falls back to the application id when the title is blank', () => {
-    expect(topSnippet(3, '   ', 'app-9')).toContain('## TOP 3: app-9');
-  });
-
-  it('falls back to a generic "TOP n" label when title and id are both missing', () => {
-    expect(topSnippet(4, null, null)).toContain('## TOP 4: TOP 4');
   });
 });
 
@@ -104,17 +66,6 @@ describe('voteSnippet', () => {
   });
 });
 
-describe('insertAt', () => {
-  it('inserts at the caret position', () => {
-    expect(insertAt('abcd', 'X', 2)).toBe('abXcd');
-  });
-
-  it('appends when the caret is null or out of range', () => {
-    expect(insertAt('abcd', 'X', null)).toBe('abcdX');
-    expect(insertAt('abcd', 'X', 99)).toBe('abcdX');
-  });
-});
-
 describe('renderMarkdown', () => {
   it('escapes raw HTML so editor input cannot inject markup', () => {
     const out = renderMarkdown('<img src=x onerror=alert(1)>');
@@ -137,7 +88,7 @@ describe('renderMarkdown', () => {
   });
 
   it('renders blockquotes and paragraphs with line breaks', () => {
-    expect(renderMarkdown('> Zitat')).toContain('<blockquote>Zitat</blockquote>');
+    expect(renderMarkdown('> Zitat')).toContain('<blockquote><p>Zitat</p></blockquote>');
     expect(renderMarkdown('a\nb')).toBe('<p>a<br>b</p>');
   });
 
@@ -197,7 +148,7 @@ describe('renderMarkdown', () => {
   });
 
   it('keeps a plain blockquote when there is no callout marker', () => {
-    expect(renderMarkdown('> Zitat')).toContain('<blockquote>Zitat</blockquote>');
+    expect(renderMarkdown('> Zitat')).toContain('<blockquote><p>Zitat</p></blockquote>');
   });
 
   it('treats a [!FOO] marker that is not a known callout as a plain blockquote', () => {
@@ -218,14 +169,14 @@ describe('renderMarkdown', () => {
     expect(out).toContain('callout__title');
   });
 
-  it('renders a multi-line blockquote joined by <br>', () => {
+  it('renders a multi-line blockquote as one paragraph joined by <br>', () => {
     const out = renderMarkdown('> eins\n> zwei');
-    expect(out).toBe('<blockquote>eins<br>zwei</blockquote>');
+    expect(out).toBe('<blockquote><p>eins<br>zwei</p></blockquote>');
   });
 
   it('stops collecting quote lines at the first non-quote line', () => {
     const out = renderMarkdown('> zitat\nnormaler Absatz');
-    expect(out).toContain('<blockquote>zitat</blockquote>');
+    expect(out).toContain('<blockquote><p>zitat</p></blockquote>');
     expect(out).toContain('<p>normaler Absatz</p>');
   });
 

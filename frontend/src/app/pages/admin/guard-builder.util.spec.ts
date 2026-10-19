@@ -1,8 +1,5 @@
 import {
-  buildLeaf,
-  combine,
   GuardError,
-  isGuardValid,
   validateAction,
   validateGuard,
 } from './guard-builder.util';
@@ -118,8 +115,6 @@ describe('validateGuard (mirror of backend validate_guard)', () => {
       key: 'admin.flow.err.guardNeedsValue',
       params: { op: 'budgetIs' },
     });
-    expect(isGuardValid({ roleIs: '' })).toBe(false);
-    expect(isGuardValid({ roleIs: 'a' })).toBe(true);
   });
 
   it('checks combinator arity and children', () => {
@@ -285,21 +280,5 @@ describe('flow variant B (gremium from the cost center)', () => {
         validateAction({ type: 'notify', recipients: [{ kind: 'applicant', ref: 'x' }] }),
       ).key,
     ).toBe('admin.flow.err.notifyRecipientNoRef');
-  });
-});
-
-describe('builder helpers', () => {
-  it('buildLeaf + combine compose guards', () => {
-    expect(buildLeaf('roleIs', 'stupa')).toEqual({ roleIs: 'stupa' });
-    expect(combine('and', [{ roleIs: 'a' }, { deadlinePassed: true }])).toEqual({
-      and: [{ roleIs: 'a' }, { deadlinePassed: true }],
-    });
-    expect(combine('not', [{ deadlinePassed: true }])).toEqual({ not: { deadlinePassed: true } });
-  });
-
-  it('combine wraps `not` with the first child and isGuardValid swallows errors', () => {
-    expect(combine('or', [{ roleIs: 'a' }])).toEqual({ or: [{ roleIs: 'a' }] });
-    expect(isGuardValid(null)).toBe(true);
-    expect(isGuardValid({ roleIs: 'x' }, false)).toBe(false);
   });
 });

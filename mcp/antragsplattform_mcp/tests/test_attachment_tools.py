@@ -3,8 +3,7 @@
 The first part fakes the API and checks the arguments that the tools hand to it. The
 second part runs the real `ApiClient` against an `httpx.MockTransport` and checks the
 exact multipart request on the wire: the path, the part name `file`, the file name, the
-part content type and the form fields `field_key` and `is_comparison_offer`. These are
-the names of `POST /api/applications/{id}/attachments` in
+part content type and the form field `field_key`. These are the names of `POST /api/applications/{id}/attachments` in
 `backend/app/modules/files/router.py`. `test_attachment_contract.py` runs the same
 tools against that router itself.
 """
@@ -58,7 +57,7 @@ def pdf(tmp_path: Path) -> Path:
 def test_upload_sends_file_part_and_form(fake_api: _FakeApi, pdf: Path) -> None:
     out = asyncio.run(
         meetings.upload_attachment(
-            APP_ID, str(pdf), field_key="offer", is_comparison_offer=True
+            APP_ID, str(pdf), field_key="offer"
         )
     )
     assert out == {"id": ATT_ID, "scanned": False}
@@ -67,7 +66,7 @@ def test_upload_sends_file_part_and_form(fake_api: _FakeApi, pdf: Path) -> None:
             f"/applications/{APP_ID}/attachments",
             {
                 "files": {"file": ("Angebot 1.pdf", PDF, "application/pdf")},
-                "data": {"is_comparison_offer": "true", "field_key": "offer"},
+                "data": {"field_key": "offer"},
             },
         )
     ]
@@ -75,7 +74,7 @@ def test_upload_sends_file_part_and_form(fake_api: _FakeApi, pdf: Path) -> None:
 
 def test_upload_leaves_out_field_key(fake_api: _FakeApi, pdf: Path) -> None:
     asyncio.run(meetings.upload_attachment(APP_ID, str(pdf)))
-    assert fake_api.calls[0][1]["data"] == {"is_comparison_offer": "false"}
+    assert fake_api.calls[0][1]["data"] == {}
 
 
 def test_upload_filename_override_drops_directories(
@@ -197,13 +196,12 @@ def test_upload_wire_format(monkeypatch: pytest.MonkeyPatch, pdf: Path) -> None:
         "mime": "application/pdf",
         "size": len(PDF),
         "scanned": False,
-        "is_comparison_offer": True,
     }
     wire = _Wire(lambda req, n: httpx.Response(201, json=body))
     _client(monkeypatch, wire)
     out = asyncio.run(
         meetings.upload_attachment(
-            APP_ID, str(pdf), field_key="offer", is_comparison_offer=True
+            APP_ID, str(pdf), field_key="offer"
         )
     )
     assert out == body
@@ -214,7 +212,6 @@ def test_upload_wire_format(monkeypatch: pytest.MonkeyPatch, pdf: Path) -> None:
     assert req.headers["content-type"].startswith("multipart/form-data; boundary=")
     assert _parts(req) == {
         "file": ("Angebot 1.pdf", "application/pdf", PDF),
-        "is_comparison_offer": (None, None, b"true"),
         "field_key": (None, None, b"offer"),
     }
 

@@ -489,7 +489,9 @@ export class TicketDetailComponent {
 
   private load(id: Uuid): void {
     const seq = ++this.seq;
-    if (id !== this.id) {
+    // A newly opened ticket takes what the list read ahead; a reload reads fresh.
+    const opened = id !== this.id;
+    if (opened) {
       this.id = id;
       this.outbox.clear();
       this.ticket.set(null);
@@ -500,7 +502,7 @@ export class TicketDetailComponent {
     }
     this.notFound.set(false);
     this.error.set(false);
-    this.read(id).subscribe({
+    this.read(id, opened).subscribe({
       next: (t) => {
         if (seq !== this.seq) return;
         this.show(t);
@@ -517,15 +519,15 @@ export class TicketDetailComponent {
   }
 
   /** The ticket: the team detail, or the own ticket of the reporter in the same shape. */
-  private read(id: Uuid): Observable<TicketDetail> {
-    if (this.manager) return this.api.get(id);
+  private read(id: Uuid, detail = false): Observable<TicketDetail> {
+    if (this.manager) return this.api.get(id, { detail });
     const me: TicketReporter = {
       principalId: null,
       displayName: this.auth.displayName() || null,
       email: null,
       anonymized: false,
     };
-    return this.api.getMine(id).pipe(
+    return this.api.getMine(id, { detail }).pipe(
       tap((m) => this.canReply.set(m.canReply)),
       map((m) => fromMine(m, me)),
     );

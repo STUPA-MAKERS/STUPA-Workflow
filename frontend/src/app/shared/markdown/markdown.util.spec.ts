@@ -45,8 +45,23 @@ describe('markdownToSafeHtml', () => {
   });
 
   it('renders quotes and fenced code blocks', () => {
-    expect(markdownToSafeHtml('> Zitat')).toBe('<blockquote>Zitat</blockquote>');
+    expect(markdownToSafeHtml('> Zitat')).toBe('<blockquote><p>Zitat</p></blockquote>');
     expect(markdownToSafeHtml('```\ncode <x>\n```')).toBe('<pre><code>code &lt;x&gt;</code></pre>');
+  });
+
+  it('renders the blocks inside a quote: paragraphs, headings, lists and a nested quote', () => {
+    expect(markdownToSafeHtml('> Hallo,\n>\n> ## Termin\n> - eins\n> > alt')).toBe(
+      '<blockquote><p>Hallo,</p>\n<h5>Termin</h5>\n<ul><li>eins</li></ul>\n' +
+        '<blockquote><p>alt</p></blockquote></blockquote>',
+    );
+  });
+
+  it('shows an escaped character as it is and a trailing backslash as a line break', () => {
+    expect(markdownToSafeHtml('\\*kein\\* \\[Link\\](x) a\\\\b \\<')).toBe(
+      '<p>*kein* [Link](x) a\\b &lt;</p>',
+    );
+    expect(markdownToSafeHtml('Reutlingen\\\nHallo')).toBe('<p>Reutlingen<br>Hallo</p>');
+    expect(markdownToSafeHtml('`a\\*b`')).toBe('<p><code>a\\*b</code></p>');
   });
 
   describe('tables', () => {
@@ -148,7 +163,7 @@ describe('markdownToSafeHtml', () => {
         '<p><strong>Frage</strong><br>ja: 3</p></div>',
     );
     expect(markdownToSafeHtml('> [!NOTE]')).toContain('callout--note');
-    expect(markdownToSafeHtml('> [!FOO] bar')).toBe('<blockquote>[!FOO] bar</blockquote>');
+    expect(markdownToSafeHtml('> [!FOO] bar')).toBe('<blockquote><p>[!FOO] bar</p></blockquote>');
   });
 
   it('honours headingOffset', () => {

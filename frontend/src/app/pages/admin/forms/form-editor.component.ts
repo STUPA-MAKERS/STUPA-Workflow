@@ -47,6 +47,7 @@ import {
   blankField,
   blankOption,
   duplicateKeys,
+  fundingProblem,
   groupsFromFields,
   groupsToFields,
   moveQuestionTo,
@@ -265,6 +266,8 @@ export class FormEditorComponent {
   private readonly flatQuestions = computed(() => this.groups().flatMap((g) => g.fields));
 
   protected readonly duplicates = computed(() => duplicateKeys(this.flatQuestions()));
+  /** The form-level problem of the requested funding field, or null. */
+  protected readonly fundingIssue = computed(() => fundingProblem(this.flatQuestions()));
   /** Validation errors per question, indexed by "gi:qi". */
   protected readonly fieldErrors = computed(() => {
     const map: Record<string, string[]> = {};
@@ -279,6 +282,7 @@ export class FormEditorComponent {
     () =>
       this.flatQuestions().length > 0 &&
       this.duplicates().length === 0 &&
+      this.fundingIssue() === null &&
       Object.values(this.fieldErrors()).every((e) => e.length === 0),
   );
 
