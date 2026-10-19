@@ -1,0 +1,54 @@
+/* The frame over the parent (`fit="box"`), in the look of the invoices page. */
+:host {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3);
+  border: 2px dashed var(--color-accent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
+  pointer-events: none;
+  animation: drop-in var(--motion-fast) var(--ease-standard);
+}
+/* Over the part of the parent on the screen: the box comes from the host style. */
+:host(.drop--view) {
+  position: fixed;
+  inset: auto;
+  z-index: var(--z-dialog);
+  border-radius: var(--radius-2xl);
+}
+
+.drop__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  text-align: center;
+}
+.drop__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.drop__label {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+
+@keyframes drop-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :host {
+    animation: none;
+  }
+}

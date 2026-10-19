@@ -51,7 +51,18 @@
           }
         </article>
       } @else {
-        <article class="sp" aria-labelledby="sp-title">
+        <!-- A file dropped anywhere on the page becomes an attachment. -->
+        <article
+          class="sp"
+          aria-labelledby="sp-title"
+          appFileDrop
+          #drop="appFileDrop"
+          [appFileDropEnabled]="takesDrop()"
+          (appFileDrop)="onFilesDropped($event)"
+        >
+          @if (drop.active()) {
+            <app-drop-overlay fit="view" [label]="'applications.attachments.drop' | t" />
+          }
           <header class="sp__head">
             <div class="sp__headTop">
               <span class="sp__ref">{{ 'status.case' | t: { id: ref() } }}</span>

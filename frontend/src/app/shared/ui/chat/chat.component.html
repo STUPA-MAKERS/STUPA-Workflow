@@ -180,7 +180,12 @@
 </div>
 
 @if (canPost()) {
-  <form class="chat__composer" (submit)="submit($event)" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+  <form
+    class="chat__composer"
+    (submit)="submit($event)"
+    (dragover)="onComposerDragOver($event)"
+    (drop)="onComposerDrop($event)"
+  >
     @if (segmentOptions().length > 1) {
       <app-segmented
         class="chat__vis"
@@ -282,6 +287,10 @@
       ><app-icon name="send" /></app-button>
     </div>
   </form>
+}
+
+@if (fileDrag.active()) {
+  <app-drop-overlay [label]="'chat.drop' | t" />
 }
 
 <app-confirm-dialog

@@ -4,7 +4,7 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render, screen, within } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { BehaviorSubject } from 'rxjs';
 import { ApplicationsDetailComponent } from './applications-detail.component';
@@ -229,6 +229,57 @@ describe('ApplicationsDetailComponent', () => {
     expect(screen.getByText('Fest')).toBeInTheDocument();
     expect(screen.getByText('Bitte Kostenplan ergänzen.')).toBeInTheDocument();
     flushAttachments(http);
+    http.verify();
+  });
+
+  it('uploads a file dropped anywhere on the application as an attachment', async () => {
+    const { http, detectChanges, container, cmp, fixture } = await setup();
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const page = container.querySelector('article.ad') as HTMLElement;
+    const frame = () => container.querySelector('app-drop-overlay');
+    // The panel is no target of its own: the page shows one frame.
+    const panel = container.querySelector('.att') as HTMLElement;
+    fireEvent.dragEnter(panel, { dataTransfer: { types: ['Files'] } });
+    detectChanges();
+    expect(frame()).toHaveTextContent('Dateien zum Hochladen ablegen');
+    expect(container.querySelectorAll('app-drop-overlay')).toHaveLength(1);
+
+    const pdf = new File(['x'], 'drop.pdf', { type: 'application/pdf' });
+    fireEvent.drop(page, { dataTransfer: { types: ['Files'], files: [pdf] } });
+    detectChanges();
+    expect(frame()).toBeNull();
+    http
+      .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/attachments')
+      .flush({ id: 'd', filename: 'drop.pdf', mime: 'application/pdf', size: 1, scanned: false, is_comparison_offer: false });
+    detectChanges();
+    expect(screen.getByText('drop.pdf')).toBeInTheDocument();
+
+    // In tabs, the drop opens the tab "Anhänge".
+    const pageService = fixture.debugElement.injector.get(ApplicationsPageService);
+    pageService.split.set(false);
+    detectChanges();
+    cmp.onFilesDropped([]);
+    expect(cmp.tab()).toBe('files');
+    pageService.split.set(true);
+    // With the comments open, the chat takes its own drop.
+    cmp.commentsOpen.set(true);
+    detectChanges();
+    expect(fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } })).toBe(true);
+    flushAttachments(http);
+    http.verify();
+  });
+
+  it('takes no drop without the right to manage the application', async () => {
+    const { http, detectChanges, container } = await setup(['application.read']);
+    flushAll(http);
+    detectChanges();
+    flushAttachments(http);
+    const page = container.querySelector('article.ad') as HTMLElement;
+    expect(fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } })).toBe(true);
+    detectChanges();
+    expect(container.querySelector('app-drop-overlay')).toBeNull();
     http.verify();
   });
 

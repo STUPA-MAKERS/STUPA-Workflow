@@ -31,6 +31,7 @@ export type {
 } from './chat/chat.models';
 export { ConfirmDialogComponent } from './confirm-dialog/confirm-dialog.component';
 export { DateBlockComponent } from './date-block/date-block.component';
+export { DropOverlayComponent } from './drop-overlay/drop-overlay.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
 export { FabComponent } from './fab/fab.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';
