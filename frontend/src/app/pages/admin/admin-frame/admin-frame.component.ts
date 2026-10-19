@@ -26,16 +26,19 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import {
+  EmptyStateComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FRAME_MODES, type FrameModeKey, type FramePage } from './frame-modes';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One group of the navigation with the pages the principal may open. */
 interface NavGroup {
@@ -171,7 +174,7 @@ export class AdminFrameComponent {
   readonly mode = computed(() => FRAME_MODES[this.frame()] ?? FRAME_MODES.admin);
 
   /** The viewport is wide: the navigation is a column beside the page. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
+  readonly wide = mediaQuery(MEDIA.wide);
 
   /** The path of the open page, without the query string and the fragment. */
   private readonly path = signal(pathOf(this.router.url));

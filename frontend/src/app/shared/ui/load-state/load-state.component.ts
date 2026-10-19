@@ -2,8 +2,10 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, contentChild, input, TemplateRef } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { LoadState } from '@shared/forms/settings-form';
-import { NoteComponent } from '../note/note.component';
-import { SkeletonComponent } from '../skeleton/skeleton.component';
+import {
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 
 /**
  * The states of a page or a section that reads its data first.

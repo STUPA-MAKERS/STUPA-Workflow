@@ -6,13 +6,14 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  SwitchComponent,
+  MoveButtonsComponent,
+  SelectFieldComponent,
   type SelectOption,
+  SwitchComponent,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { StateDef } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
-import { TruncatedDirective } from '@shared/truncated.directive';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /** Row of the guard priority stack. The parent computes the label. */
@@ -31,6 +32,7 @@ export interface GuardPriorityRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MoveButtonsComponent,
     I18nInputComponent,
     TruncatedDirective,
     FormsModule,

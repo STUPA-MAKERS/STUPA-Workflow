@@ -6,11 +6,13 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
-import { formatBytes } from '@shared/format-bytes';
+import {
+  EmptyStateComponent,
+  formatBytes,
+  IconComponent,
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import type { PublicDecision, PublicProtocolDetail, PublicTop } from './public-protocols.models';
 import { electionCaption } from '../voting/election.util';
 import { PublicProtocolsService } from './public-protocols.service';

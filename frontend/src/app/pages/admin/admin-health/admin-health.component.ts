@@ -4,10 +4,13 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  formatBytes,
+  IconComponent,
+  type IconName,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditChainCheck, AuditVerification, Backup, BackupList } from '../admin.models';
-import { formatBytes } from '@shared/format-bytes';
 import { checkedAt, formatCount, formatWhen } from './admin-health.util';
 import { AuditLiveCheckService } from './audit-live-check.service';
 

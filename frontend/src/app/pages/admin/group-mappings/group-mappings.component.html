@@ -125,7 +125,7 @@
       <button type="submit" hidden></button>
     </form>
   }
-  <div dialog-footer class="gm__dialogFoot">
+  <div dialog-footer>
     <app-button variant="text" (click)="closeDialog()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!valid()" [loading]="saving()" (click)="save()">{{ 'action.save' | t }}</app-button>
   </div>

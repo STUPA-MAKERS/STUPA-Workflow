@@ -25,18 +25,22 @@ import {
 import {
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  MoveButtonsComponent,
+  moveItem,
   SegmentedComponent,
-  SwitchComponent,
-  ToastService,
   type SegmentedOption,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  SwitchComponent,
+  TextareaComponent,
+  ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS } from '../meetings-display.util';
 import { problemDetail } from '@core/api/problem';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { personLabel } from '@shared/person-label.util';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
@@ -81,6 +85,8 @@ export interface CandidateDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    MoveButtonsComponent,
     EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
@@ -312,9 +318,7 @@ export class VoteOpenDialogComponent {
     const to = index + delta;
     this.candidates.update((list) => {
       if (to < 0 || to >= list.length) return list;
-      const next = [...list];
-      [next[index], next[to]] = [next[to], next[index]];
-      return next;
+      return moveItem(list, index, delta);
     });
   }
 

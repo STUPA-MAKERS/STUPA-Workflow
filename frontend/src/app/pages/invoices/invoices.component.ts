@@ -20,37 +20,39 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
-  IconComponent,
-  MEDIA,
-  SegmentedComponent,
-  type SegmentedOption,
-  type SelectOption,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  ConfirmDialogComponent,
+  downloadBlob,
   DropOverlayComponent,
   EmptyStateComponent,
-  FabComponent,
+  FileDropDirective,
   FileDropZoneComponent,
+  IconComponent,
+  InfiniteScrollDirective,
   ListDetailLayoutComponent,
-  PageHeaderComponent,
   ListItemComponent,
+  MEDIA,
+  mediaQuery,
   RangeChipComponent,
   type RangeValue,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  ScrollFadeDirective,
   SearchPillComponent,
+  SegmentedComponent,
+  type SegmentedOption,
+  type SelectOption,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import {
+  FabComponent,
+  PageHeaderComponent,
   invoiceStatus,
 } from '@shared/ui';
-import { FileDropDirective } from '@shared/file-drop.directive';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { downloadBlob } from '@shared/download.util';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
@@ -69,7 +71,6 @@ import {
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
 import { debounced } from '@shared/debounced';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { dayMonth } from '@shared/date-format';
 import { groupByMonth } from '@shared/group-by-month';
@@ -118,6 +119,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
     DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
@@ -159,7 +161,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly canManage = computed(() => this.auth.can('budget.book'));
 
   /** < 768px: one primary action in the title row, the rest in a menu; forms as a sheet. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
   readonly split = computed(() => this.layout()?.collapsed() === false);
@@ -277,9 +279,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
       utc: true,
     }),
   );
-
-  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
-  readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   /** Debounced search, about 250 ms. It drives the `q` param of the server query. */
   onSearch(value: string): void {
@@ -465,20 +464,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
 
     effect(() => this.frame.fill.set(this.split()));
 
-    // Infinite scroll. Side by side the list scrolls inside its own box.
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const root = this.split() ? (this.scroller()?.nativeElement ?? null) : null;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((e) => e.isIntersecting)) this.loadMore();
-        },
-        { root, rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   /**

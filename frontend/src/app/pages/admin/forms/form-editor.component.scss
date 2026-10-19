@@ -2,7 +2,7 @@
 // the cards of the shown group, and the form settings with the versions.
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 @use '../../../shared/ui/surface-card' as sc;
 
 :host {

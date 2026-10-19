@@ -21,15 +21,20 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { StatusView } from '@shared/status-kind.util';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import {
+  AvatarComponent,
+  EmptyStateComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  placeBelow,
+  showInTopLayer,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  watchAnchoredPopover,
+} from '@stupa-makers/ui-kit';
 import { dayMonth, monthYear } from '@shared/date-format';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The gap between the cell and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
@@ -97,7 +102,7 @@ export class AttendanceDetailComponent {
 
   readonly gremiumId = input.required<string>();
   /** A phone viewport: the bottom sheet instead of the popover. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly headingId = `gad-title-${nextId++}`;
 
   readonly request = signal<AttendanceDetailRequest | null>(null);
@@ -114,25 +119,13 @@ export class AttendanceDetailComponent {
   private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
 
   constructor() {
-    const onPointer = (e: Event) => {
-      if (!this.isOpen() || this.phone()) return;
-      const target = e.target as Node;
-      const inPop = !!this.pop()?.nativeElement.contains(target);
-      const onAnchor = !!this.anchor?.contains(target);
-      if (!inPop && !onAnchor) this.close(false);
-    };
-    const onMove = () => {
-      if (this.isOpen() && !this.phone()) this.place();
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('resize', onMove);
-    window.addEventListener('scroll', onMove, true);
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('resize', onMove);
-      window.removeEventListener('scroll', onMove, true);
-      this.sub?.unsubscribe();
+    watchAnchoredPopover({
+      isOpen: () => this.isOpen() && !this.phone(),
+      inside: () => [this.pop()?.nativeElement, this.anchor],
+      close: () => this.close(false),
+      follow: () => this.place(),
     });
+    inject(DestroyRef).onDestroy(() => this.sub?.unsubscribe());
 
     afterRenderEffect(() => {
       const open = this.isOpen();
@@ -222,7 +215,7 @@ export class AttendanceDetailComponent {
     }
     if (el === this.shownEl) return;
     this.shownEl = el;
-    showPopover(el);
+    showInTopLayer(el);
     if (phone) return;
     this.place();
     el.classList.add('gad--placed');
@@ -234,28 +227,8 @@ export class AttendanceDetailComponent {
     const pop = this.pop()?.nativeElement;
     if (!pop) return;
     const rect = (this.anchor ?? this.host.nativeElement).getBoundingClientRect();
-    const box = pop.getBoundingClientRect();
-    const left = Math.min(
-      Math.max(EDGE, rect.left),
-      Math.max(EDGE, window.innerWidth - EDGE - box.width),
-    );
-    let top = rect.bottom + GAP;
-    if (top + box.height > window.innerHeight - EDGE && rect.top - GAP - box.height >= EDGE) {
-      top = rect.top - GAP - box.height;
-    }
+    const { top, left } = placeBelow(rect, pop.getBoundingClientRect(), { gap: GAP, edge: EDGE });
     pop.style.top = `${top}px`;
     pop.style.left = `${left}px`;
   }
-}
-
-/** Put a popover element into the top layer. */
-function showPopover(el: HTMLElement): void {
-  const pop = el as HTMLElement & { showPopover?: () => void };
-  if (typeof pop.showPopover !== 'function') return;
-  try {
-    if (pop.matches(':popover-open')) return;
-  } catch {
-    // The engine does not know the selector (jsdom, old browsers).
-  }
-  pop.showPopover();
 }

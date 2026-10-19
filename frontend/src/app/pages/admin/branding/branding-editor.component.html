@@ -73,15 +73,7 @@
                 (dragleave)="onDragLeave()"
                 (drop)="onDrop(slot, $event)"
               >
-                <input
-                  #logo
-                  class="br__file"
-                  type="file"
-                  [accept]="accept"
-                  tabindex="-1"
-                  aria-hidden="true"
-                  (change)="onLogoSelected(slot, logo)"
-                />
+                <app-file-picker #logo [accept]="accept" (picked)="onLogoSelected(slot, $event)" />
                 @if (d.logos[slot]; as asset) {
                   <span class="br__thumb"><img [src]="asset.url" alt="" /></span>
                   <span class="br__logoText">
@@ -94,7 +86,7 @@
                     [iconOnly]="true"
                     [ariaLabel]="('admin.brand.replaceLogo' | t) + ': ' + slotLabel(slot)"
                     [title]="'admin.brand.replaceLogo' | t"
-                    (click)="logo.click()"
+                    (click)="logo.open()"
                     ><app-icon name="upload"
                   /></app-button>
                   <app-button
@@ -112,7 +104,7 @@
                     <span class="br__logoName">{{ slotLabel(slot) }}</span>
                     <span class="br__logoHint">{{ 'admin.brand.dropHere' | t }}</span>
                   </span>
-                  <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.click()">{{
+                  <app-button variant="outlined" size="sm" [ariaLabel]="('admin.brand.pick' | t) + ': ' + slotLabel(slot)" (click)="logo.open()">{{
                     'admin.brand.pick' | t
                   }}</app-button>
                 }
@@ -178,8 +170,13 @@
               <header class="br__columnHead">
                 <span class="cap">{{ 'admin.brand.column' | t: { n: ci + 1 } }}</span>
                 <span class="br__columnActions">
-                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="ci === 0" [ariaLabel]="('admin.common.moveUp' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, -1)"><app-icon name="up" /></app-button>
-                  <app-button variant="text" size="sm" [iconOnly]="true" [disabled]="last" [ariaLabel]="('admin.common.moveDown' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="moveColumn(ci, 1)"><app-icon name="down" /></app-button>
+                  <app-move-buttons
+                    [upDisabled]="ci === 0"
+                    [downDisabled]="last"
+                    [upLabel]="('admin.common.moveUp' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })"
+                    [downLabel]="('admin.common.moveDown' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })"
+                    (move)="moveColumn(ci, $event)"
+                  />
                   <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeColumn' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="removeColumn(ci)"><app-icon name="trash" /></app-button>
                 </span>
               </header>

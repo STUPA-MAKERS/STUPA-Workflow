@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
+import { SegBarComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The turnout of an open vote: "14 von 19 Anwesenden haben abgestimmt", the percent and

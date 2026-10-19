@@ -115,26 +115,45 @@
         }
       </section>
 
-      <div class="mf__cols">
-        <div class="mf__stack">
-          @if (mode() === 'create') {
-            <app-currency-input
-              class="mf__amount"
-              name="tamount"
-              [label]="'expenses.field.amount' | t"
-              [required]="true"
-              [ngModel]="d.tAmount()"
-              (ngModelChange)="d.tAmount.set($event)"
-            />
-            <app-input
-              name="tdesc"
-              [label]="'expenses.field.description' | t"
-              [required]="true"
-              [placeholder]="'expenses.transfers.descriptionPlaceholder' | t"
-              [ngModel]="d.tDescription()"
-              (ngModelChange)="d.tDescription.set($event)"
-            />
-          } @else {
+      @if (mode() === 'create') {
+        <!-- The amount beside the year, the description below over the full width. -->
+        <div class="tf__fields">
+          <app-currency-input
+            class="mf__amount tf__amount"
+            name="tamount"
+            [label]="'expenses.field.amount' | t"
+            [required]="true"
+            [ngModel]="d.tAmount()"
+            (ngModelChange)="d.tAmount.set($event)"
+          />
+          <app-select
+            class="tf__fy"
+            name="tfy"
+            [label]="'expenses.field.fiscalYear' | t"
+            [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
+            [options]="d.transferFyOptions()"
+            [required]="true"
+            [error]="
+              d.tFromId() && !d.transferFyOptions().length
+                ? ('expenses.field.noFiscalYear' | t)
+                : ''
+            "
+            [ngModel]="d.tFiscalYearId()"
+            (ngModelChange)="d.tFiscalYearId.set($event)"
+          />
+          <app-input
+            class="tf__desc"
+            name="tdesc"
+            [label]="'expenses.field.description' | t"
+            [required]="true"
+            [placeholder]="'expenses.transfers.descriptionPlaceholder' | t"
+            [ngModel]="d.tDescription()"
+            (ngModelChange)="d.tDescription.set($event)"
+          />
+        </div>
+      } @else {
+        <div class="mf__cols">
+          <div class="mf__stack">
             <app-currency-input
               class="mf__amount"
               name="teamount"
@@ -150,25 +169,8 @@
               [ngModel]="t.editDescription()"
               (ngModelChange)="t.editDescription.set($event)"
             />
-          }
-        </div>
-        <div class="mf__stack">
-          @if (mode() === 'create') {
-            <app-select
-              name="tfy"
-              [label]="'expenses.field.fiscalYear' | t"
-              [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
-              [options]="d.transferFyOptions()"
-              [required]="true"
-              [error]="
-                d.tFromId() && !d.transferFyOptions().length
-                  ? ('expenses.field.noFiscalYear' | t)
-                  : ''
-              "
-              [ngModel]="d.tFiscalYearId()"
-              (ngModelChange)="d.tFiscalYearId.set($event)"
-            />
-          } @else {
+          </div>
+          <div class="mf__stack">
             <div class="mf__locked">
               <span class="mf__lockedLabel"
                 ><app-icon name="lock" [size]="14" />{{ 'expenses.field.fiscalYear' | t }}</span
@@ -200,9 +202,9 @@
                 (ngModelChange)="t.editNote.set($event)"
               ></textarea>
             </label>
-          }
+          </div>
         </div>
-      </div>
+      }
     </div>
   </div>
 

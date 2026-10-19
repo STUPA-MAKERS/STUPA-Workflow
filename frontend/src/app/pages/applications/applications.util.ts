@@ -1,7 +1,7 @@
 import type { Transition } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
-import { formatBytes as formatBytesIn } from '@shared/format-bytes';
 import { flowColorKind } from '@shared/status-kind.util';
+import { formatBytes as formatBytesIn } from '@stupa-makers/ui-kit';
 
 /**
  * Derive the display title of an application from the free `data` fields.

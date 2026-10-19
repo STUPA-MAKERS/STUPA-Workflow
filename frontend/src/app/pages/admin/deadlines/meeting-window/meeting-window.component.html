@@ -6,31 +6,27 @@
       <ng-template #content>
         <form class="gs__grid" (submit)="$event.preventDefault(); save()">
           <div class="gs__field">
-            <div class="gs__unitBox">
-              <app-input
-                type="number"
-                [label]="'admin.meetingWindow.openLead' | t"
-                [error]="openError()"
-                name="openLeadMinutes"
-                [ngModel]="draft().open"
-                (ngModelChange)="patch({ open: $event })"
-              />
-              <span class="gs__unit" aria-hidden="true">{{ 'admin.meetingWindow.unit' | t }}</span>
-            </div>
+            <app-input
+              type="number"
+              [label]="'admin.meetingWindow.openLead' | t"
+              [error]="openError()"
+              name="openLeadMinutes"
+              [ngModel]="draft().open"
+              (ngModelChange)="patch({ open: $event })"
+              [suffix]="'admin.meetingWindow.unit' | t"
+            />
           </div>
 
           <div class="gs__field">
-            <div class="gs__unitBox">
-              <app-input
-                type="number"
-                [label]="'admin.meetingWindow.confirmLead' | t"
-                [error]="confirmError()"
-                name="confirmLeadMinutes"
-                [ngModel]="draft().confirm"
-                (ngModelChange)="patch({ confirm: $event })"
-              />
-              <span class="gs__unit" aria-hidden="true">{{ 'admin.meetingWindow.unit' | t }}</span>
-            </div>
+            <app-input
+              type="number"
+              [label]="'admin.meetingWindow.confirmLead' | t"
+              [error]="confirmError()"
+              name="confirmLeadMinutes"
+              [ngModel]="draft().confirm"
+              (ngModelChange)="patch({ confirm: $event })"
+              [suffix]="'admin.meetingWindow.unit' | t"
+            />
           </div>
         </form>
       </ng-template>

@@ -37,7 +37,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type {
@@ -51,37 +50,32 @@ import type {
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import {
-  FieldGroupComponent,
-  FieldRowComponent,
-} from '@shared/ui/field-group/field-group.component';
-import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import {
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import {
-  SheetBarComponent,
-  SheetBarTitleDirective,
-} from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
   ButtonComponent,
   CheckboxComponent,
+  copyText,
   DialogComponent,
+  EmptyStateComponent,
+  FieldGroupComponent,
+  FieldRowComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   InputComponent,
+  liveSearch,
   MEDIA,
+  mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SkeletonComponent,
+  StatusTextComponent,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -89,7 +83,6 @@ import {
   TodoNewDialogComponent,
   type NewTodoLink,
 } from '../../features/todos/new-dialog/todo-new-dialog.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_ICON,
@@ -101,7 +94,6 @@ import {
   reporterEventText,
   reporterName,
 } from './tickets.util';
-import { copyToClipboard } from '@shared/clipboard';
 import { clock, dayMonth } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
 
@@ -241,7 +233,7 @@ export class TicketDetailComponent {
   readonly manager = this.auth.can('ticket.manage');
   /** The reporter may write: false while a block holds back the sender. */
   readonly canReply = signal(true);
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   private id: Uuid = '';
   private seq = 0;
@@ -647,7 +639,7 @@ export class TicketDetailComponent {
 
   /** Copy the link of the ticket. */
   async copyLink(): Promise<void> {
-    if (await copyToClipboard(location.href.split('?')[0])) {
+    if (await copyText(location.href.split('?')[0])) {
       this.toast.success(this.t('tickets.detail.linkCopied'));
     } else {
       this.toast.error(this.t('tickets.detail.linkFailed'));

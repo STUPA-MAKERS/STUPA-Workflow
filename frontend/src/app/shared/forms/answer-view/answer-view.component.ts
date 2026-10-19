@@ -1,12 +1,12 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import type { FieldType, FormFieldDef, FormSection } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
-import { FieldGroupComponent, FieldRowComponent } from '@shared/ui/field-group/field-group.component';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
 import { formatAnswer, formatFieldValue, isEmptyAnswer } from '../answer-format';
 import { resolveI18n } from '../i18n-text';
 import { evalJsonLogic, isFieldVisible } from '../jsonlogic';
 import { PositionsViewComponent } from '../positions-view/positions-view.component';
+import { FieldGroupComponent, FieldRowComponent } from '@stupa-makers/ui-kit';
 
 /** One answer as a label and its text. */
 export interface AnswerCell {

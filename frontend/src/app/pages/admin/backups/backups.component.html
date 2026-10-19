@@ -40,19 +40,15 @@
         <app-button
           variant="outlined"
           [disabled]="!restoreEnabled() || busy()"
-          (click)="fileInput.click()"
+          (click)="picker.open()"
         >
           <app-icon name="upload" /> {{ 'admin.backups.import' | t }}
         </app-button>
-        <input
-          #fileInput
-          class="bk__file"
-          type="file"
+        <app-file-picker
+          #picker
           accept=".age,application/octet-stream"
-          tabindex="-1"
-          aria-hidden="true"
           [disabled]="!restoreEnabled() || busy()"
-          (change)="upload($event)"
+          (picked)="upload($event)"
         />
       </div>
     </section>
@@ -150,7 +146,7 @@
       />
       <button type="submit" hidden></button>
     </form>
-    <div dialog-footer class="bk__dialogFoot">
+    <div dialog-footer>
       <app-button variant="text" (click)="confirmRestore.set(null)">{{ 'action.cancel' | t }}</app-button>
       <app-button variant="danger" [disabled]="!restoreArmed() || busy()" (click)="doRestore()">
         <app-icon name="history" /> {{ 'admin.backups.restore' | t }}

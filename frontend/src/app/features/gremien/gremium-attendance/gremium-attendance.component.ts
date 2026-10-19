@@ -18,15 +18,19 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { downloadBlob } from '@shared/download.util';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
+  ButtonComponent,
+  downloadBlob,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import { AttendanceDetailComponent } from '../attendance-detail/attendance-detail.component';
 import { GREMIEN_NOW } from '../gremien.store';
 import {
@@ -50,8 +54,6 @@ import {
   toCsv,
 } from '../gremien.util';
 import { monthShort, monthYear } from '@shared/date-format';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
@@ -136,7 +138,7 @@ export class GremiumAttendanceComponent {
   /** The sheet is as high as the pane: the matrix takes the free height and scrolls. */
   readonly fill = input(false);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   private readonly detail = viewChild(AttendanceDetailComponent);
 
   readonly preset = signal<RangePreset>('last6');

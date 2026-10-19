@@ -305,8 +305,7 @@ describe('BrandingEditorComponent', () => {
     const c = fixture.componentInstance as any;
     const big = new File(['x'], 'big.png', { type: 'image/png' });
     Object.defineProperty(big, 'size', { value: 5 * 1024 * 1024 });
-    const input = { files: [big], value: 'x' } as unknown as HTMLInputElement;
-    c.onLogoSelected('imagemark', input);
+    c.onLogoSelected('imagemark', [big]);
     expect(toast.error).toHaveBeenCalledWith('Datei zu groß (max. 2 MB).');
   });
 
@@ -315,8 +314,7 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const before = JSON.stringify(c.draft().logos);
-    const input = { files: [], value: '' } as unknown as HTMLInputElement;
-    expect(() => c.onLogoSelected('imagemark', input)).not.toThrow();
+    expect(() => c.onLogoSelected('imagemark', [])).not.toThrow();
     expect(JSON.stringify(c.draft().logos)).toBe(before);
   });
 
@@ -325,8 +323,7 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const file = new File(['raw'], 'mark.png', { type: 'image/png' });
-    const input = { files: [file], value: 'mark.png' } as unknown as HTMLInputElement;
-    c.onLogoSelected('wordmark', input);
+    c.onLogoSelected('wordmark', [file]);
     await waitFor(() => expect(c.draft().logos.wordmark).toBeDefined());
     expect(c.draft().logos.wordmark.filename).toBe('mark.png');
     expect(c.draft().logos.wordmark.mime).toBe('image/png');

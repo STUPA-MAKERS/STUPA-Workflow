@@ -18,14 +18,17 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  HighlightComponent,
+  IconComponent,
+  type IconName,
+  isApplePlatform,
+  liveSearch,
+  StatusTextComponent,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 import { CommandPaletteService } from './command-palette.service';
-import { highlight, type TextPart } from './highlight';
 import { PageIndexService, type PageEntry } from './page-index.service';
-import { isApplePlatform } from './shortcut';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { liveSearch } from '@shared/live-search';
 
 /** One row of the palette. A page comes from the client, a record from the server. */
 interface PaletteRow {
@@ -103,7 +106,7 @@ const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
+  imports: [HighlightComponent, TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
   templateUrl: './command-palette.component.html',
   styleUrl: './command-palette.component.scss',
 })
@@ -275,11 +278,6 @@ export class CommandPaletteComponent {
   /** Flat index of a row, so the template can mark the active one across groups. */
   indexOf(row: PaletteRow): number {
     return this.rows().findIndex((r) => r.key === row.key);
-  }
-
-  /** The parts of a text that match the query, for the highlight. */
-  parts(text: string): TextPart[] {
-    return highlight(text, this.query());
   }
 
   /** A stable DOM id for a row. */

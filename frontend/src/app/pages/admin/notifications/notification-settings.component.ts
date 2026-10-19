@@ -1,9 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { IconComponent, InputComponent, SwitchComponent } from '@stupa-makers/ui-kit';
+import {
+  IconComponent,
+  InputComponent,
+  NoteComponent,
+  SwitchComponent,
+} from '@stupa-makers/ui-kit';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';

@@ -13,10 +13,9 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, RowMenuComponent, type RowMenuSection } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { SimplifyPathPipe } from '@shared/budget-path';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui';
 import type { BudgetTreeNode } from './budget-tree.api';
 
 /**

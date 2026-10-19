@@ -4,6 +4,7 @@
 // the same. Side by side the sheet is surface 1 with a large radius; one pane at a time it
 // sits on the page.
 @use 'breakpoints' as bp;
+@use 'dot-parts' as dots;
 @use 'swatch';
 
 :host {
@@ -36,23 +37,10 @@
   overflow-x: clip;
 }
 .fd__parts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-inline-start: calc(-1 * var(--fd-sep));
-  min-width: 0;
+  @include dots.list(var(--fd-sep));
 }
 .fd__part {
-  min-width: 0;
-  white-space: nowrap;
-}
-.fd__part::before {
-  display: inline-block;
-  width: var(--fd-sep);
-  color: var(--color-text-subtle);
-  text-align: center;
-  content: '·';
-  content: '·' / '';
+  @include dots.part(var(--fd-sep));
 }
 .fd__amount {
   color: var(--color-text);

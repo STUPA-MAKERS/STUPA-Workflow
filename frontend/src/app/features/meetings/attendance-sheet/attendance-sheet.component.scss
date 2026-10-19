@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 :host {
   display: contents;

@@ -25,6 +25,7 @@ import {
   ButtonComponent,
   CardComponent,
   IconComponent,
+  NoteComponent,
 } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
@@ -54,7 +55,6 @@ import {
   voteStatusVariant,
 } from './meetings-display.util';
 import { beamerUrl } from '../voting/beamer-link.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /**
  * Meetings page: the overview (`/meetings`, `MeetingsOverviewComponent`: list or

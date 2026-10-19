@@ -14,16 +14,21 @@ import type { GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA, TabsComponent, type TabItem } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SkeletonComponent,
+  type TabItem,
+  TabsComponent,
+} from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { CreateMeetingDialogComponent } from '../../meetings/create-meeting-dialog/create-meeting-dialog.component';
@@ -90,7 +95,7 @@ export class GremiumDetailComponent {
   private readonly page = inject(GremienComponent, { optional: true });
   protected readonly store = inject(GremienStore);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The list sits beside the sheet: the sheet fills the pane and scrolls inside. */
   readonly split = computed(() => this.page?.split() ?? false);
 

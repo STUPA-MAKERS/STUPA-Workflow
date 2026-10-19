@@ -6,24 +6,26 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { liveSearch } from '@shared/live-search';
+import { PageHeaderComponent } from '@shared/ui';
 import {
   AvatarComponent,
+  CapitalizePipe,
   EmptyStateComponent,
   FilterSelectComponent,
+  type FilterSelectOption,
+  liveSearch,
   NoteComponent,
-  PageHeaderComponent,
   RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SearchPillComponent,
-  StickyBarComponent,
   SkeletonComponent,
   StatusTextComponent,
-} from '@shared/ui';
-import { ToastService } from '@stupa-makers/ui-kit';
+  StickyBarComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../admin.models';
-import type { FilterSelectOption, RowMenuItem, RowMenuSection } from '@shared/ui';
 import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
 import { personLabel } from '@shared/person-label.util';

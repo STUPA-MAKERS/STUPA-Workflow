@@ -1,12 +1,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   computed,
-  effect,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
@@ -15,17 +12,21 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import {
-  FilterSelectComponent,
-  type FilterSelectOption,
   PageHeaderComponent,
-  RangeChipComponent,
-  type RangeValue,
-  SkeletonComponent,
 } from '@shared/ui';
 import {
   ButtonComponent,
   ConfigDiffComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
+  InfiniteScrollDirective,
+  NoteComponent,
+  RangeChipComponent,
+  type RangeValue,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -36,9 +37,6 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { expandSet } from '@shared/expand-set';
 
 const PAGE_SIZE = 50;
@@ -242,6 +240,7 @@ type VerifyState =
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
     NoteComponent,
     EmptyStateComponent,
     RouterLink,
@@ -347,7 +346,6 @@ export class AuditLogComponent {
       : { kind: 'error', title: this.i18n.translate('admin.health.audit.broken'), sub: parts.join(' · ') };
   });
 
-  private readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   constructor() {
     this.api.listAuditActors().subscribe({
@@ -360,18 +358,6 @@ export class AuditLogComponent {
     });
     this.reload();
 
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const obs = new IntersectionObserver(
-        (items) => {
-          if (items.some((i) => i.isIntersecting)) this.loadMore();
-        },
-        { rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   private chipText(label: TranslationKey, options: FilterSelectOption[], value: string): string {

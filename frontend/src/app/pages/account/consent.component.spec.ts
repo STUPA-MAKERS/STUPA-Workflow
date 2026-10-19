@@ -125,9 +125,10 @@ describe('OAuthConsentComponent', () => {
   it('offers the lifetimes of the server, the default chosen, and no "never"', async () => {
     await setup();
     const chips = ['1 Stunde', '8 Stunden', '1 Tag', '30 Tage', '90 Tage'].map((n) =>
-      screen.getByRole('button', { name: n }),
+      screen.getByRole('radio', { name: n }),
     );
-    expect(chips.map((c) => c.getAttribute('aria-pressed'))).toEqual([
+    expect(screen.getByRole('radiogroup', { name: 'Gültigkeitsdauer' })).toBeInTheDocument();
+    expect(chips.map((c) => c.getAttribute('aria-checked'))).toEqual([
       'false',
       'false',
       'false',
@@ -142,13 +143,13 @@ describe('OAuthConsentComponent', () => {
       consentRequest: jest.fn(() => of({ ...clone(REQ), lifetimes: ['2w'], defaultLifetime: '2w' })),
     });
     await setup(api);
-    expect(screen.getByRole('button', { name: '2w' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('radio', { name: '2w' })).toHaveAttribute('aria-checked', 'true');
   });
 
   it('sends the chosen scopes and the chosen lifetime, then follows the redirect', async () => {
     const { api } = await setup();
     await userEvent.click(screen.getByRole('checkbox', { name: /^Administration/ }));
-    await userEvent.click(screen.getByRole('button', { name: '8 Stunden' }));
+    await userEvent.click(screen.getByRole('radio', { name: '8 Stunden' }));
     await userEvent.click(screen.getByRole('button', { name: 'Erlauben' }));
     expect(api.submitConsent).toHaveBeenCalledWith({
       approve: true,

@@ -77,40 +77,6 @@ app-note {
 }
 
 /* Links in the look of the kit buttons: a link navigates, a button acts. */
-.done__btn {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control-height);
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-}
-.done__btn:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-.done__btn--fill {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-}
-.done__btn--fill:hover {
-  filter: brightness(1.06);
-}
-.done__btn--outlined {
-  box-shadow: inset 0 0 0 1px var(--color-border-strong);
-  color: var(--color-text);
-}
-.done__btn--outlined:hover,
-.done__btn--text:hover {
-  background: var(--color-surface-2);
-}
-.done__btn--text {
-  padding: 0 var(--space-3);
-  color: var(--color-accent-text);
-}
-
 @include bp.phone {
   .done__card {
     padding: var(--space-5);

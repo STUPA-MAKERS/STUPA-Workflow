@@ -8,31 +8,38 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { AuthService } from '@core/auth/auth.service';
-import { exportDownload } from '@shared/download.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { SimplifyPathPipe } from '@shared/budget-path';
 import {
+  ButtonComponent,
+  DialogComponent,
   EmptyStateComponent,
   FilterSelectComponent,
+  IconComponent,
   ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  ScrollFadeDirective,
   SearchPillComponent,
   type Seg,
   SegBarComponent,
-  SideSheetComponent,
-  PageHeaderComponent,
   SheetBarComponent,
   SheetBarKickerDirective,
+  SideSheetComponent,
   SkeletonComponent,
-  StatusTextComponent,
   type StatusKind,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { AuthService } from '@core/auth/auth.service';
+import { exportDownload } from '@shared/download.util';
+import { SimplifyPathPipe } from '@shared/budget-path';
+import {
+  PageHeaderComponent,
   flowColorKind,
 } from '@shared/ui';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,
@@ -45,7 +52,6 @@ import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { formatMoney } from '@shared/format-money';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
@@ -176,10 +182,10 @@ export class BudgetDashboardComponent {
   private readonly auth = inject(AuthService);
 
   /** The pane sits beside the sheet only on a wide viewport. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
+  readonly wide = mediaQuery(MEDIA.wide);
   /** A phone opens the tree in a sheet from the bottom, a narrow viewport in a sheet
    *  from the start. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */

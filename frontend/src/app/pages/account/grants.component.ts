@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   inject,
   signal,
@@ -13,20 +12,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { downloadBlob } from '@shared/download.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ConfirmDialogComponent,
+  CopyButtonComponent,
+  downloadBlob,
+  EmptyStateComponent,
+  IconComponent,
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import { scopeLabel } from './scope-labels';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** What the confirmation dialog asks: revoke one grant, or all of them. */
 type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };
-
-/** How long "Kopiert" shows on the copy button, in ms. */
-const COPIED_MS = 2000;
 
 /**
  * Account page "API-Zugang" (board Konto-API-Zugang).
@@ -45,6 +45,7 @@ const COPIED_MS = 2000;
   imports: [
     ConfirmDialogComponent,
     ButtonComponent,
+    CopyButtonComponent,
     EmptyStateComponent,
     IconComponent,
     LocalizedDatePipe,
@@ -71,7 +72,6 @@ export class AccountGrantsComponent {
   readonly actionError = signal<TranslationKey | null>(null);
   readonly setup = signal<McpSetup | null>(null);
   readonly downloading = signal(false);
-  readonly copied = signal(false);
 
   /** The open confirmation, or null. */
   readonly confirm = signal<Confirm | null>(null);
@@ -100,7 +100,6 @@ export class AccountGrantsComponent {
     return s ? JSON.stringify({ mcpServers: s.mcpServers }, null, 2) : '';
   });
 
-  private copiedTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     this.reload();
@@ -112,9 +111,6 @@ export class AccountGrantsComponent {
         },
       });
     }
-    inject(DestroyRef).onDestroy(() => {
-      if (this.copiedTimer !== null) clearTimeout(this.copiedTimer);
-    });
   }
 
   reload(): void {
@@ -186,19 +182,5 @@ export class AccountGrantsComponent {
         this.actionError.set('account.mcp.downloadError');
       },
     });
-  }
-
-  /** Copy the `mcpServers` entry. The Clipboard API can be absent. */
-  copySetup(): void {
-    const json = this.setupJson();
-    if (!json) return;
-    void navigator.clipboard?.writeText(json)?.then(
-      () => {
-        this.copied.set(true);
-        if (this.copiedTimer !== null) clearTimeout(this.copiedTimer);
-        this.copiedTimer = setTimeout(() => this.copied.set(false), COPIED_MS);
-      },
-      () => this.copied.set(false),
-    );
   }
 }

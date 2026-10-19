@@ -18,28 +18,31 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, IsoDateTime, Uuid } from '@core/api/models';
 import { TodosApiService, type TodoMineItem } from '@core/api/todos.service';
-import { IconComponent } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ListDetailLayoutComponent } from '@shared/ui/list-detail/list-detail-layout.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { flowColorKind, type StatusKind } from '@shared/status-kind.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
+  IconComponent,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  liveSearch,
+  NoteComponent,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SkeletonComponent,
+  type StatusKind,
+  StatusTextComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
+// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
+// it uses.
+import {
+  flowColorKind,
+} from '@shared/status-kind.util';
 import { NO_FILTER, dueInfo, matchesFilter, type DueTone } from '../../features/todos/todos.util';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { ApplicationsPageService } from '../applications/applications-page.service';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { liveSearch } from '@shared/live-search';
 import { calendarDaysSince, isoDay } from '@shared/date-format';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';

@@ -17,13 +17,14 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  CopyButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   InputComponent,
-  ToastService,
+  SelectFieldComponent,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * The public share links of one application (`application.share`): mint a link, read it
@@ -46,6 +47,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
     LocalizedDatePipe,
     TranslatePipe,
     ButtonComponent,
+    CopyButtonComponent,
     DialogComponent,
     InputComponent,
     SelectFieldComponent,
@@ -77,7 +79,6 @@ export class ShareLinksDialogComponent {
    */
   readonly fresh = signal<ApplicationShareLink | null>(null);
   readonly freshUrl = computed(() => this.fresh()?.url ?? null);
-  readonly copied = signal(false);
 
   /** How long a new link lives. "Never" is deliberately not among the options. */
   readonly ttlOptions: SelectOption[] = [
@@ -107,7 +108,6 @@ export class ShareLinksDialogComponent {
 
   private reset(id: Uuid): void {
     this.fresh.set(null);
-    this.copied.set(false);
     this.label.set('');
     this.shares.set([]);
     this.loading.set(true);
@@ -130,7 +130,6 @@ export class ShareLinksDialogComponent {
     const id = this.applicationId();
     if (!id || this.creating()) return;
     this.creating.set(true);
-    this.copied.set(false);
     const label = this.label().trim();
     this.api
       .createApplicationShare(id, { ttlDays: Number(this.ttl()), ...(label ? { label } : {}) })
@@ -167,15 +166,6 @@ export class ShareLinksDialogComponent {
     });
   }
 
-  /** Copy the fresh link. The Clipboard API can be absent, so the write is optional. */
-  copy(): void {
-    const url = this.freshUrl();
-    if (!url) return;
-    void navigator.clipboard?.writeText(url)?.then(
-      () => this.copied.set(true),
-      () => this.copied.set(false),
-    );
-  }
 
   /** Whether a link still opens. Revoked and expired both read as dead. */
   protected isLive(share: ApplicationShareLink): boolean {

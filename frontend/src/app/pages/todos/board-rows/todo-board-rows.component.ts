@@ -32,11 +32,15 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
-import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  EmptyStateComponent,
+  IconComponent,
+  LongPressDirective,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
 import { TodoCacheService } from '../../../features/todos/todo-cache.service';
-import { LongPressDirective } from '@shared/long-press.directive';
 import {
   DROP_ENTER,
   applyMove,
@@ -54,7 +58,6 @@ import {
 } from '../../../features/todos/todos.util';
 import { BOARD_ICON } from '../board-picker/todo-board-picker.component';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { KanbanKeyDrag, type KeyDragPosition } from '../../../features/todos/kanban-key-drag';
 
 /** The ids of the collapsed rows, per browser ("Meine To-Dos" and "Alle" share them). */

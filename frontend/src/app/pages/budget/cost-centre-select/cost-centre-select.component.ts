@@ -14,12 +14,10 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { IconComponent, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { simplifyPathKey } from '@shared/budget-path';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { nodeColors } from '../budget-color.util';
 import type { BudgetTreeNode } from '../budget-tree.api';
 import { formatMoney } from '@shared/format-money';
@@ -124,7 +122,7 @@ export class CostCentreSelectComponent {
   /** The list opened. */
   readonly opened = output<void>();
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   protected readonly open = signal(false);
   protected readonly popoverOpen = computed(() => this.open() && !this.phone());
   protected readonly sheetOpen = computed(() => this.open() && this.phone());

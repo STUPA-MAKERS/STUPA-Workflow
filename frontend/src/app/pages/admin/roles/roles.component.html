@@ -136,7 +136,7 @@
     />
     <button type="submit" hidden></button>
   </form>
-  <div dialog-footer class="ar__dialogFoot">
+  <div dialog-footer>
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!keyValid()" [loading]="creating()" (click)="createRole()">{{
       'admin.common.create' | t

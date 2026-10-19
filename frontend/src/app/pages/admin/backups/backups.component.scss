@@ -31,15 +31,6 @@
   min-width: 0;
 }
 
-/* The native file input stays in the DOM for the click, but has no box. */
-.bk__file {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-}
-
 .bk__list {
   display: flex;
   flex-direction: column;
@@ -96,11 +87,6 @@
 }
 .bk__target {
   margin: 0;
-}
-.bk__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 @include bp.below-wide {

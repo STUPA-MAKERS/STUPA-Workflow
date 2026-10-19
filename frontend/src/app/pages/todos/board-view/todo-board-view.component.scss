@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 @use '../../../shared/ui/drag-preview' as dp;
 
 :host {
@@ -255,7 +255,7 @@
   min-height: 0;
   overflow: visible;
 }
-@media (max-width: 768px) {
+@include bp.phone {
   .bv--phone {
     --bv-gutter: var(--space-4);
   }

@@ -208,7 +208,7 @@ describe('AdminCdVariantsComponent', () => {
     await userEvent.click(screen.getByRole('radio', { name: /Fußzeile/ }));
     expect(c.logoDraft().slot).toBe('footer');
     const file = new File(['x'], 'fuss.svg', { type: 'image/svg+xml' });
-    c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
+    c.onFileSelected([file]);
     c.saveLogo();
     expect(api.uploadCdVariantLogo).toHaveBeenCalledWith('cd-1', 'footer', file);
   });
@@ -375,7 +375,7 @@ describe('AdminCdVariantsComponent', () => {
     c.openLogoDialog(VARIANT, 'title');
     expect(c.canSaveLogo()).toBe(false); // no file yet
     const file = new File(['x'], 'neu.png', { type: 'image/png' });
-    c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
+    c.onFileSelected([file]);
     expect(c.canSaveLogo()).toBe(true);
     c.saveLogo();
     expect(api.uploadCdVariantLogo).toHaveBeenCalledWith('cd-1', 'title', file);
@@ -389,7 +389,7 @@ describe('AdminCdVariantsComponent', () => {
     c.openLogoDialog(VARIANT, 'title');
     const big = new File([''], 'big.png', { type: 'image/png' });
     Object.defineProperty(big, 'size', { value: 3 * 1024 * 1024 });
-    c.onFileSelected({ files: [big] } as unknown as HTMLInputElement);
+    c.onFileSelected([big]);
     expect(c.logoError()).toBe('admin.cdVariants.logoTooLarge');
     expect(c.canSaveLogo()).toBe(false);
     c.saveLogo();
@@ -399,7 +399,7 @@ describe('AdminCdVariantsComponent', () => {
   it('clears the file when the picker is cancelled', async () => {
     const { c } = await setup();
     c.openLogoDialog(VARIANT, 'title');
-    c.onFileSelected({ files: null } as unknown as HTMLInputElement);
+    c.onFileSelected([]);
     expect(c.logoDraft().file).toBeNull();
   });
 
@@ -438,7 +438,7 @@ describe('AdminCdVariantsComponent', () => {
       );
       expect(c.accept()).toBe('image/png,image/jpeg,image/webp');
       const file = png();
-      c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
+      c.onFileSelected([file]);
       expect(c.logoDraft().checking).toBe(true);
       expect(c.canSaveLogo()).toBe(false); // the size is not known yet
       fixture.detectChanges();
@@ -467,7 +467,7 @@ describe('AdminCdVariantsComponent', () => {
         uploadCdVariantLogo: jest.fn(() => of(next)),
       });
       const { c, fixture } = await squareSetup(Promise.resolve({ width: 300, height: 300 }), api);
-      c.onFileSelected({ files: [png('neu.png')] } as unknown as HTMLInputElement);
+      c.onFileSelected([png('neu.png')]);
       await fixture.whenStable();
       c.saveLogo();
       const ids = c.variants()[0].logos.map((l: CdVariantLogo) => l.id);
@@ -481,7 +481,7 @@ describe('AdminCdVariantsComponent', () => {
       [{ width: 128, height: 128 }, 'tooSmall', /128 × 128 px · zu klein, mindestens 256 × 256 px/],
     ])('refuses %p before the upload', async (size, verdict, text) => {
       const { api, c, fixture } = await squareSetup(Promise.resolve(size));
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       await fixture.whenStable();
       fixture.detectChanges();
       expect(c.verdict()).toBe(verdict);
@@ -495,7 +495,7 @@ describe('AdminCdVariantsComponent', () => {
     it('refuses an SVG for the square slot', async () => {
       const { c } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
       const svg = new File(['<svg/>'], 'logo.svg', { type: 'image/svg+xml' });
-      c.onFileSelected({ files: [svg] } as unknown as HTMLInputElement);
+      c.onFileSelected([svg]);
       expect(c.logoError()).toBe('admin.cdVariants.squareType');
       expect(c.logoDraft().file).toBeNull();
       expect(c.readImageSize).not.toHaveBeenCalled();
@@ -503,7 +503,7 @@ describe('AdminCdVariantsComponent', () => {
 
     it('reports an image that does not load', async () => {
       const { c, fixture } = await squareSetup(Promise.reject(new Error('broken')));
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       await fixture.whenStable();
       expect(c.logoError()).toBe('admin.cdVariants.squareUnreadable');
       expect(c.logoDraft().checking).toBe(false);
@@ -518,8 +518,8 @@ describe('AdminCdVariantsComponent', () => {
         .fn()
         .mockReturnValueOnce(new Promise((r) => (resolveFirst = r)))
         .mockReturnValueOnce(new Promise((_, r) => (rejectSecond = r)));
-      c.onFileSelected({ files: [png('a.png')] } as unknown as HTMLInputElement);
-      c.onFileSelected({ files: [png('b.png')] } as unknown as HTMLInputElement);
+      c.onFileSelected([png('a.png')]);
+      c.onFileSelected([png('b.png')]);
       // The first preview URL goes when the second file comes.
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
       c.closeLogoDialog();
@@ -532,7 +532,7 @@ describe('AdminCdVariantsComponent', () => {
 
     it('drops the picked file when the slot changes', async () => {
       const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       await fixture.whenStable();
       c.setSlot('square'); // the same slot keeps everything
       expect(c.logoDraft().file).not.toBeNull();
@@ -558,7 +558,7 @@ describe('AdminCdVariantsComponent', () => {
         Promise.resolve({ width: 512, height: 512 }),
         api,
       );
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       await fixture.whenStable();
       c.saveLogo();
       expect(c.logoError()).toBe(key);
@@ -570,7 +570,7 @@ describe('AdminCdVariantsComponent', () => {
         uploadCdVariantLogo: jest.fn(() => throwError(() => ({ status: 413, error: { code: 'x' } }))),
       });
       const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }), api);
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       await fixture.whenStable();
       c.saveLogo();
       expect(c.logoError()).toBe('admin.cdVariants.logoTooLarge');
@@ -581,7 +581,7 @@ describe('AdminCdVariantsComponent', () => {
         uploadCdVariantLogo: jest.fn(() => throwError(() => ({ status: 415, error: 'nope' }))),
       });
       const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }), api);
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       await fixture.whenStable();
       c.saveLogo();
       expect(c.logoError()).toBe('admin.cdVariants.logoType');
@@ -595,14 +595,14 @@ describe('AdminCdVariantsComponent', () => {
 
     it('revokes the preview when the page goes', async () => {
       const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       fixture.destroy();
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
     });
 
     it('ignores a pick without an open dialog', async () => {
       const { c } = await setup();
-      c.onFileSelected({ files: [png()] } as unknown as HTMLInputElement);
+      c.onFileSelected([png()]);
       expect(c.logoDraft()).toBeNull();
     });
   });
@@ -658,7 +658,7 @@ describe('AdminCdVariantsComponent', () => {
       makeApi({ uploadCdVariantLogo: jest.fn(() => httpError(status as number)) }),
     );
     c.openLogoDialog(VARIANT, 'title');
-    c.onFileSelected({ files: [file] } as unknown as HTMLInputElement);
+    c.onFileSelected([file]);
     c.saveLogo();
     expect(c.logoError()).toBe(key);
     expect(c.logoSaving()).toBe(false);
@@ -718,9 +718,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.variants()[0]).toEqual(other);
 
     c.openLogoDialog(VARIANT, 'footer');
-    c.onFileSelected({
-      files: [new File(['x'], 'f.png', { type: 'image/png' })],
-    } as unknown as HTMLInputElement);
+    c.onFileSelected([new File(['x'], 'f.png', { type: 'image/png' })]);
     c.saveLogo();
     expect(c.variants()[0].logos).toEqual([]);
 

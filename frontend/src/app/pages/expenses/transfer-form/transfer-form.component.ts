@@ -9,11 +9,11 @@ import {
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  SelectFieldComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
 import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
@@ -43,9 +43,10 @@ interface LegFree {
  *
  * New: "Von → nach" with the two legs as cards (each opens `app-cost-centre-select`) and
  * "Frei danach" on each (the free amount now struck through, the amount after the
- * transfer), "Richtung tauschen", then the amount and the description beside the fiscal
- * year. The main action names the amount ("500,00 € übertragen"). The dates and the note
- * follow in the edit.
+ * transfer), "Richtung tauschen", then the amount beside the fiscal year and the
+ * description over the full width (one column in a narrow pane). The main action names
+ * the amount ("500,00 € übertragen"). The edit has the amount and the description beside
+ * the fiscal year, the dates and the note.
  *
  * Edit: the two cost centres of a transfer are fixed on the server, so the legs show
  * locked and the form changes the amount, the text, the dates and the note.

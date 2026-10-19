@@ -7,22 +7,25 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
-  EmptyStateComponent,
-  NoteComponent,
   PageHeaderComponent,
+} from '@shared/ui';
+import {
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  IconComponent,
+  NoteComponent,
   RowMenuComponent,
-  SkeletonComponent,
-  StatusTextComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui';
-import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { problemCode } from '@core/api/problem';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { expandSet } from '@shared/expand-set';
 
 /**

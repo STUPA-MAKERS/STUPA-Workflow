@@ -16,15 +16,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
-import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
 import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
 import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { ButtonComponent, InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  InputComponent,
+  NoteComponent,
+  SwitchComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** The choices of the retention chip, in months. */

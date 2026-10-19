@@ -3,7 +3,6 @@ import {
   Component,
   DestroyRef,
   ElementRef,
-  NgZone,
   afterRenderEffect,
   inject,
   signal,
@@ -13,18 +12,23 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import {
+  ButtonComponent,
+  CopyButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  placeBelow,
+  showInTopLayer,
+  SideSheetComponent,
+  SkeletonComponent,
+  watchAnchoredPopover,
+} from '@stupa-makers/ui-kit';
 
 /** The gap between the anchor and the popover, and the least gap to the viewport edge. */
 const GAP = 6;
 const EDGE = 8;
-/** "Kopiert!" shows this long, then the button reads "Kopieren" again. */
-export const COPIED_MS = 2000;
-
 let nextId = 0;
 
 /**
@@ -66,6 +70,7 @@ let nextId = 0;
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
+    CopyButtonComponent,
     IconComponent,
     SideSheetComponent,
     SkeletonComponent,
@@ -77,7 +82,7 @@ export class CalendarSubscribeComponent {
   private readonly api = inject(ApiClient);
 
   /** A phone viewport: the bottom sheet instead of the popover. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly isOpen = signal(false);
   readonly headingId = `cs-title-${nextId++}`;
 
@@ -87,7 +92,6 @@ export class CalendarSubscribeComponent {
   /** The last create of the link ("Abo-Link erzeugen", "Neue URL erzeugen") failed. */
   readonly rotateError = signal(false);
   readonly busy = signal(false);
-  readonly copied = signal(false);
   /** "Neue URL erzeugen" waits for the confirmation. */
   readonly confirming = signal(false);
   private loaded = false;
@@ -99,31 +103,17 @@ export class CalendarSubscribeComponent {
   /** The element that is in the top layer now (popover or sheet), else null. */
   private shownEl: HTMLElement | null = null;
   private observer: ResizeObserver | null = null;
-  private copiedTimer: ReturnType<typeof setTimeout> | null = null;
-  private readonly zone = inject(NgZone);
+  private readonly copyButton = viewChild(CopyButtonComponent);
 
   constructor() {
-    const onPointer = (e: Event) => {
-      if (!this.isOpen() || this.phone()) return;
-      const target = e.target as Node;
-      const inPop = !!this.pop()?.nativeElement.contains(target);
-      const onAnchor = !!this.anchor?.contains(target);
+    watchAnchoredPopover({
+      isOpen: () => this.isOpen() && !this.phone(),
       // A press on the anchor toggles by itself; closing here would reopen it.
-      if (!inPop && !onAnchor) this.close(false);
-    };
-    const onResize = () => {
-      if (this.isOpen() && !this.phone()) this.place();
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('resize', onResize);
-    window.addEventListener('scroll', onResize, true);
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('scroll', onResize, true);
-      this.unobserve();
-      this.clearCopied();
+      inside: () => [this.pop()?.nativeElement, this.anchor],
+      close: () => this.close(false),
+      follow: () => this.place(),
     });
+    inject(DestroyRef).onDestroy(() => this.unobserve());
 
     // After each render that changes the open state, the mode (a resize across the phone
     // limit renders the other element) or the element itself: put the new element into
@@ -146,7 +136,7 @@ export class CalendarSubscribeComponent {
   open(anchor: EventTarget | null = null): void {
     this.anchor = anchor instanceof HTMLElement ? anchor : null;
     this.confirming.set(false);
-    this.clearCopied();
+    this.copyButton()?.reset();
     this.rotateError.set(false);
     this.isOpen.set(true);
     if (!this.loaded) this.load();
@@ -165,7 +155,7 @@ export class CalendarSubscribeComponent {
     if (el === this.shownEl) return;
     this.shownEl = el;
     this.unobserve();
-    showPopover(el);
+    showInTopLayer(el);
     if (phone) return;
     this.place();
     el.classList.add('cs--placed');
@@ -250,7 +240,6 @@ export class CalendarSubscribeComponent {
     if (this.busy()) return;
     this.busy.set(true);
     this.rotateError.set(false);
-    this.clearCopied();
     this.api.rotateCalendar().subscribe({
       next: (feed) => {
         this.loaded = true;
@@ -265,34 +254,6 @@ export class CalendarSubscribeComponent {
     });
   }
 
-  /**
-   * Copy the subscription URL to the clipboard. The Clipboard API can be absent.
-   * "Kopiert!" shows for {@link COPIED_MS}, then the button reads "Kopieren" again.
-   */
-  copy(): void {
-    const url = this.url();
-    if (!url) return;
-    void navigator.clipboard?.writeText(url)?.then(
-      () => {
-        this.clearCopied();
-        this.copied.set(true);
-        // Outside the zone: the timer is no pending task that keeps the page unstable.
-        this.copiedTimer = this.zone.runOutsideAngular(() =>
-          setTimeout(() => {
-            this.copiedTimer = null;
-            this.copied.set(false);
-          }, COPIED_MS),
-        );
-      },
-      () => this.clearCopied(),
-    );
-  }
-
-  private clearCopied(): void {
-    if (this.copiedTimer !== null) clearTimeout(this.copiedTimer);
-    this.copiedTimer = null;
-    this.copied.set(false);
-  }
 
   /**
    * Under the anchor, aligned to its end, inside the viewport. The place goes straight
@@ -303,34 +264,9 @@ export class CalendarSubscribeComponent {
     const pop = this.pop()?.nativeElement;
     if (!pop) return;
     const rect = (this.anchor ?? this.host.nativeElement).getBoundingClientRect();
-    const box = pop.getBoundingClientRect();
-    const left = Math.min(
-      Math.max(EDGE, rect.right - box.width),
-      Math.max(EDGE, window.innerWidth - EDGE - box.width),
-    );
-    let top = rect.bottom + GAP;
-    if (top + box.height > window.innerHeight - EDGE && rect.top - GAP - box.height >= EDGE) {
-      top = rect.top - GAP - box.height;
-    }
+    const { top, left } = placeBelow(rect, pop.getBoundingClientRect(), { gap: GAP, edge: EDGE, align: 'end' });
     pop.style.top = `${top}px`;
     pop.style.left = `${left}px`;
   }
 }
 
-/** Put a popover element into the top layer. It renders anew on each opening. */
-function showPopover(el: HTMLElement | undefined): void {
-  const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
-  if (typeof pop?.showPopover !== 'function') return;
-  // A second call on an open popover throws.
-  if (typeof pop.matches === 'function' && safeMatches(pop, ':popover-open')) return;
-  pop.showPopover();
-}
-
-/** `matches` throws for a selector the engine does not know (jsdom, old browsers). */
-function safeMatches(el: Element, selector: string): boolean {
-  try {
-    return el.matches(selector);
-  } catch {
-    return false;
-  }
-}

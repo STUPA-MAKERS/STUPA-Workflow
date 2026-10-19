@@ -234,7 +234,7 @@
             }
             </div>
             @if (transferHasMore()) {
-              <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+              <div class="exp__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMoreTransfers()" aria-hidden="true"></div>
               <div class="exp__more">
                 <app-button variant="text" size="sm" [loading]="transferLoadingMore()" (click)="loadMoreTransfers()">{{
                   'expenses.loadMore' | t
@@ -338,7 +338,7 @@
             }
             </div>
             @if (hasMore()) {
-              <div #sentinel class="exp__sentinel" aria-hidden="true"></div>
+              <div class="exp__sentinel" appInfiniteScroll [scrollRoot]="split() ? scroller : null" (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
               <div class="exp__more">
                 <app-button variant="text" size="sm" [loading]="loadingMore()" (click)="loadMore()">{{
                   'expenses.loadMore' | t

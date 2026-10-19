@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
-@use '../../shared/ui/scroll-fade' as fade;
+@use 'dot-parts' as dots;
+@use 'scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
 :host {
@@ -97,24 +98,10 @@
   overflow-x: clip;
 }
 .inv__parts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-inline-start: calc(-1 * var(--inv-sep));
-  min-width: 0;
+  @include dots.list(var(--inv-sep));
 }
 .inv__part {
-  min-width: 0;
-  white-space: nowrap;
-}
-.inv__part::before {
-  display: inline-block;
-  width: var(--inv-sep);
-  color: var(--color-text-subtle);
-  font-family: var(--font-sans);
-  text-align: center;
-  content: '·';
-  content: '·' / '';
+  @include dots.part(var(--inv-sep), $font: var(--font-sans));
 }
 .inv__no {
   white-space: normal;

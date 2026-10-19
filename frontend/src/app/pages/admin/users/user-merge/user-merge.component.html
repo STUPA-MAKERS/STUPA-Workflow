@@ -133,7 +133,7 @@
               </app-note>
               <ul class="um__rights" [attr.aria-label]="'admin.users.merge.rightsTitle' | t">
                 @for (r of p.extraPermissions; track $index) {
-                  <li class="um__right mono">{{ permissionLabel(r) }}</li>
+                  <li class="code-tag um__right mono">{{ permissionLabel(r) }}</li>
                 }
               </ul>
             </section>
@@ -192,7 +192,7 @@
     }
   }
 
-  <div dialog-footer class="um__foot">
+  <div dialog-footer>
     @switch (step()) {
       @case ('pick') {
         <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>

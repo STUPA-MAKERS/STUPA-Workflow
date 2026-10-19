@@ -35,7 +35,7 @@
               @if (h.events.length) {
                 <ul class="wh__events" [attr.aria-label]="'admin.webhook.events' | t">
                   @for (ev of h.events; track ev) {
-                    <li class="wh__event mono">{{ ev }}</li>
+                    <li class="code-tag code-tag--outlined wh__event mono">{{ ev }}</li>
                   }
                 </ul>
               } @else {
@@ -51,15 +51,15 @@
                 >{{ 'admin.webhook.active' | t }}</app-switch
               >
               @if (canManage()) {
-                <button
-                  type="button"
+                <app-button
                   class="wh__toggle"
-                  [attr.aria-expanded]="statusDetail()?.id === h.id"
-                  [attr.aria-controls]="'wh-status-' + h.id"
+                  variant="text"
+                  [ariaExpanded]="statusDetail()?.id === h.id"
+                  [ariaControls]="'wh-status-' + h.id"
                   (click)="toggleStatus(h)"
                 >
                   {{ 'admin.webhook.delivery.title' | t }}
-                </button>
+                </app-button>
                 <app-row-menu
                   [sections]="rowMenu()"
                   [label]="('ui.rowMenu.trigger' | t) + ': ' + (h.name || h.url)"
@@ -76,7 +76,7 @@
             <section class="wh__status" [id]="'wh-status-' + h.id" [attr.aria-label]="'admin.webhook.delivery.title' | t">
               <h3 class="section-title">{{ 'admin.webhook.delivery.title' | t }}</h3>
               @if (s) {
-                <dl class="wh__grid">
+                <dl class="kv wh__grid">
                   <div>
                     <dt>{{ 'admin.webhook.delivery.state' | t }}</dt>
                     @let st = deliveryStatus(s.lastState);
@@ -94,7 +94,7 @@
                     <dt>{{ 'admin.webhook.delivery.lastAt' | t }}</dt>
                     <dd class="mono">{{ s.lastAt ? (s.lastAt | ldate: 'short') : '—' }}</dd>
                   </div>
-                  <div class="wh__reason">
+                  <div class="kv__wide">
                     <dt>{{ 'admin.webhook.delivery.reason' | t }}</dt>
                     <dd>{{ reasonLabel(s.reasonClass) }}</dd>
                   </div>

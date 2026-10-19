@@ -1,22 +1,25 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   inject,
   input,
   model,
   output,
-  signal,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import type { Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import {
+  ButtonComponent,
+  CopyButtonComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  SideSheetComponent,
+} from '@stupa-makers/ui-kit';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { JOIN_COPIED_MS } from './join-link.component';
 
@@ -31,15 +34,15 @@ import { JOIN_COPIED_MS } from './join-link.component';
   selector: 'app-join-qr',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, IconComponent, QrCodeComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, CopyButtonComponent, IconComponent, QrCodeComponent, SideSheetComponent],
   host: { '(document:keydown.escape)': 'open.set(false)' },
   templateUrl: './join-qr.component.html',
   styleUrl: './join-qr.component.scss',
 })
-export class JoinQrComponent implements OnDestroy {
+export class JoinQrComponent {
   private readonly i18n = inject(I18nService);
   protected readonly guests = inject(MeetingGuestsService, { optional: true });
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly meeting = input.required<Meeting>();
   /** The trigger button in the header (wide and medium screens). */
@@ -48,8 +51,7 @@ export class JoinQrComponent implements OnDestroy {
   /** "Auf dem Beamer zeigen". */
   readonly beamer = output<void>();
 
-  protected readonly copied = signal(false);
-  private timer: ReturnType<typeof setTimeout> | null = null;
+  protected readonly copiedMs = JOIN_COPIED_MS;
 
   /** The link of the open meeting, while the lead may show it. */
   protected readonly link = computed(() => {
@@ -63,28 +65,8 @@ export class JoinQrComponent implements OnDestroy {
     return this.i18n.translate('guests.qr.label', { url });
   }
 
-  copy(): void {
-    const url = this.link()?.joinUrl;
-    if (!url) return;
-    void navigator.clipboard?.writeText(url)?.then(
-      () => {
-        this.copied.set(true);
-        if (this.timer !== null) clearTimeout(this.timer);
-        this.timer = setTimeout(() => {
-          this.timer = null;
-          this.copied.set(false);
-        }, JOIN_COPIED_MS);
-      },
-      () => this.copied.set(false),
-    );
-  }
-
   showOnBeamer(): void {
     this.open.set(false);
     this.beamer.emit();
-  }
-
-  ngOnDestroy(): void {
-    if (this.timer !== null) clearTimeout(this.timer);
   }
 }

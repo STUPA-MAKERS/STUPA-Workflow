@@ -1,8 +1,8 @@
 // The closed field: the filled field of the ui-kit (`_field.scss`), the whole box is the
-// button. The open list: the option menu of the app (`_option-menu.scss`) with a search
+// button. The open list: the option menu of the app (the kit `_option-menu.scss`) with a search
 // on top and the cost centres grouped by their top-level budget.
 @use 'field' as f;
-@use '../../../shared/ui/option-menu' as om;
+@use 'option-menu' as om;
 
 :host {
   display: block;

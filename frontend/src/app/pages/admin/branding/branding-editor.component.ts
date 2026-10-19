@@ -20,18 +20,22 @@ import {
   type SubmittedKind,
 } from '@core/branding/submitted-texts';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   ButtonComponent,
+  FilePickerComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
+  MoveButtonsComponent,
+  moveItem,
+  NoteComponent,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '@shared/format-bytes';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
@@ -43,7 +47,6 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { renderMarkdown } from '../../../features/meetings/meetings.util';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
@@ -84,6 +87,8 @@ type FreetextKey = (typeof FREETEXTS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
+    MoveButtonsComponent,
     NgTemplateOutlet,
     SectionHeaderComponent,
     I18nInputComponent,
@@ -250,9 +255,8 @@ export class BrandingEditorComponent {
     return this.linkErrors().includes(url);
   }
 
-  protected onLogoSelected(slot: LogoSlot, input: HTMLInputElement): void {
-    const file = input.files?.[0];
-    input.value = '';
+  protected onLogoSelected(slot: LogoSlot, files: File[]): void {
+    const file = files[0];
     if (file) this.readLogo(slot, file);
   }
 
@@ -316,11 +320,7 @@ export class BrandingEditorComponent {
 
   protected moveColumn(i: number, dir: -1 | 1): void {
     this.patch((d) => {
-      const next = [...d.footerColumns];
-      const j = i + dir;
-      if (j < 0 || j >= next.length) return;
-      [next[i], next[j]] = [next[j], next[i]];
-      d.footerColumns = next;
+      d.footerColumns = moveItem(d.footerColumns, i, dir);
     });
   }
 

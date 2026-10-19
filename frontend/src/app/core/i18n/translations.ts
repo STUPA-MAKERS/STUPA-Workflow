@@ -14,11 +14,6 @@ export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
 
-  // Generic filter bar (app-filter-bar). The same strings apply everywhere.
-  'filter.button': 'Filter',
-  'filter.apply': 'Anwenden',
-  'filter.reset': 'Zurücksetzen',
-
   'shell.nav.start': 'Start',
   'shell.nav.brand': '{name}, Start',
   'shell.nav.more': 'Mehr',
@@ -67,15 +62,8 @@ export const de = {
   // Shared building blocks (shared/ui). Only the names of controls; a page passes its
   // own visible text.
   'ui.rowMenu.trigger': 'Weitere Aktionen',
-  'ui.rowMenu.empty': 'Keine Aktionen möglich',
-  'ui.filterSelect.empty': 'Keine Auswahl möglich',
   'ui.selection.toolbar': 'Auswahl',
-  'ui.selection.clear': 'Auswahl aufheben',
-  'ui.search.clear': 'Suche leeren',
-  'ui.selection.count': '{count} ausgewählt',
-  'ui.selection.selectAll': 'Alle wählen',
   'ui.listDetail.back': 'Zur Liste',
-  'ui.avatarStack.more': '{count} weitere',
   'ui.history.noDate': 'Ohne Datum',
   'ui.history.showValues': 'Werte anzeigen',
   'ui.history.hideValues': 'Werte ausblenden',
@@ -2054,8 +2042,6 @@ export const de = {
   'admin.flow.cfgDeadlinePh': 'Keine Frist',
   'admin.flow.guardPriority': 'Guard-Priorität',
   'admin.flow.guardDefault': 'Kein Guard (Catch-all)',
-  'admin.flow.moveUp': 'Nach oben',
-  'admin.flow.moveDown': 'Nach unten',
   'admin.flow.branch': 'Ergebnis-Zweig',
   'admin.flow.branchNone': '— (kein Zweig)',
   'admin.flow.from': 'Von',
@@ -3196,13 +3182,6 @@ export const de = {
   'admin.groupMappings.role.empty': 'Noch keine OIDC-Gruppe einer Gremien-Rolle zugeordnet.',
   'admin.groupMappings.role.deleteBody':
     'Die Zuordnung wird gelöscht. Die Mitglieder aus dieser Gruppe bekommen wieder die Rolle aus ihren anderen Zuordnungen, sonst „Mitglied“. Das lässt sich nicht rückgängig machen.',
-  'ui.range.from': 'von',
-  'ui.range.to': 'bis',
-  'ui.range.fromOnly': 'ab {value}',
-  'ui.range.toOnly': 'bis {value}',
-  'ui.range.apply': 'Anwenden',
-  'ui.range.reset': 'Zurücksetzen',
-  'ui.range.invalid': 'Der Anfang liegt nach dem Ende.',
   'expenses.bulk.deleteCount': '{count} Buchungen löschen',
   'expenses.bulk.deleteLimit': 'Sammel-Löschen gilt für höchstens {max} Buchungen.',
   'expenses.bulk.exportLine': '{count} Buchungen als .xlsx',

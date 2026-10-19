@@ -21,25 +21,27 @@ import type { VoteResult } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
 import { voteResultStatus, type StatusView } from '@shared/status-kind.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+  IconComponent,
+  ListItemComponent,
+  liveSearch,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
 import { electionStatus } from '../../voting/election.util';
 import { GREMIEN_NOW } from '../gremien.store';
 import { monthKey, shiftMonth } from '../gremien.util';
 import { dayMonth, monthYear } from '@shared/date-format';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { majorityLabel } from '../../meetings/meetings-display.util';
 import { formatMoney } from '@shared/format-money';
@@ -113,7 +115,7 @@ export class GremiumDecisionsComponent {
 
   readonly gremiumId = input.required<string>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   readonly error = signal(false);

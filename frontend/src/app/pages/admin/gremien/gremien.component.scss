@@ -131,31 +131,9 @@
 }
 
 .grem__grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-3) var(--space-5);
-  margin: 0;
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);
-}
-.grem__setting {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-/* The recipients take a whole line: an address is never cut. */
-.grem__setting--wide {
-  grid-column: 1 / -1;
-}
-.grem__setting dt {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.grem__setting dd {
-  margin: 0;
-  overflow-wrap: anywhere;
 }
 .grem__copy {
   font-family: var(--font-mono);
@@ -165,13 +143,13 @@
 
 @container (max-width: 44rem) {
   .grem__grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    --kv-cols: 2;
   }
 }
 
 @container (max-width: 34rem) {
   .grem__grid {
-    grid-template-columns: minmax(0, 1fr);
+    --kv-cols: 1;
   }
   .grem__body {
     padding: 0 var(--space-3) var(--space-3);

@@ -17,12 +17,15 @@ import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { AvatarComponent, NoteComponent, SkeletonComponent } from '@shared/ui';
 import {
+  AvatarComponent,
   ButtonComponent,
   CheckboxComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  NoteComponent,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -47,7 +50,6 @@ import {
   toggleEntry,
   type RevokeEntry,
 } from './revoke-selection';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { personLabel } from '@shared/person-label.util';
 

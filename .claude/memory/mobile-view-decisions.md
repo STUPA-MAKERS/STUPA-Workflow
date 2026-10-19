@@ -16,7 +16,7 @@ Binding rules for mobile work. The frame details are in the `frontend` skill
   Start, Anträge, Sitzungen, Aufgaben (`BOTTOM_BAR_KEYS`) and "Mehr". "Mehr" opens a bottom
   `app-side-sheet` with the other permitted areas, "Suche" and the account menu. Above 768px
   the 96px nav rail (`layout/nav-rail`) has a "Suche" button, so search is in reach on every
-  page without a keyboard. The shell picks rail or bar with `mediaQuerySignal(MEDIA.phone)`,
+  page without a keyboard. The shell picks rail or bar with `mediaQuery(MEDIA.phone)` of the ui-kit,
   not with CSS only. There is no hamburger drawer.
 - **Fixed or sticky bottom elements** of a page (meeting dock, selection bar, ballot, wizard
   nav, FAB) sit above the bar: `bottom: var(--app-bottom-inset, 0px)`. On a phone the shell sets

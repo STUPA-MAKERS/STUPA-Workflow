@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
 /* The list/detail pane page of the applications and the tasks

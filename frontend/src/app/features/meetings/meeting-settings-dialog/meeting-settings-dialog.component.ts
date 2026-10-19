@@ -14,20 +14,21 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { Attendance, GuestsMode, JoinLink, Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
   DatepickerComponent,
   DialogComponent,
   InputComponent,
+  NoteComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
   TimeInputComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { problemCode, problemDetail } from '@core/api/problem';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** The longest meeting title that the server accepts (`MEETING_TITLE_MAX`). */

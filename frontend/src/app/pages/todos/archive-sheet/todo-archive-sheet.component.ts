@@ -3,13 +3,18 @@ import type { Page, Uuid } from '@core/api/models';
 import { TodosApiService, type TodoCardDetail, type TodoCardTile } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { liveSearch } from '@shared/live-search';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
-import { NoteComponent } from '@shared/ui/note/note.component';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  liveSearch,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SearchPillComponent,
+  SideSheetComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { isoDay, shortDay } from '@shared/date-format';
 
 /** One page of the archive. */
@@ -37,7 +42,7 @@ export class TodoArchiveSheetComponent {
   readonly openCard = output<Uuid>();
   readonly restored = output<TodoCardDetail>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly items = signal<TodoCardTile[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);

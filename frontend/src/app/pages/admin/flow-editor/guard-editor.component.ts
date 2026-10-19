@@ -14,9 +14,9 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
+  SelectFieldComponent,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   COMPARE_OPS,
   GUARD_ACTOR_OPERATORS,

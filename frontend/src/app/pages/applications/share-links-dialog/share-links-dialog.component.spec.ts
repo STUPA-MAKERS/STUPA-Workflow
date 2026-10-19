@@ -127,7 +127,7 @@ describe('ShareLinksDialogComponent', () => {
     expect(cmp.label()).toBe('');
   });
 
-  it('copies the fresh link to the clipboard', async () => {
+  it('copies the fresh link to the clipboard and keeps "Kopiert"', async () => {
     const writeText = jest.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     const { http, detectChanges, cmp, openWith } = await setup();
@@ -138,39 +138,29 @@ describe('ShareLinksDialogComponent', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Kopieren' }));
     expect(writeText).toHaveBeenCalledWith('https://x.example/s/token-abc');
-    expect(cmp.copied()).toBe(true);
+    await Promise.resolve();
+    await Promise.resolve();
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Kopiert' })).toBeInTheDocument();
   });
 
-  it('survives a browser without the clipboard API', async () => {
+  it('keeps "Kopieren" without the clipboard API', async () => {
     Object.assign(navigator, { clipboard: undefined });
-    const { http, cmp, openWith } = await setup();
+    const { http, detectChanges, cmp, openWith } = await setup();
     openWith([]);
     cmp.create();
     http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-    expect(() => cmp.copy()).not.toThrow();
-    expect(cmp.copied()).toBe(false);
+    detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Kopieren' }));
+    detectChanges();
+    expect(screen.getByRole('button', { name: 'Kopieren' })).toBeInTheDocument();
   });
 
-  it('marks the link as not copied when the clipboard write is refused', async () => {
-    const writeText = jest.fn().mockRejectedValue(new Error('denied'));
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { http, cmp, openWith } = await setup();
+  it('offers no copy without a fresh link', async () => {
+    const { detectChanges, openWith } = await setup();
     openWith([]);
-    cmp.create();
-    http.expectOne((r) => r.method === 'POST').flush(liveShare({ url: 'https://x/s/t' }));
-    cmp.copy();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(cmp.copied()).toBe(false);
-  });
-
-  it('copies nothing when there is no fresh link', async () => {
-    const writeText = jest.fn();
-    Object.assign(navigator, { clipboard: { writeText } });
-    const { cmp, openWith } = await setup();
-    openWith([]);
-    cmp.copy();
-    expect(writeText).not.toHaveBeenCalled();
+    detectChanges();
+    expect(screen.queryByRole('button', { name: 'Kopieren' })).toBeNull();
   });
 
   it('replaces a revoked link in place rather than dropping it from the list', async () => {

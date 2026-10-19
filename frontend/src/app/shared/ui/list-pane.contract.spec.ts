@@ -1,12 +1,12 @@
 /**
  * One set of rules for the list pane pages (`_list-pane.scss`) and one fade for a scroll
- * area (`_scroll-fade.scss`).
+ * area (the ui-kit partial `_scroll-fade.scss`).
  *
  * The lists of applications, bookings, invoices, tasks, votes, tickets, meetings and
  * gremien each had a copy of the column, the chips, the scroll area with its fade, the
  * groups and the row menu. jsdom applies no styles, so this spec reads the sources.
  */
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const APP = join(__dirname, '../..');
@@ -46,9 +46,12 @@ describe('the list pane pages', () => {
   });
 
   it('keeps the fades in one partial, for the rows and for the chips', () => {
-    const fade = read('shared/ui/_scroll-fade.scss');
-    expect(fade).toContain('@mixin fade-y($size)');
-    expect(fade).toContain('@mixin fade-x($size)');
+    const kitFade = join(APP, '../../vendor/ui-kit/src/styles/_scroll-fade.scss');
+    const fade = readFileSync(kitFade, 'utf8');
+    expect(fade).toContain('@mixin fade-y($size');
+    expect(fade).toContain('@mixin fade-x($size');
+    // The app keeps no copy: `@use 'scroll-fade'` resolves to the kit partial.
+    expect(existsSync(join(APP, 'shared/ui/_scroll-fade.scss'))).toBe(false);
     const pane = read('shared/ui/_list-pane.scss');
     expect(pane).toContain("@use 'scroll-fade' as fade;");
     expect(pane).toContain('@include fade.fade-x(var(#{$fade}));');

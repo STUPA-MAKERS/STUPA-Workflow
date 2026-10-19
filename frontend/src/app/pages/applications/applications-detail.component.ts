@@ -45,49 +45,35 @@ import {
   positionsTotal,
 } from '@shared/forms/positions';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { AnswerViewComponent } from '@shared/forms/answer-view/answer-view.component';
+import { ChatComponent, ChatDrafts, ChatOutbox, appendOnce, withScanStates, draftDropper, filesRefused, sendErrorKey, toChatAttachments, HistoryComponent, flowColorKind, chatPeople, type ChatEdit, type ChatPerson, type ChatMessage, type ChatRef, type ChatSend, type ChatVisibility, type HistoryChange, type HistoryEntry } from '@shared/ui';
 import {
-  ChatComponent,
-  ChatDrafts,
-  ChatOutbox,
-  appendOnce,
-  withScanStates,
-  draftDropper,
-  filesRefused,
-  sendErrorKey,
-  toChatAttachments,
+  ButtonComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  DropOverlayComponent,
   EmptyStateComponent,
   FieldGroupComponent,
   FieldRowComponent,
-  HistoryComponent,
-  NoteComponent,
-  RowMenuComponent,
-  StatusTextComponent,
-  flowColorKind,
-  chatPeople,
-  type ChatEdit,
-  type ChatPerson,
-  type ChatMessage,
-  type ChatRef,
-  type ChatSend,
-  type ChatVisibility,
-  type HistoryChange,
-  type HistoryEntry,
-  type RowMenuItem,
-  type RowMenuSection,
-} from '@shared/ui';
-import {
-  ButtonComponent,
-  DialogComponent,
+  FileDropDirective,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SelectFieldComponent,
+  type SelectOption,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SideSheetComponent,
+  StatusTextComponent,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type SelectOption,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -96,8 +82,6 @@ import {
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
-import { FileDropDirective } from '@shared/file-drop.directive';
-import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
 import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
@@ -107,12 +91,8 @@ import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { localToday } from '@shared/date-format';
@@ -227,7 +207,7 @@ export class ApplicationsDetailComponent {
   /** The route of the list pane: `/applications`, or `/tasks` on the tasks page. */
   readonly listPath = computed(() => this.page?.listPath() ?? ['/applications']);
   /** Phone: every header action goes into the menu. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   /**

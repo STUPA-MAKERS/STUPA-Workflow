@@ -13,8 +13,12 @@ import type { AgendaItem, Attendance, HandoverMode, Meeting } from '@core/api/mo
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, DialogComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  DialogComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 import { currentPosition, handoverPreview } from '../keepers.util';
 import { clock } from '@shared/date-format';
 import { personLabel } from '@shared/person-label.util';

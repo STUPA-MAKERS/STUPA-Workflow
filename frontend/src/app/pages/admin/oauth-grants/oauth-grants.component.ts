@@ -6,18 +6,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  PageHeaderComponent,
+} from '@shared/ui';
+import {
   AvatarComponent,
+  ButtonComponent,
+  ConfirmDialogComponent,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
   NoteComponent,
-  PageHeaderComponent,
   SkeletonComponent,
-} from '@shared/ui';
-import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { personLabel } from '@shared/person-label.util';
 
 /* A token usually carries every scope. Showing all of them wrapped each row over three

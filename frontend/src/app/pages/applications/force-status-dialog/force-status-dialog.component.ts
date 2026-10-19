@@ -18,10 +18,10 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   DialogComponent,
-  ToastService,
+  SelectFieldComponent,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 
 /**
  * "Status setzen": put an application straight into a state of its flow

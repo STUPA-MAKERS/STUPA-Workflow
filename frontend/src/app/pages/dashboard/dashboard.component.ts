@@ -30,37 +30,38 @@ import type {
   VoteListItem,
 } from '@core/api/models';
 import {
+  AvatarComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  DateBlockComponent,
+  EmptyStateComponent,
   IconComponent,
+  ListItemComponent,
   MEDIA,
-  TabsComponent,
+  mediaQuery,
+  NoteComponent,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SegBarComponent,
+  SideSheetComponent,
+  SkeletonComponent,
+  type StatusKind,
+  StatusTextComponent,
   type TabItem,
+  TabsComponent,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
-  type StatusKind,
   flowColorKind,
   meetingVoteStatus,
 } from '@shared/status-kind.util';
 import { closedStatus } from '../../features/voting/election.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { NavService } from '../../layout/nav.service';
 import {
   type BudgetAllocationView,
@@ -68,7 +69,6 @@ import {
   BudgetTreeApi,
   type FiscalYear,
 } from '../budget/budget-tree.api';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { formatMoney } from '@shared/format-money';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
@@ -219,11 +219,11 @@ export class DashboardComponent {
   private readonly router = inject(Router);
 
   /** Phone width (<= 768px): compact head, the band first, list rows, floating button. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** Wide (>= 1200px): the list and the sheet side by side, no page scroll. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
+  readonly wide = mediaQuery(MEDIA.wide);
   /** A very wide screen shows more meetings in the sheet. */
-  private readonly extraWide = mediaQuerySignal('(min-width: 1680px)');
+  private readonly extraWide = mediaQuery('(min-width: 1680px)');
   /** The account sheet of the compact phone head. */
   readonly accountOpen = signal(false);
 

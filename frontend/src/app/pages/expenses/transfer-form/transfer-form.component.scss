@@ -104,3 +104,33 @@
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
+
+/* A new transfer: the amount beside the fiscal year, the description over the full
+   width. One column in a narrow pane: amount, description, year. */
+.tf__fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-areas:
+    'amount fy'
+    'desc desc';
+  gap: var(--space-3) var(--space-6);
+  align-items: start;
+}
+.tf__amount {
+  grid-area: amount;
+}
+.tf__fy {
+  grid-area: fy;
+}
+.tf__desc {
+  grid-area: desc;
+}
+@container (max-width: 40rem) {
+  .tf__fields {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      'amount'
+      'desc'
+      'fy';
+  }
+}

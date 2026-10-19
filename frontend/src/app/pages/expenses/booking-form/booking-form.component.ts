@@ -9,16 +9,18 @@ import {
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
 import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
 import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type {
   BudgetTreeNode,

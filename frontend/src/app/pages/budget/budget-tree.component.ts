@@ -20,32 +20,36 @@ import {
   CellDirective,
   CheckboxComponent,
   type ColumnDef,
+  ConfirmDialogComponent,
   CurrencyInputComponent,
   DataTableComponent,
   DialogComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   InputComponent,
   MEDIA,
+  mediaQuery,
+  NoteComponent,
+  observeElementSize,
   RowDetailDirective,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
   type SelectOption,
+  StatusTextComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { AdminApiService } from '../admin/admin-api.service';
-import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { formatMoney } from '@shared/format-money';
 
 /** A visible tree row: a node, its depth and whether it has children. */
@@ -141,7 +145,7 @@ export class BudgetTreeComponent {
   private readonly injector = inject(Injector);
 
   /** Phone: the toolbar actions go into the header menu, the rows into cards. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   /** The width of the page, measured: the sheet beside the admin navigation is narrower
    *  than the viewport says. `0` until the first measure (all columns). */
   readonly width = signal(0);
@@ -347,12 +351,10 @@ export class BudgetTreeComponent {
   constructor() {
     this.reload();
     // Measure the page: beside the admin navigation it is narrower than the viewport.
-    afterNextRender(() => {
-      if (typeof ResizeObserver === 'undefined') return;
-      const observer = new ResizeObserver((entries) => this.width.set(entries[0].contentRect.width));
-      observer.observe(this.host.nativeElement);
-      this.destroyRef.onDestroy(() => observer.disconnect());
-    });
+    observeElementSize(
+      () => this.host.nativeElement,
+      (size) => this.width.set(size.width),
+    );
     // Gremien for the visibility select in the edit dialog.
     this.adminApi.listGremienOptions().subscribe({
       next: (list) => this.gremiumOptions.set(list.map((g) => ({ value: g.id, label: g.name }))),
