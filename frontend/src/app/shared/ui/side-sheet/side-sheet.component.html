@@ -1,9 +1,17 @@
 @if (open()) {
-  <div class="ss__scrim" aria-hidden="true" (click)="close()"></div>
+  <div
+    class="ss__scrim"
+    aria-hidden="true"
+    animate.enter="ss__scrim--entering"
+    animate.leave="ss__scrim--leaving"
+    (click)="close()"
+  ></div>
   <div
     #pane
     [class]="'ss ss--' + side()"
     [class.ss--dragging]="dragging()"
+    animate.enter="ss--entering"
+    animate.leave="ss--leaving"
     [style.transform]="dragY() ? 'translateY(' + dragY() + 'px)' : null"
     role="dialog"
     aria-modal="true"

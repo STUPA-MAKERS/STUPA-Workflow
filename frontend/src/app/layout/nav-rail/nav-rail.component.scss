@@ -94,8 +94,27 @@
   font-weight: var(--fw-semibold);
 }
 .rail__item.is-active .rail__ind {
-  background: var(--color-selected);
   color: var(--color-accent-text);
+}
+/* The fill of the active entry grows from the middle; hover only tints. */
+.rail__ind::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-selected);
+  opacity: 0;
+  scale: 0.5 1;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    scale var(--motion-base) var(--ease-standard);
+}
+.rail__item.is-active .rail__ind::before {
+  opacity: 1;
+  scale: 1;
+}
+.rail__ind > app-icon {
+  position: relative;
 }
 .rail__item:focus-visible,
 .rail__brand:focus-visible {

@@ -217,7 +217,7 @@
 }
 .ap__list.cdk-drop-list-dragging .ap__row:not(.cdk-drag-placeholder),
 .ap__row.cdk-drag-animating {
-  transition: transform var(--motion-base) cubic-bezier(0, 0, 0.2, 1);
+  transition: transform var(--motion-base) var(--ease-standard);
 }
 @media (prefers-reduced-motion: reduce) {
   .ap__list.cdk-drop-list-dragging .ap__row,

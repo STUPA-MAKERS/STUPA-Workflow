@@ -65,8 +65,27 @@
 /* The selected token is too close to surface 3 in both themes. The pill mixes the accent
    into the bar surface instead. */
 .bb__item.is-active .bb__ind {
-  background: color-mix(in srgb, var(--color-accent) 28%, var(--color-surface-3));
   color: var(--color-accent-text);
+}
+/* The pill grows from the middle when its entry becomes active. */
+.bb__ind::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-accent) 28%, var(--color-surface-3));
+  opacity: 0;
+  scale: 0.5 1;
+  transition:
+    opacity var(--motion-base) var(--ease-standard),
+    scale var(--motion-base) var(--ease-standard);
+}
+.bb__item.is-active .bb__ind::before {
+  opacity: 1;
+  scale: 1;
+}
+.bb__ind > app-icon {
+  position: relative;
 }
 .bb__item:focus-visible {
   outline: none;

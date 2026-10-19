@@ -193,6 +193,11 @@ export class AdminDeadlinesComponent {
     for (const s of this.dirtySections()) s?.save();
   }
 
+  /** "Speichern": send every settings section that has changes. */
+  protected saveSettings(): void {
+    for (const s of this.dirtySections()) s?.save();
+  }
+
   constructor() {
     this.api.listDeadlinePolicies().subscribe({
       next: (p) => {

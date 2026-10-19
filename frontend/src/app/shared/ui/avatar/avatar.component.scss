@@ -41,7 +41,7 @@
   border-radius: 50%;
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.15s ease-out;
+  transition: opacity var(--motion-fast) var(--ease-standard);
 }
 .av__img--on {
   opacity: 1;

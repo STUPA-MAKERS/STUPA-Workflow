@@ -30,6 +30,7 @@
           @let m = item.msg;
           <div
             class="chat__row"
+            animate.enter="motion-rise-in"
             [attr.data-msg-id]="m.id"
             [class.chat__row--own]="m.own"
             [class.chat__row--head]="item.head"

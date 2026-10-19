@@ -153,7 +153,7 @@
 }
 .ad--stale > :not(.skel-progress) {
   opacity: 0.55;
-  transition: opacity 150ms var(--ease-standard, ease) 300ms;
+  transition: opacity var(--motion-fast) var(--ease-standard) var(--skeleton-delay);
 }
 .ad__progress {
   inset-inline: var(--radius-2xl);
