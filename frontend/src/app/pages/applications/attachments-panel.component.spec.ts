@@ -471,7 +471,7 @@ describe('AttachmentsPanelComponent', () => {
   });
 
   // Bulk select
-  it('tracks per-row selection, select-all and the selected count', async () => {
+  it('tracks per-row selection and shows the bulk bar only with a selection', async () => {
     const { http, detectChanges, fixture } = await setup();
     const cmp = fixture.componentInstance;
     await uploadFile('a.pdf');
@@ -486,29 +486,22 @@ describe('AttachmentsPanelComponent', () => {
     });
     detectChanges();
 
-    expect(cmp.allSelected()).toBe(false);
     expect(cmp.selectedCount()).toBe(0);
+    expect(document.querySelector('.att__bulkbar')).toBeNull();
 
     cmp.toggleSelect('a', true);
+    detectChanges();
     expect(cmp.isSelected('a')).toBe(true);
     expect(cmp.selectedCount()).toBe(1);
-    expect(cmp.allSelected()).toBe(false);
+    expect(document.querySelector('.att__bulkbar')).not.toBeNull();
 
     cmp.toggleSelect('a', false);
     expect(cmp.isSelected('a')).toBe(false);
 
-    cmp.toggleSelectAll(true);
+    cmp.toggleSelect('a', true);
+    cmp.toggleSelect('b', true);
     expect(cmp.selectedCount()).toBe(2);
-    expect(cmp.allSelected()).toBe(true);
-
-    cmp.toggleSelectAll(false);
-    expect(cmp.selectedCount()).toBe(0);
     http.verify();
-  });
-
-  it('allSelected is false for an empty list', async () => {
-    const { fixture } = await setup();
-    expect(fixture.componentInstance.allSelected()).toBe(false);
   });
 
   it('bulk-deletes selected attachments and clears them from the list', async () => {
@@ -527,7 +520,8 @@ describe('AttachmentsPanelComponent', () => {
     });
     detectChanges();
 
-    cmp.toggleSelectAll(true);
+    cmp.toggleSelect('a', true);
+    cmp.toggleSelect('b', true);
     cmp.bulkDelete();
     // concatMap sends the DELETE requests one after the other.
     http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, {
@@ -580,7 +574,8 @@ describe('AttachmentsPanelComponent', () => {
     });
     detectChanges();
 
-    cmp.toggleSelectAll(true);
+    cmp.toggleSelect('a', true);
+    cmp.toggleSelect('b', true);
     cmp.bulkDelete();
     // The first DELETE succeeds and the second one fails.
     http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, {

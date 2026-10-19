@@ -905,7 +905,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.attachments.dropHint':
     'Max 10 MB per file. Drag files here or pick them — scanned for malware after upload.',
   'applications.attachments.drop': 'Drop files to upload',
-  'applications.attachments.selectAll': 'Select all',
   'applications.attachments.selectedCount': '{count} selected',
   'applications.attachments.deleteSelected': 'Delete selected',
   'applications.attachments.comparisonOffer': 'Comparison offer',

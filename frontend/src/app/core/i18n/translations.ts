@@ -928,7 +928,6 @@ export const de = {
   'applications.attachments.dropHint':
     'Max. 10 MB pro Datei. Dateien hierher ziehen oder auswählen — wird nach dem Hochladen auf Schadsoftware geprüft.',
   'applications.attachments.drop': 'Dateien zum Hochladen ablegen',
-  'applications.attachments.selectAll': 'Alle auswählen',
   'applications.attachments.selectedCount': '{count} ausgewählt',
   'applications.attachments.deleteSelected': 'Auswahl löschen',
   'applications.attachments.comparisonOffer': 'Vergleichsangebot',
