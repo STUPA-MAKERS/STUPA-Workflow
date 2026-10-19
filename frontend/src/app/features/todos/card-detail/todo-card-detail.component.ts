@@ -67,6 +67,7 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
+import { TodoCacheService } from '../todo-cache.service';
 import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfer-dialog/todo-transfer-dialog.component';
 import {
   LINK_ICON,
@@ -166,6 +167,8 @@ export class TodoCardDetailComponent {
   private readonly injector = inject(Injector);
   private readonly live = inject(TodoLiveService);
   private readonly router = inject(Router);
+  /** The reads of the to-do page, the details read ahead too; absent on other pages. */
+  private readonly cache = inject(TodoCacheService, { optional: true });
   private readonly t: Translate = (key, params) => this.i18n.translate(key, params);
 
   readonly cardId = input.required<Uuid>();
@@ -262,6 +265,11 @@ export class TodoCardDetailComponent {
     effect(() => {
       const id = this.cardId();
       untracked(() => this.load(id, true));
+    });
+    // Keep the card as it is now for the next opening.
+    effect(() => {
+      const c = this.card();
+      if (c) untracked(() => this.cache?.putCard(c));
     });
     effect((onCleanup) => {
       const boardId = this.liveBoard();
@@ -562,9 +570,21 @@ export class TodoCardDetailComponent {
     this.notFound.set(false);
     this.error.set(false);
     this.today.set(isoDay(new Date()));
+    // A card read ahead shows at once; the read behind it does not replace a field in edit.
+    const held = fresh ? this.cache?.card(id) : null;
+    if (held) {
+      this.card.set(held);
+      this.loading.set(false);
+      this.loadMembers(held.boardId);
+    }
+    const local = this.localSeq;
     this.api.card(id).subscribe({
       next: (card) => {
         if (seq !== this.seq) return;
+        if (held && (this.editing() || local !== this.localSeq)) {
+          this.stale.set(this.editing());
+          return;
+        }
         this.card.set(card);
         this.loading.set(false);
         this.loadMembers(card.boardId);
@@ -572,8 +592,10 @@ export class TodoCardDetailComponent {
       error: (err: unknown) => {
         if (seq !== this.seq) return;
         this.loading.set(false);
-        if (err instanceof HttpErrorResponse && err.status === 404) this.notFound.set(true);
-        else this.error.set(true);
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.card.set(null);
+          this.notFound.set(true);
+        } else if (!held) this.error.set(true);
       },
     });
   }
@@ -581,6 +603,8 @@ export class TodoCardDetailComponent {
   private loadMembers(boardId: Uuid): void {
     if (this.membersOf === boardId) return;
     this.membersOf = boardId;
+    const held = this.cache?.members(boardId);
+    if (held) this.members.set(held);
     this.api.members(boardId).subscribe({
       next: (list) => this.members.set(list),
       error: () => {

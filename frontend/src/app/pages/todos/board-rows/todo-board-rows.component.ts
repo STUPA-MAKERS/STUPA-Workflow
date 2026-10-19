@@ -35,6 +35,7 @@ import type { TodoPing } from '@core/ws/ws-messages';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
+import { TodoCacheService } from '../../../features/todos/todo-cache.service';
 import { LongPressDirective } from '@shared/long-press.directive';
 import {
   DROP_ENTER,
@@ -238,6 +239,8 @@ export class TodoBoardRowsComponent implements OnInit {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly live = inject(TodoLiveService);
+  /** The reads of the page, the ones made ahead too; absent outside the page. */
+  private readonly cache = inject(TodoCacheService, { optional: true });
 
   readonly filter = input.required<BoardFilter>();
   readonly today = input.required<string>();
@@ -367,6 +370,11 @@ export class TodoBoardRowsComponent implements OnInit {
       const rows = this.rows();
       if (this.ready()) this.matches.emit(rows.reduce((n, r) => n + r.count, 0));
     });
+    // Keep the rows for a return, my changes too.
+    effect(() => {
+      const boards = this.boards();
+      if (untracked(this.ready)) untracked(() => this.cache?.putRows(this.source(), boards, this.etag));
+    });
     effect(() => {
       const ids = this.dropIds();
       untracked(() => this.drops.emit(ids));
@@ -384,8 +392,15 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // The first read waits for the inputs: `source` picks the route.
-    this.load(null);
+    // The first read waits for the inputs: `source` picks the route. Rows read ahead
+    // show at once, and the read behind them keeps them on a 304.
+    const held = this.cache?.rows(this.source());
+    if (held) {
+      this.boards.set(held.boards);
+      this.etag = held.etag;
+      this.ready.set(true);
+    }
+    this.load(held?.etag ?? null);
   }
 
   // ------------------------------------------------------------------ data

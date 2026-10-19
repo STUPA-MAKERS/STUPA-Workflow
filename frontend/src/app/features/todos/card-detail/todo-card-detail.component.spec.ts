@@ -10,6 +10,7 @@ import { type FakeTodoLive, provideFakeTodoLive } from '../../../../testing/todo
 import { TodoLiveService } from '@core/ws/todo-live.service';
 import { TestBed } from '@angular/core/testing';
 import { DraftAttachmentsService } from '../../apply/draft-attachments.service';
+import { TodoCacheService } from '../todo-cache.service';
 import { TodoCardDetailComponent } from './todo-card-detail.component';
 
 const COMMENT: TodoComment = {
@@ -61,11 +62,16 @@ interface Opts {
   mode?: 'drawer' | 'pane';
   split?: boolean;
   board?: TodoBoard | null;
+  /** The reads of the to-do page; absent on other pages. */
+  cache?: TodoCacheService;
+  /** The card read: a subject keeps it in flight. */
+  read?: Subject<TodoCardDetail>;
 }
 
 async function setup(opts: Opts = {}) {
   const card = opts.card ?? detail({ comments: [COMMENT] });
   const api = makeApi(card);
+  if (opts.read) api.card.mockReturnValue(opts.read);
   const toast = { success: jest.fn(), error: jest.fn() };
   const files = { deleteDraftAttachment: jest.fn(() => of(undefined)), uploadDraftAttachment: jest.fn() };
   const out = { closed: jest.fn(), changed: jest.fn(), commentsChanged: jest.fn(), archived: jest.fn() };
@@ -78,6 +84,7 @@ async function setup(opts: Opts = {}) {
       { provide: ApiClient, useValue: files },
       { provide: ToastService, useValue: toast },
       provideFakeTodoLive(),
+      ...(opts.cache ? [{ provide: TodoCacheService, useValue: opts.cache }] : []),
     ],
   });
   const cmp = view.fixture.componentInstance;
@@ -89,6 +96,50 @@ async function setup(opts: Opts = {}) {
 describe('TodoCardDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => jest.restoreAllMocks());
+
+  describe('read ahead', () => {
+    function heldCache() {
+      const cache = { card: jest.fn(() => detail({ title: 'Alt' })), putCard: jest.fn(), members: jest.fn(() => MEMBERS) };
+      return cache as unknown as TodoCacheService & typeof cache;
+    }
+
+    it('shows a card read ahead at once and takes the read behind it', async () => {
+      const cache = heldCache();
+      const read = new Subject<TodoCardDetail>();
+      const { cmp, detect, api } = await setup({ cache, read });
+      expect(cmp.loading()).toBe(false);
+      expect(screen.getByRole('heading', { level: 2, name: 'Alt' })).toBeInTheDocument();
+      expect(api.members).toHaveBeenCalledWith('b-1');
+      read.next(detail());
+      detect();
+      expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
+      expect(cache.putCard).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Raum buchen' }));
+    });
+
+    it('keeps a field in edit when the read behind a card read ahead answers', async () => {
+      const cache = heldCache();
+      const read = new Subject<TodoCardDetail>();
+      const { cmp } = await setup({ cache, read });
+      cmp.editingTitle.set(true);
+      read.next(detail());
+      expect(cmp.card()?.title).toBe('Alt');
+    });
+
+    it('keeps a card read ahead when the read behind it fails, and drops it on a 404', async () => {
+      const cache = heldCache();
+      const failed = new Subject<TodoCardDetail>();
+      const first = await setup({ cache, read: failed });
+      failed.error(new HttpErrorResponse({ status: 500 }));
+      expect(first.cmp.error()).toBe(false);
+      expect(first.cmp.card()?.title).toBe('Alt');
+      TestBed.resetTestingModule();
+      const gone = new Subject<TodoCardDetail>();
+      const second = await setup({ cache, read: gone });
+      gone.error(new HttpErrorResponse({ status: 404 }));
+      expect(second.cmp.notFound()).toBe(true);
+      expect(second.cmp.card()).toBeNull();
+    });
+  });
 
   it('shows the card side by side: activity, fields, links, description and checklist', async () => {
     const { api, container, closed, cmp, detect } = await setup();
