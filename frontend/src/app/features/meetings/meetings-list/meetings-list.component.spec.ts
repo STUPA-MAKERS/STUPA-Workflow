@@ -186,7 +186,7 @@ describe('MeetingsListComponent', () => {
     expect(within(closedRow).getByText('Di, 18:04')).toBeInTheDocument();
     expect(closedRow.querySelector('app-date-block')).toHaveClass('db--muted');
     // One pane at a time a chevron says that the row opens a step.
-    expect(liveRow.querySelector('.mtl__chev')).not.toBeNull();
+    expect(liveRow.querySelector('app-row-chevron')).not.toBeNull();
   });
 
   it('names a meeting without a date or a time and a group without a date', async () => {
@@ -474,7 +474,7 @@ describe('MeetingsListComponent', () => {
       expect(view.container.querySelector('.mtl')).toHaveClass('mtl--split');
       expect(screen.getByRole('heading', { level: 2, name: '34. Sitzung' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '34. Sitzung' })).toHaveAttribute('aria-current', 'true');
-      expect(view.container.querySelector('.mtl__chev')).toBeNull();
+      expect(view.container.querySelector('app-row-chevron')).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: '35. Sitzung' }));
       await view.fixture.whenStable();
       view.fixture.detectChanges();

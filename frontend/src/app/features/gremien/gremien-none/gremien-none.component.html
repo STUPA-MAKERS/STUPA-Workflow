@@ -1,14 +1,8 @@
-<div class="none">
-  @switch (state()) {
-    @case ('empty') {
-      <app-empty-state plain icon="landmark"
-        fill
-        [heading]="'gremien.list.empty' | t"
-        [body]="'gremien.list.emptyBody' | t"
-      />
-    }
-    @case ('pick') {
-      <app-empty-state plain icon="landmark" fill [heading]="'gremien.none' | t" [body]="'gremien.noneBody' | t" />
-    }
-  }
-</div>
+<app-detail-none
+  [state]="state()"
+  icon="landmark"
+  [heading]="'gremien.none' | t"
+  [body]="'gremien.noneBody' | t"
+  [emptyHeading]="'gremien.list.empty' | t"
+  [emptyBody]="'gremien.list.emptyBody' | t"
+/>

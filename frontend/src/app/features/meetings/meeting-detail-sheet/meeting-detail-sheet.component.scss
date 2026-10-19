@@ -26,13 +26,6 @@
 }
 
 /* ------------------------------------------------------------------ header */
-.ms__head {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding-bottom: 22px;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 
 /* Items with a dot between two of them, also after a wrap (never a dot at a line start). */
 .ms__line {

@@ -55,6 +55,7 @@ import {
 import { BOARD_ICON } from '../board-picker/todo-board-picker.component';
 import { DONE_PREVIEW } from '../board-view/todo-board-view.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { KanbanKeyDrag, type KeyDragPosition } from '../../../features/todos/kanban-key-drag';
 
 /** The ids of the collapsed rows, per browser ("Meine To-Dos" and "Alle" share them). */
 export const COLLAPSED_KEY = 'ap.todos.rows.collapsed';
@@ -106,13 +107,9 @@ export interface RowLead {
 }
 
 /** The keyboard drag: the held card, its row and its place now. */
-interface KeyDrag {
+/** A keyboard drag also knows the board of the held card. */
+interface KeyDrag extends KeyDragPosition {
   boardId: Uuid;
-  cardId: Uuid;
-  col: number;
-  index: number;
-  fromCol: number;
-  fromIndex: number;
 }
 
 /**
@@ -290,11 +287,11 @@ export class TodoBoardRowsComponent implements OnInit {
   readonly collapsed = signal<ReadonlySet<Uuid>>(readCollapsed());
   /** Done columns opened past the preview, by column id. */
   readonly expanded = signal<ReadonlySet<Uuid>>(new Set());
-  readonly kb = signal<KeyDrag | null>(null);
+  /** The keyboard drag; `kb` is the held card. */
+  private readonly keyDrag = new KanbanKeyDrag<KeyDrag>();
+  readonly kb = this.keyDrag.held;
   /** A touch lifts a card after this long press, so a swipe over the cards scrolls; a mouse lifts it at once. */
   protected readonly dragDelay = { touch: 400, mouse: 0 };
-  /** The keydown of Space lifted or put down a card, so its keyup must not click the tile. */
-  private spaceTaken = false;
   /** The pointer drag: the column the card left and the column it is over (any row). */
   readonly ptr = signal<{ from: Uuid; over: Uuid } | null>(null);
   /** A card of the rows is held, by pointer or keyboard. */
@@ -775,68 +772,41 @@ export class TodoBoardRowsComponent implements OnInit {
 
   // ------------------------------------------------------------------ keyboard drag
 
-  /**
-   * A button activates on the keyup of Space (Firefox does so even after a prevented
-   * keydown), so the keyup after a lift or a put-down would open the card and the drawer
-   * would end the drag. The keydown handles Space.
-   */
   onTileKeyUp(event: KeyboardEvent): void {
-    if (event.key !== ' ' || (!this.spaceTaken && !this.kb())) return;
-    this.spaceTaken = false;
-    event.preventDefault();
+    this.keyDrag.keyUp(event);
   }
 
   onTileKey(event: KeyboardEvent, row: BoardRow, card: TodoCardTile, colIndex: number, index: number): void {
     if (!this.canDrag(row)) return;
-    const kb = this.kb();
-    if (!kb) {
-      if (event.key !== ' ') return;
-      event.preventDefault();
-      this.spaceTaken = true;
-      this.kb.set({ boardId: row.board.id, cardId: card.id, col: colIndex, index, fromCol: colIndex, fromIndex: index });
-      this.say('todos.drag.lifted', row, card);
-      return;
-    }
-    if (kb.cardId !== card.id) return;
     const cols = row.columns;
-    switch (event.key) {
-      case 'ArrowUp':
-      case 'ArrowDown': {
-        event.preventDefault();
-        const len = this.list(row, cols[kb.col]).length;
-        const step = event.key === 'ArrowUp' ? -1 : 1;
-        this.kb.set({ ...kb, index: Math.max(0, Math.min(len - 1, kb.index + step)) });
-        break;
-      }
-      case 'ArrowLeft':
-      case 'ArrowRight': {
-        event.preventDefault();
-        const col = Math.max(0, Math.min(cols.length - 1, kb.col + (event.key === 'ArrowLeft' ? -1 : 1)));
-        if (col === kb.col) return;
-        const others = this.cardsIn(row, cols[col].id).filter((c) => c.id !== kb.cardId).length;
-        this.kb.set({ ...kb, col, index: Math.min(kb.index, others) });
-        break;
-      }
-      case ' ':
-      case 'Enter':
-        event.preventDefault();
-        this.spaceTaken = event.key === ' ';
-        this.commit(kb, row, card);
+    const step = this.keyDrag.key(
+      event,
+      card.id,
+      () => ({ boardId: row.board.id, cardId: card.id, col: colIndex, index, fromCol: colIndex, fromIndex: index }),
+      {
+        count: cols.length,
+        length: (col) => this.list(row, cols[col]).length,
+        others: (col, id) => this.cardsIn(row, cols[col].id).filter((c) => c.id !== id).length,
+      },
+    );
+    switch (step.kind) {
+      case 'lift':
+        this.say('todos.drag.lifted', row, card);
         return;
-      case 'Escape':
-      case 'Tab':
-        this.kb.set(null);
+      case 'move':
+        this.say('todos.drag.moved', row, card);
+        this.refocus(card.id);
+        return;
+      case 'drop':
+        this.commit(step.at, row, card);
+        return;
+      case 'cancel':
         this.say('todos.drag.cancelled', row, card);
-        if (event.key === 'Escape') {
-          event.preventDefault();
-          this.refocus(card.id);
-        }
+        if (step.refocus) this.refocus(card.id);
         return;
       default:
         return;
     }
-    this.say('todos.drag.moved', row, card);
-    this.refocus(card.id);
   }
 
   /** A keyboard drag ends when the focus or a pointer goes anywhere but the held card. */

@@ -4,7 +4,7 @@
   class="chip fs__chip"
   [class.fs__chip--md]="size() === 'md'"
   [class.fs__chip--icon]="iconOnly()"
-  [class.on]="active()"
+  [class.on]="shownActive()"
   aria-haspopup="listbox"
   [attr.aria-expanded]="open()"
   [attr.aria-controls]="open() ? listId : null"
@@ -22,7 +22,7 @@
       [principalId]="who.principalId"
       [icon]="who.icon"
     />
-  } @else if (icon(); as lead) {
+  } @else if (shownIcon(); as lead) {
     <app-icon [name]="lead" [size]="15" />
   }
   @if (!iconOnly()) {
@@ -35,7 +35,7 @@
       >{{ chipText() }}</span
     >
   }
-  @if (chevron()) {
+  @if (shownChevron()) {
     <app-icon class="fs__chev" name="down" [size]="15" />
   }
 </button>

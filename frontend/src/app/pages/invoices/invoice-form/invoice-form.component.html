@@ -9,17 +9,14 @@
   (submit)="submit($event)"
 >
   @if (layout() !== 'sheet') {
-    <header class="ff__head">
-      <div class="ff__titles">
-        <h2 class="ff__title" [id]="'if-title-' + mode()">{{ title() | t }}</h2>
-        @if (subtitle()) {
-          <p class="ff__subtitle">{{ subtitle() }}</p>
-        }
-      </div>
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" />
-      </app-button>
-    </header>
+    <header
+      class="ff__head"
+      appPaneFormHead
+      [heading]="title() | t"
+      [headingId]="'if-title-' + mode()"
+      [subtitle]="subtitle()"
+      (closed)="close()"
+    ></header>
   }
 
   <div class="ff__body" appScrollFade="y">
@@ -232,33 +229,24 @@
     </div>
   </div>
 
-  <footer class="ff__foot">
-    @if (mode() === 'edit') {
-      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
-      <app-button
-        variant="danger"
-        [iconOnly]="layout() === 'sheet'"
-        [ariaLabel]="'action.delete' | t"
-        (click)="remove.emit()"
-      >
-        <span class="ff__btn"
-          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
-        >
+  <footer
+    class="ff__foot"
+    appPaneFormFoot
+    [deletable]="mode() === 'edit'"
+    [compact]="layout() === 'sheet'"
+    (removed)="remove.emit()"
+    (cancelled)="close()"
+  >
+    @if (mode() === 'create') {
+      <app-button variant="fill" [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
+        <span class="ff__btn"><app-icon name="plus" />{{
+          (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
+        }}</span>
       </app-button>
+    } @else {
+      <app-button variant="fill" [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
+        'action.save' | t
+      }}</app-button>
     }
-    <div class="ff__footEnd">
-      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-      @if (mode() === 'create') {
-        <app-button variant="fill" [disabled]="!h.canSubmitCreate()" [loading]="h.saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="plus" />{{
-            (layout() === 'sheet' ? 'expenses.form.addShort' : 'invoices.add') | t
-          }}</span>
-        </app-button>
-      } @else {
-        <app-button variant="fill" [disabled]="!h.canSubmitEdit()" [loading]="h.saving()" (click)="submit($event)">{{
-          'action.save' | t
-        }}</app-button>
-      }
-    </div>
   </footer>
 </form>

@@ -217,6 +217,34 @@ app-dialog {
   }
 }
 
+// The head of a detail sheet (`.sheet-head`): the sheet bar, the title and the lines
+// below it, closed by a rule. Every detail sheet uses it, so the title and the rule sit
+// at the same place on every page. A sheet without the rule (a phone) overrides it.
+.sheet-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sheet-head-gap);
+  padding-bottom: 22px;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+// The way back of a detail sheet whose item is gone (`.sheet-back-link`): a tonal pill
+// link to the list.
+.sheet-back-link {
+  display: inline-flex;
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text);
+  font-weight: var(--fw-semibold);
+  text-decoration: none;
+}
+.sheet-back-link:hover {
+  background: var(--color-surface-4);
+}
+
 // The text button of `app-row-menu` (the "…" of the budget breadcrumb): its minimum
 // size and its side padding. The breadcrumb reads the same tokens for its fit.
 :root {

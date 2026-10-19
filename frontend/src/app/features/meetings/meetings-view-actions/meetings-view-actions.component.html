@@ -1,0 +1,10 @@
+@if (showSwitch()) {
+  <app-meetings-view-switch [value]="view()" (valueChange)="viewChange.emit($event)" />
+}
+<app-button
+  variant="text"
+  [iconOnly]="true"
+  [ariaLabel]="'meetings.overview.subscribe' | t"
+  [ariaPressed]="abo().isOpen()"
+  (click)="abo().toggle($event.currentTarget)"
+><app-icon name="cal" /></app-button>

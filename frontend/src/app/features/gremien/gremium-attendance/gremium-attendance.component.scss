@@ -372,9 +372,6 @@ tfoot .gat__foot--name {
 .gat__cardSum {
   font-size: var(--fs-small);
 }
-.gat__chev {
-  @include gremien-tab.chevron;
-}
 .gat__cardCells {
   display: flex;
   gap: 4px;

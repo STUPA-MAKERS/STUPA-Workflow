@@ -1,47 +1,49 @@
 <section class="ns admin-page">
   <app-page-header [flush]="true" [title]="'admin.notifications.title' | t" />
 
-  @if (error()) {
+  @if (settings() && error()) {
     <app-note kind="error" icon="alert" role="alert">{{ $any(error()) | t }}</app-note>
   }
 
-  @if (loading()) {
-    <app-skeleton variant="lines" [count]="4" [label]="'common.loading' | t" />
-  } @else if (settings(); as s) {
-    <section class="ns__card" aria-labelledby="ns-reminder">
-      <app-icon class="ns__icon" name="bell" [size]="20" />
-      <div class="ns__body">
-        <div class="ns__head">
-          <div class="ns__text">
-            <h2 class="section-title" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
+  <app-load-state [state]="loadState()" [lines]="4" [errorText]="'admin.notifications.error' | t">
+    <ng-template #content>
+      @if (settings(); as s) {
+      <section class="ns__card" aria-labelledby="ns-reminder">
+        <app-icon class="ns__icon" name="bell" [size]="20" />
+        <div class="ns__body">
+          <div class="ns__head">
+            <div class="ns__text">
+              <h2 class="section-title" id="ns-reminder">{{ 'admin.notifications.taskReminder' | t }}</h2>
+            </div>
+            <app-switch [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
+              {{ 'admin.notifications.enabled' | t }}
+            </app-switch>
           </div>
-          <app-switch [checked]="s.taskReminderEnabled" (checkedChange)="patch({ taskReminderEnabled: $event })">
-            {{ 'admin.notifications.enabled' | t }}
-          </app-switch>
+          <div class="ns__fields">
+            <app-input
+              type="number"
+              [label]="'admin.notifications.afterDays' | t"
+              [error]="afterDaysError()"
+              [ngModel]="s.taskReminderAfterDays"
+              (ngModelChange)="patch({ taskReminderAfterDays: toNumber($event) })"
+              [disabled]="!s.taskReminderEnabled"
+              name="afterDays"
+            />
+            <app-input
+              type="number"
+              [label]="'admin.notifications.repeatDays' | t"
+              [error]="repeatDaysError()"
+              [ngModel]="s.taskReminderRepeatDays"
+              (ngModelChange)="patch({ taskReminderRepeatDays: toNumber($event) })"
+              [disabled]="!s.taskReminderEnabled"
+              name="repeatDays"
+            />
+          </div>
         </div>
-        <div class="ns__fields">
-          <app-input
-            type="number"
-            [label]="'admin.notifications.afterDays' | t"
-            [error]="afterDaysError()"
-            [ngModel]="s.taskReminderAfterDays"
-            (ngModelChange)="patch({ taskReminderAfterDays: toNumber($event) })"
-            [disabled]="!s.taskReminderEnabled"
-            name="afterDays"
-          />
-          <app-input
-            type="number"
-            [label]="'admin.notifications.repeatDays' | t"
-            [error]="repeatDaysError()"
-            [ngModel]="s.taskReminderRepeatDays"
-            (ngModelChange)="patch({ taskReminderRepeatDays: toNumber($event) })"
-            [disabled]="!s.taskReminderEnabled"
-            name="repeatDays"
-          />
-        </div>
-      </div>
-    </section>
-  }
+      </section>
+      }
+    </ng-template>
+  </app-load-state>
 
   @if (settings() && dirty()) {
     <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!valid()" (activate)="save()" />

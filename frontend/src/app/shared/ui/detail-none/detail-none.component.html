@@ -1,0 +1,20 @@
+@if (ghost()) {
+  <div class="dn__ghost" aria-hidden="true">
+    <span class="dn__bar dn__bar--title"></span>
+    <span class="dn__bar dn__bar--meta"></span>
+    <span class="dn__bar dn__bar--rule"></span>
+    <div class="dn__cols">
+      <span class="dn__bar dn__bar--card"></span>
+      <span class="dn__bar dn__bar--card"></span>
+    </div>
+  </div>
+} @else {
+  @switch (state()) {
+    @case ('empty') {
+      <app-empty-state plain fill [icon]="emptyIcon() ?? icon()" [heading]="emptyHeading()" [body]="emptyBody()" />
+    }
+    @case ('pick') {
+      <app-empty-state plain fill [icon]="icon()" [heading]="heading()" [body]="body()" />
+    }
+  }
+}

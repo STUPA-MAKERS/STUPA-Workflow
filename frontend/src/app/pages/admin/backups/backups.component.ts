@@ -27,6 +27,7 @@ import { formatBytes } from '@shared/format-bytes';
 import type { Backup, BackupKind } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** File name the browser saves an archive under. Mirrors the server-side name. */
 function archiveFileName(createdAt: string): string {
@@ -60,6 +61,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FilePickerComponent,
+    SectionHeaderComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,

@@ -28,6 +28,7 @@ import {
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
@@ -60,6 +61,7 @@ export const MEMBER_PREVIEW = 7;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ButtonComponent,
+    SectionHeaderComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,

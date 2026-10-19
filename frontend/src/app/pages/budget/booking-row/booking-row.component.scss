@@ -1,0 +1,34 @@
+:host {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+.bkr__mark {
+  flex: none;
+  color: var(--color-text-subtle);
+}
+.bkr__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.bkr__title {
+  font-weight: var(--fw-medium);
+}
+.bkr__meta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.bkr__amount {
+  flex: none;
+  font-size: 0.8125rem;
+}
+:host(.bkr--plain) .bkr__title {
+  font-weight: inherit;
+}
+:host(.bkr--plain) .bkr__amount {
+  font-size: inherit;
+}

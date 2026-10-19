@@ -24,6 +24,7 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 import { dayMonth, daysUntil } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
@@ -41,6 +42,7 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetActionComponent,
     NoteComponent,
     EmptyStateComponent,
     SheetBarComponent,

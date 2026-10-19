@@ -21,6 +21,7 @@ import { SubstitutePoolComponent } from './substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { localToday } from '@shared/date-format';
 
 /**
@@ -40,6 +41,7 @@ import { localToday } from '@shared/date-format';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

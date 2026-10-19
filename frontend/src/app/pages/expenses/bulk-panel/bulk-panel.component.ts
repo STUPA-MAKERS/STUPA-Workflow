@@ -20,6 +20,8 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { dayMonth } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
@@ -36,6 +38,8 @@ import { formatMoney } from '@shared/format-money';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SumRowComponent,
+    BookingRowComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,

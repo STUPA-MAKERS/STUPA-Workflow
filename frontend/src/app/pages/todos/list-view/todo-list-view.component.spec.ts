@@ -40,7 +40,7 @@ describe('TodoListViewComponent', () => {
     expect(screen.getByText('Antrag · Lerncafé')).toBeInTheDocument();
     expect(screen.getByText('Sitzung')).toBeInTheDocument();
     expect(screen.getByText('Haushalt')).toBeInTheDocument();
-    expect(screen.getByText(/10\.10\. · überfällig/).closest('.lv__due')).toHaveClass('lv__due--overdue');
+    expect(screen.getByText(/10\.10\. · überfällig/).closest('.lv__due')).toHaveClass('tdu--overdue');
     expect(screen.getAllByRole('img', { name: 'Niemand zuständig' })).toHaveLength(3);
     expect(within(screen.getByRole('rowgroup', { name: 'In Arbeit' })).getByText('Keine Karten')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Spät' }));
@@ -59,7 +59,7 @@ describe('TodoListViewComponent', () => {
     expect(head).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('checkbox', { name: '„Erledigt eins“ wieder öffnen' })).toHaveAttribute('aria-checked', 'true');
     // A done card shows its date without the overdue colour.
-    expect(screen.getByText('01.10.').closest('.lv__due')).not.toHaveClass('lv__due--overdue');
+    expect(screen.getByText('01.10.').closest('.lv__due')).not.toHaveClass('tdu--overdue');
     fireEvent.click(head);
     fixture.detectChanges();
     expect(screen.queryByRole('button', { name: 'Erledigt eins' })).toBeNull();

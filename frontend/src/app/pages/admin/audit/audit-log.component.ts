@@ -37,6 +37,7 @@ import type {
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { expandSet } from '@shared/expand-set';
 
 const PAGE_SIZE = 50;
 
@@ -270,7 +271,7 @@ export class AuditLogComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
   /** Ids of the expanded entries. Their detail area is visible. */
-  protected readonly open = signal<ReadonlySet<number>>(new Set());
+  protected readonly open = expandSet<number>();
 
   /** The `audit.revert` permission as a front-end gate. The backend stays authoritative. The
    *  value is reactive because the principal loads asynchronously. */
@@ -416,17 +417,11 @@ export class AuditLogComponent {
   }
 
   protected isOpen(id: number): boolean {
-    return this.open().has(id);
+    return this.open.has(id);
   }
 
   protected toggle(id: number): void {
-    this.open.update((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    if (this.isOpen(id)) {
+    if (this.open.toggle(id)) {
       const entry = this.entries().find((e) => e.id === id);
       if (entry) this.loadDiff(entry);
     }
@@ -520,7 +515,7 @@ export class AuditLogComponent {
     this.entries.set([]);
     this.cursor.set(null);
     this.hasMore.set(false);
-    this.open.set(new Set());
+    this.open.clear();
     this.load(true);
   }
 

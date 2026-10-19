@@ -48,6 +48,7 @@ import {
   type RevokeEntry,
 } from './revoke-selection';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
@@ -100,6 +101,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,

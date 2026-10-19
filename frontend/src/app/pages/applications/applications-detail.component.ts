@@ -114,6 +114,7 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { localToday } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
@@ -164,6 +165,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AmountComponent,
     DropOverlayComponent,
     FileDropDirective,
     ConfirmDialogComponent,

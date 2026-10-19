@@ -45,6 +45,7 @@ import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { clock, dayMonthYear } from '@shared/date-format';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
@@ -125,6 +126,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     PageHeaderComponent,
     RouterOutlet,

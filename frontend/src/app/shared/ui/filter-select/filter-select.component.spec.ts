@@ -348,6 +348,35 @@ describe('FilterSelectComponent', () => {
     expect(screen.queryByRole('button', { name: 'Zurücksetzen' })).toBeNull();
   });
 
+  it('follows its value in the filled mode: a check and the selection colour, no chevron', async () => {
+    const props = (p: { value?: string; multiple?: boolean; values?: string[] }) => ({
+      options: [
+        { value: 'false', label: 'Ohne Archiv' },
+        { value: 'true', label: 'Nur Archiv' },
+      ],
+      value: p.value ?? 'false',
+      multiple: p.multiple ?? false,
+      values: p.values ?? [],
+    });
+    const { rerender, container } = await render(
+      `<app-filter-select label="Archiv" [options]="options" [value]="value" [multiple]="multiple" [values]="values"
+                          filled unsetValue="false" />`,
+      { imports: [FilterSelectComponent], componentProperties: props({}) },
+    );
+    const chip = screen.getByRole('button', { name: 'Archiv: Ohne Archiv' });
+    expect(chip).not.toHaveClass('on');
+    expect(chip.querySelector('.fs__chev')).not.toBeNull();
+    expect(chip.querySelectorAll('app-icon')).toHaveLength(1);
+    await rerender({ componentProperties: props({ value: 'true' }) });
+    expect(chip).toHaveClass('on');
+    expect(chip.querySelector('.fs__chev')).toBeNull();
+    expect(chip.querySelectorAll('app-icon')).toHaveLength(1);
+    await rerender({ componentProperties: props({ multiple: true }) });
+    expect(chip).not.toHaveClass('on');
+    await rerender({ componentProperties: props({ multiple: true, values: ['true'] }) });
+    expect(container.querySelector('.fs__chip')).toHaveClass('on');
+  });
+
   it('says when there is no choice', async () => {
     const { chip, user, host, view } = await setup();
     host.options.set([]);

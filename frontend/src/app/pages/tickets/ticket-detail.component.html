@@ -4,7 +4,7 @@
        the ticket arrives. Fixed headings and labels are real text; the bars show after
        300ms (`skel-in`). -->
   <article class="td" [class.td--split]="split()" aria-busy="true">
-    <header class="td__head" aria-hidden="true">
+    <header class="sheet-head td__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle class="sheet-title td__title skel-in">
           <span class="skel-text td__skelTitle"></span>
@@ -47,7 +47,7 @@
 } @else if (notFound()) {
   <div class="td">
     <app-empty-state plain icon="ticket" fill [heading]="'tickets.detail.notFound' | t">
-      <a routerLink="/tickets" queryParamsHandling="preserve" class="td__backLink">{{ 'tickets.detail.backToList' | t }}</a>
+      <a routerLink="/tickets" queryParamsHandling="preserve" class="sheet-back-link td__backLink">{{ 'tickets.detail.backToList' | t }}</a>
     </app-empty-state>
   </div>
 } @else if (error()) {
@@ -56,7 +56,7 @@
   </div>
 } @else if (ticket(); as ticket) {
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
-    <header class="td__head">
+    <header class="sheet-head td__head">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle id="td-title" class="sheet-title td__title">{{ ticket.title }}</h2>
         <app-button

@@ -162,13 +162,6 @@
 }
 
 /* ------------------------------------------------------------------ header */
-.ad__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sheet-head-gap);
-  padding-bottom: 22px;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 .ad__line {
   --ad-sep: 24px;
 }
@@ -188,18 +181,6 @@
    clip hides it. */
 .ad__part {
   @include dots.part(var(--ad-sep));
-}
-.ad__amount {
-  color: var(--color-text);
-}
-/* F1: the approved amount, and the requested one struck through next to it. */
-.ad__amount--approved {
-  font-weight: var(--fw-semibold);
-  color: var(--color-accent-text);
-}
-.ad__amountStruck {
-  margin-left: var(--space-2);
-  color: var(--color-text-muted);
 }
 /* "gebunden 900,00 € (bewilligt statt beantragt)" under the cost centre. */
 .ad__bound {
@@ -423,20 +404,6 @@
   margin-top: var(--space-3);
 }
 /* Same affordance as the 404 page: a way out, styled as a button. */
-.ad__backLink {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control-height);
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-}
-.ad__backLink:hover {
-  background: var(--color-surface-4);
-}
 
 @include bp.phone {
   .ad__pair {

@@ -34,7 +34,6 @@ import {
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingStatus } from '@shared/status-kind.util';
 import {
   type AgendaMove,
@@ -54,6 +53,7 @@ import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { JoinQrComponent } from '../public-join/join-qr.component';
+import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
@@ -83,6 +83,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MeetingHeadComponent,
     ScrollFadeDirective,
     NgTemplateOutlet,
     TranslatePipe,
@@ -90,7 +91,6 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
     IconComponent,
     RowMenuComponent,
     SideSheetComponent,
-    StatusTextComponent,
     AgendaPaneComponent,
     PrepChecklistComponent,
     SessionDockComponent,

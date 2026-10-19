@@ -39,6 +39,7 @@ import { monthKey, shiftMonth } from '../gremien.util';
 import { dayMonth, monthYear } from '@shared/date-format';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { majorityLabel } from '../../meetings/meetings-display.util';
 import { formatMoney } from '@shared/format-money';
 
@@ -88,6 +89,7 @@ const NO_RESULT: StatusView = { kind: 'muted', key: 'gremien.decisions.noResult'
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     StickyBarComponent,
     TranslatePipe,

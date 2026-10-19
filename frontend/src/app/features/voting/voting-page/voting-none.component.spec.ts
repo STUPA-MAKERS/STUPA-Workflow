@@ -4,7 +4,7 @@ import { VotingNoneComponent } from './voting-none.component';
 describe('VotingNoneComponent', () => {
   it('shows only the empty sheet without the list page', async () => {
     const { container } = await render(VotingNoneComponent);
-    expect(container.querySelector('.none')).toBeInTheDocument();
+    expect(container.querySelector('app-detail-none.dn--sheet')).toBeInTheDocument();
     expect(screen.queryByRole('heading')).not.toBeInTheDocument();
   });
 });

@@ -34,6 +34,7 @@ import { GREMIEN_NOW } from '../gremien.store';
 import { monthKey, shiftMonth } from '../gremien.util';
 import { isoDay, monthYear, shortTime, weekdayDate } from '@shared/date-format';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 export type MeetingsRange = '' | 'upcoming' | 'past6' | 'past12';
 export type MeetingsProtocol = '' | 'final' | 'draft' | 'none';
@@ -72,6 +73,7 @@ const NO_PROTOCOL: StatusView = { kind: 'muted', key: 'gremien.meetings.protocol
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     RouterLink,
     TranslatePipe,

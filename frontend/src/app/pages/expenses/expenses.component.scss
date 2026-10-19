@@ -1,10 +1,10 @@
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
+@use '../budget/swatch';
+@use '../../shared/ui/list-pane' as lp;
 
 :host {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 /* One pane at a time the host takes at least the free height of the shell main. Side by
    side it is a pane page (`.pane-page`), which sets its own flex. */
@@ -16,16 +16,13 @@
   min-width: 0;
 }
 .exp:not(.exp--split) {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
+  @include lp.single-column;
 }
 .exp:not(.exp--split) > app-list-detail {
   flex: 1 0 auto;
 }
 .exp--split {
-  flex: 1 1 0;
-  min-height: 0;
+  @include lp.split-column;
 }
 
 /* ------------------------------------------------------------------ list pane */
@@ -33,11 +30,7 @@
    (styles.scss) and `app-page-header` with `pane`. */
 
 .exp__chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+  @include lp.chips;
 }
 .exp__chip {
   max-width: 100%;
@@ -48,11 +41,7 @@
   pointer-events: none;
 }
 .exp__swatch {
-  display: inline-block;
-  flex: none;
-  width: 9px;
-  height: 9px;
-  border-radius: 2px;
+  @include swatch.mark(9px);
 }
 
 .exp__bar {
@@ -84,19 +73,12 @@
 
 /* ------------------------------------------------------------------ rows */
 .exp__scroll {
-  --exp-fade: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.scroll(--exp-fade);
   /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .exp--split .exp__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--exp-fade);
+  @include lp.split-scroll(--exp-fade);
 }
 .exp--split .exp__scroll > * {
   flex: none;
@@ -107,12 +89,10 @@
 }
 
 .exp__group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 .exp__month {
-  padding: 18px var(--space-4) 6px;
+  @include lp.month;
 }
 .exp__group:first-child .exp__month,
 .exp__skel .exp__month {
@@ -123,9 +103,7 @@
   width: 7rem;
 }
 .exp__rows {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 .exp__row--checked {
   --li-bg: var(--color-selected);
@@ -154,9 +132,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.exp__cc .exp__swatch {
-  margin-inline-end: 6px;
-  vertical-align: 0;
+.exp__cc {
+  --ccl-size: 9px;
 }
 .exp__arrow {
   display: inline-flex;
@@ -186,49 +163,13 @@
 /* With a pointer, the row menu shows on hover, on focus and while it is open. It keeps
    its place, so nothing shifts. One pane at a time a chevron sits in that place while
    the menu is hidden. Without hover (touch), the menu always shows. */
-.exp__menuSlot {
-  position: relative;
-  display: inline-flex;
-}
-.exp__chev {
-  display: none;
-}
-@media (hover: hover) {
-  .exp__menu,
-  .exp__chev {
-    transition: opacity var(--motion-fast) var(--ease-standard);
-  }
-  .exp__menu {
-    opacity: 0;
-  }
-  .exp__chev {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
-    pointer-events: none;
-  }
-  .exp__row:hover .exp__menu,
-  .exp__row:focus-within .exp__menu,
-  .exp__menu:has([aria-expanded='true']) {
-    opacity: 1;
-  }
-  .exp__row:hover .exp__chev,
-  .exp__row:focus-within .exp__chev,
-  .exp__menuSlot:has([aria-expanded='true']) .exp__chev {
-    opacity: 0;
-  }
-}
+@include lp.hover-menu(exp);
 
 .exp__sentinel {
   height: 1px;
 }
 .exp__more {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-3);
+  @include lp.more;
 }
 
 /* ------------------------------------------------------------------ detail pane */
@@ -240,60 +181,11 @@
   min-height: 0;
 }
 /* The empty sheet: the same surface the open booking sits on, so nothing jumps. */
-.exp__none {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-}
-.exp--split .exp__none {
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
-}
-.exp__none--skeleton {
-  gap: var(--space-4);
-  padding: 76px var(--space-6) var(--space-6);
-}
-.exp__ghost {
-  display: block;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-}
-.exp__ghost--title {
-  width: 45%;
-  height: 30px;
-}
-.exp__ghost--meta {
-  width: 30%;
-  height: 12px;
-}
-.exp__ghost--rule {
-  height: 1px;
-  margin-block: var(--space-2);
-  background: var(--color-border);
-}
-.exp__ghostCols {
-  display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: var(--space-5);
-}
-.exp__ghost--card {
-  height: 120px;
-}
 
 @include bp.phone {
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .exp__chips {
-    --exp-chip-fade: var(--space-6);
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .exp__chips::-webkit-scrollbar {
-    display: none;
-  }
-  .exp__chips {
-    @include fade.fade-x(var(--exp-chip-fade));
+    @include lp.phone-chips(--exp-chip-fade);
   }
   /* A phone row gives the sub line more width, so a cost-centre name stays readable:
      less padding, a smaller gap to the amount and narrower dots. */

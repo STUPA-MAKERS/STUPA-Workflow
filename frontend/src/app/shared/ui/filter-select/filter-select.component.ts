@@ -1,5 +1,6 @@
 import {
   ChangeDetectionStrategy,
+  booleanAttribute,
   Component,
   DestroyRef,
   ElementRef,
@@ -108,6 +109,15 @@ export class FilterSelectComponent {
   readonly resetLabel = input<string | null>(null);
   /** The text when there is no choice. Default: "Keine Auswahl möglich". */
   readonly emptyText = input<string | null>(null);
+  /**
+   * The chip follows its value: while a value is set, it shows the selection colour and a
+   * check and has no chevron. While the value is `unsetValue` (or no value is chosen), it
+   * shows `icon` and the chevron. `active`, `icon` and `chevron` then apply only to the
+   * unset chip.
+   */
+  readonly filled = input(false, { transform: booleanAttribute });
+  /** With `filled`: the value that means "no filter" (default: the empty string). */
+  readonly unsetValue = input('');
 
   /** The list opened. */
   readonly opened = output<void>();
@@ -118,6 +128,14 @@ export class FilterSelectComponent {
   protected readonly popoverOpen = computed(() => this.open() && !this.phone());
   protected readonly sheetOpen = computed(() => this.open() && this.phone());
   protected readonly position = signal({ top: 0, left: 0 });
+
+  /** With `filled`: a value other than `unsetValue` is chosen. */
+  protected readonly isSet = computed(() =>
+    this.filled() && (this.multiple() ? this.values().length > 0 : this.value() !== this.unsetValue()),
+  );
+  protected readonly shownActive = computed(() => this.isSet() || this.active());
+  protected readonly shownIcon = computed<IconName | null>(() => (this.isSet() ? 'check' : this.icon()));
+  protected readonly shownChevron = computed(() => !this.isSet() && this.chevron());
 
   protected readonly chipText = computed(() => {
     const own = this.text();
