@@ -23,7 +23,7 @@ import { SiteFooterComponent } from './site-footer/site-footer.component';
  *
  * - `rail`: a signed-in principal. The navigation rail at the start edge, or the bottom
  *   bar on a phone. The branded footer shows only on a route with `footer: true` (the
- *   start page and the public pages).
+ *   public pages).
  * - `public`: nobody signed in. The public top bar and the branded footer, always.
  * - `bare`: route data `chrome: false` (the beamer). Only the page.
  * - `pending`: the session is not known yet. Only the page, so no frame flashes up
@@ -75,8 +75,8 @@ export class ShellComponent {
 
   /**
    * Route data `footer: true`: the branded footer (copyright, Impressum, Datenschutz)
-   * shows at the end of the page. Only the start page and the public pages have it. A
-   * work page (a list, a list with a detail, a meeting, the administration) has no
+   * shows at the end of the page. Only the public pages have it. A work page (the start
+   * page, a list, a list with a detail, a meeting, the administration) has no
    * footer, so a page that fills the viewport ends at the bottom edge of the window.
    */
   private readonly footerRoute = signal(false);
@@ -96,7 +96,7 @@ export class ShellComponent {
   /**
    * Route data `fab: true`: on a phone the page shows a floating action button above the
    * bottom bar (the start page). The frame then keeps the foot of the body free for it, so
-   * the button never covers the footer and its legal links.
+   * the button never covers the end of the page.
    */
   readonly fab = signal(false);
   /** Route data `chrome: false` turns the frame off, for example for the beamer. */

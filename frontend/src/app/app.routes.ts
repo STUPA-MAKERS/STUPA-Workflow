@@ -13,8 +13,8 @@ import {
  * permission: a global one (`data.permission`) or a gremium one in any gremium
  * (`data.gremiumPermission`). `data.chrome: false` shows the page without the frame of the
  * shell (no rail, no bars, no footer), for the beamer. `data.footer: true` shows the
- * branded footer below a page of the signed-in frame: only the start page and the public
- * pages have it (the public frame shows it always).
+ * branded footer below a page of the signed-in frame: only the public pages have it (the
+ * public frame shows it always).
  */
 export const routes: Routes = [
   {
@@ -101,8 +101,8 @@ export const routes: Routes = [
         path: 'dashboard',
         // Wide: the two columns of the start page fill the width (board Main).
         // Fab: on a phone the shell keeps the foot of the page free for the "Antrag" button.
-        // Footer: the start page is the only signed-in page with the branded footer.
-        data: { title: 'nav.dashboard', wide: true, fab: true, footer: true },
+        // No footer: only signed-in principals see this page, so the legal links add nothing.
+        data: { title: 'nav.dashboard', wide: true, fab: true },
         canActivate: [authGuard],
         loadComponent: () =>
           import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
