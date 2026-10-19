@@ -549,6 +549,8 @@ td:first-child > .skel--bar {
      short delay; closing fades first, then the height goes.
    - `.motion-rise-in`: a new entry in a list (a chat message, a row): it fades in and
      rises by --motion-shift-sm.
+   - `.motion-fade-in`: content that takes the place of other content (the board and the
+     list of a view switch): it only fades in, it does not move.
    - `.motion-fade-out`: an entry that goes. */
 .motion-expand-in,
 .motion-expand-out {
@@ -579,6 +581,9 @@ td:first-child > .skel--bar {
 .motion-rise-in {
   animation: motion-rise-in var(--motion-base) var(--ease-enter);
 }
+.motion-fade-in {
+  animation: motion-fade-in var(--motion-base) var(--ease-standard);
+}
 .motion-fade-out {
   pointer-events: none;
   animation: motion-fade-out var(--motion-xs) var(--ease-exit) forwards;
@@ -605,6 +610,11 @@ td:first-child > .skel--bar {
   from {
     opacity: 0;
     transform: translateY(var(--motion-shift-sm));
+  }
+}
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
   }
 }
 @keyframes motion-fade-out {

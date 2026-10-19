@@ -1742,6 +1742,9 @@ describe('ApplicationsDetailComponent', () => {
     const drafts = before.injector.get(DraftAttachmentsService);
     cmp.commentsOpen.set(false);
     detectChanges();
+    // The sheet drops its content once the pane has gone.
+    await new Promise((resolve) => setTimeout(resolve));
+    detectChanges();
     expect(chat()).toBeNull();
     cmp.commentsOpen.set(true);
     detectChanges();

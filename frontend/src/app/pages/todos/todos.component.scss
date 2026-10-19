@@ -232,14 +232,39 @@
     border-radius: 0;
   }
 }
-@media (prefers-reduced-motion: no-preference) {
-  .td__drawer {
-    animation: td-in var(--motion-base) var(--ease-enter);
-  }
+/* Motion, as `app-side-sheet` from the end: the drawer slides in from the end edge and goes
+   back there, faster on the way out; the scrim fades with it. Reduced motion shortens
+   every animation to nothing (ui-kit base styles). */
+.td__scrim--entering {
+  animation: td-fade-in var(--motion-base) var(--ease-standard);
+}
+.td__scrim--leaving {
+  animation: td-fade-out var(--motion-base) var(--ease-exit) forwards;
+}
+.td__drawer--entering {
+  animation: td-in var(--motion-slow) var(--ease-enter);
+}
+.td__drawer--leaving {
+  pointer-events: none;
+  animation: td-out var(--motion-base) var(--ease-exit) forwards;
 }
 @keyframes td-in {
   from {
-    transform: translateX(2rem);
+    transform: translateX(calc(100% + 12px));
+  }
+}
+@keyframes td-out {
+  to {
+    transform: translateX(calc(100% + 12px));
+  }
+}
+@keyframes td-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes td-fade-out {
+  to {
     opacity: 0;
   }
 }

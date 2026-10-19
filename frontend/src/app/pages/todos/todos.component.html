@@ -157,7 +157,12 @@
       <!-- "Alle": the rows of every board; they read themselves. Until they answer, the
            skeleton of a board stands in their place. -->
       @if (rowMatches() === null) {
-        <app-todo-board-skeleton [view]="phone() ? 'rows' : 'board'" [phone]="phone()" [natural]="true" />
+        <app-todo-board-skeleton
+          animate.enter="motion-fade-in"
+          [view]="phone() ? 'rows' : 'board'"
+          [phone]="phone()"
+          [natural]="true"
+        />
         <span class="sr-only" role="status">{{ 'todos.loading' | t }}</span>
       } @else if (allEmpty()) {
         <app-empty-state shape="card" fill [heading]="'todos.all.empty' | t" />
@@ -167,6 +172,7 @@
         </app-empty-state>
       }
       <app-todo-board-rows
+        animate.enter="motion-fade-in"
         source="all"
         [me]="me()"
         [liveIds]="liveRowIds()"
@@ -181,6 +187,7 @@
       />
     } @else if (loading()) {
       <app-todo-board-skeleton
+        animate.enter="motion-fade-in"
         [view]="phoneList() ? 'rows' : view()"
         [phone]="phone()"
         [canWrite]="summary()?.canWrite ?? false"
@@ -201,6 +208,7 @@
         </app-empty-state>
       } @else if (view() === 'list') {
         <app-todo-list-view
+          animate.enter="motion-fade-in"
           [board]="b"
           [cards]="visible()"
           [labels]="labelsById()"
@@ -210,6 +218,7 @@
         />
       } @else if (!phoneList()) {
         <app-todo-board-view
+          animate.enter="motion-fade-in"
           [board]="b"
           [cards]="visible()"
           [labels]="labelsById()"
@@ -229,6 +238,7 @@
       }
       @if (withRows()) {
         <app-todo-board-rows
+          animate.enter="motion-fade-in"
           [filter]="filter()"
           [filterLabels]="labelsById()"
           [today]="today()"
@@ -256,10 +266,18 @@
 </div>
 
 @if (cardId(); as id) {
-  <div class="td__scrim" aria-hidden="true" (click)="closeCard()"></div>
+  <div
+    class="td__scrim"
+    aria-hidden="true"
+    animate.enter="td__scrim--entering"
+    animate.leave="td__scrim--leaving"
+    (click)="closeCard()"
+  ></div>
   <aside
     #drawer
     class="td__drawer"
+    animate.enter="td__drawer--entering"
+    animate.leave="td__drawer--leaving"
     role="dialog"
     aria-modal="true"
     tabindex="-1"
