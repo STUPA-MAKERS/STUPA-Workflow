@@ -5,6 +5,7 @@ import type { DeadlinePolicy } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
+import { AuthService } from '@core/auth/auth.service';
 import { AdminDeadlinesComponent } from './deadlines.component';
 import { pickOption } from '../../../../testing/select';
 
@@ -36,6 +37,41 @@ async function setup(api = makeApi()) {
 
 describe('AdminDeadlinesComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  it('turns the floating button into "Speichern" while a settings section has changes', async () => {
+    const api = {
+      ...makeApi(),
+      getMeetingSettings: jest.fn(() => of({ openLeadMinutes: 60, confirmLeadMinutes: 10 })),
+      putMeetingSettings: jest.fn((b: object) => of({ ...b, updatedAt: null })),
+      getGuestSettings: jest.fn(() => of({ confirmTtlHours: 12, linkTtlDays: null })),
+      putGuestSettings: jest.fn((b: object) => of(b)),
+    };
+    const toast = { success: jest.fn(), error: jest.fn() };
+    const view = await render(AdminDeadlinesComponent, {
+      providers: [
+        { provide: AdminApiService, useValue: api },
+        { provide: ToastService, useValue: toast },
+        { provide: AuthService, useValue: { can: () => true } },
+      ],
+    });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Frist anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+
+    const hours = screen.getByLabelText('Unbestätigte Anträge verwerfen nach');
+    await userEvent.clear(hours);
+    await userEvent.type(hours, '48');
+    expect(screen.queryByRole('button', { name: 'Frist anlegen' })).toBeNull();
+    await userEvent.clear(hours);
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    await userEvent.type(hours, '48');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(api.putGuestSettings).toHaveBeenCalledWith({ confirmTtlHours: 48, linkTtlDays: null });
+    expect(api.putMeetingSettings).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Frist anlegen' })).toBeInTheDocument();
+  });
 
   it('lists policies with key, kind and resolved value', async () => {
     await setup();

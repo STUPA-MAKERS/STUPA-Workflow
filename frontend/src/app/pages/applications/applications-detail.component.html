@@ -75,16 +75,15 @@
         @if (!phone()) {
           <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
         }
-        <app-button variant="fill" [loading]="savingEdit()" (click)="saveEdit()">
-          <app-icon name="check" />
-          {{ 'applications.detail.save' | t }}
-        </app-button>
         <span class="ad__editFade" aria-hidden="true"></span>
       </header>
       <!-- No form element: Enter in a field must not save the whole application. -->
       <div class="ad__edit fe-form">
-        <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+        <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" (modelChange)="editDirty.set(true)" />
       </div>
+      @if (editDirty()) {
+        <app-fab icon="check" [label]="'action.save' | t" [loading]="savingEdit()" (activate)="saveEdit()" />
+      }
     </article>
   } @else {
     <!-- C: another application is on its way. This one stays, dimmed and inert after

@@ -8,16 +8,10 @@
     }
     <div actions class="fe__headTools">
       @if (phone()) {
-        <app-button variant="fill" size="sm" [disabled]="!validation().valid" [loading]="saving()" (click)="save()">
-          <app-icon name="check" /> {{ 'admin.flow.save' | t }}
-        </app-button>
         <app-row-menu [sections]="headerMenu()" (selected)="onHeaderMenu($event)" />
       } @else {
         <app-button variant="text" [attr.aria-pressed]="showVersions()" (click)="toggleVersions()">
           <app-icon name="history" /> {{ 'admin.flow.versions' | t }}
-        </app-button>
-        <app-button variant="fill" [disabled]="!validation().valid" [loading]="saving()" (click)="save()">
-          <app-icon name="check" /> {{ 'admin.flow.save' | t }}
         </app-button>
       }
     </div>
@@ -310,4 +304,8 @@
       }
     </aside>
   </div>
+
+  @if (dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!validation().valid" (activate)="save()" />
+  }
 </section>

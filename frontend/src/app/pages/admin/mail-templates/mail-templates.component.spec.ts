@@ -55,10 +55,17 @@ describe('MailTemplatesComponent', () => {
     expect(screen.getByText(/name/)).toBeInTheDocument();
   });
 
-  it('saves edits and renders a preview', async () => {
-    const { api } = await setup();
-    await userEvent.click(await screen.findByRole('button', { name: 'Speichern' }));
-    expect(api.upsertMailTemplate).toHaveBeenCalled();
+  it('shows "Speichern" only after an edit, saves it and renders a preview', async () => {
+    const { api, view } = await setup();
+    await screen.findByRole('button', { name: /Anmelde-Link/ });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await userEvent.type(screen.getByDisplayValue('Anmeldung'), ' neu');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(api.upsertMailTemplate).toHaveBeenCalledWith(
+      expect.objectContaining({ subjectI18n: expect.objectContaining({ de: 'Anmeldung neu' }) }),
+    );
     await userEvent.click(screen.getByRole('button', { name: 'Vorschau' }));
     expect(api.previewMailPayload).toHaveBeenCalled();
     expect(await screen.findByText('Hallo Anzeigename')).toBeInTheDocument();

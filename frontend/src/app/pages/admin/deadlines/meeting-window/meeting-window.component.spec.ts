@@ -37,41 +37,43 @@ async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] }
 
 const openField = (): HTMLInputElement => screen.getByLabelText('Frühestens eröffnen');
 const confirmField = (): HTMLInputElement => screen.getByLabelText('Ohne Rückfrage eröffnen ab');
-const saveButton = (): HTMLButtonElement => screen.getByRole('button', { name: 'Speichern' });
 
 describe('MeetingWindowSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('shows the stored minutes and saves new ones', async () => {
-    const { api, toast } = await setup();
+    const { api, toast, c } = await setup();
     expect(screen.getByRole('heading', { name: 'Sitzung eröffnen' })).toBeInTheDocument();
     expect(openField().value).toBe('60');
     expect(confirmField().value).toBe('10');
-    expect(saveButton()).toBeDisabled();
+    // The section has no button of its own: the deadlines page shows "Speichern".
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(c.dirty()).toBe(false);
     await userEvent.clear(openField());
     await userEvent.type(openField(), '90');
     await userEvent.clear(confirmField());
     await userEvent.type(confirmField(), '0');
-    await userEvent.click(saveButton());
+    expect(c.dirty()).toBe(true);
+    c.save();
     expect(api.putMeetingSettings).toHaveBeenCalledWith({ openLeadMinutes: 90, confirmLeadMinutes: 0 });
     expect(toast.success).toHaveBeenCalled();
-    expect(saveButton()).toBeDisabled();
+    expect(c.dirty()).toBe(false);
   });
 
   it('refuses a value outside the range and a confirm point before the open', async () => {
-    const { api } = await setup();
+    const { api, c } = await setup();
     await userEvent.clear(openField());
     await userEvent.type(openField(), '10081');
     expect(screen.getByText('Eine ganze Zahl von 0 bis 10080 Minuten.')).toBeInTheDocument();
-    expect(saveButton()).toBeDisabled();
+    expect(c.valid()).toBe(false);
     await userEvent.clear(openField());
     await userEvent.type(openField(), '5');
     expect(screen.getByText('Höchstens so viele Minuten wie bei „Frühestens eröffnen“.')).toBeInTheDocument();
-    expect(saveButton()).toBeDisabled();
+    expect(c.valid()).toBe(false);
     await userEvent.clear(confirmField());
     expect(screen.getByText('Eine ganze Zahl von 0 bis 10080 Minuten.')).toBeInTheDocument();
     await userEvent.type(confirmField(), '5');
-    expect(saveButton()).toBeEnabled();
+    expect(c.valid()).toBe(true);
     expect(api.putMeetingSettings).not.toHaveBeenCalled();
   });
 
@@ -80,10 +82,11 @@ describe('MeetingWindowSettingsComponent', () => {
     const { toast, c } = await setup({ api });
     await userEvent.clear(openField());
     await userEvent.type(openField(), '30');
-    await userEvent.click(saveButton());
+    c.save();
     expect(toast.error).toHaveBeenCalled();
     expect(c.draft().open).toBe('30');
-    expect(saveButton()).toBeEnabled();
+    expect(c.dirty()).toBe(true);
+    expect(c.saving()).toBe(false);
   });
 
   it('does nothing on save without a change or with an invalid field', async () => {

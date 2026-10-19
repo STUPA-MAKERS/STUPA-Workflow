@@ -53,4 +53,20 @@ describe('FabComponent', () => {
     const { container } = await setup(`<app-fab label="Sitzung anlegen" [contained]="true" />`);
     expect(container.querySelector('app-fab')).toHaveClass('fab--contained');
   });
+
+  it('is the save action with the check icon, and takes no click while it saves or is disabled', async () => {
+    const activate = jest.fn();
+    const { rerender } = await setup(
+      `<app-fab icon="check" label="Speichern" [loading]="loading" [disabled]="disabled" (activate)="activate()" />`,
+      { activate, loading: true, disabled: false },
+    );
+    const button = screen.getByRole('button', { name: 'Speichern' });
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toBeDisabled();
+    await rerender({ componentProperties: { activate, loading: false, disabled: true } });
+    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    await rerender({ componentProperties: { activate, loading: false, disabled: false } });
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(activate).toHaveBeenCalledTimes(1);
+  });
 });

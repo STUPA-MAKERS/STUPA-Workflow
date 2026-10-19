@@ -111,6 +111,7 @@ import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -141,8 +142,9 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
  *
  * A transition with `addsToAgenda` opens the agenda dialog, which asks for the meeting.
  * "Bearbeiten" turns the sheet into the edit form (board Anträge-Bearbeiten): the bar
- * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen and Speichern over
- * the fields of the form by section. A 422 of the server shows on its field.
+ * "Antrag bearbeiten · Speichern legt Version n+1 an" with Abbrechen over the fields of
+ * the form by section. The floating "Speichern" shows after the first change of a field.
+ * A 422 of the server shows on its field.
  *
  * The comments run in `app-chat`, in a sheet over the page: from the end on a wide
  * screen, from the bottom on a phone. The header action "Kommentare" with the count
@@ -159,6 +161,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ConfirmDialogComponent,
+    FabComponent,
     SheetBarComponent,
     SheetBarKickerDirective,
     NgTemplateOutlet,
@@ -387,6 +390,8 @@ export class ApplicationsDetailComponent {
   readonly editing = signal(false);
   readonly editFields = signal<FormlyFieldConfig[]>([]);
   readonly savingEdit = signal(false);
+  /** A field of the edit form changed. Only then the page shows "Speichern". */
+  readonly editDirty = signal(false);
   editForm = new FormGroup({});
   editModel: Record<string, unknown> = {};
   readonly confirmDelete = signal(false);
@@ -1139,6 +1144,7 @@ export class ApplicationsDetailComponent {
     );
     this.editModel = structuredClone(app.data);
     this.editForm = new FormGroup({});
+    this.editDirty.set(false);
     this.editing.set(true);
   }
 

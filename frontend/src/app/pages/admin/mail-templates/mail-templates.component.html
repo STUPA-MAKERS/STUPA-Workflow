@@ -104,9 +104,6 @@
             <app-button variant="outlined" [loading]="previewing()" (click)="runPreview()">
               <app-icon name="eye" /> {{ 'admin.mailTemplates.preview' | t }}
             </app-button>
-            <app-button variant="fill" [loading]="saving()" (click)="save()">
-              <app-icon name="check" /> {{ 'action.save' | t }}
-            </app-button>
           </span>
         </div>
       </section>
@@ -120,4 +117,8 @@
       <app-empty-state plain icon="mail" fill [heading]="'admin.mailTemplates.selectHint' | t" />
     }
   </div>
+
+  @if (dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" (activate)="save()" />
+  }
 </section>

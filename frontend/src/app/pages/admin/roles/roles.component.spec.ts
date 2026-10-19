@@ -89,7 +89,7 @@ describe('AdminRolesComponent', () => {
     await userEvent.click(toggle);
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(inst.isOpen(ROLES[2])).toBe(true);
-    expect(screen.getByRole('button', { name: 'Namen speichern' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Bezeichnung (DE)' })).toBeInTheDocument();
     await userEvent.click(toggle);
     expect(inst.isOpen(ROLES[2])).toBe(false);
   });
@@ -135,7 +135,7 @@ describe('AdminRolesComponent', () => {
     const { inst, api } = await setup();
     inst.togglePerm(ROLES[2], 'removed.key', true);
     inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-ref'), 'flow.configure', true);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-ref'));
+    inst.saveRoles();
     expect(api.saveRolePermissions).toHaveBeenCalledWith('r-ref', ['flow.configure']);
   });
 
@@ -183,20 +183,38 @@ describe('AdminRolesComponent', () => {
     expect(role.permissions).toContain('flow.configure');
   });
 
-  it('saveRole persists and replaces the role; success toast', async () => {
-    const { inst, api, toast } = await setup();
+  it('"Speichern" replaces "Rolle anlegen" while a role has changes, and saves them', async () => {
+    const { fixture, inst, api, toast } = await setup();
+    expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     inst.togglePerm(ROLES[1], 'flow.configure', true);
     inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-member'), 'application.read', false);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Rolle anlegen' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['flow.configure']);
-    expect(toast.success).toHaveBeenCalled();
+    expect(api.renameRole).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Rolle anlegen' })).toBeInTheDocument();
   });
 
-  it('saveRole error path shows an error toast', async () => {
+  it('a right switched on and off again is no change', async () => {
+    const { inst } = await setup();
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    inst.togglePerm(inst.roles().find((r: Role) => r.id === 'r-member'), 'flow.configure', false);
+    expect(inst.rolesDirty()).toBe(false);
+  });
+
+  it('a failed save of the rights shows an error toast and keeps the change', async () => {
     const api = makeApi({ saveRolePermissions: jest.fn(() => throwError(() => new Error('x'))) });
     const { inst, toast } = await setup(api);
-    inst.saveRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    inst.saveRoles();
     expect(toast.error).toHaveBeenCalled();
+    expect(inst.rolesDirty()).toBe(true);
+    expect(inst.savingRoles()).toBe(false);
   });
 
   it('nameDraft returns label-derived default then the patched draft', async () => {
@@ -210,21 +228,37 @@ describe('AdminRolesComponent', () => {
     expect(inst.nameDraft(ROLES[1])).toEqual({ de: 'Mitglied!', en: 'Member!' });
   });
 
-  it('renameRole persists and updates the role; success toast', async () => {
+  it('saves a new name with "Speichern" and updates the role', async () => {
     const { inst, api, toast } = await setup();
     inst.patchName(ROLES[1], 'de', 'Mitglied');
     inst.patchName(ROLES[1], 'en', 'Member');
-    inst.renameRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    expect(inst.rolesDirty()).toBe(true);
+    inst.saveRoles();
     expect(api.renameRole).toHaveBeenCalledWith('r-member', { de: 'Mitglied', en: 'Member' });
+    expect(api.saveRolePermissions).not.toHaveBeenCalled();
     expect(toast.success).toHaveBeenCalled();
     const updated = inst.roles().find((r: Role) => r.id === 'r-member');
     expect(updated.label).toEqual({ de: 'Mitglied', en: 'Member' });
+    expect(inst.rolesDirty()).toBe(false);
   });
 
-  it('renameRole error path shows an error toast', async () => {
+  it('saves the rights before the name of the same role', async () => {
+    const { inst, api } = await setup();
+    inst.togglePerm(ROLES[1], 'flow.configure', true);
+    inst.patchName(ROLES[1], 'de', 'Mitglied');
+    inst.saveRoles();
+    expect(api.saveRolePermissions).toHaveBeenCalledWith('r-member', ['application.read', 'flow.configure']);
+    expect(api.renameRole).toHaveBeenCalledWith('r-member', { de: 'Mitglied', en: 'member' });
+    expect(api.saveRolePermissions.mock.invocationCallOrder[0]).toBeLessThan(
+      api.renameRole.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('a failed rename shows an error toast', async () => {
     const api = makeApi({ renameRole: jest.fn(() => throwError(() => new Error('x'))) });
     const { inst, toast } = await setup(api);
-    inst.renameRole(inst.roles().find((r: Role) => r.id === 'r-member'));
+    inst.patchName(ROLES[1], 'de', 'Neu');
+    inst.saveRoles();
     expect(toast.error).toHaveBeenCalled();
   });
 

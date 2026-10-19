@@ -41,15 +41,14 @@
               <strong id="sp-edit-title" tabindex="-1" #editTitle>{{ 'status.edit.title' | t }}</strong>
             </p>
             <app-button variant="text" (click)="cancelEdit()">{{ 'action.cancel' | t }}</app-button>
-            <app-button variant="fill" [loading]="saving()" (click)="save()">
-              <app-icon name="check" />
-              {{ 'applications.detail.save' | t }}
-            </app-button>
           </header>
           <!-- No form element: Enter in a field must not save the whole application. -->
           <div class="sp__edit fe-form">
-            <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" />
+            <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" (modelChange)="editDirty.set(true)" />
           </div>
+          @if (editDirty()) {
+            <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" (activate)="save()" />
+          }
         </article>
       } @else {
         <article class="sp" aria-labelledby="sp-title">

@@ -1,5 +1,6 @@
 import { NEVER, of, throwError } from 'rxjs';
 import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type { FlowGraph, Guard } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
@@ -158,10 +159,10 @@ function buildValid(c: any): void {
 describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('reports an empty graph as invalid and disables save', async () => {
+  it('reports an empty graph as invalid and shows no save', async () => {
     await setup();
     expect(screen.getByText('Der Flow hat keine Status.')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('says nothing about the flow while the flow is still loading', async () => {
@@ -200,6 +201,19 @@ describe('FlowEditorComponent (Drag&Drop-Canvas)', () => {
     expect(graph.states.map((s) => s.key)).toEqual(['a', 'b']);
     expect(graph.states.filter((s) => s.isInitial)).toHaveLength(1);
     expect(graph.layout?.positions).toBeDefined();
+  });
+
+  it('shows "Speichern" only while the flow has unsaved changes', async () => {
+    const { fixture, createGlobalFlowVersion } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    buildValid(c);
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(createGlobalFlowVersion).toHaveBeenCalledTimes(1);
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
   it('renders one canvas node per state', async () => {

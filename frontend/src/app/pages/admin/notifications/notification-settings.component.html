@@ -1,11 +1,5 @@
 <section class="ns">
-  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t">
-    @if (settings()) {
-      <app-button actions variant="fill" [disabled]="!dirty() || !valid()" [loading]="saving()" (click)="save()">
-        <app-icon name="check" /> {{ 'action.save' | t }}
-      </app-button>
-    }
-  </app-page-header>
+  <app-page-header [flush]="true" [title]="'admin.notifications.title' | t" />
 
   @if (error()) {
     <app-note kind="error" icon="alert" role="alert">{{ $any(error()) | t }}</app-note>
@@ -47,5 +41,9 @@
         </div>
       </div>
     </section>
+  }
+
+  @if (settings() && dirty()) {
+    <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!valid()" (activate)="save()" />
   }
 </section>

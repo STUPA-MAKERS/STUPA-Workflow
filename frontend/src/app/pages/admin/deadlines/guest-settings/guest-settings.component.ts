@@ -6,7 +6,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
-  ButtonComponent,
   InputComponent,
   type SelectOption,
   ToastService,
@@ -58,7 +57,7 @@ function draftOf(s: GuestSettings): Draft {
   selector: 'app-guest-settings',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, InputComponent, SelectFieldComponent, NoteComponent, SkeletonComponent],
+  imports: [FormsModule, TranslatePipe, InputComponent, SelectFieldComponent, NoteComponent, SkeletonComponent],
   templateUrl: './guest-settings.component.html',
   styleUrl: './guest-settings.component.scss',
 })
@@ -76,7 +75,7 @@ export class GuestSettingsComponent {
   protected readonly loading = signal(true);
   /** The read failed: `forbidden` hides the section, `error` names the failure. */
   protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
-  protected readonly saving = signal(false);
+  readonly saving = signal(false);
   /** The stored values; the draft compares against them. */
   private readonly saved = signal<GuestSettings | null>(null);
   protected readonly draft = signal<Draft>({ hours: '', mode: 'unlimited', days: '' });
@@ -106,7 +105,8 @@ export class GuestSettingsComponent {
     return { confirmTtlHours: hours, linkTtlDays: this.days() };
   });
 
-  protected readonly dirty = computed(() => {
+  /** The section has changes that are not saved. The deadlines page then shows "Speichern". */
+  readonly dirty = computed(() => {
     const s = this.saved();
     const b = this.body();
     if (!s) return false;
@@ -114,7 +114,9 @@ export class GuestSettingsComponent {
     return b.confirmTtlHours !== s.confirmTtlHours || b.linkTtlDays !== s.linkTtlDays;
   });
 
-  protected readonly canSave = computed(() => this.dirty() && this.body() !== null && !this.saving());
+  /** Every field is valid, so a save can send the section. */
+  readonly valid = computed(() => this.body() !== null);
+  private readonly canSave = computed(() => this.dirty() && this.body() !== null && !this.saving());
 
   constructor() {
     if (!this.allowed()) {
@@ -148,7 +150,8 @@ export class GuestSettingsComponent {
     this.draft.update((d) => ({ ...d, mode: m, days: m === 'days' && !d.days ? '30' : d.days }));
   }
 
-  protected save(): void {
+  /** Send the section. The "Speichern" button of the deadlines page and the form submit call it. */
+  save(): void {
     const body = this.body();
     if (!body || !this.canSave()) return;
     this.saving.set(true);

@@ -60,7 +60,17 @@
 
   <app-guest-settings />
 
-  <app-fab [label]="'fab.deadline' | t" (activate)="openAdd()" />
+  @if (settingsDirty()) {
+    <app-fab
+      icon="check"
+      [label]="'action.save' | t"
+      [loading]="settingsSaving()"
+      [disabled]="!settingsValid()"
+      (activate)="saveSettings()"
+    />
+  } @else {
+    <app-fab [label]="'fab.deadline' | t" (activate)="openAdd()" />
+  }
 </section>
 
 <app-dialog

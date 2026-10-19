@@ -1,17 +1,9 @@
 <section class="br">
   <app-page-header [flush]="true" [title]="'admin.brand.title' | t">
     @if (draft()) {
-      <ng-container ngProjectAs="[actions]">
-        <app-button variant="tonal" [disabled]="linkErrors().length > 0" (click)="saveDraft()">{{ 'admin.brand.saveDraft' | t }}</app-button>
-        <!-- A phone keeps one action in the header; the activate goes into the menu. -->
-        @if (phone()) {
-          <app-row-menu [label]="'admin.brand.moreActions' | t" [sections]="phoneMenu()" (selected)="activate()" />
-        } @else {
-          <app-button variant="fill" [disabled]="!canActivate()" (click)="activate()">
-            <app-icon name="check" /> {{ 'admin.brand.activate' | t }}
-          </app-button>
-        }
-      </ng-container>
+      <app-button actions variant="fill" [disabled]="!canActivate()" (click)="activate()">
+        <app-icon name="check" /> {{ 'admin.brand.activate' | t }}
+      </app-button>
     }
   </app-page-header>
 
@@ -339,5 +331,15 @@
       <app-skeleton variant="lines" [count]="6" [label]="'common.loading' | t" />
       <app-skeleton variant="panel" />
     </div>
+  }
+
+  @if (draft() && dirty()) {
+    <app-fab
+      icon="check"
+      [label]="'action.save' | t"
+      [loading]="savingDraft()"
+      [disabled]="linkErrors().length > 0"
+      (activate)="saveDraft()"
+    />
   }
 </section>
