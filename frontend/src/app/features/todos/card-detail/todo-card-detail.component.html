@@ -10,7 +10,7 @@
           {{ 'todos.card.back' | t }}
         </button>
       }
-      <app-sheet-bar [kicker]="loadingKicker()" [bleed]="mode() === 'pane' && split()">
+      <app-sheet-bar [bleed]="mode() === 'pane' && split()">
         @if (!phone() && mode() === 'drawer') {
           <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         }
@@ -68,11 +68,6 @@
         </button>
       }
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
-        <!-- A phone wraps the kicker: the board name is key information and never ends in "…". -->
-        <span appSheetBarKicker class="cd__kicker" [class.ell]="!phone()" [title]="kicker()">
-          <a class="cd__kickerBoard" data-testid="cd-board" [routerLink]="['/todos', card.boardId]">{{ card.boardName }}</a>
-          · {{ 'todos.card.kickerKind' | t }}
-        </span>
         @if (mode() === 'pane' && !phone() && boardLink(); as link) {
           <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
             {{ 'todos.card.openInBoard' | t }}

@@ -48,12 +48,6 @@ export class TransferDetailComponent {
     return costCentreLabel(this.costCentres(), t.toBudgetId, t.toPathKey);
   });
 
-  protected readonly metaLine = computed(() => {
-    const kind = this.i18n.translate('expenses.transfers.kind');
-    const fy = this.fyLabel();
-    return fy ? `${kind} · ${this.i18n.translate('expenses.detail.fy', { fy })}` : kind;
-  });
-
   protected readonly amount = computed(() => formatEur(Number(this.transfer().amount), this.i18n.locale()));
 
   protected readonly createdAt = computed(() =>

@@ -287,23 +287,6 @@ export class TicketDetailComponent {
     return t ? reporterName(t.reporter, this.t) : '';
   });
 
-  /** "Ticket · T-0040". The report time is a row in the details. */
-  readonly kicker = computed(() => {
-    const t = this.ticket();
-    if (!t) return '';
-    return this.t('tickets.detail.kicker', { number: t.number });
-  });
-
-  /** The kicker around the ticket number, which the bar sets in mono. */
-  readonly kickerParts = computed(() => {
-    const text = this.kicker();
-    const no = this.ticket()?.number ?? '';
-    const at = no ? text.indexOf(no) : -1;
-    return at < 0
-      ? { before: text, number: '', after: '' }
-      : { before: text.slice(0, at), number: no, after: text.slice(at + no.length) };
-  });
-
   readonly statusKind = computed(() => STATUS_KIND[this.ticket()?.status ?? 'new']);
   readonly statusLabel = computed(() => this.t(STATUS_LABEL[this.ticket()?.status ?? 'new']));
   readonly kindLabel = computed(() => this.t(KIND_LABEL[this.ticket()?.kind ?? 'bug']));

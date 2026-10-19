@@ -81,12 +81,6 @@ export class InvoiceDetailComponent {
     return i.supplier || i.number || this.i18n.translate('invoices.untitled');
   });
 
-  protected readonly metaLine = computed(() => {
-    const i = this.invoice();
-    const kind = this.i18n.translate('invoices.detail.kind');
-    return i.number ? `${kind} · ${i.number}` : kind;
-  });
-
   /** "in 9 Tagen", "heute fällig" or "seit 3 Tagen überfällig", for an open invoice. */
   protected readonly due = computed(() => {
     const i = this.invoice();

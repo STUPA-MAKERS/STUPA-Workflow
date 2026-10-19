@@ -135,7 +135,6 @@ async function setup(opts: {
   const page = opts.page
     ? {
         split: signal(opts.page.split),
-        gremiumNames: signal(new Map([['v1', 'Haushaltsausschuss']])),
         shown: signal<ShownVote | null>(null),
         notify: jest.fn(),
         follow: jest.fn(() => {
@@ -597,18 +596,8 @@ describe('VoteCastComponent', () => {
       expect(document.querySelector('app-vote-panel')).not.toHaveClass('vpn--flat');
     });
 
-    it('names the gremium of the meeting in the bar', async () => {
+    it('draws no line above the title', async () => {
       await setup({ page: { split: true } });
-      expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('StuPa');
-    });
-
-    it('names the gremium of the list row for a vote without a meeting', async () => {
-      await setup({ page: { split: true }, vote: vote({ meetingId: null }) });
-      expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('Haushaltsausschuss');
-    });
-
-    it('leaves the bar line empty without a gremium', async () => {
-      await setup({ page: { split: true }, vote: vote({ id: 'v9', meetingId: null }) });
       expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
     });
 

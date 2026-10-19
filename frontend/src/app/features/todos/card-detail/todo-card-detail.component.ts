@@ -296,17 +296,6 @@ export class TodoCardDetailComponent {
     return b.cards.some((x) => x.id === id) ? b : null;
   });
 
-  /** The kicker while the card loads: the board is known from the page when it holds the card. */
-  readonly loadingKicker = computed(() => {
-    const name = this.pageBoard()?.name;
-    return name ? this.t('todos.card.kicker', { board: name }) : '';
-  });
-
-  readonly kicker = computed(() => {
-    const c = this.card();
-    return c ? this.t('todos.card.kicker', { board: c.boardName }) : '';
-  });
-
   /**
    * The line under the title: "Angelegt von <name>" and the day. Each part is one segment
    * that wraps as a whole, so a narrow sheet breaks the line between them, never inside the

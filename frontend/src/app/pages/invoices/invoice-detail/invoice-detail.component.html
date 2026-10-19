@@ -1,7 +1,7 @@
 @let i = invoice();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="id-title">
   <header class="fd__head">
-    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+    <app-sheet-bar [bleed]="split()">
       @if (phone()) {
         @if (canManage()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">

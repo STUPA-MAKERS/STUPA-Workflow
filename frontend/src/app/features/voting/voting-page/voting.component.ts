@@ -433,9 +433,6 @@ export class VotingComponent implements OnDestroy {
   }
 
   private collectGremien(items: VoteListItem[]): void {
-    const names = new Map(this.page.gremiumNames());
-    for (const item of items) if (item.gremiumName) names.set(item.id, item.gremiumName);
-    this.page.gremiumNames.set(names);
     const next = new Map(this.seenGremien());
     let changed = false;
     for (const item of items) {

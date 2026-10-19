@@ -98,13 +98,6 @@ export class BookingDetailComponent {
   );
 
   /** "Buchung · HHJ 2026" (or "Unterbuchung"). */
-  protected readonly metaLine = computed(() => {
-    const e = this.expense();
-    const kind = this.i18n.translate(e.parentExpenseId ? 'expenses.detail.subKind' : 'expenses.detail.kind');
-    const fy = this.fyLabel();
-    return fy ? `${kind} · ${this.i18n.translate('expenses.detail.fy', { fy })}` : kind;
-  });
-
   protected readonly amount = computed(() => {
     const e = this.expense();
     return signedEur(e.kind, e.amount, this.i18n.locale());

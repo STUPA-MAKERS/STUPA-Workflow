@@ -1,7 +1,7 @@
 @let t = transfer();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="tdt-title">
   <header class="fd__head">
-    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+    <app-sheet-bar [bleed]="split()">
       @if (canManage()) {
         @if (phone()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">

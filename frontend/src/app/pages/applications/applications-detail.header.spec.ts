@@ -188,16 +188,16 @@ async function openMenu(detectChanges: () => void) {
 describe('ApplicationsDetailComponent — header', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('shows "<Typ> · Version n", the title, and status · gremium · amount', async () => {
+  it('shows the title and status · type · gremium · amount, with no line above the title', async () => {
     await setup();
-    expect(screen.getByText('Förderantrag · Version 2')).toBeInTheDocument();
+    expect(document.querySelector('.sheet-bar__kicker')?.textContent?.trim()).toBe('');
     expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
     // Intl puts a non-breaking space before the currency sign. The dots are CSS: every
     // part draws one before it, and the line clips the one at each line start.
     expect(line).toHaveClass('ad__seps');
     const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
-    expect(parts).toEqual(['Eingereicht', 'Studierendenparlament', '1.250,00€']);
+    expect(parts).toEqual(['Eingereicht', 'Förderantrag', 'Studierendenparlament', '1.250,00€']);
     expect(line.textContent).not.toContain('·');
   });
 
@@ -205,11 +205,11 @@ describe('ApplicationsDetailComponent — header', () => {
     await setup({ app: { state: null } });
     const line = document.querySelector('.ad__line') as HTMLElement;
     const parts = [...line.querySelectorAll('.ad__part')].map((el) => el.textContent?.replace(/\s+/g, ''));
-    expect(parts).toEqual(['Studierendenparlament', '1.250,00€']);
+    expect(parts).toEqual(['Förderantrag', 'Studierendenparlament', '1.250,00€']);
   });
 
-  it('shows the amount alone when the state and the gremium are missing', async () => {
-    await setup({ app: { state: null, gremiumId: null } });
+  it('shows the amount alone when the state, the type and the gremium are missing', async () => {
+    await setup({ app: { state: null, gremiumId: null, typeId: 'other' } });
     const line = document.querySelector('.ad__line') as HTMLElement;
     expect(line.querySelectorAll('.ad__part')).toHaveLength(1);
     expect(line.textContent?.replace(/\s+/g, '')).toBe('1.250,00€');
@@ -229,7 +229,7 @@ describe('ApplicationsDetailComponent — header', () => {
 
   it('leaves out an unknown type, a missing gremium and a missing amount', async () => {
     const { cmp, http } = await setup({ app: { gremiumId: null, amount: null, typeId: 'other' } });
-    expect(document.querySelector('.sheet-bar__kicker')?.textContent?.trim()).toBe('Version 2');
+    expect(document.querySelector('.sheet-bar__kicker')?.textContent?.trim()).toBe('');
     expect(document.querySelector('.ad__line')!.textContent?.trim()).toBe('Eingereicht');
     expect(cmp.gremiumName()).toBeNull();
     http.verify();
@@ -375,7 +375,7 @@ describe('ApplicationsDetailComponent — header', () => {
       cmp.onMenu({ id: 'nope', label: '' });
       cmp.app.set(null);
       expect(cmp.menuSections()).toEqual([]);
-      expect(cmp.metaLine()).toBe('');
+      expect(cmp.typeName()).toBeNull();
       cmp.onMenu({ id: 'delete', label: '' });
       expect(cmp.confirmDelete()).toBe(false);
     });

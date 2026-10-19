@@ -294,8 +294,7 @@ describe('TicketDetailComponent', () => {
     expect(line).toHaveTextContent('In Bearbeitung');
     expect(line).toHaveTextContent('Fehler');
     expect(line).toHaveTextContent('Mara Keller');
-    expect(document.querySelector('app-sheet-bar')).toHaveTextContent(/Ticket · T-0040/);
-    expect(document.querySelector('app-sheet-bar .mono')).toHaveTextContent('T-0040');
+    expect(line).toHaveTextContent('T-0040');
     expect(screen.getByRole('button', { name: /Erledigt/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ablehnen' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Wieder öffnen/ })).not.toBeInTheDocument();
@@ -678,18 +677,16 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByRole('link', { name: 'Zur Liste' })).toHaveAttribute('href', '/tickets');
   });
 
-  it('names only the ticket number in the kicker', async () => {
+  it('names the ticket number in the line under the title, with no line above it', async () => {
     await start('/tickets/t40');
-    const kicker = document.querySelector('app-sheet-bar [appSheetBarKicker]');
-    expect(kicker?.textContent?.trim()).toBe('Ticket · T-0040');
+    expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
+    expect(document.querySelector('.td__line .mono')?.textContent?.trim()).toBe('T-0040');
   });
 
   it('names a failed read', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => throwError(() => new Error('down')) });
     expect(screen.getByRole('alert')).toHaveTextContent('Das Ticket konnte nicht geladen werden.');
     // Without a ticket the header parts fall back.
-    expect(cmp.kicker()).toBe('');
-    expect(cmp.kickerParts()).toEqual({ before: '', number: '', after: '' });
     expect(cmp.reporter()).toBe('');
     expect(cmp.statusKind()).toBe('accent');
     expect(cmp.statusLabel()).toBe('Neu');

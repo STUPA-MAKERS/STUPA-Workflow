@@ -28,10 +28,7 @@
 .gd--none.gd--split {
   padding: var(--space-6);
 }
-/* The loading sheet: bars in the size of the kicker, the logo, the name and the facts. */
-.gd__skelKicker {
-  width: 8rem;
-}
+/* The loading sheet: bars in the size of the logo, the name and the facts. */
 .gd__skelLogo {
   width: 2.5rem;
   height: 2.5rem;
@@ -59,18 +56,6 @@
 .gd--split .gd__head,
 .gd--split .gd__tabs {
   padding-inline: var(--space-6);
-}
-.gd__kicker {
-  display: block;
-  min-width: 0;
-}
-.gd__dot {
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
-.gd__role {
-  color: var(--color-text);
-  font-weight: var(--fw-semibold);
 }
 
 .gd__titleRow {

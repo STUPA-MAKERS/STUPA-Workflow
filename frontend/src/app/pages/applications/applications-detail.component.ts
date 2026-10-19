@@ -689,12 +689,9 @@ export class ApplicationsDetailComponent {
   private gremienRequested = false;
 
   /** "<Typ> · Version n" above the title. */
-  readonly metaLine = computed(() => {
+  readonly typeName = computed(() => {
     const app = this.app();
-    if (!app) return '';
-    const type = this.types().find((t) => t.id === app.typeId)?.name;
-    const version = this.i18n.translate('applications.detail.version', { version: app.version });
-    return type ? `${type} · ${version}` : version;
+    return app ? (this.types().find((t) => t.id === app.typeId)?.name ?? null) : null;
   });
 
   /**

@@ -122,11 +122,13 @@ export class GremiumDetailComponent {
   readonly facts = computed<string[]>(() => {
     const g = this.gremium();
     if (!g) return [];
-    const out = [
+    const role = this.roleLabel();
+    const out = role ? [`${this.i18n.translate('gremien.detail.yourRole')} ${role}`] : [];
+    out.push(
       g.memberCount === 1
         ? this.i18n.translate('gremien.list.member1')
         : this.i18n.translate('gremien.list.members', { n: g.memberCount }),
-    ];
+    );
     if (g.quorumPercent !== null) {
       out.push(this.i18n.translate('gremien.detail.quorum', { n: g.quorumPercent }));
     }

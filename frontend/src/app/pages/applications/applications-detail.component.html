@@ -100,7 +100,7 @@
         <span class="skel-progress ad__progress" aria-hidden="true"></span>
       }
       <header class="ad__head">
-        <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+        <app-sheet-bar [bleed]="split()">
           <!-- The comments open in a sheet over the page; the count waits for the thread. -->
           <app-button
             class="ad__commentsBtn"
@@ -170,6 +170,9 @@
               <span class="ad__part">
                 <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
               </span>
+            }
+            @if (typeName(); as type) {
+              <span class="ad__part ell" [title]="type">{{ type }}</span>
             }
             @if (gremiumName(); as gremium) {
               <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>

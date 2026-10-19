@@ -151,7 +151,7 @@ async function setup(inputs: Record<string, unknown> = {}) {
 describe('BookingDetailComponent', () => {
   it('shows the head, the payment, the details and the cost centre with its figures', async () => {
     const { view } = await setup();
-    expect(screen.getByText('Buchung · HHJ 2026')).toBeInTheDocument();
+    expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
     expect(screen.getByRole('heading', { name: 'Lastenrad Anzahlung' })).toBeInTheDocument();
     expect(screen.getByText('Überweisung')).toBeInTheDocument();
     expect(screen.getByText('RE-2026-118')).toBeInTheDocument();
@@ -197,7 +197,6 @@ describe('BookingDetailComponent', () => {
       fyLabel: null,
       canManage: false,
     });
-    expect(screen.getByText('Buchung')).toBeInTheDocument();
     expect(screen.getAllByText('—').length).toBeGreaterThan(4);
     // No figures for a cost centre outside the tree, no edit for a reader.
     expect(screen.queryByRole('img')).toBeNull();
@@ -287,7 +286,7 @@ describe('BookingDetailComponent', () => {
       phone: true,
       expense: { ...EXPENSE, parentExpenseId: 'p', kind: 'income' },
     });
-    expect(screen.getByText('Unterbuchung · HHJ 2026')).toBeInTheDocument();
+    expect(screen.getByText('Unterbuchung')).toHaveClass('fd__part');
     expect(screen.getByText('Einnahme')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Bearbeiten' }));
     expect(edit).toHaveBeenCalled();

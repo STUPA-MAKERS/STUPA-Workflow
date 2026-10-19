@@ -2,13 +2,6 @@
   <article class="gd" [class.gd--split]="split()" aria-labelledby="gd-title">
     <header class="gd__head">
       <app-sheet-bar class="gd__bar" [bleed]="split()">
-        <span appSheetBarKicker class="gd__kicker ell">
-          {{ 'gremien.detail.kicker' | t }}
-          @if (roleLabel()) {
-            <span class="gd__dot" aria-hidden="true">·</span>{{ 'gremien.detail.yourRole' | t }}
-            <strong class="gd__role">{{ roleLabel() }}</strong>
-          }
-        </span>
         @if (!phone()) {
           <app-button
             variant="text"
@@ -136,9 +129,7 @@
        after 300ms. -->
   <article class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
     <header class="gd__head skel-in" aria-hidden="true">
-      <app-sheet-bar class="gd__bar" [bleed]="split()">
-        <span appSheetBarKicker class="gd__kicker"><span class="skel-text gd__skelKicker"></span></span>
-      </app-sheet-bar>
+      <app-sheet-bar class="gd__bar" [bleed]="split()" />
       <div class="gd__titleRow">
         <span class="skel-box gd__skelLogo" [class.gd__skelLogo--lg]="!phone()"></span>
         <span class="gd__title"><span class="skel-text gd__skelTitle"></span></span>

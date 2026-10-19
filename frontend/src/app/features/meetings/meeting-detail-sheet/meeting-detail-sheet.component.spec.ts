@@ -80,12 +80,13 @@ function flush(
 jest.setTimeout(15_000);
 
 describe('MeetingDetailSheetComponent', () => {
-  it('shows the head of a live meeting: Gremium, date, status, time and minute-taker', async () => {
+  it('shows the head of a live meeting: status, date, time and minute-taker, no line above the title', async () => {
     const { http, fixture } = await setup();
     expect(screen.getByRole('status')).toHaveTextContent('Sitzung wird geladen');
     flush(http);
     fixture.detectChanges();
-    expect(screen.getByText('StuPa · Do., 15.10.2026')).toBeInTheDocument();
+    expect(fixture.nativeElement.querySelector('.sheet-bar__kicker').textContent.trim()).toBe('');
+    expect(screen.getByText('Do., 15.10.2026')).toHaveClass('ms__part');
     expect(screen.getByRole('heading', { level: 2, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
     expect(screen.getByText('Live')).toHaveClass('st--accent');
     expect(screen.getByText('seit 18:04')).toBeInTheDocument();

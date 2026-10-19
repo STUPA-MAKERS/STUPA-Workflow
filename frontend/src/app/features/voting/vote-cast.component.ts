@@ -201,14 +201,6 @@ export class VoteCastComponent implements OnDestroy {
     return allowed ? ['/voting/beamer', meetingId] : null;
   });
 
-  /** The line at the top of the sheet: the gremium of the meeting, else of the list row. */
-  readonly sheetMeta = computed(() => {
-    const fromMeeting = this.context().meeting?.gremiumName;
-    if (fromMeeting) return fromMeeting;
-    const id = this.loaded()?.id;
-    return (id && this.page?.gremiumNames().get(id)) || null;
-  });
-
   /**
    * The line below the phone title. A meeting vote names its meeting and agenda item
    * ("TOP 3 · 34. Sitzung des Studierendenparlaments"); a vote without a meeting reads

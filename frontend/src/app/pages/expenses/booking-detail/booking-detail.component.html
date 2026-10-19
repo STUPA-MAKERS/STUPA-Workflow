@@ -1,7 +1,7 @@
 @let e = expense();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="bd-title">
   <header class="fd__head">
-    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+    <app-sheet-bar [bleed]="split()">
       @if (canManage()) {
         @if (phone()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit(e)">
@@ -29,6 +29,9 @@
             (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t
           }}</app-status-text>
         </span>
+        @if (e.parentExpenseId) {
+          <span class="fd__part">{{ 'expenses.detail.subKind' | t }}</span>
+        }
         <span class="fd__part fd__cc ell" [title]="cc().path + ' · ' + cc().name">
           @if (cc().color) {
             <span class="fd__swatch" aria-hidden="true" [style.background]="cc().color"></span>

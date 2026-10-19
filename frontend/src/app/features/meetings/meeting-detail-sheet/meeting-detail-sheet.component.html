@@ -1,7 +1,7 @@
 @let m = meeting();
 <article class="ms" [class.ms--split]="split()" aria-labelledby="ms-title">
   <header class="ms__head">
-    <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+    <app-sheet-bar [bleed]="split()">
       @if (m.canManage && !phone()) {
         <app-button
           variant="text"
@@ -28,6 +28,9 @@
         <span class="ms__part">
           <app-status-text [kind]="status().kind">{{ status().key | t }}</app-status-text>
         </span>
+        @if (dateText()) {
+          <span class="ms__part mono">{{ dateText() }}</span>
+        }
         @if (timeText()) {
           <span class="ms__part mono">{{ timeText() }}</span>
         }

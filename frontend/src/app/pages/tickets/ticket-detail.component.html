@@ -59,7 +59,6 @@
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
     <header class="td__head">
       <app-sheet-bar [bleed]="split()">
-        <span appSheetBarKicker class="ell" [title]="kicker()">{{ kickerParts().before }}<span class="mono">{{ kickerParts().number }}</span>{{ kickerParts().after }}</span>
         <app-button
           variant="text"
           [iconOnly]="true"
@@ -78,6 +77,8 @@
       <h2 id="td-title" class="td__title">{{ ticket.title }}</h2>
       <p class="td__line">
         <app-status-text [kind]="statusKind()">{{ statusLabel() }}</app-status-text>
+        <span class="td__dot" aria-hidden="true">·</span>
+        <span class="mono">{{ ticket.number }}</span>
         <span class="td__dot" aria-hidden="true">·</span>
         <span>{{ kindLabel() }}</span>
         @if (manager) {
