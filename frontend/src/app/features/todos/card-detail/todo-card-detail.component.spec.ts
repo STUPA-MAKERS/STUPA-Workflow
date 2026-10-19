@@ -109,7 +109,7 @@ describe('TodoCardDetailComponent', () => {
       const { cmp, detect, api } = await setup({ cache, read });
       expect(cmp.loading()).toBe(false);
       expect(screen.getByRole('heading', { level: 2, name: 'Alt' })).toBeInTheDocument();
-      expect(api.members).toHaveBeenCalledWith('b-1');
+      expect(api.members).toHaveBeenCalledWith('b-1', { detail: true });
       read.next(detail());
       detect();
       expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
@@ -146,8 +146,8 @@ describe('TodoCardDetailComponent', () => {
     // The due line counts from today; pin today to the day the fixture dates were written for.
     cmp.today.set('2026-10-16');
     detect();
-    expect(api.card).toHaveBeenCalledWith('k-1');
-    expect(api.members).toHaveBeenCalledWith('b-1');
+    expect(api.card).toHaveBeenCalledWith('k-1', { detail: true });
+    expect(api.members).toHaveBeenCalledWith('b-1', { detail: true });
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
     // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
@@ -706,7 +706,7 @@ describe('TodoCardDetailComponent', () => {
     expect(transferred).toHaveBeenCalledWith({ card: expect.objectContaining({ boardId: 'b-2' }), fromBoardId: from });
     expect(order).toEqual(['transferred', 'changed']);
     expect(cmp.card()?.boardId).toBe('b-2');
-    expect(api.members).toHaveBeenLastCalledWith('b-2');
+    expect(api.members).toHaveBeenLastCalledWith('b-2', { detail: true });
     expect(toast.success).toHaveBeenCalledWith('Karte nach „Fachschaft Informatik“ verschoben');
     expect(cmp.transferOpen()).toBe(false);
     expect(cmp.transferring()).toBe(false);

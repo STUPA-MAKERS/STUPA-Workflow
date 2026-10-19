@@ -13,6 +13,8 @@ import { ActivatedRoute, NavigationEnd, type ParamMap, Router, RouterOutlet } fr
 import type { Observable } from 'rxjs';
 import { filter, map } from 'rxjs/operators';
 import { AuthService } from '@core/auth/auth.service';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import type { PersonRef, Uuid } from '@core/api/models';
 import {
   TICKET_KINDS,
@@ -242,6 +244,15 @@ export class TicketsComponent implements OnDestroy {
   readonly hasMore = computed(() => this.items().length < this.total());
 
   constructor() {
+    // The shown tickets read their detail ahead, so a click shows it at once.
+    prefetchDetails({
+      items: computed(() => [...this.items(), ...(this.closedItems() ?? [])]),
+      key: (t) => t.id,
+      reads: (t) =>
+        this.manager
+          ? [this.api.get(t.id, { detail: true }), inject(TodosApiService).linked('ticket', t.id)]
+          : [this.api.getMine(t.id, { detail: true })],
+    });
     if (this.manager) {
       this.api.assignees().subscribe({
         next: (list) => this.assignees.set(list),

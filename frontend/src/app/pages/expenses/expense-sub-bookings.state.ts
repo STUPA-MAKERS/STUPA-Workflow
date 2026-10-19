@@ -33,9 +33,10 @@ export class ExpenseSubBookingsState {
     return this.loadingSub().has(id);
   }
 
-  loadSub(id: string): void {
+  /** `detail`: the first read of an opened booking, which takes what the list read ahead. */
+  loadSub(id: string, detail = false): void {
     this.loadingSub.update((s) => new Set(s).add(id));
-    this.api.listSubBookings(id as Uuid).subscribe({
+    this.api.listSubBookings(id as Uuid, { detail }).subscribe({
       next: (rows) => {
         this.subRows.update((m) => new Map(m).set(id, rows));
         this.loadingSub.update((s) => {

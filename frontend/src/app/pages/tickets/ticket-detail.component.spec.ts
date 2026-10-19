@@ -625,7 +625,7 @@ describe('TicketDetailComponent', () => {
     api.get.mockClear();
     todosApi.linked.mockClear();
     cmp.onTodoCreated();
-    expect(api.get).toHaveBeenCalledWith('t40');
+    expect(api.get).toHaveBeenCalledWith('t40', { detail: false });
     expect(todosApi.linked).toHaveBeenCalledWith('ticket', 't40');
   });
 
@@ -1083,7 +1083,7 @@ describe('TicketDetailComponent', () => {
     cmp.notes.set(note('scanning').notes);
     setGet(() => of(note('clean')));
     harness.fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
-    expect(api.get).toHaveBeenLastCalledWith('t40');
+    expect(api.get).toHaveBeenLastCalledWith('t40', { detail: false });
     expect(cmp.notes()[0].attachments[0].scanState).toBe('clean');
 
     // A failed read keeps the page; an answer for a ticket the user left is dropped.
@@ -1201,7 +1201,7 @@ describe('TicketDetailComponent', () => {
   describe('as the reporter', () => {
     it('reads the own ticket without the work of the team', async () => {
       const { cmp, api, todosApi } = await start('/tickets/t40', { manager: false, split: true });
-      expect(api.getMine).toHaveBeenCalledWith('t40');
+      expect(api.getMine).toHaveBeenCalledWith('t40', { detail: true });
       expect(api.get).not.toHaveBeenCalled();
       expect(api.assignees).not.toHaveBeenCalled();
       expect(todosApi.linked).not.toHaveBeenCalled();
