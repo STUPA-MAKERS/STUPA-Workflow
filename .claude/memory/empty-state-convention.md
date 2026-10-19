@@ -27,8 +27,7 @@ It has two looks (Frederik, 2026-10-17: "Ich meinte für Listen!"):
   free text, back).
 - `rows` = ghost rows, default 5; 3 in sheets, side panes, small dialogs; 2 in tiles; 1 for
   a per-board or per-group line.
-- `fill` when it is the only content of a flex-column pane or page: it centres vertically
-  and renders the heading as `h2`. Otherwise the heading is a `<p>`; `level` (1–3) sets it explicitly.
+- `fill` when it is the only content of a flex-column pane or page: ghost rows stay at the top (Frederik 2026-10-19: "top-aligned"), a `plain` state centres vertically. It renders the heading as `h2`. Otherwise the heading is a `<p>`; `level` (1–3) sets it explicitly.
 - Render it in the `@else` of the list, never as an `<li>` or table row; a data table drops
   `[emptyText]` and renders only while loading or with rows.
 - A list beside a detail pane gets the ghost rows itself; the detail pane is `plain`.

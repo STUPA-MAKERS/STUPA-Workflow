@@ -5,12 +5,15 @@
 }
 
 /* `fill`: the whole page or pane is empty. The host takes the free height of its
-   flex-column parent and centres the block in it, so the state does not sit at the top of
-   an empty page. */
+   flex-column parent. The ghost rows stay at the top, where the rows of the list would
+   start. A `plain` state is no list, so it centres in the free height. */
 :host(.es-host--fill) {
   display: flex;
   flex: 1 0 auto;
   flex-direction: column;
+  justify-content: flex-start;
+}
+:host(.es-host--fill.es-host--plain) {
   justify-content: center;
 }
 
