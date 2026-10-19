@@ -549,7 +549,8 @@ export class VotingComponent implements OnDestroy {
     const ended = item.status === 'closed' || item.status === 'cancelled';
     const status =
       item.status === 'closed' && item.result ? closedStatus(item.kind, item.result) : this.statusOf(item.status);
-    let where: string | null = item.gremiumName;
+    // The row names its meeting; a vote without one names no gremium either.
+    let where: string | null = null;
     if (item.meetingTitle) {
       where =
         item.agendaPosition === null

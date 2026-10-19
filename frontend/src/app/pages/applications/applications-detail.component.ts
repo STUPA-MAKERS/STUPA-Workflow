@@ -684,9 +684,6 @@ export class ApplicationsDetailComponent {
 
   /** The application types, for "<Typ> · Version n". */
   private readonly types = signal<ApplicationType[]>([]);
-  /** Gremium names from the meeting filter list, for a gremium the reader is not in. */
-  private readonly filterGremien = signal<{ id: Uuid; name: string }[]>([]);
-  private gremienRequested = false;
 
   /** "<Typ> · Version n" above the title. */
   readonly typeName = computed(() => {
@@ -715,14 +712,6 @@ export class ApplicationsDetailComponent {
     }
     if (cap.intake) parts.push(cap.intake);
     return parts;
-  });
-
-  /** The name of the gremium of the application, or null when it is not known here. */
-  readonly gremiumName = computed(() => {
-    const id = this.app()?.gremiumId;
-    if (!id) return null;
-    const own = this.auth.gremien().find((g) => g.id === id)?.name;
-    return own ?? this.filterGremien().find((g) => g.id === id)?.name ?? null;
   });
 
   /** The status of the application as coloured text. */
@@ -891,17 +880,6 @@ export class ApplicationsDetailComponent {
     el?.focus({ preventScroll: true });
   }
 
-  /** Load the gremium names once, when the gremium is not one of the reader's own. */
-  private resolveGremium(app: Application): void {
-    if (!app.gremiumId || this.gremienRequested) return;
-    if (this.auth.gremien().some((g) => g.id === app.gremiumId)) return;
-    this.gremienRequested = true;
-    this.api.listMeetingFilterGremien().subscribe({
-      next: (list) => this.filterGremien.set(list),
-      error: () => this.filterGremien.set([]),
-    });
-  }
-
   /** Load sequence number that guards against a late response.
    *  A fast switch between detail pages can deliver a response of an earlier
    *  application. Such a response must not overwrite the current one. Each response
@@ -951,7 +929,6 @@ export class ApplicationsDetailComponent {
         this.switching.set(false);
         this.app.set(app);
         this.loading.set(false);
-        this.resolveGremium(app);
         this.loadAux();
         // Take the effective form from the pinned version of the application, not from
         // the active one. The labels and the edit fields then match the data that the

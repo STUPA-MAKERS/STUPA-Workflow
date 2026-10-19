@@ -173,9 +173,6 @@
             @if (typeName(); as type) {
               <span class="ad__part ell" [title]="type">{{ type }}</span>
             }
-            @if (gremiumName(); as gremium) {
-              <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
-            }
             @if (application.amount !== null) {
               @if (approvedAmount(application); as approved) {
                 <!-- F1: the approved amount, the requested one struck through next to it. -->
@@ -187,20 +184,15 @@
                 <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
               }
             }
+            @if (captureParts(); as parts) {
+              <!-- #11: an application that a member captured on behalf of the applicant
+                   says so at the end of the line, a part may wrap inside. -->
+              @for (part of parts; track $index) {
+                <span class="ad__part ad__capture" data-testid="ad-capture">{{ part }}</span>
+              }
+            }
           </span>
         </p>
-
-        @if (captureParts(); as parts) {
-          <!-- #11: a subtle note for an application that a member captured on behalf of
-               the applicant. The dots sit between the parts only (as in the line above). -->
-          <p class="ad__line ad__seps ad__capture" data-testid="ad-capture">
-            <span class="ad__parts">
-              @for (part of parts; track $index) {
-                <span class="ad__part">{{ part }}</span>
-              }
-            </span>
-          </p>
-        }
 
         @if (canTransition() && transitions().length) {
           <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">

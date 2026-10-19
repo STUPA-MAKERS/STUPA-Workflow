@@ -1080,7 +1080,11 @@ describe('ApplicationsDetailComponent', () => {
       'eingegangen am 01.06.2026',
       'per PDF',
     ]);
-    expect(screen.getByTestId('ad-capture').textContent).toContain('per PDF');
+    expect(screen.getAllByTestId('ad-capture').map((e) => e.textContent?.trim())).toEqual([
+      'Erfasst von Clara Clerk am 05.06.2026',
+      'eingegangen am 01.06.2026',
+      'per PDF',
+    ]);
     expect(cmp.historyEntries()[0].body).toBe(
       'Version 1\nIm Auftrag der antragstellenden Person erfasst\nEingang: per PDF',
     );
