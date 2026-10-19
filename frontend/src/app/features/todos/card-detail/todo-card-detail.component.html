@@ -11,7 +11,7 @@
         </button>
       }
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
-        <p appSheetBarTitle class="cd__title skel-in" aria-hidden="true">
+        <p appSheetBarTitle class="sheet-title cd__title skel-in" aria-hidden="true">
           <span class="skel-text cd__skelTitle"></span>
           @if (phone()) {
             <span class="skel-text cd__skelTitle cd__skelTitle--second"></span>
@@ -27,7 +27,7 @@
           </app-button>
         }
       </app-sheet-bar>
-      <p class="cd__created skel-in" aria-hidden="true"><span class="skel-text skel-text--muted cd__skelCreated"></span></p>
+      <p class="sheet-line cd__created skel-in" aria-hidden="true"><span class="skel-text skel-text--muted cd__skelCreated"></span></p>
     </header>
     @if (phone()) {
       <app-tabs class="cd__tabs" idPrefix="cd-busy" [tabs]="busyTabs()" [active]="'details'" aria-hidden="true" />
@@ -70,7 +70,7 @@
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
         <!-- While the title is edited, the form takes its place below the bar. -->
         @if (!editingTitle()) {
-          <h2 appSheetBarTitle id="cd-title" class="cd__title">{{ card.title }}</h2>
+          <h2 appSheetBarTitle id="cd-title" class="sheet-title cd__title">{{ card.title }}</h2>
         }
         @if (mode() === 'pane' && !phone() && boardLink(); as link) {
           <a class="cd__boardLink" [routerLink]="link" [queryParams]="{ card: card.id }">
@@ -111,7 +111,7 @@
           </app-button>
         </form>
       }
-      <p class="cd__created">
+      <p class="sheet-line cd__created">
         <!-- The dot ends the part before it, so a wrapped line never starts with it. -->
         @for (part of createdParts(); track $index; let last = $last) {
           @if (last) {

@@ -2,7 +2,7 @@
 <article class="fd" [class.fd--split]="split()" aria-labelledby="id-title">
   <header class="fd__head">
     <app-sheet-bar [bleed]="split()">
-      <h2 appSheetBarTitle id="id-title" class="fd__title">{{ title() }}</h2>
+      <h2 appSheetBarTitle id="id-title" class="sheet-title fd__title">{{ title() }}</h2>
       @if (phone()) {
         @if (canManage()) {
           <app-button variant="tonal" size="sm" (click)="edit.emit()">
@@ -33,7 +33,7 @@
         <app-row-menu [label]="'invoices.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
       }
     </app-sheet-bar>
-    <p class="fd__line fd__seps">
+    <p class="sheet-line fd__line fd__seps">
       <span class="fd__parts">
         <span class="fd__part">
           <app-status-text [kind]="status().kind">{{ status().key | t }}</app-status-text>

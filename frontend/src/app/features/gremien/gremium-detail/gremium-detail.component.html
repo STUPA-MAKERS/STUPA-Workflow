@@ -4,7 +4,7 @@
       <app-sheet-bar class="gd__bar" [bleed]="split()">
         <div appSheetBarTitle class="gd__titleRow">
           <app-gremium-logo [name]="g.name" [logoUrl]="g.logoUrl" [size]="phone() ? 'md' : 'lg'" />
-          <h2 id="gd-title" class="gd__title">{{ g.name }}</h2>
+          <h2 id="gd-title" class="sheet-title gd__title">{{ g.name }}</h2>
         </div>
         @if (!phone()) {
           <app-button
@@ -33,7 +33,7 @@
 
       <!-- Every part draws its dot before it; the line clips the dot of the first part on
            each line, so a dot shows only between two parts, also after a wrap. -->
-      <p class="gd__line">
+      <p class="sheet-line gd__line">
         <span class="gd__parts">
           @for (fact of facts(); track fact) {
             <span class="gd__part">{{ fact }}</span>
@@ -132,10 +132,10 @@
       <app-sheet-bar class="gd__bar" [bleed]="split()">
         <div appSheetBarTitle class="gd__titleRow">
           <span class="skel-box gd__skelLogo" [class.gd__skelLogo--lg]="!phone()"></span>
-          <span class="gd__title"><span class="skel-text gd__skelTitle"></span></span>
+          <span class="sheet-title gd__title"><span class="skel-text gd__skelTitle"></span></span>
         </div>
       </app-sheet-bar>
-      <p class="gd__line"><span class="skel-text skel-text--muted gd__skelLine"></span></p>
+      <p class="sheet-line gd__line"><span class="skel-text skel-text--muted gd__skelLine"></span></p>
     </header>
     <div class="gd__body">
       <app-skeleton variant="items" [count]="5" [grouped]="true" [label]="'gremien.detail.loading' | t" />

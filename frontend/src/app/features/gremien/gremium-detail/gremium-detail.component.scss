@@ -70,24 +70,13 @@
   padding-block: 6px;
 }
 .gd__title {
-  margin: 0;
   min-width: 0;
-  font-size: 1.75rem;
-  line-height: 2.25rem;
-  font-weight: var(--fw-semibold);
-  letter-spacing: -0.01em;
-  overflow-wrap: anywhere;
 }
 
 /* Items with a dot between two of them, also after a wrap (never a dot at a line start). */
 .gd__line {
   --gd-sep: 24px;
-  margin: 0;
   overflow-x: clip;
-  color: var(--color-text-muted);
-  font-size: var(--fs-md);
-  line-height: 1.375rem;
-  min-width: 0;
 }
 .gd__line:empty,
 .gd__parts:empty {
@@ -160,15 +149,8 @@
 }
 
 @include bp.phone {
-  .gd__title {
-    font-size: 1.375rem;
-    line-height: 1.75rem;
-  }
   .gd__head .gd__titleRow {
     padding-block: 10px;
-  }
-  .gd__line {
-    font-size: var(--fs-sm);
   }
   .gd__body {
     padding-top: var(--space-4);

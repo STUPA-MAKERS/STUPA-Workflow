@@ -33,20 +33,8 @@
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.fd__title {
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-  overflow-wrap: anywhere;
-}
 .fd__line {
   --fd-sep: 24px;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-md);
-  min-width: 0;
 }
 /* Items with a dot between two of them, also after a wrap: every part draws its dot
    before it, and the line clips the dot of the first part on each line. */
@@ -387,9 +375,3 @@
   font-size: var(--fs-small);
 }
 
-@include bp.phone {
-  .fd__title {
-    font-size: var(--fs-h1, 1.5rem);
-    line-height: 1.25;
-  }
-}

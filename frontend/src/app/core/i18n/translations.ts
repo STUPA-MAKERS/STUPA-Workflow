@@ -38,6 +38,8 @@ export const de = {
   'tasks.loading': 'Aufgaben werden geladen …',
   'tasks.empty': 'Keine offenen Aufgaben.',
   'tasks.error': 'Aufgaben konnten nicht geladen werden.',
+  'tasks.search': 'Aufgaben durchsuchen',
+  'tasks.noMatch': 'Keine Aufgabe passt zur Suche.',
   'tasks.emptyBody': 'Hier erscheinen Anträge, die auf deine Bearbeitung oder Prüfung warten.',
   'tasks.none': 'Keine Aufgabe geöffnet',
   'tasks.waiting.today': 'seit heute',

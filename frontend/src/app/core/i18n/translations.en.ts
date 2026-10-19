@@ -36,6 +36,8 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'tasks.loading': 'Loading tasks…',
   'tasks.empty': 'No open tasks.',
   'tasks.error': 'Tasks could not be loaded.',
+  'tasks.search': 'Search tasks',
+  'tasks.noMatch': 'No task matches the search.',
   'tasks.emptyBody': 'Applications that wait for you to act or review show here.',
   'tasks.none': 'No task open',
   'tasks.waiting.today': 'since today',

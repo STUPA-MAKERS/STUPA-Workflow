@@ -51,21 +51,10 @@
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.td__title {
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-  overflow-wrap: anywhere;
-}
 .td__line {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-md);
 }
 .td__dot {
   margin-inline: 8px;
@@ -380,10 +369,6 @@
     padding: var(--space-5) var(--space-4) var(--main-pad-bottom, 0px);
     overflow-y: auto;
     overscroll-behavior: contain;
-  }
-  .td__title {
-    font-size: var(--fs-h1);
-    line-height: var(--lh-h1);
   }
   .td__pair {
     grid-template-columns: minmax(0, 1fr);

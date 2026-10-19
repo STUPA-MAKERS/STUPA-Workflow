@@ -59,12 +59,12 @@
   <article class="fd fd--split bp" aria-labelledby="bp-title">
     <header class="fd__head">
       <app-sheet-bar [bleed]="true">
-        <h2 appSheetBarTitle id="bp-title" class="fd__title">{{ 'expenses.bulk.title' | t: { count: rows().length } }}</h2>
+        <h2 appSheetBarTitle id="bp-title" class="sheet-title fd__title">{{ 'expenses.bulk.title' | t: { count: rows().length } }}</h2>
         <app-button variant="text" [iconOnly]="true" [ariaLabel]="'expenses.bulk.stop' | t" (click)="closed.emit()">
           <app-icon name="x" />
         </app-button>
       </app-sheet-bar>
-      <p class="fd__line fd__seps">
+      <p class="sheet-line fd__line fd__seps">
         <span class="fd__parts">
           @if (commonCostCentre(); as cc) {
             <span class="fd__part">{{ cc }}</span>

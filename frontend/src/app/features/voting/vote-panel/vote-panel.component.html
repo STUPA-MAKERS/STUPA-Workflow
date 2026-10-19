@@ -2,8 +2,12 @@
 @let s = status();
 
 @if (layout() === 'phone') {
-  <app-status-text class="vpn__cap" [kind]="s.kind">{{ s.key | t }} · {{ rules() }}</app-status-text>
-  <h1 class="vpn__q vpn__q--phone">{{ question() }}</h1>
+  <h1 class="sheet-title">{{ question() }}</h1>
+  <p class="sheet-line vpn__meta">
+    <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
+    <span class="vpn__sep" aria-hidden="true">·</span>
+    <span class="vpn__rules">{{ rules() }}</span>
+  </p>
 } @else if (layout() === 'strip') {
   <div class="vpn__head">
     <app-status-text class="vpn__cap" [kind]="s.kind">{{ stripCap() }}</app-status-text>
@@ -23,10 +27,10 @@
   <!-- The question opens the page on the line of its actions (`vpnActions`), as the title
        of every detail sheet does; the meta line follows below it. -->
   <app-sheet-bar class="vpn__bar">
-    <h2 appSheetBarTitle class="vpn__q">{{ question() }}</h2>
+    <h2 appSheetBarTitle class="sheet-title">{{ question() }}</h2>
     <ng-content select="[vpnActions]" />
   </app-sheet-bar>
-  <p class="vpn__meta">
+  <p class="sheet-line vpn__meta">
     <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
     <span class="vpn__sep" aria-hidden="true">·</span>
     @if (where(); as w) {

@@ -5,12 +5,12 @@
   <article class="ad ad--busy" [class.ad--split]="split()" aria-busy="true">
     <header class="ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
-        <h2 appSheetBarTitle class="ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
+        <h2 appSheetBarTitle class="sheet-title ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
         <!-- The action "Kommentare" and the menu. -->
         <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
         <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
       </app-sheet-bar>
-      <p class="ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
+      <p class="sheet-line ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
       @if (canTransition()) {
         <ng-container *ngTemplateOutlet="transitionsSkel" />
       }
@@ -100,7 +100,7 @@
       }
       <header class="ad__head">
         <app-sheet-bar [bleed]="split()">
-          <h2 appSheetBarTitle id="ad-title" class="ad__title">{{ title() }}</h2>
+          <h2 appSheetBarTitle id="ad-title" class="sheet-title ad__title">{{ title() }}</h2>
           <!-- The comments open in a sheet over the page; the count waits for the thread. -->
           <app-button
             class="ad__commentsBtn"
@@ -163,7 +163,7 @@
 
         <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
              part on each line, so a dot shows only between two items, also after a wrap. -->
-        <p class="ad__line ad__seps">
+        <p class="sheet-line ad__line ad__seps">
           <span class="ad__parts">
             @if (application.state) {
               <span class="ad__part">
