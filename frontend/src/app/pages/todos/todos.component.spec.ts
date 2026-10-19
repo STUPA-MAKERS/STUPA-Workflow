@@ -52,6 +52,8 @@ interface Opts {
   readAhead?: boolean;
   /** Each board read answers with a board of that id (the read ahead keeps them apart). */
   perBoard?: boolean;
+  /** The card read (the drawer and the board check of a card link). */
+  cardRead?: () => Observable<TodoCardDetail>;
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -76,7 +78,7 @@ async function start(url: string, opts: Opts = {}) {
     mine: jest.fn((): Observable<TodoMine> => of({ items: [{ ...tile({ id: 'k-1' }), boardName: '', boardKind: 'gremium', columnName: '', labels: [] }], dueSoonCount: 0 })),
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
     createCard: jest.fn(() => of(detail({ id: 'k-9', columnId: 'c-1', title: 'Neu' }))),
-    card: jest.fn(() => of(detail())),
+    card: jest.fn(opts.cardRead ?? (() => of(detail()))),
     board: jest.fn(() => of(b)),
     linkTargets: jest.fn(() => of([])),
     archive: jest.fn(() => of({ items: [], total: 0, limit: 50, offset: 0 })),
@@ -134,6 +136,38 @@ describe('TodosComponent', () => {
     expect(router.url).toBe('/todos/b-0?view=list');
     expect(api.pollBoard).toHaveBeenCalledWith('b-0', null);
     expect(api.members).toHaveBeenCalledWith('b-0');
+  });
+
+  it('opens the board of a card link that names the card only', async () => {
+    const { router, settle } = await start('/todos?card=k-7', {
+      cardRead: () => of(detail({ id: 'k-7', boardId: 'b-2' })),
+    });
+    await settle();
+    expect(router.url).toBe('/todos/b-2?card=k-7');
+  });
+
+  it('opens the default board when the card of a card link does not read', async () => {
+    const { router, settle } = await start('/todos?card=k-7', {
+      cardRead: () => throwError(() => new HttpErrorResponse({ status: 404 })),
+    });
+    await settle();
+    expect(router.url).toBe('/todos/b-0?card=k-7');
+  });
+
+  it('moves an older card link to the board the card is on now', async () => {
+    const { router, settle } = await start('/todos/b-1?card=k-1', {
+      cardRead: () => of(detail({ id: 'k-1', boardId: 'b-2' })),
+    });
+    await settle();
+    expect(router.url).toBe('/todos/b-2?card=k-1');
+  });
+
+  it('keeps a card of another board on the personal board', async () => {
+    const { router, settle } = await start('/todos/b-0?card=k-1', {
+      cardRead: () => of(detail({ id: 'k-1', boardId: 'b-2' })),
+    });
+    await settle();
+    expect(router.url).toBe('/todos/b-0?card=k-1');
   });
 
   it('keeps a board in the URL', async () => {

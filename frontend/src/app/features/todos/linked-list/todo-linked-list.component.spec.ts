@@ -36,7 +36,7 @@ describe('TodoLinkedListComponent', () => {
     const { api, cmp } = await setup(() => of([card(), card({ id: 'k-2', title: 'Erledigt', isDone: true, dueDate: null, assignees: [] })]));
     expect(api.linked).toHaveBeenCalledWith('application', 'a-1');
     expect(screen.getByRole('heading', { name: 'To-Dos' })).toHaveAttribute('id', 'ad-todos');
-    expect(screen.getByRole('link', { name: 'Raum buchen' })).toHaveAttribute('href', '/todos/b-1?card=k-1');
+    expect(screen.getByRole('link', { name: 'Raum buchen' })).toHaveAttribute('href', '/todos?card=k-1');
     expect(screen.getByText('Studierendenparlament · In Arbeit · fällig 17.10.')).toBeInTheDocument();
     expect(screen.getByText('Studierendenparlament · In Arbeit')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Erledigt' }).closest('li')).toHaveClass('tl__row--done');

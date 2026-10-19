@@ -71,8 +71,8 @@ def test_the_kinds_are_registered() -> None:
     assert set(KEYS) <= set(_REASONS)
     for key in KEYS:
         assert set(CATALOGUE_BY_KEY[key].body_i18n) == {"de", "en"}
-    link = todo_link(SETTINGS, "b", "c")
-    assert link.url.endswith("/todos/b?card=c")
+    link = todo_link(SETTINGS, "c")
+    assert link.url.endswith("/todos?card=c")
 
 
 async def test_the_assigned_mail(sent: list[dict[str, Any]]) -> None:
@@ -85,7 +85,7 @@ async def test_the_assigned_mail(sent: list[dict[str, Any]]) -> None:
     assert out["kind"] == "todo_assigned"
     assert out["context"] == {"cardTitle": "Plakat", "boardName": "StuPa", "actor": "Ada"}
     assert out["idempotency_parts"] == ("todo_assigned", str(c.id), str(OTHER), str(mail.event_id))
-    assert out["link"].url.endswith(f"/todos/{b.id}?card={c.id}")
+    assert out["link"].url.endswith(f"/todos?card={c.id}")
 
 
 async def test_two_identical_events_get_two_idempotency_keys(sent: list[dict[str, Any]]) -> None:

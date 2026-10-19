@@ -607,7 +607,7 @@ describe('TicketDetailComponent', () => {
       split: true,
     });
     const link = screen.getByRole('link', { name: 'PDF-Kopf: Beginn statt Ende verwenden' });
-    expect(link).toHaveAttribute('href', '/todos/b1?card=c1');
+    expect(link).toHaveAttribute('href', '/todos?card=c1');
     expect(cmp.todoSub(card())).toBe('Plattform · In Arbeit · fällig 17.10.');
     expect(cmp.todoSub(card({ dueDate: null }))).toBe('Plattform · In Arbeit');
     expect(
