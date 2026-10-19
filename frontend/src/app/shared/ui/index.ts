@@ -13,7 +13,7 @@
  * initial bundle too.
  */
 export { AvatarComponent, AvatarStackComponent, initials } from './avatar/avatar.component';
-export type { AvatarSize } from './avatar/avatar.component';
+export type { AvatarPerson, AvatarSize } from './avatar/avatar.component';
 export { ChatComponent } from './chat/chat.component';
 export { ChatDrafts } from './chat/chat-drafts';
 export { chatPeople, type ChatPerson } from './chat/chat-mentions';
@@ -31,6 +31,7 @@ export type {
 } from './chat/chat.models';
 export { ConfirmDialogComponent } from './confirm-dialog/confirm-dialog.component';
 export { DateBlockComponent } from './date-block/date-block.component';
+export { DropOverlayComponent } from './drop-overlay/drop-overlay.component';
 export { EmptyStateComponent } from './empty-state/empty-state.component';
 export { FabComponent } from './fab/fab.component';
 export { FieldGroupComponent, FieldRowComponent } from './field-group/field-group.component';

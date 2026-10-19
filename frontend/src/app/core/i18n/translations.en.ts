@@ -853,6 +853,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'chat.deleteConfirm': 'The message is deleted. This cannot be undone.',
   'chat.ownMessage': 'Your message · {time}',
   'chat.attach': 'Attach file',
+  'chat.drop': 'Drop files to attach',
   'chat.removeFile': 'Remove {name}',
   'chat.uploading': 'uploading …',
   'chat.pastedImage': 'image',

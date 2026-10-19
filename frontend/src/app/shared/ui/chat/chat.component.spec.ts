@@ -1373,6 +1373,28 @@ describe('ChatComponent', () => {
         expect(drag(input(), 'dragover', [], ['text/plain']).defaultPrevented).toBe(false);
         expect(drag(input(), 'drop', [], ['text/plain']).defaultPrevented).toBe(false);
       });
+
+      it('takes a drop anywhere on the chat and shows a frame while files hover', async () => {
+        const { log, api, view, settle } = await setup({ canAttach: true });
+        const frame = () => view.container.querySelector('app-drop-overlay');
+        fireEvent.dragEnter(log(), { dataTransfer: { types: ['Files'] } });
+        view.fixture.detectChanges();
+        expect(frame()).toHaveTextContent('Dateien zum Anhängen ablegen');
+        expect(frame()).toHaveAttribute('aria-hidden', 'true');
+        const drop = drag(log(), 'drop', [new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
+        expect(drop.defaultPrevented).toBe(true);
+        await settle();
+        expect(frame()).toBeNull();
+        expect(api.uploadDraftAttachment.mock.calls.map((c) => (c[0] as File).name)).toEqual(['a.pdf']);
+      });
+
+      it('lets a file drag pass on the log of a chat that takes no files', async () => {
+        const { log, view } = await setup({ canAttach: true, canPost: false });
+        expect(fireEvent.dragEnter(log(), { dataTransfer: { types: ['Files'] } })).toBe(true);
+        view.fixture.detectChanges();
+        expect(view.container.querySelector('app-drop-overlay')).toBeNull();
+        expect(drag(log(), 'drop', []).defaultPrevented).toBe(false);
+      });
     });
 
     it('keeps the text of a paste that also holds a picture of it (Word, a web page)', async () => {

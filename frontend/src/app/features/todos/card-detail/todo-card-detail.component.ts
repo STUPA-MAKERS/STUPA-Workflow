@@ -351,7 +351,10 @@ export class TodoCardDetailComponent {
     const assigned = new Set((this.card()?.assignees ?? []).map((a) => a.principalId));
     return this.members()
       .filter((m) => !assigned.has(m.principalId))
-      .map((m) => ({ value: m.principalId, label: m.displayName ?? this.t('chat.deletedPerson') }));
+      .map((m) => {
+        const label = m.displayName ?? this.t('chat.deletedPerson');
+        return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
+      });
   });
 
   readonly labelOptions = computed<FilterSelectOption[]>(() => {

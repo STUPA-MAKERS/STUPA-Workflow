@@ -49,8 +49,9 @@ export type EmptyStateShape =
  * reader has no access to. Ghost rows there would promise a list that never comes.
  *
  * Set `fill` when the empty state is the whole page or pane. The host then takes the free
- * height of its flex-column parent and centres the block in it vertically. Without it, the
- * block keeps its own height, for a card, a tab or a dialog.
+ * height of its flex-column parent. The ghost rows stay at the top, where the list would
+ * start; a `plain` state centres in that height. Without it, the block keeps its own
+ * height, for a card, a tab or a dialog.
  */
 @Component({
   selector: 'app-empty-state',
@@ -77,8 +78,8 @@ export class EmptyStateComponent {
   /** Number of ghost rows, 1 to 5. A small box (a dashboard tile) passes fewer. */
   readonly rows = input(5, { transform: numberAttribute });
   /**
-   * Fill the free height of the parent and centre in it. The parent must be a flex
-   * column that has that height.
+   * Fill the free height of the parent: ghost rows at the top, a `plain` state centred.
+   * The parent must be a flex column that has that height.
    */
   readonly fill = input(false, { transform: booleanAttribute });
   /**

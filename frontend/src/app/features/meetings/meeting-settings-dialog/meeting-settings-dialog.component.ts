@@ -22,9 +22,8 @@ import {
   InputComponent,
   TimeInputComponent,
   ToastService,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { errorCode, errorDetail } from '../meetings-display.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
@@ -99,16 +98,17 @@ export class MeetingSettingsDialogComponent {
   readonly keeperLocked = computed(() => this.locked() || this.protocolFinal());
 
   /** O20: members with `protocol.write`, and the current minute-taker. */
-  readonly keeperOptions = computed<SelectOption[]>(() => {
+  readonly keeperOptions = computed<SelectFieldOption[]>(() => {
     const current = this.meeting()?.protokollantId ?? null;
+    const none = this.i18n.translate('meetings.protokollant.none');
     return [
-      { value: '', label: this.i18n.translate('meetings.protokollant.none') },
+      { value: '', label: none, person: { name: none, icon: 'user' } },
       ...this.roster()
         .filter((a) => a.canKeepProtocol || a.principalId === current)
-        .map((a) => ({
-          value: a.principalId,
-          label: a.displayName || a.email || this.i18n.translate('common.unnamed'),
-        })),
+        .map((a) => {
+          const label = a.displayName || a.email || this.i18n.translate('common.unnamed');
+          return { value: a.principalId, label, person: { name: label, principalId: a.principalId } };
+        }),
     ];
   });
 

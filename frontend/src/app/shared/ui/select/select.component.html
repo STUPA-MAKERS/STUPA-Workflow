@@ -36,6 +36,16 @@
       (keyup)="onTriggerKeyUp($event)"
       (blur)="onBlur()"
     >
+      @if (chosen()?.person; as who) {
+        <app-avatar
+          class="sel__av"
+          size="xs"
+          [decorative]="true"
+          [name]="who.name"
+          [principalId]="who.principalId"
+          [icon]="who.icon"
+        />
+      }
       <span class="sel__value" [class.sel__value--empty]="!chosen()">{{ display() }}</span>
     </button>
     <app-icon class="fld__chevron" name="down" [size]="18" />
@@ -60,6 +70,16 @@
     (click)="pick(row)"
     (pointermove)="hover(row)"
   >
+    @if (row.person; as who) {
+      <app-avatar
+        class="sel__optAv"
+        size="xs"
+        [decorative]="true"
+        [name]="who.name"
+        [principalId]="who.principalId"
+        [icon]="who.icon"
+      />
+    }
     <span class="sel__label" [class.sel__label--empty]="row.placeholder">{{ row.label }}</span>
     @if (isChosen(row)) {
       <app-icon class="sel__check" name="check" [size]="18" />
