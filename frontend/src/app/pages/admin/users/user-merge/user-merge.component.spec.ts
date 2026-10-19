@@ -115,7 +115,11 @@ describe('UserMergeComponent', () => {
     // An inactive account without a name shows its e-mail and the tag.
     expect(screen.getAllByText('off@x').length).toBeGreaterThan(0);
     expect(screen.getByText('deaktiviert')).toBeInTheDocument();
-    expect(screen.getAllByText(/nie/)).toHaveLength(2);
+    // Each row carries the last login twice: as a column at the end (wide) and as a line
+    // below the e-mail (narrow). CSS shows one of them.
+    expect(list.querySelectorAll('.um__hitLogin--trail')).toHaveLength(2);
+    expect(list.querySelectorAll('.um__hitLogin--sub')).toHaveLength(2);
+    expect(screen.getAllByText(/nie/)).toHaveLength(4);
   });
 
   it('shows "no results" for an empty or failed search', async () => {

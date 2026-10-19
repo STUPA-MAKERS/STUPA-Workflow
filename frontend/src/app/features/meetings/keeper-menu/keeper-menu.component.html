@@ -20,6 +20,7 @@
 <app-search-pill
   class="km__search"
   size="md"
+  [clearable]="true"
   [placeholder]="'meetings.dock.searchMember' | t"
   [value]="query()"
   (valueChange)="query.set($event)"

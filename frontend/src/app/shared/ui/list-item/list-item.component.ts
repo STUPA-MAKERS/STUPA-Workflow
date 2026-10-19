@@ -36,7 +36,8 @@ import { type Params, RouterLink, type QueryParamsHandling } from '@angular/rout
  * Slots: `[lead]` (an avatar for a person, an icon or a date block; never initials for a
  * thing), `[status]` (a status right after the title, on the title line; the title gets
  * the ellipsis first), `[sub]` and `[trail]`. Set `--li-hover` on the host to change the
- * hover surface (for example in a row group on surface 2), `--li-color` to change the
+ * hover surface (for example in a row group on surface 2), `--li-min-height` and
+ * `--li-pad-y` for a dense list, `--li-color` to change the
  * text colour (for example a muted row of the past), `--li-sub-color` to change the colour
  * of the sub line, `--li-radius` to match the corners of a row group and `--li-bg` to give
  * the row a surface of its own (for example a checked row of a multiple selection).

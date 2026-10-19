@@ -61,6 +61,11 @@
 }
 .ccp__placeholder {
   color: var(--color-text-subtle);
+  /* The placeholder is a hint, not a value: one line with an ellipsis, so the empty
+     field keeps the height of the fields beside it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .ccp__swatch {
   display: inline-block;
