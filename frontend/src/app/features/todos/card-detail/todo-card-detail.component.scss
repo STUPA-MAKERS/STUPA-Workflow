@@ -32,8 +32,8 @@
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: var(--space-1);
-  padding-bottom: var(--space-4);
+  gap: var(--sheet-head-gap);
+  padding-bottom: 22px;
   border-bottom: 1px solid var(--color-border);
 }
 .cd__back {
@@ -50,24 +50,6 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
-/* The board in the kicker leads to the board; it keeps the muted kicker colour until hover. */
-.cd__kicker {
-  display: block;
-  min-width: 0;
-}
-.cd__kickerBoard {
-  color: inherit;
-  text-decoration: none;
-}
-.cd__kickerBoard:hover {
-  color: var(--color-text);
-  text-decoration: underline;
-}
-.cd__kickerBoard:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
 .cd__boardLink {
   display: inline-flex;
   align-items: center;
@@ -80,13 +62,6 @@
 }
 .cd__boardLink:hover {
   text-decoration: underline;
-}
-.cd__title {
-  margin: 0;
-  font-size: 1.625rem;
-  font-weight: var(--fw-bold);
-  line-height: 1.25;
-  overflow-wrap: anywhere;
 }
 .cd__titleForm,
 .cd__itemForm {
@@ -114,11 +89,6 @@
 .cd__titleInput:focus-visible,
 .cd__itemInput:focus-visible {
   outline: 2px solid var(--color-focus-ring);
-}
-.cd__created {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
 }
 /* A part of the line ("Angelegt von …", the day) wraps as a whole: a narrow sheet breaks
    the line between the parts, and inside a part only when it alone is wider than the
@@ -546,9 +516,6 @@ a.cd__linkTitle:hover {
   flex: 1 1 0;
   justify-content: center;
 }
-:host(.cd--phone) .cd__title {
-  font-size: var(--fs-h1);
-}
 .cd__panel {
   display: flex;
   flex-direction: column;
@@ -561,17 +528,6 @@ a.cd__linkTitle:hover {
 :host(.cd--phone) .cd__head {
   border-bottom: 0;
   padding-bottom: 0;
-}
-/* Under the back link the kicker line needs only the height of its 40px buttons. */
-:host(.cd--phone) .cd__head app-sheet-bar {
-  min-height: 40px;
-}
-/* The kicker wraps on a phone, so the board name stays whole; ⋮ stays at its first line. */
-:host(.cd--phone) .cd__head app-sheet-bar {
-  align-items: flex-start;
-}
-:host(.cd--phone) .cd__kicker {
-  padding-block: 10px;
 }
 /* The labels take only their own width, so the values get the room: at 360px a person
    chip with a first and a last name and the "+" fit on one line. */

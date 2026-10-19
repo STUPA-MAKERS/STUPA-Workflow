@@ -43,7 +43,9 @@ async function setup(inputs: Record<string, unknown> = {}) {
 describe('TransferDetailComponent', () => {
   it('shows the pair, both bookings, the data and who booked it', async () => {
     await setup();
-    expect(screen.getByText('Übertrag · HHJ 2025')).toBeInTheDocument();
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Zuschuss Hallensanierung' })).toBeInTheDocument();
     expect(screen.getByText('Ausgabe auf')).toBeInTheDocument();
     expect(screen.getByText('Einnahme auf')).toBeInTheDocument();
@@ -56,7 +58,6 @@ describe('TransferDetailComponent', () => {
 
   it('falls back to the paths and dashes for what it does not know', async () => {
     await setup({ costCentres: new Map(), fyLabel: null, transfer: { ...TRANSFER, note: null, actorName: null, paymentDate: null } });
-    expect(screen.getByText('Übertrag')).toBeInTheDocument();
     expect(screen.getAllByText('VS-900').length).toBeGreaterThan(0);
     expect(screen.getAllByText('—').length).toBeGreaterThan(2);
   });

@@ -29,7 +29,7 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 
@@ -48,6 +48,7 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   imports: [
     EmptyStateComponent,
     SheetBarComponent,
+    SheetBarTitleDirective,
     ButtonComponent,
     IconComponent,
     LocalizedDatePipe,
@@ -98,13 +99,6 @@ export class BookingDetailComponent {
   );
 
   /** "Buchung · HHJ 2026" (or "Unterbuchung"). */
-  protected readonly metaLine = computed(() => {
-    const e = this.expense();
-    const kind = this.i18n.translate(e.parentExpenseId ? 'expenses.detail.subKind' : 'expenses.detail.kind');
-    const fy = this.fyLabel();
-    return fy ? `${kind} · ${this.i18n.translate('expenses.detail.fy', { fy })}` : kind;
-  });
-
   protected readonly amount = computed(() => {
     const e = this.expense();
     return signedEur(e.kind, e.amount, this.i18n.locale());

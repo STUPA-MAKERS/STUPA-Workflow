@@ -37,6 +37,9 @@ import { ApplicationsPageService } from '../applications/applications-page.servi
 import { groupByMonth, type MonthGroup } from '../applications/applications.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
+import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
+import { liveSearch } from '@shared/live-search';
 
 const DAY_MS = 86_400_000;
 
@@ -118,6 +121,8 @@ interface TaskRow {
     StatusTextComponent,
     ScrollFadeDirective,
     FilterSelectComponent,
+    SearchPillComponent,
+    StickyBarComponent,
   ],
   providers: [ApplicationsPageService],
   host: { '[class.pane-page]': 'split()' },
@@ -166,13 +171,23 @@ export class TasksComponent implements OnDestroy {
   readonly showApplications = computed(() => !this.hasTodos() || this.show() !== 'todos');
   readonly showTodos = computed(() => this.hasTodos() && this.show() !== 'applications');
 
+  /** The applied search text, lower case; the rows filter in the browser. */
+  readonly query = signal('');
+  /** The search field: it filters while the user types, Escape and × clear it. */
+  readonly search = liveSearch({
+    run: (q) => this.query.set(q.toLocaleLowerCase()),
+    minLength: 1,
+  });
+
   readonly todoRows = computed<TodoRow[]>(() => {
     const today = isoDay(new Date(Date.now()));
     const f = { ...NO_FILTER, due: this.due() };
     const ctx = { today, mine: new Set<Uuid>(), labels: new Map() };
     const t: Translate = (key, params) => this.i18n.translate(key, params);
+    const q = this.query();
     return this.todos()
       .filter((item) => matchesFilter(item, f, ctx))
+      .filter((item) => !q || `${item.title} ${item.boardName}`.toLocaleLowerCase().includes(q))
       .map((item) => {
         if (!item.dueDate) return { item, due: null, tone: 'normal' as DueTone };
         const info = dueInfo(item.dueDate, today, this.i18n.formatLocale(), t);
@@ -196,7 +211,13 @@ export class TasksComponent implements OnDestroy {
   ]);
   readonly dueText = computed(() => this.i18n.translate(DUE_TEXT[this.due()]));
 
-  readonly rows = computed<TaskRow[]>(() =>
+  readonly rows = computed<TaskRow[]>(() => {
+    const q = this.query();
+    return this.allRows().filter(
+      (r) => !q || `${r.title} ${r.typeLabel} ${r.stateLabel ?? ''}`.toLocaleLowerCase().includes(q),
+    );
+  });
+  private readonly allRows = computed<TaskRow[]>(() =>
     this.tasks().map((item) => ({
       item,
       createdAt: item.createdAt,

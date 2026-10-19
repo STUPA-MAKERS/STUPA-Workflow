@@ -35,7 +35,7 @@ import {
   openVoteOf,
   topsLabel,
 } from '../meetings-overview.util';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** What the sheet loaded for the meeting. `null` = the request failed. */
@@ -78,6 +78,7 @@ interface AgendaRow {
   imports: [
     EmptyStateComponent,
     SheetBarComponent,
+    SheetBarTitleDirective,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
@@ -115,10 +116,10 @@ export class MeetingDetailSheetComponent {
   readonly status = computed<StatusView>(() => meetingStatus(this.meeting().status));
 
   /** "Studierendenparlament · Di., 29.09.2026". */
-  readonly metaLine = computed(() => {
+  /** "Di., 20.10.2026", or '' without a date. */
+  readonly dateText = computed(() => {
     const m = this.meeting();
-    const date = m.date ? weekdayDate(m.date, this.i18n.formatLocale()) : '';
-    return [m.gremiumName, date].filter(Boolean).join(' · ');
+    return m.date ? weekdayDate(m.date, this.i18n.formatLocale()) : '';
   });
 
   /** "seit 18:04", "18:00–20:00" or "18:04–21:40". */

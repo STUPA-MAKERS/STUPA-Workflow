@@ -56,6 +56,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
+import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import { TodoTileMenuComponent, type TileMenuRequest } from '../../features/todos/tile-menu/todo-tile-menu.component';
 import {
   TodoTransferDialogComponent,
@@ -174,6 +175,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
   // On a phone the board fills the free height too, so its column pages scroll inside;
   // the list scrolls as a page.
   host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
+  providers: [TodoCacheService],
   templateUrl: './todos.component.html',
   styleUrl: './todos.component.scss',
 })
@@ -188,6 +190,7 @@ export class TodosComponent implements OnDestroy {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
   private readonly live = inject(TodoLiveService);
+  private readonly cache = inject(TodoCacheService);
 
   readonly phone = mediaQuerySignal(MEDIA.phone);
 
@@ -306,17 +309,16 @@ export class TodosComponent implements OnDestroy {
     const n = this.rowMatches();
     return n === null ? this.rowsExpected() : n > 0;
   });
-  /** The shape of each board the page has shown: the skeleton draws it on a return. */
-  private readonly shapes = signal<ReadonlyMap<Uuid, { columns: number; labels: boolean }>>(new Map());
-  /** The shape of the loading board: known from an earlier visit, else a new board. */
+  /**
+   * The shape of a board that loads, the shape of a new board. A board shown or read ahead
+   * before shows at once, without a skeleton.
+   */
   readonly skeleton = computed(() => {
-    const id = this.boardId();
-    const known = id ? this.shapes().get(id) : undefined;
     const personal = this.summary()?.kind === 'personal';
     return {
-      columns: known?.columns ?? 4,
+      columns: 4,
       // A new personal board has no labels, so its chip row has no label chip.
-      labels: known?.labels ?? !personal,
+      labels: !personal,
       natural: personal && this.view() === 'board' && this.rowsExpected(),
     };
   });
@@ -456,6 +458,13 @@ export class TodosComponent implements OnDestroy {
       next: (boards) => {
         this.boards.set(boards);
         if (!this.boardId()) this.openDefault(boards);
+        // Read every board and its cards ahead, so a board change and an opened card
+        // show at once; the shown board first.
+        const shown = this.boardId();
+        this.cache.prefetch(
+          boards.map((b) => b.id),
+          shown && shown !== ALL_BOARDS ? shown : null,
+        );
       },
       error: () => {
         if (!this.boardId()) {
@@ -480,16 +489,15 @@ export class TodosComponent implements OnDestroy {
       untracked(() => this.loadMe(id));
     });
 
-    // Remember the shape of each shown board for its skeleton on a return.
+    // Keep the shown board and its people for a return.
     effect(() => {
       const b = this.board();
-      if (!b) return;
-      const shape = { columns: b.columns.length, labels: b.labels.length > 0 };
-      untracked(() => {
-        const known = this.shapes().get(b.id);
-        if (known?.columns === shape.columns && known.labels === shape.labels) return;
-        this.shapes.update((m) => new Map(m).set(b.id, shape));
-      });
+      if (b) untracked(() => this.cache.putBoard(b, this.etag));
+    });
+    effect(() => {
+      const list = this.members();
+      const b = this.board();
+      if (b && list.length) untracked(() => this.cache.putMembers(b.id, list));
     });
 
     // The drawer takes the focus once when it opens for a card.
@@ -572,7 +580,8 @@ export class TodosComponent implements OnDestroy {
     });
   }
 
-  private loadBoard(id: Uuid): void {
+  /** Show a board; `held` takes it from the reads made before, else it waits for its read. */
+  private loadBoard(id: Uuid, held = this.cache.board(id)): void {
     const seq = ++this.loadSeq;
     this.loading.set(true);
     this.notFound.set(false);
@@ -582,21 +591,34 @@ export class TodosComponent implements OnDestroy {
     this.rowMatches.set(null);
     this.filter.set(NO_FILTER);
     this.search.sync('');
-    this.api.pollBoard(id, null).subscribe({
+    // A board read ahead shows at once; the read behind it keeps it on a 304.
+    if (held) {
+      this.board.set(held.board);
+      this.etag = held.etag;
+      this.loading.set(false);
+      this.cache.readCards(held.board.cards, true);
+    }
+    const muts = this.mutations;
+    this.api.pollBoard(id, held?.etag ?? null).subscribe({
       next: ({ board, etag }) => {
         if (seq !== this.loadSeq) return;
-        this.board.set(board);
-        this.etag = etag;
+        if (board && !(held && muts !== this.mutations)) {
+          this.board.set(board);
+          this.etag = etag;
+          if (!held) this.cache.readCards(board.cards, true);
+        }
         this.loading.set(false);
       },
       error: (err: unknown) => {
         if (seq !== this.loadSeq) return;
         this.loading.set(false);
-        if (err instanceof HttpErrorResponse && err.status === 404) this.notFound.set(true);
-        else this.error.set(true);
+        if (err instanceof HttpErrorResponse && err.status === 404) {
+          this.board.set(null);
+          this.notFound.set(true);
+        } else if (!held) this.error.set(true);
       },
     });
-    this.members.set([]);
+    this.members.set((held && this.cache.members(id)) || []);
     this.api.members(id).subscribe({
       next: (list) => {
         if (seq === this.loadSeq) this.members.set(list);
@@ -1136,8 +1158,9 @@ export class TodosComponent implements OnDestroy {
     this.boards.update((list) => list.map((b) => (b.id === board.id ? { ...b, name: board.name } : b)));
   }
 
+  /** Read the board again, not from the reads made before (the retry after an error). */
   reload(): void {
     const id = this.boardId();
-    if (id) this.loadBoard(id);
+    if (id) this.loadBoard(id, null);
   }
 }

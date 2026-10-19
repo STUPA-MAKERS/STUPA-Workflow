@@ -76,7 +76,9 @@ const text = () => (document.body.textContent ?? '').replace(/\s+/g, ' ');
 describe('InvoiceDetailComponent', () => {
   it('shows the head, the receipt, the amounts with the VAT rate, the data and the bookings', async () => {
     await setup();
-    expect(screen.getByText('Rechnung · RE-2026-118')).toBeInTheDocument();
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Radhaus Müller GmbH' })).toBeInTheDocument();
     expect(screen.getByText('in 9 Tagen')).toBeInTheDocument();
     expect(screen.getByText('USt. 19 %')).toBeInTheDocument();
@@ -139,7 +141,6 @@ describe('InvoiceDetailComponent', () => {
       },
       canManage: false,
     });
-    expect(screen.getByText('Rechnung')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Rechnung ohne Lieferant' })).toBeInTheDocument();
     expect(screen.getByText('USt.')).toBeInTheDocument();
     expect(screen.getByText('Kein Beleg-PDF hinterlegt.')).toBeInTheDocument();

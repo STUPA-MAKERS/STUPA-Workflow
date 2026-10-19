@@ -32,23 +32,11 @@
   padding-bottom: 22px;
   border-bottom: var(--border-width) solid var(--color-border);
 }
-.ms__title {
-  margin: 0;
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-tight);
-  overflow-wrap: anywhere;
-}
 
 /* Items with a dot between two of them, also after a wrap (never a dot at a line start). */
 .ms__line {
   --ms-sep: 24px;
-  margin: 0;
   overflow-x: clip;
-  color: var(--color-text-muted);
-  font-size: var(--fs-md);
-  min-width: 0;
 }
 .ms__parts {
   display: flex;

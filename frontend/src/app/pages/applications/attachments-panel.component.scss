@@ -40,15 +40,10 @@
   padding-inline: var(--space-4) var(--space-1);
 }
 /* Every checkbox of the panel has a 44px touch target around its 18px box. The
-   negative margins keep the box where it was and the row or bar at its height. */
-.att__bulkbar app-checkbox ::ng-deep label,
+   negative margins keep the box where it was and the row at its height. */
 .att__row app-checkbox ::ng-deep label {
   min-height: 2.75rem;
   margin-block: calc((1.125rem - 2.75rem) / 2);
-}
-.att__bulkbar app-checkbox ::ng-deep label {
-  padding-inline: calc((2.75rem - 1.125rem) / 2);
-  margin-inline: calc((1.125rem - 2.75rem) / 2) 0;
 }
 /* A row box has no text of its own (the file name names it), so its label is the box
    and its target only, centred on the box. */
