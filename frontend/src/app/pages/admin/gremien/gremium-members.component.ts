@@ -11,6 +11,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -172,7 +173,7 @@ export class GremiumMembersComponent {
   }
 
   private roleName(role: GremiumRole): string {
-    return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
+    return i18nLabel(role.name, this.i18n.locale(), role.key);
   }
 
   private rank(role: GremiumRole | undefined): number {

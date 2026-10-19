@@ -17,17 +17,13 @@
 }
 
 <h3 class="km__cap cap">{{ heading() | t }}</h3>
-<label class="km__search">
-  <app-icon name="search" [size]="17" />
-  <input
-    type="search"
-    name="keeperQuery"
-    [placeholder]="'meetings.dock.searchMember' | t"
-    [attr.aria-label]="'meetings.dock.searchMember' | t"
-    [ngModel]="query()"
-    (ngModelChange)="query.set($event)"
-  />
-</label>
+<app-search-pill
+  class="km__search"
+  size="md"
+  [placeholder]="'meetings.dock.searchMember' | t"
+  [value]="query()"
+  (valueChange)="query.set($event)"
+/>
 
 <ul class="km__people">
   @for (c of candidates(); track c.principalId) {

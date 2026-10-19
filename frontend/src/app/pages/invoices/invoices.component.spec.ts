@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { render, screen, within } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -440,136 +440,93 @@ describe('InvoicesComponent', () => {
     expect(c.loadingMore()).toBe(false);
   });
 
-  function dragEvent(types: string[], file?: File): DragEvent {
-    return {
-      preventDefault: jest.fn(),
-      dataTransfer: {
-        types,
-        files: file ? ([file] as unknown as FileList) : ([] as unknown as FileList),
-      },
-    } as unknown as DragEvent;
-  }
+  // Drag and drop on the page (`appFileDrop`; the counting has its own spec).
+  const pdfFile = () => new File(['x'], 'a.pdf', { type: 'application/pdf' });
+  const fileDrag = (file?: File) => ({ dataTransfer: { types: ['Files'], files: file ? [file] : [] } });
+  const pageOf = (container: Element) => container.querySelector('.inv') as HTMLElement;
+  const overlay = (container: Element) => container.querySelector('app-drop-overlay');
 
-  it('onDragEnter activates the overlay when files are dragged and user can manage', async () => {
-    const { c } = await setup();
-    const ev = dragEvent(['Files']);
-    c.onDragEnter(ev);
-    expect(ev.preventDefault).toHaveBeenCalled();
-    expect(c.dragActive()).toBe(true);
+  it('shows the overlay while a manager drags files over the page', async () => {
+    const { fixture, container } = await setup();
+    // A cancelled dragenter (false) takes the drag.
+    expect(fireEvent.dragEnter(pageOf(container), fileDrag())).toBe(false);
+    fixture.detectChanges();
+    expect(overlay(container)).not.toBeNull();
+    expect(fireEvent.dragOver(pageOf(container), fileDrag())).toBe(false);
   });
 
-  it('onDragEnter ignores when user cannot manage', async () => {
-    const { c } = await setup({ canManage: false });
-    const ev = dragEvent(['Files']);
-    c.onDragEnter(ev);
-    expect(c.dragActive()).toBe(false);
-    expect(ev.preventDefault).not.toHaveBeenCalled();
+  it('takes no drag for a reader, a text drag or a drag without data', async () => {
+    const { fixture, container } = await setup({ canManage: false });
+    expect(fireEvent.dragEnter(pageOf(container), fileDrag())).toBe(true);
+    expect(fireEvent.dragOver(pageOf(container), fileDrag())).toBe(true);
+    fixture.detectChanges();
+    expect(overlay(container)).toBeNull();
+    TestBed.resetTestingModule();
+    const manager = await setup();
+    const page = pageOf(manager.container);
+    expect(fireEvent.dragEnter(page, { dataTransfer: { types: ['text/plain'] } })).toBe(true);
+    expect(fireEvent.dragEnter(page)).toBe(true);
+    expect(fireEvent.dragOver(page, { dataTransfer: { types: [] } })).toBe(true);
+    manager.fixture.detectChanges();
+    expect(overlay(manager.container)).toBeNull();
   });
 
-  it('onDragEnter ignores when no files in the drag', async () => {
-    const { c } = await setup();
-    const ev = dragEvent(['text/plain']);
-    c.onDragEnter(ev);
-    expect(c.dragActive()).toBe(false);
+  it('keeps the overlay until the last leave', async () => {
+    const { fixture, container } = await setup();
+    const page = pageOf(container);
+    const inner = container.querySelector('.inv__scroll') as HTMLElement;
+    fireEvent.dragEnter(page, fileDrag());
+    fireEvent.dragEnter(inner, fileDrag());
+    fireEvent.dragLeave(page, fileDrag());
+    fixture.detectChanges();
+    expect(overlay(container)).not.toBeNull();
+    fireEvent.dragLeave(inner, fileDrag());
+    fixture.detectChanges();
+    expect(overlay(container)).toBeNull();
   });
 
-  it('hasFiles tolerates a missing dataTransfer (no types)', async () => {
-    const { c } = await setup();
-    // dataTransfer is undefined. So `?.types ?? []` stays empty and reports no files.
-    const ev = { preventDefault: jest.fn(), dataTransfer: undefined } as unknown as DragEvent;
-    c.onDragEnter(ev);
-    expect(c.dragActive()).toBe(false);
-    expect(ev.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it('onDragOver preventDefault only for file drags by a manager', async () => {
-    const { c } = await setup();
-    const ok = dragEvent(['Files']);
-    c.onDragOver(ok);
-    expect(ok.preventDefault).toHaveBeenCalled();
-    const noFiles = dragEvent([]);
-    c.onDragOver(noFiles);
-    expect(noFiles.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it('onDragOver ignored without manage rights', async () => {
-    const { c } = await setup({ canManage: false });
-    const ev = dragEvent(['Files']);
-    c.onDragOver(ev);
-    expect(ev.preventDefault).not.toHaveBeenCalled();
-  });
-
-  it('onDragLeave decrements depth and deactivates at zero', async () => {
-    const { c } = await setup();
-    c.onDragEnter(dragEvent(['Files'])); // Depth 1, active.
-    c.onDragEnter(dragEvent(['Files'])); // Depth 2.
-    const leave1 = dragEvent(['Files']);
-    c.onDragLeave(leave1); // Depth 1, still active.
-    expect(c.dragActive()).toBe(true);
-    const leave2 = dragEvent(['Files']);
-    c.onDragLeave(leave2); // Depth 0, now inactive.
-    expect(c.dragActive()).toBe(false);
-  });
-
-  it('onDragLeave is a no-op when not active', async () => {
-    const { c } = await setup();
-    const ev = dragEvent(['Files']);
-    c.onDragLeave(ev);
-    expect(ev.preventDefault).not.toHaveBeenCalled();
-    expect(c.dragActive()).toBe(false);
-  });
-
-  it('onDrop ignored without manage rights', async () => {
-    const { c, http } = await setup({ canManage: false });
-    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    const ev = dragEvent(['Files'], file);
-    c.onDrop(ev);
-    expect(ev.preventDefault).not.toHaveBeenCalled();
+  it('imports nothing that a reader drops', async () => {
+    const { container, http } = await setup({ canManage: false });
+    expect(fireEvent.drop(pageOf(container), fileDrag(pdfFile()))).toBe(true);
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
-  it('onDrop with a file triggers an import (parse)', async () => {
-    const { c, http } = await setup();
-    c.onDragEnter(dragEvent(['Files']));
-    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    const ev = dragEvent(['Files'], file);
-    c.onDrop(ev);
-    expect(ev.preventDefault).toHaveBeenCalled();
-    expect(c.dragActive()).toBe(false);
+  it('imports a PDF dropped on the page and hides the overlay', async () => {
+    const { c, fixture, container, http } = await setup();
+    fireEvent.dragEnter(pageOf(container), fileDrag());
+    expect(fireEvent.drop(pageOf(container), fileDrag(pdfFile()))).toBe(false);
+    fixture.detectChanges();
+    expect(overlay(container)).toBeNull();
     const req = http.expectOne((r) => r.url.endsWith('/api/invoices/parse'));
     expect(c.importing()).toBe(true);
     req.flush(PARSE);
     expect(c.importing()).toBe(false);
   });
 
-  it('onDrop without a file just resets the overlay', async () => {
-    const { c, http } = await setup();
-    c.onDragEnter(dragEvent(['Files']));
-    const ev = dragEvent(['Files']); // No file.
-    c.onDrop(ev);
-    expect(c.dragActive()).toBe(false);
+  it('only resets the overlay for a drop without a file', async () => {
+    const { c, fixture, container, http } = await setup();
+    fireEvent.dragEnter(pageOf(container), fileDrag());
+    fireEvent.drop(pageOf(container), fileDrag());
+    fixture.detectChanges();
+    expect(overlay(container)).toBeNull();
+    http.expectNone((r) => r.url.includes('/invoices/parse'));
+    c.onFilesDropped([]);
     http.expectNone((r) => r.url.includes('/invoices/parse'));
   });
 
-  it('onDrop leaves a drop on the drop zone to the zone', async () => {
-    const { c, http } = await setup();
-    c.onDragEnter(dragEvent(['Files']));
-    const zone = document.createElement('app-file-drop-zone');
-    const inner = document.createElement('span');
-    zone.appendChild(inner);
-    const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
-    const ev = { ...dragEvent(['Files'], file), target: inner } as unknown as DragEvent;
-    c.onDrop(ev);
-    expect(ev.preventDefault).not.toHaveBeenCalled();
-    expect(c.dragActive()).toBe(false);
-    http.expectNone((r) => r.url.includes('/invoices/parse'));
-    // A target outside the zone, and a target without `closest`, count as the page.
-    const outside = { ...dragEvent(['Files']), target: document.createElement('div') } as unknown as DragEvent;
-    c.onDrop(outside);
-    expect(outside.preventDefault).toHaveBeenCalled();
-    const odd = { ...dragEvent(['Files']), target: {} } as unknown as DragEvent;
-    c.onDrop(odd);
-    expect(odd.preventDefault).toHaveBeenCalled();
+  it('leaves a drag and a drop on the drop zone to the zone', async () => {
+    const { fixture, container, http } = await setup();
+    const zone = container.querySelector('app-file-drop-zone') as HTMLElement;
+    const inner = zone.querySelector('*') as HTMLElement;
+    fireEvent.dragEnter(pageOf(container), fileDrag());
+    // Into the zone: the page counts the leave of the page, not the enter of the zone.
+    fireEvent.dragEnter(inner, fileDrag());
+    fireEvent.dragLeave(pageOf(container), fileDrag());
+    fixture.detectChanges();
+    expect(overlay(container)).toBeNull();
+    fireEvent.drop(inner, fileDrag(pdfFile()));
+    // One import: the zone's own.
+    expect(http.match((r) => r.url.endsWith('/api/invoices/parse')).length).toBe(1);
   });
 
   it('onZoneFiles imports nothing for a reader', async () => {
@@ -1611,10 +1568,10 @@ describe('InvoicesComponent (list/detail)', () => {
   });
 
   it('shows the whole page as the drop target while a PDF is dragged over it', async () => {
-    const { c, fixture, container } = await setup();
-    c.dragActive.set(true);
+    const { fixture, container } = await setup();
+    fireEvent.dragEnter(container.querySelector('.inv') as HTMLElement, { dataTransfer: { types: ['Files'] } });
     fixture.detectChanges();
-    expect(container.querySelector('.inv__dropOverlay')?.textContent).toContain('PDF hier ablegen, um zu importieren');
+    expect(container.querySelector('app-drop-overlay')?.textContent).toContain('PDF hier ablegen, um zu importieren');
   });
 
   it('formats days and loads the tree only once', async () => {

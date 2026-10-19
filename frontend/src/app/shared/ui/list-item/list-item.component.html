@@ -1,4 +1,4 @@
-<div class="li" [class.li--on]="selected()" [class.li--wrap]="wrap()" (pointerenter)="measure()">
+<div class="li" [class.li--on]="selected()" [class.li--wrap]="wrap()" [class.li--subWrap]="subWrap()" (pointerenter)="measure()">
   <span class="li__lead"><ng-content select="[lead]" /></span>
   <span class="li__body">
     <span class="li__head">

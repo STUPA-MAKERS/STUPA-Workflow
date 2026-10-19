@@ -97,28 +97,7 @@
               @if (revisionId(e)) {
                 <div class="al__diff">
                   @if (diffOf(e); as d) {
-                    @if (diffLines(d); as lines) {
-                      <!-- One compact code block: the field, "-" the old value, "+" the new. -->
-                      <div class="al__code mono" role="group" [attr.aria-label]="'admin.audit.diff.label' | t">
-                        @for (l of lines; track l.key) {
-                          <div class="al__codeItem">
-                            <div class="al__codeKey">{{ l.key }}</div>
-                            @if (l.before !== null) {
-                              <div class="al__codeDel">
-                                <span aria-hidden="true">- </span><span class="sr-only">{{ 'admin.audit.diff.before' | t }}: </span>{{ l.before }}
-                              </div>
-                            }
-                            @if (l.after !== null) {
-                              <div class="al__codeIns">
-                                <span aria-hidden="true">+ </span><span class="sr-only">{{ 'admin.audit.diff.after' | t }}: </span>{{ l.after }}
-                              </div>
-                            }
-                          </div>
-                        } @empty {
-                          <p class="al__codeNone">{{ 'admin.audit.diff.none' | t }}</p>
-                        }
-                      </div>
-                    }
+                    <app-config-diff [diff]="d.diff" compact />
                   } @else {
                     <app-skeleton variant="lines" [count]="2" [label]="'common.loading' | t" />
                   }
@@ -160,15 +139,11 @@
   }
 </section>
 
-<app-dialog
+<app-confirm-dialog
   [open]="!!confirmRevert()"
   [title]="'admin.audit.revert.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmRevert.set(null)"
->
-  <p class="al__dialogText">{{ 'admin.audit.revert.confirm' | t }}</p>
-  <div dialog-footer class="al__dialogFoot">
-    <app-button variant="text" (click)="confirmRevert.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="danger" (click)="doRevert()">{{ 'admin.audit.revert.action' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="'admin.audit.revert.confirm' | t"
+  [confirmLabel]="'admin.audit.revert.action' | t"
+  (confirm)="doRevert()"
+  (cancel)="confirmRevert.set(null)"
+/>

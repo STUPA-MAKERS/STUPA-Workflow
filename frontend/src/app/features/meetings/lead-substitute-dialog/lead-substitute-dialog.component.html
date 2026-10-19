@@ -13,18 +13,13 @@
     <section class="dd__group" [attr.aria-label]="'meetings.leadSubstitute.pool' | t">
       <h3 class="dd__cap cap">{{ 'meetings.leadSubstitute.pool' | t }}</h3>
       @if (searchable()) {
-        <label class="dd__search">
-          <app-icon name="search" [size]="17" />
-          <input
-            class="dd__searchInput"
-            type="search"
-            name="lead-substitute-search"
-            [ngModel]="query()"
-            (ngModelChange)="query.set($event)"
-            [placeholder]="'meetings.leadSubstitute.search' | t"
-            [attr.aria-label]="'meetings.leadSubstitute.search' | t"
-          />
-        </label>
+        <app-search-pill
+          class="dd__search"
+          size="md"
+          [placeholder]="'meetings.leadSubstitute.search' | t"
+          [value]="query()"
+          (valueChange)="query.set($event)"
+        />
       }
       @if (failed()) {
         <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'meetings.leadSubstitute.loadFailed' | t }}</app-note>

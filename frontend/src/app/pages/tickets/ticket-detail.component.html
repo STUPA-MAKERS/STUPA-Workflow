@@ -275,22 +275,13 @@
           {{ 'tickets.todos.add' | t }}
         </app-button>
       </div>
-      @if (todos().length) {
-        <ul class="rowgroup td__todos">
-          @for (card of todos(); track card.id) {
-            <li class="td__todo" [class.td__todo--done]="card.isDone">
-              <app-icon class="td__todoIcon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
-              <span class="td__todoText">
-                <a class="td__todoTitle" [routerLink]="['/todos', card.boardId]" [queryParams]="{ card: card.id }">{{ card.title }}</a>
-                <span class="td__todoSub">{{ todoSub(card) }}</span>
-              </span>
-              @if (card.assignees.length) {
-                <app-avatar-stack size="xs" [names]="todoNames(card)" [principalIds]="todoIds(card)" [max]="3" />
-              }
-            </li>
-          }
-        </ul>
-      }
+      <app-todo-linked-list
+        kind="ticket"
+        avatarSize="xs"
+        [targetId]="ticket.id"
+        [items]="todos()"
+        [showTitle]="false"
+      />
     </section>
   }
 
@@ -416,5 +407,13 @@
 </app-dialog>
 
 @if (manager && ticket(); as ticket) {
-  <app-ticket-todo-dialog [ticket]="ticket" [(open)]="todoOpen" (created)="onTodoCreated()" />
+  <app-todo-new-dialog
+    heading="tickets.todo.title"
+    [withDescription]="false"
+    [boardKinds]="todoBoardKinds"
+    [initialTitle]="ticket.title"
+    [initialLinks]="todoLinks()"
+    [(open)]="todoOpen"
+    (created)="onTodoCreated()"
+  />
 }

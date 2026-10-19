@@ -8,7 +8,7 @@ import {
   type ExpenseKind,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
-import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { debounced } from '@shared/debounced';
 
 export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
 
@@ -22,7 +22,6 @@ export class ExpensesListState {
 
   private readonly PAGE = 20;
   private nextOffset = 0;
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   readonly budgetTree = signal<BudgetTreeNode[]>([]);
   readonly items = signal<Expense[]>([]);
@@ -146,10 +145,8 @@ export class ExpensesListState {
     this.reload();
   }
 
-  private debouncedReload(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), LIVE_SEARCH_DEBOUNCE_MS);
-  }
+  /** The search and the typed filter bounds reload after a pause. */
+  private readonly debouncedReload = debounced(() => this.reload());
 
   /**
    * Reload page 0 after a filter or sort change, WITHOUT emptying the list first.
@@ -264,6 +261,6 @@ export class ExpensesListState {
   }
 
   dispose(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.debouncedReload.cancel();
   }
 }

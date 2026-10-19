@@ -91,21 +91,15 @@
               }
             </div>
             @if (emailMatch(); as match) {
-              <p class="ff__info" role="status" data-testid="cap-email-match">
-                <app-icon name="user" [size]="16" />
-                <span>{{ 'applications.capture.emailMatch' | t: { name: match.displayName || match.email || '' } }}</span>
-              </p>
+              <app-note icon="user" [surface]="layout() === 'sheet' ? 3 : 2" role="status" data-testid="cap-email-match">{{ 'applications.capture.emailMatch' | t: { name: match.displayName || match.email || '' } }}</app-note>
             }
             @if (noHits()) {
-              <p class="ff__info" role="status">
-                <app-icon name="info" [size]="16" />
-                <span class="cap__noHit">
+              <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2" role="status"><span class="cap__noHit">
                   {{ 'applications.capture.noHits' | t }}
                   <button type="button" class="cap__link" (click)="useAsGuest()">
                     {{ 'applications.capture.useGuest' | t }}
                   </button>
-                </span>
-              </p>
+                </span></app-note>
             }
           } @else {
             <div class="ff__grid cap__guest">
@@ -179,10 +173,7 @@
         />
       </fieldset>
     } @else {
-      <p class="ff__info cap__pickType">
-        <app-icon name="info" [size]="16" />
-        <span>{{ 'applications.capture.pickType' | t }}</span>
-      </p>
+      <app-note class="cap__pickType" icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'applications.capture.pickType' | t }}</app-note>
     }
   </div>
 

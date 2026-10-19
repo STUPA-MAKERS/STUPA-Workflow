@@ -13,6 +13,7 @@ import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/ro
 import { filter } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { ApplicationListItem, ApplicationType, IsoDateTime, Uuid } from '@core/api/models';
@@ -344,14 +345,8 @@ export class TasksComponent implements OnDestroy {
 
   /** The exact moment, for the tooltip of the waiting time. */
   sinceTitle(at: IsoDateTime | null | undefined): string | null {
-    if (!at) return null;
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) return null;
-    const when = new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(d);
-    return this.i18n.translate('tasks.waiting.title', { date: when });
+    const when = formatMoment(at, this.i18n.formatLocale());
+    return when ? this.i18n.translate('tasks.waiting.title', { date: when }) : null;
   }
 
   /** "Zur Liste" (narrow layout): close the detail. */

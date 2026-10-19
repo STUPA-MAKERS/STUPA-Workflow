@@ -5,7 +5,6 @@ import {
   inject,
   input,
   output,
-  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -19,7 +18,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
+import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
@@ -31,6 +30,7 @@ import {
 import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
 import type { ExpenseTransfersState } from '../expense-transfers.state';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** A new transfer, or a correction of the one in `transfers.editing`. */
 export type TransferFormMode = 'create' | 'edit';
@@ -59,8 +59,9 @@ interface Leg {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     ButtonComponent,
-    CostCentreTreeComponent,
+    CostCentrePickerComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     FormsModule,
@@ -89,12 +90,6 @@ export class TransferFormComponent {
   readonly remove = output<void>();
 
   /** The open tree: the source or the target field. */
-  protected readonly picking = signal<'from' | 'to' | null>(null);
-
-  protected label(id: string): CostCentreLabel | null {
-    return id ? costCentreLabel(this.costCentres(), id, null) : null;
-  }
-
   /** The fixed pair of the transfer under correction. */
   protected readonly pair = computed(() => {
     const t = this.transfers().editing();
@@ -127,11 +122,6 @@ export class TransferFormComponent {
     if (!id) return;
     if (which === 'from') this.dialogs().onTransferFrom(id);
     else this.dialogs().tToId.set(id);
-    this.picking.set(null);
-  }
-
-  protected toggle(which: 'from' | 'to'): void {
-    this.picking.set(this.picking() === which ? null : which);
   }
 
   money(value: number): string {

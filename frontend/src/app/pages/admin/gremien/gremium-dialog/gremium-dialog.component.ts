@@ -33,6 +33,7 @@ import {
   slugify,
 } from '../../admin.models';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The largest lead time in minutes that the server accepts (30 days). */
 export const MAX_DELEGATION_LEAD_MINUTES = 60 * 24 * 30;
@@ -99,6 +100,7 @@ export function parseRecipients(raw: string): string[] {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     SkeletonComponent,
     FormsModule,
     RouterLink,

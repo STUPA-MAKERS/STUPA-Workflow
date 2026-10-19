@@ -26,6 +26,7 @@ import { bookedOn } from '../invoice-figures';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /**
  * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
@@ -41,6 +42,7 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,

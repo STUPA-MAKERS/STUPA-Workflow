@@ -65,6 +65,54 @@
   color: var(--color-text);
 }
 
+/* Inline: a row in the flow of the page, in the place of the row it stands for (the
+   tabs above a list, the title row of a phone). The selected surface marks the mode. */
+:host(.selbar--inline) {
+  position: static;
+  display: block;
+  flex: none;
+  min-width: 0;
+  pointer-events: auto;
+}
+:host(.selbar--inline) .selbar {
+  gap: var(--space-2);
+  max-width: none;
+  height: auto;
+  min-height: var(--control-height);
+  padding: 0 var(--space-2) 0 var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+  box-shadow: none;
+}
+:host(.selbar--inline) .selbar__count {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-right: 0;
+  overflow: hidden;
+  font-size: var(--fs-md);
+  text-overflow: ellipsis;
+}
+:host(.selbar--inline) .selbar__clear {
+  color: inherit;
+}
+
+/* The select-all box takes the free width: the whole count is its label. */
+.selbar__all {
+  flex: 1 1 auto;
+  align-self: stretch;
+  min-width: 0;
+}
+.selbar__all ::ng-deep label {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: inherit;
+}
+.selbar__all ::ng-deep .cbx__label {
+  display: flex;
+  min-width: 0;
+}
+
 /* A phone has little room: a narrower edge and a smaller gap after the count. */
 @include bp.phone {
   .selbar {

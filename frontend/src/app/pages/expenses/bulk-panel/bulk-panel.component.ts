@@ -6,14 +6,13 @@ import {
   input,
   model,
   output,
-  signal,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent, IconComponent, InputComponent } from '@stupa-makers/ui-kit';
-import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
+import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
@@ -40,7 +39,7 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
-    CostCentreTreeComponent,
+    CostCentrePickerComponent,
     FormsModule,
     IconComponent,
     InputComponent,
@@ -72,7 +71,6 @@ export class BulkPanelComponent {
   readonly remove = output<void>();
   readonly closed = output<void>();
 
-  protected readonly treeOpen = signal(false);
 
   /** The sum of the selection, signed. */
   protected readonly sum = computed(() => {
@@ -109,7 +107,6 @@ export class BulkPanelComponent {
 
   protected pick(id: string): void {
     this.budgetId.set(id);
-    this.treeOpen.set(false);
   }
 
   costCentre(e: Expense): CostCentreLabel {

@@ -132,6 +132,11 @@
 .ff__grid--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
+/* A grid with a picker in it (`app-cost-centre-picker inGrid`): its tree takes a row of
+   its own, and the cells after the picker stay in the row of the picker. */
+.ff__grid--dense {
+  grid-auto-flow: row dense;
+}
 @include bp.phone {
   .ff__grid--3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -158,63 +163,17 @@
 .ff__control::-webkit-search-cancel-button {
   display: none;
 }
-/* A field that opens a picker: the whole box is the button. */
-.ff__pick {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--field-height);
-  margin: 0;
-  padding: 24px var(--space-3) 8px var(--space-4);
-  border: 0;
-  border-radius: var(--radius-field);
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--fs-md);
-  line-height: 1.375rem;
-  text-align: start;
-  cursor: pointer;
-}
-.ff__pick:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.ff__pick > .ell {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-.ff__pick app-icon {
-  flex: none;
-  color: var(--color-text-muted);
-  pointer-events: none;
-}
-.ff__placeholder {
-  color: var(--color-text-subtle);
-}
-.ff__swatch {
-  display: inline-block;
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 2px;
-}
 .ff__mono {
   color: var(--color-text-muted);
   font-family: var(--font-mono);
   font-size: 0.8125rem;
 }
-/* The tree of a picker field, open below the field. */
-.ff__tree {
-  max-height: 18rem;
-  overflow-y: auto;
-  padding: var(--space-2);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
+/* The tree of a cost-centre picker (`app-cost-centre-picker`), open below the field. */
+.ff {
+  --ccp-tree-bg: var(--color-surface-2);
 }
-.ff--sheet .ff__tree {
-  background: var(--color-surface-3);
+.ff--sheet {
+  --ccp-tree-bg: var(--color-surface-3);
 }
 
 /* A fixed value: dashed outline, a lock before the label. */
@@ -276,25 +235,6 @@
   }
 }
 
-/* An info line: an icon and a short text. */
-.ff__info {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-.ff--sheet .ff__info {
-  background: var(--color-surface-3);
-}
-.ff__info app-icon {
-  flex: none;
-  margin-top: 1px;
-}
 .ff__error {
   margin: 0;
   padding: 0 var(--space-4);

@@ -1,10 +1,11 @@
 :host {
+  --note-surface: var(--color-surface-2);
   display: flex;
   align-items: flex-start;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-field);
-  background: var(--color-surface-2);
+  background: var(--note-surface);
   color: var(--color-text-muted);
   font-size: 0.84375rem; /* 13.5px */
   line-height: 1.25rem;
@@ -14,15 +15,25 @@
   flex: none;
   margin-top: 1px;
 }
+/* Inside a sheet, which is surface 2 itself. */
+:host(.note--s3) {
+  --note-surface: var(--color-surface-3);
+}
+:host(.note--ok) {
+  color: var(--color-text);
+}
+:host(.note--ok) .note__icon {
+  color: var(--color-accent-text);
+}
 /* A warning or an error must stand out from a neutral note beside it (board
    Arbeit-Rechnung-Import, duplicate warning): the surface takes a tint of the tone,
    and the text the full text colour. */
 :host(.note--warn) {
-  background: color-mix(in srgb, var(--color-warning) 14%, var(--color-surface-2));
+  background: color-mix(in srgb, var(--color-warning) 14%, var(--note-surface));
   color: var(--color-text);
 }
 :host(.note--error) {
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface-2));
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--note-surface));
   color: var(--color-text);
 }
 :host(.note--warn) .note__icon {
@@ -51,7 +62,8 @@
 /* The retry button is centred on a text line. It moves back by the start padding of a
    text sm button (10px), so that below the text its label starts at the edge of the
    text. */
-.note__action {
+.note__action,
+.note__body > ::ng-deep [noteAction] {
   flex: none;
   margin-block: calc((1.25rem - 2rem) / 2); /* a 32px sm button on a 20px text line */
   margin-inline-start: -10px;

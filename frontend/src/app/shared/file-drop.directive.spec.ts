@@ -25,6 +25,20 @@ class HostComponent {
   pageDrops = 0;
 }
 
+@Component({
+  standalone: true,
+  imports: [FileDropDirective],
+  template: `
+    <div id="zone" appFileDrop #zone="appFileDrop" appFileDropExclude=".own" (appFileDrop)="dropped.push($event)">
+      <span id="child">{{ zone.active() ? 'aktiv' : 'ruhig' }}</span>
+      <div class="own"><span id="own">eigene Ablage</span></div>
+    </div>
+  `,
+})
+class ExcludeHostComponent {
+  readonly dropped: File[][] = [];
+}
+
 const files = { types: ['Files'] };
 const pdf = new File(['x'], 'a.pdf', { type: 'application/pdf' });
 
@@ -113,6 +127,31 @@ describe('FileDropDirective', () => {
     host.enabled.set(true);
     fireEvent.dragEnter(zone, { dataTransfer: files });
     fireEvent.dragLeave(zone, { dataTransfer: files });
+    expect(state()).toBe('ruhig');
+  });
+
+  it('leaves a drag over an excluded child alone and hides there', async () => {
+    const view = await render(ExcludeHostComponent);
+    const q = (sel: string) => view.container.querySelector(sel) as HTMLElement;
+    const state = () => {
+      view.fixture.detectChanges();
+      return q('#child').textContent;
+    };
+    fireEvent.dragEnter(q('#child'), { dataTransfer: files });
+    expect(state()).toBe('aktiv');
+    // Into the child that takes its own drops: its enter is not counted and passes on,
+    // the leave of the page child counts, so the overlay hides.
+    expect(fireEvent.dragEnter(q('#own'), { dataTransfer: files })).toBe(true);
+    fireEvent.dragLeave(q('#child'), { dataTransfer: files });
+    expect(state()).toBe('ruhig');
+    fireEvent.drop(q('#own'), { dataTransfer: { types: ['Files'], files: [pdf] } });
+    expect(view.fixture.componentInstance.dropped).toEqual([]);
+    // Back on the host itself, a drop counts.
+    fireEvent.dragEnter(q('#child'), { dataTransfer: files });
+    fireEvent.dragLeave(q('#own'), { dataTransfer: files });
+    expect(state()).toBe('aktiv');
+    fireEvent.drop(q('#child'), { dataTransfer: { types: ['Files'], files: [pdf] } });
+    expect(view.fixture.componentInstance.dropped).toEqual([[pdf]]);
     expect(state()).toBe('ruhig');
   });
 });

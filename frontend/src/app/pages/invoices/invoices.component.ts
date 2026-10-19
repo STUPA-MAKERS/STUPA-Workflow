@@ -27,6 +27,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
+  DropOverlayComponent,
   EmptyStateComponent,
   FabComponent,
   FileDropZoneComponent,
@@ -45,6 +46,7 @@ import {
   StickyBarComponent,
   invoiceStatus,
 } from '@shared/ui';
+import { FileDropDirective } from '@shared/file-drop.directive';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { downloadBlob } from '@shared/download.util';
 import { mediaQuerySignal } from '../../layout/media-query';
@@ -65,7 +67,7 @@ import {
   InvoiceFormComponent,
   invoiceFieldsValid,
 } from './invoice-form/invoice-form.component';
-import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { debounced } from '@shared/debounced';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** What the import found, for the note at the top of the review form. */
@@ -112,8 +114,10 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,
+    DropOverlayComponent,
     EmptyStateComponent,
     FabComponent,
+    FileDropDirective,
     FileDropZoneComponent,
     IconComponent,
     InvoiceDetailComponent,
@@ -185,7 +189,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly importing = signal(false);
   /** True while a manual receipt upload runs in the create form. */
   readonly attaching = signal(false);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
   /** Monotone request generation: a late answer of an older filter state is dropped. */
   private fetchEpoch = 0;
 
@@ -304,13 +307,10 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.reload();
   }
 
-  private debouncedReload(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.reload(), LIVE_SEARCH_DEBOUNCE_MS);
-  }
+  /** The search reloads after a pause; the component's end drops a waiting reload. */
+  private readonly debouncedReload = debounced(() => this.reload());
 
   ngOnDestroy(): void {
-    if (this.searchTimer) clearTimeout(this.searchTimer);
     this.frame.fill.set(false);
   }
 
@@ -320,9 +320,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly importNotice = signal<ImportNotice>(null);
   /** The number of an invoice that exists already (N31), or null. */
   readonly importDuplicate = signal<string | null>(null);
-
-  private dragDepth = 0;
-  readonly dragActive = signal(false);
 
   readonly statusOptions = computed<SelectOption[]>(() =>
     (['open', 'paid'] as const).map((v) => ({
@@ -627,48 +624,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   }
 
   // --- import ----------------------------------------------------------------------
-  /** A drag event that the drop zone handles itself. The page overlay leaves it alone, so
-   *  one drop never imports twice. */
-  private inDropZone(event: DragEvent): boolean {
-    const target = event.target as Element | null;
-    return !!target && typeof target.closest === 'function' && !!target.closest('app-file-drop-zone');
-  }
-
-  onDragEnter(event: DragEvent): void {
-    if (!this.canManage() || !this.hasFiles(event) || this.inDropZone(event)) return;
-    event.preventDefault();
-    this.dragDepth++;
-    this.dragActive.set(true);
-  }
-
-  onDragOver(event: DragEvent): void {
-    if (!this.canManage() || !this.hasFiles(event)) return;
-    event.preventDefault();
-  }
-
-  onDragLeave(event: DragEvent): void {
-    if (!this.dragActive() || this.inDropZone(event)) return;
-    event.preventDefault();
-    this.dragDepth = Math.max(0, this.dragDepth - 1);
-    if (this.dragDepth === 0) this.dragActive.set(false);
-  }
-
-  onDrop(event: DragEvent): void {
-    if (!this.canManage()) return;
-    if (this.inDropZone(event)) {
-      this.dragDepth = 0;
-      this.dragActive.set(false);
-      return;
-    }
-    event.preventDefault();
-    this.dragDepth = 0;
-    this.dragActive.set(false);
-    const file = event.dataTransfer?.files?.[0];
-    if (file) this.importFile(file);
-  }
-
-  private hasFiles(event: DragEvent): boolean {
-    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
+  /** Files dropped on the page (outside the drop zone). One import at a time. */
+  onFilesDropped(files: File[]): void {
+    if (this.canManage() && files[0]) this.importFile(files[0]);
   }
 
   onFilePicked(event: Event): void {

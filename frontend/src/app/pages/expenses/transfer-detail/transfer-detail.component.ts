@@ -11,6 +11,7 @@ import {
   formatEur,
 } from '../../budget/expense-display.util';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /**
  * The detail of a transfer (board Fin-Uebertraege): "Übertrag · HHJ 2025", the
@@ -22,7 +23,7 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
   selector: 'app-transfer-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SheetBarComponent, SheetBarTitleDirective, ButtonComponent, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
+  imports: [NoteComponent, SheetBarComponent, SheetBarTitleDirective, ButtonComponent, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
   templateUrl: './transfer-detail.component.html',
   styleUrl: './transfer-detail.component.scss',
 })
@@ -49,13 +50,6 @@ export class TransferDetailComponent {
   });
 
   protected readonly amount = computed(() => formatEur(Number(this.transfer().amount), this.i18n.locale()));
-
-  protected readonly createdAt = computed(() =>
-    new Date(this.transfer().createdAt).toLocaleString(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }),
-  );
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
     if (!this.canManage()) return [];

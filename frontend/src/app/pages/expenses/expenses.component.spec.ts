@@ -3067,12 +3067,13 @@ describe('ExpensesComponent (list/detail)', () => {
     fixture.detectChanges();
     const boxes = container.querySelectorAll<HTMLInputElement>('app-list-item input[type=checkbox]');
     expect(boxes.length).toBe(2);
+    expect(screen.getByRole('checkbox', { name: '„Plakate“ auswählen' })).not.toBeChecked();
     boxes[0].click();
     fixture.detectChanges();
     expect(c.detailView()).toBe('bulk');
     expect(screen.getByRole('heading', { name: '1 Buchungen ausgewählt' })).toBeInTheDocument();
     // The select-all box of the bar selects every row.
-    const all = screen.getByRole('checkbox', { name: 'Alle wählen' });
+    const all = screen.getByRole('checkbox', { name: /^Alle wählen/ });
     await userEvent.click(all);
     expect(c.selectedCount()).toBe(2);
     await userEvent.click(screen.getByRole('button', { name: 'Alle wählen' }));
@@ -3104,8 +3105,11 @@ describe('ExpensesComponent (list/detail)', () => {
     c.startSelecting();
     c.toggleSelect('e-1', true);
     fixture.detectChanges();
-    expect(screen.getByRole('heading', { name: '1 ausgewählt' })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Löschen' }));
+    const bar = screen.getByRole('toolbar', { name: 'Auswahl' });
+    expect(within(bar).getByRole('status')).toHaveTextContent('1 ausgewählt');
+    // The list pane keeps its name while the title row is the bar.
+    expect(screen.getByRole('region', { name: 'Buchungen' })).toBeInTheDocument();
+    await userEvent.click(within(bar).getByRole('button', { name: 'Löschen' }));
     expect(c.bulkConfirm()).toBe('delete');
   });
 

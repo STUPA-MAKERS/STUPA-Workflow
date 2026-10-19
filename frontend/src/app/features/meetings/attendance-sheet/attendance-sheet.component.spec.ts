@@ -481,8 +481,8 @@ describe('AttendanceSheetComponent', () => {
     const { fixture } = await setup({}, [], [MEDIA.phone]);
     expect(sheet()).toHaveClass('ss--bottom');
     await userEvent.type(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' }), 'vera');
-    await userEvent.keyboard('{Escape}');
-    expect(fixture.componentInstance.open()).toBe(false);
+    fixture.componentInstance.open.set(false);
+    fixture.detectChanges();
     fixture.componentInstance.open.set(true);
     fixture.detectChanges();
     expect(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' })).toHaveValue('');

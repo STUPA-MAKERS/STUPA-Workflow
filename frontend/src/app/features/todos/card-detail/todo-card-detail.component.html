@@ -428,7 +428,14 @@
         @if (items().length) {
           <span class="cd__progress">
             <span class="num">{{ doneItems().length }}/{{ items().length }}</span>
-            <span class="cd__bar-track" aria-hidden="true"><span class="cd__bar-fill" [style.width.%]="progress()"></span></span>
+            <app-seg-bar
+              class="cd__checkBar"
+              size="thin"
+              aria-hidden="true"
+              [segments]="[{ value: doneItems().length, tone: 'filled' }]"
+              [total]="items().length"
+              [label]="doneItems().length + '/' + items().length"
+            />
           </span>
         }
       </div>

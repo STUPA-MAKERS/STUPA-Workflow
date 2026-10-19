@@ -57,7 +57,7 @@
         <div class="bd__chips">
           <button
             type="button"
-            class="bd-chip bd-chip--on bd__pathChip"
+            class="chip on bd__pathChip"
             aria-haspopup="dialog"
             [attr.aria-expanded]="navOpen()"
             [title]="pathLabel()"
@@ -71,9 +71,9 @@
           <!-- The page reaches the overview without the picker, as on the wide layout. -->
           <button
             type="button"
-            class="bd-chip"
+            class="chip"
             aria-haspopup="dialog"
-            [class.bd-chip--on]="overviewOpen()"
+            [class.on]="overviewOpen()"
             (click)="overviewOpen.set(true)"
           >
             <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
@@ -260,7 +260,7 @@
       @if (wide()) {
         <div class="bd__chips">
           <ng-container *ngTemplateOutlet="yearChip" />
-          <button type="button" class="bd-chip" (click)="overviewOpen.set(true)">
+          <button type="button" class="chip" (click)="overviewOpen.set(true)">
             <app-icon name="grid" [size]="15" />{{ 'budget.overview.button' | t }}
           </button>
         </div>
@@ -367,8 +367,8 @@
           <button
             type="button"
             role="tab"
-            class="bd-chip"
-            [class.bd-chip--on]="activeOverviewMetric() === m"
+            class="chip"
+            [class.on]="activeOverviewMetric() === m"
             [attr.aria-selected]="activeOverviewMetric() === m"
             (click)="overviewMetric.set(m)"
           >

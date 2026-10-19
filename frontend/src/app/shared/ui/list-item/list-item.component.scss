@@ -130,6 +130,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.li--subWrap .li__sub {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .li__sub ::ng-deep app-status-text {
   display: inline;
 }

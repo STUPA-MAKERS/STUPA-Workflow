@@ -599,6 +599,22 @@ describe('BudgetTreeComponent', () => {
     flushReload(http);
   });
 
+  it('toggles a state with the box of its row in the state dialog', async () => {
+    const { c, http, fixture } = await setup({ gremien: 'ok', flow: 'states' });
+    c.stateConfigOpen.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const accepted = screen.getByRole('checkbox', { name: 'Angenommen: Angenommen (accepted)' });
+    expect(accepted).toBeChecked();
+    const denied = screen.getByRole('checkbox', { name: /^Abgelehnt: orphan/ });
+    expect(denied).not.toBeChecked();
+    await userEvent.click(denied);
+    const patch = http.expectOne((r) => r.url.endsWith('/budgets/b-vs') && r.method === 'PATCH');
+    expect(patch.request.body).toEqual({ acceptedStateKeys: ['accepted'], deniedStateKeys: ['denied', 'orphan'] });
+    patch.flush({});
+    flushReload(http);
+  });
+
   it('toggleState toasts an error on failure', async () => {
     const { c, http, toast } = await setup();
     c.toggleState('accepted', 'new');

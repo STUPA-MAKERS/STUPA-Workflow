@@ -16,7 +16,13 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { liveSearch } from '@shared/live-search';
-import { AvatarComponent, NoteComponent, SearchPillComponent, SkeletonComponent } from '@shared/ui';
+import {
+  AvatarComponent,
+  ListItemComponent,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+} from '@shared/ui';
 import {
   ButtonComponent,
   CheckboxComponent,
@@ -94,6 +100,7 @@ interface ConflictProblem {
     TranslatePipe,
     LocalizedDatePipe,
     AvatarComponent,
+    ListItemComponent,
     NoteComponent,
     SearchPillComponent,
     SkeletonComponent,

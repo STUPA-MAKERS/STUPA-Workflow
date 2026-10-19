@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
-import type { BudgetTreeNode } from '../../budget/budget-tree.api';
+import type { BudgetTreeNode } from './budget-tree.api';
 import { CostCentrePickerComponent, findCostCentre } from './cost-centre-picker.component';
 
 function node(id: string, key: string, name: string, children: BudgetTreeNode[] = []): BudgetTreeNode {
@@ -57,5 +57,39 @@ describe('CostCentrePickerComponent', () => {
     view.fixture.componentRef.setInput('value', 'zzz');
     view.fixture.detectChanges();
     expect(screen.getByText('Unbekannt')).toBeInTheDocument();
+  });
+
+  it('names the pick by name, or by name and short path, with its colour', async () => {
+    const coloured = [{ ...node('r', 'VSM', 'Wurzel', [node('c', 'VSM-8', 'Kind')]), color: '#ff0000' }];
+    const view = await render(CostCentrePickerComponent, {
+      inputs: { nodes: coloured, value: 'c', label: 'K', text: 'name', swatch: true },
+    });
+    const value = screen.getByText('Kind');
+    expect(value).toHaveAttribute('title', 'Kind');
+    const swatch = view.container.querySelector('.ccp__swatch') as HTMLElement;
+    expect(swatch).toBeTruthy();
+    expect(swatch.style.background).not.toBe('');
+    view.fixture.componentRef.setInput('text', 'namePath');
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.ccp__path')?.textContent).toBe('VSM-8');
+    // Without `swatch` there is no colour, and an unknown id has none either.
+    view.fixture.componentRef.setInput('swatch', false);
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.ccp__swatch')).toBeNull();
+    view.fixture.componentRef.setInput('swatch', true);
+    view.fixture.componentRef.setInput('value', 'zzz');
+    view.fixture.detectChanges();
+    expect(view.container.querySelector('.ccp__swatch')).toBeNull();
+    expect(view.container.querySelector('.ccp__path')).toBeNull();
+  });
+
+  it('marks a required field and takes a grid cell with inGrid', async () => {
+    const view = await render(CostCentrePickerComponent, {
+      inputs: { nodes: TREE, label: 'Kostenstelle', placeholder: 'Wählen', required: true, inGrid: true },
+    });
+    expect(view.container.querySelector('.text-danger')?.textContent?.trim()).toBe('*');
+    // The asterisk is not part of the name.
+    expect(screen.getByRole('button', { name: 'Kostenstelle Wählen' })).toBeInTheDocument();
+    expect((view.fixture.nativeElement as HTMLElement).classList.contains('ccp--grid')).toBe(true);
   });
 });

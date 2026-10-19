@@ -1,18 +1,37 @@
-@if (count() > 0) {
+@if (inline() || count() > 0) {
   <div class="selbar" role="toolbar" [attr.aria-label]="'ui.selection.toolbar' | t">
-    <span class="selbar__count" role="status">{{
-      countLabel() ?? ('ui.selection.count' | t: { count: count() })
-    }}</span>
+    @if (allSelected() !== null) {
+      <!-- The box and the count are one label: the whole text toggles the selection. -->
+      <app-checkbox
+        class="selbar__all"
+        [ngModel]="allSelected()"
+        [indeterminate]="count() > 0 && !allSelected()"
+        (ngModelChange)="selectAll.emit($event)"
+      >
+        <span class="sr-only">{{ selectAllLabel() ?? ('ui.selection.selectAll' | t) }}</span>
+        <ng-container *ngTemplateOutlet="countText" />
+      </app-checkbox>
+    } @else {
+      <ng-container *ngTemplateOutlet="countText" />
+    }
     <div class="selbar__actions"><ng-content /></div>
-    <span class="selbar__div" aria-hidden="true"></span>
+    @if (!inline()) {
+      <span class="selbar__div" aria-hidden="true"></span>
+    }
     <button
       type="button"
       class="selbar__clear"
-      [attr.aria-label]="'ui.selection.clear' | t"
-      [title]="'ui.selection.clear' | t"
+      [attr.aria-label]="clearLabel() ?? ('ui.selection.clear' | t)"
+      [title]="clearLabel() ?? ('ui.selection.clear' | t)"
       (click)="cleared.emit()"
     >
       <app-icon name="x" [size]="17" />
     </button>
   </div>
 }
+
+<ng-template #countText>
+  <span class="selbar__count" role="status">{{
+    countLabel() ?? ('ui.selection.count' | t: { count: count() })
+  }}</span>
+</ng-template>

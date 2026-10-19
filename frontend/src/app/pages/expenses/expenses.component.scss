@@ -31,25 +31,6 @@
 /* The column, its header and the search bar are the shared list geometry: `.ld-pane`
    (styles.scss) and `app-page-header` with `pane`. */
 
-/* Phone: the title row as the bar of the bulk actions. */
-.exp__selBar {
-  display: flex;
-  flex: none;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: var(--control-height);
-  padding-inline: var(--space-1) 0;
-  border-radius: var(--radius-lg);
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.exp__selTitle {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-lg);
-  font-weight: var(--fw-semibold);
-}
 .exp__chips {
   display: flex;
   flex-wrap: wrap;
@@ -73,8 +54,7 @@
   border-radius: 2px;
 }
 
-.exp__bar,
-.exp__selbar {
+.exp__bar {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -95,38 +75,8 @@
 .exp__count--wait {
   visibility: hidden;
 }
-.exp__selbar {
-  gap: var(--space-2);
-  padding: 0 var(--space-2) 0 var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.exp__selAll {
-  display: flex;
-  flex: 1 1 auto;
-  align-self: stretch;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
-  cursor: pointer;
-}
-.exp__selText {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-weight: var(--fw-semibold);
-  font-size: var(--fs-md);
-}
-.exp__check {
-  flex: none;
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--color-accent);
-  cursor: pointer;
-}
 /* The row check box sits above the stretched title, so it takes its own click. */
-.exp__check--row {
+.exp__rowCheck {
   position: relative;
   z-index: 1;
 }

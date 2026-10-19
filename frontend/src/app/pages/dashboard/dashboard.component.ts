@@ -7,6 +7,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
@@ -670,9 +671,7 @@ export class DashboardComponent {
 
   /** The full date and time, for a tooltip. */
   private longMoment(at: IsoDateTime): string | null {
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) return null;
-    return d.toLocaleString(this.i18n.formatLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+    return formatMoment(at, this.i18n.formatLocale()) || null;
   }
 
   /** The short weekday of a `YYYY-MM-DD` date in the local calendar, without a dot. */

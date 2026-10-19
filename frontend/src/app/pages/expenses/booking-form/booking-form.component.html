@@ -50,12 +50,9 @@
                 <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.costCentre' | t }}</span>
                 <span class="ff__locked">{{ ccTrail() }}</span>
               </div>
-              <p class="ff__info">
-                <app-icon name="info" [size]="16" />
-                <span>{{
+              <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{
                   (e.applicationId ? 'expenses.field.inheritedCostCentre' : 'expenses.sub.inheritsShort') | t
-                }}</span>
-              </p>
+                }}</app-note>
             }
           </fieldset>
         }
@@ -188,36 +185,24 @@
               </div>
             }
             @if (mode() === 'create' && s.newApplicationId()) {
-              <p class="ff__info">
-                <app-icon name="info" [size]="16" />
-                <span>{{ 'expenses.field.inheritedCostCentre' | t }}</span>
-              </p>
+              <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.field.inheritedCostCentre' | t }}</app-note>
             } @else {
-              <div class="ff__grid">
+              <div class="ff__grid ff__grid--dense">
                 <!-- The cost centre: the tree of the applications page opens below the
-                     field. -->
-                <div class="ff__box">
-                  <span class="ff__label" [id]="'bf-cc-' + mode()">{{ 'expenses.field.costCentre' | t }} <span class="text-danger" aria-hidden="true">*</span></span>
-                  <button
-                    type="button"
-                    class="ff__pick"
-                    [attr.aria-labelledby]="'bf-cc-' + mode() + ' bf-ccv-' + mode()"
-                    [attr.aria-expanded]="treeOpen()"
-                    (click)="treeOpen.set(!treeOpen())"
-                  >
-                    @if (ccValue(); as v) {
-                      @if (v.color) {
-                        <span class="ff__swatch" aria-hidden="true" [style.background]="v.color"></span>
-                      }
-                      <span class="ell" [id]="'bf-ccv-' + mode()" [title]="v.name">{{ v.name }}</span>
-                    } @else {
-                      <span class="ell ff__placeholder" [id]="'bf-ccv-' + mode()">{{
-                        'expenses.field.costCentrePlaceholder' | t
-                      }}</span>
-                    }
-                    <app-icon [name]="treeOpen() ? 'up' : 'down'" [size]="18" />
-                  </button>
-                </div>
+                     row. -->
+                <app-cost-centre-picker
+                  inGrid
+                  swatch
+                  required
+                  text="name"
+                  [label]="'expenses.field.costCentre' | t"
+                  [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+                  [emptyLabel]="'expenses.field.noCostCentres' | t"
+                  unknownLabel="—"
+                  [nodes]="tree()"
+                  [value]="ccId()"
+                  (picked)="pickCostCentre($event)"
+                />
                 @if (mode() === 'create') {
                   <app-select
                     name="fy"
@@ -236,17 +221,6 @@
                   </div>
                 }
               </div>
-              @if (treeOpen()) {
-                <div class="ff__tree">
-                  <app-cost-centre-tree
-                    [nodes]="tree()"
-                    [selectedId]="ccId()"
-                    [ariaLabel]="'expenses.field.costCentre' | t"
-                    [emptyLabel]="'expenses.field.noCostCentres' | t"
-                    (picked)="pickCostCentre($event)"
-                  />
-                </div>
-              }
             }
           </fieldset>
         }
@@ -301,10 +275,7 @@
               (ngModelChange)="s.onPickInvoice($event)"
             />
             @if (invoiceTaken()) {
-              <p class="ff__info">
-                <app-icon name="check" [size]="16" />
-                <span>{{ 'expenses.form.fromInvoice' | t }}</span>
-              </p>
+              <app-note icon="check" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.form.fromInvoice' | t }}</app-note>
             }
             <div class="ff__grid">
               <app-input

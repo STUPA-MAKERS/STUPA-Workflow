@@ -233,7 +233,7 @@ describe('BudgetDashboardComponent', () => {
       const view = await setup();
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
       // The year, the overview and the search are outside the scrolling list.
-      expect(tree.querySelector('app-search-pill, .bd-chip')).toBeNull();
+      expect(tree.querySelector('app-search-pill, .chip')).toBeNull();
       // The pane sits on the page, so the search field keeps its own surface.
       expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
       const geometry = (scrollHeight: number, scrollTop: number) => {
@@ -876,7 +876,7 @@ describe('BudgetDashboardComponent', () => {
       expect(dialog.querySelector('.ss__body > .bd__paneBody .bd__tree')).toBeTruthy();
       // The year and the overview sit on the page, so the sheet has only the search and
       // the tree.
-      expect(dialog.querySelector('.bd-chip, select')).toBeNull();
+      expect(dialog.querySelector('.chip, select')).toBeNull();
       // The sheet has the background of the search field, so the field takes the next
       // surface there.
       expect(dialog.querySelector('.bd__paneBody')).toHaveClass('bd__paneBody--side');
@@ -934,11 +934,11 @@ describe('BudgetDashboardComponent', () => {
       expect(chips.querySelector('.bd__pathChip')).toBeTruthy();
       expect(chips.querySelector('app-filter-select')).toBeTruthy();
       const chip = within(chips).getByRole('button', { name: 'Übersicht' });
-      expect(chip).not.toHaveClass('bd-chip--on');
+      expect(chip).not.toHaveClass('on');
       chip.click();
       view.fixture.detectChanges();
       expect(c.overviewOpen()).toBe(true);
-      expect(chip).toHaveClass('bd-chip--on');
+      expect(chip).toHaveClass('on');
     });
 
     it('opens the year chip as a bottom sheet on a phone', async () => {

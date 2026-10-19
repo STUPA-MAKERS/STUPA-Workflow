@@ -16,7 +16,7 @@
             <span class="tl__sub">{{ sub(card) }}</span>
           </span>
           @if (card.assignees.length) {
-            <app-avatar-stack [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
+            <app-avatar-stack [size]="avatarSize()" [names]="names(card)" [principalIds]="ids(card)" [max]="3" />
           }
         </li>
       }

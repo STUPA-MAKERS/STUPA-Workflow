@@ -32,13 +32,12 @@ import {
   type TicketReporter,
   type TicketStatus,
 } from '@core/api/tickets.service';
-import { TodosApiService, type TodoLinkedCard } from '@core/api/todos.service';
+import { TodosApiService, type TodoBoardKind, type TodoLinkedCard } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { liveSearch } from '@shared/live-search';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type {
@@ -85,8 +84,12 @@ import {
   type TabItem,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
+import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
+import {
+  TodoNewDialogComponent,
+  type NewTodoLink,
+} from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { mediaQuerySignal } from '../../layout/media-query';
-import { TicketTodoDialogComponent } from './todo-dialog/ticket-todo-dialog.component';
 import { TicketsPageService } from './tickets-page.service';
 import {
   KIND_ICON,
@@ -192,7 +195,6 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     RouterLink,
     TranslatePipe,
     LocalizedDatePipe,
-    AvatarStackComponent,
     ButtonComponent,
     ChatComponent,
     CheckboxComponent,
@@ -210,7 +212,8 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     SkeletonComponent,
     StatusTextComponent,
     TabsComponent,
-    TicketTodoDialogComponent,
+    TodoNewDialogComponent,
+    TodoLinkedListComponent,
   ],
   // The two layouts re-create the chat; the composer files stay with the page.
   providers: [ChatDrafts],
@@ -268,6 +271,15 @@ export class TicketDetailComponent {
     error: () => this.duplicateHits.set([]),
   });
   readonly todoOpen = signal(false);
+  /** A to-do of the ticket starts on the team board of `ticket.manage`, else the personal one. */
+  readonly todoBoardKinds: readonly TodoBoardKind[] = ['team', 'personal'];
+  /** The link of a new to-do to this ticket: "Ticket · T-0040 Titel". */
+  readonly todoLinks = computed<NewTodoLink[]>(() => {
+    const t = this.ticket();
+    if (!t) return [];
+    const label = `${this.i18n.translate('todos.linkKind.ticket')} · ${t.number} ${t.title}`;
+    return [{ kind: 'ticket', targetId: t.id, label }];
+  });
   /** A block or an unblock in flight. */
   readonly blocking = signal(false);
 
@@ -800,21 +812,6 @@ export class TicketDetailComponent {
     this.load(this.id);
   }
 
-  todoSub(card: TodoLinkedCard): string {
-    const parts = [card.boardName, card.columnName];
-    if (card.dueDate)
-      parts.push(this.t('tickets.todos.due', { date: this.shortDate(card.dueDate) }));
-    return parts.join(' · ');
-  }
-
-  todoNames(card: TodoLinkedCard): string[] {
-    return card.assignees.map((a) => personName(a, this.t));
-  }
-
-  todoIds(card: TodoLinkedCard): (string | null)[] {
-    return card.assignees.map((a) => a.principalId);
-  }
-
   statusOf(status: TicketStatus): string {
     return this.t(STATUS_LABEL[status]);
   }
@@ -830,15 +827,6 @@ export class TicketDetailComponent {
       minute: '2-digit',
       hourCycle: 'h23',
     }).format(new Date(at));
-  }
-
-  /** `YYYY-MM-DD` as "17.10.". */
-  private shortDate(date: string): string {
-    const [y, m, d] = date.split('-').map(Number);
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-    }).format(new Date(y, m - 1, d));
   }
 
   reportedAt(t: TicketDetail): string {

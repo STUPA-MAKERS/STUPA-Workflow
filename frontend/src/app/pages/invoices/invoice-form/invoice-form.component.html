@@ -70,10 +70,7 @@
                 <span class="if__fileSize">{{ 'invoices.openFile' | t }}</span>
               </button>
             } @else {
-              <p class="ff__info">
-                <app-icon name="file" [size]="16" />
-                <span>{{ 'invoices.detail.noFile' | t }}</span>
-              </p>
+              <app-note icon="file" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.detail.noFile' | t }}</app-note>
             }
           }
         </section>
@@ -82,22 +79,15 @@
       <div class="ff__col if__fields">
         @if (mode() === 'create') {
           @if (h.importNotice() === 'parsed') {
-            <p class="ff__info if__ok">
-              <app-icon name="check" [size]="16" />
-              <span>{{ 'invoices.import.parsed' | t }}</span>
-            </p>
+            <app-note icon="check" kind="ok" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.import.parsed' | t }}</app-note>
           } @else if (h.importNotice() === 'manual') {
-            <p class="ff__info">
-              <app-icon name="info" [size]="16" />
-              <span>{{ 'invoices.import.manual' | t }}</span>
-            </p>
+            <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.import.manual' | t }}</app-note>
           }
           @if (h.importDuplicate() !== null) {
-            <div class="if__dup" role="alert">
-              <app-icon name="alert" [size]="18" />
-              <span class="if__dupText">{{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}</span>
-              <app-button variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
-            </div>
+            <app-note icon="alert" kind="warn" [surface]="layout() === 'sheet' ? 3 : 2" role="alert">
+              {{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}
+              <app-button noteAction variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
+            </app-note>
           }
           <div class="ff__grid">
             <app-input

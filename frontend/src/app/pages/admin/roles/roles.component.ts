@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { FormsModule } from '@angular/forms';
 import { forkJoin, type Observable, of, switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { FabComponent } from '@shared/ui/fab/fab.component';
@@ -122,7 +123,7 @@ export class AdminRolesComponent {
   }
 
   protected roleLabel(role: Role): string {
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+    return i18nLabel(role.label, this.i18n.locale(), role.key);
   }
 
   /** The admin role holds every right; its rights are read-only here. */

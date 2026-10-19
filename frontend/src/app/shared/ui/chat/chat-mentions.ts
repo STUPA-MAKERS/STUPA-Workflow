@@ -1,5 +1,6 @@
 import { computed, signal } from '@angular/core';
 import type { PersonRef } from '@core/api/models';
+import { escapeHtml } from '@shared/markdown/markdown.util';
 
 /** A person the composer offers after "@": someone who can read the thread. */
 export interface ChatPerson {
@@ -126,14 +127,6 @@ export function mentionIds(
   }
   found.sort((a, b) => a.at - b.at);
   return [...new Set(found.map((f) => f.id))];
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
 }
 
 function escapeRe(s: string): string {

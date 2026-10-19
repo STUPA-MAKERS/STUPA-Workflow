@@ -34,7 +34,8 @@ import {
   ToastService,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
-import { errorDetail, resolveI18n } from '../meetings-display.util';
+import { resolveI18n } from '@shared/forms/i18n-text';
+import { errorDetail } from '../meetings-display.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { cardsOf, isoDay, shortDay, sortedColumns } from '../../todos/todos.util';
 import { TruncatedDirective } from '@shared/truncated.directive';

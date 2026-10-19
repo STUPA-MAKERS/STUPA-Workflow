@@ -53,35 +53,30 @@
 >
   <form class="sp__form" (submit)="$event.preventDefault(); add()">
     <div class="sp__search">
-      <label class="sp__searchBox">
-        <span class="sp__searchLabel">{{ 'admin.substitutes.search' | t }}</span>
-        <input
-          class="sp__searchInput"
-          type="search"
-          autocomplete="off"
-          name="person"
-          [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
-          [attr.aria-busy]="search.pending() || null"
-          [ngModel]="search.text()"
-          (ngModelChange)="onSearch($event)"
-        />
-      </label>
+      <app-search-pill
+        size="md"
+        [placeholder]="'admin.gremien.memberSearchPlaceholder' | t"
+        [label]="'admin.substitutes.search' | t"
+        [busy]="search.pending()"
+        [value]="search.text()"
+        (valueChange)="onSearch($event)"
+        (commit)="search.flush()"
+      />
       @if (candidates().length) {
         <ul class="sp__hits" appScrollFade="y" [attr.aria-label]="'admin.substitutes.hits' | t">
           @for (c of candidates(); track c.id) {
             <li>
-              <button
-                type="button"
-                class="sp__hit"
-                [class.sp__hit--on]="selected()?.id === c.id"
+              <app-list-item
+                [title]="label(c)"
+                [selected]="selected()?.id === c.id"
+                subWrap
                 [attr.title]="c.displayName || c.email ? null : c.sub"
-                (click)="pick(c)"
+                (activate)="pick(c)"
               >
-                <span class="sp__hitName">{{ label(c) }}</span>
                 @if (c.email) {
-                  <span class="sp__hitMail mono">{{ c.email }}</span>
+                  <span sub class="mono">{{ c.email }}</span>
                 }
-              </button>
+              </app-list-item>
             </li>
           }
         </ul>
@@ -103,7 +98,7 @@
       name="member"
     />
     @if (addError()) {
-      <p class="sp__error" role="alert">{{ addError() }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ addError() }}</app-note>
     }
     <button type="submit" hidden></button>
   </form>

@@ -1,4 +1,5 @@
 import {
+  booleanAttribute,
   ChangeDetectionStrategy,
   Component,
   computed,
@@ -75,6 +76,11 @@ export class ListItemComponent {
    * the end of a long title tells the rows apart (meetings on a phone).
    */
   readonly wrap = input(false);
+  /**
+   * The sub line wraps instead of getting an ellipsis. For an e-mail address or a URL,
+   * which must stay whole and selectable.
+   */
+  readonly subWrap = input(false, { transform: booleanAttribute });
 
   /** The row was opened by a click, Enter or Space. Also emitted for a link. */
   readonly activate = output<void>();

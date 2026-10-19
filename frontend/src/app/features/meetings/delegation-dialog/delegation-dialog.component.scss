@@ -36,31 +36,17 @@
 }
 
 .dd__search {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  height: 40px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text-muted);
+  --sp-bg: var(--color-surface-3);
 }
-.dd__search:focus-within {
-  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
-}
-.dd__searchInput {
-  flex: 1 1 auto;
+/* The fieldset only switches the search off after the deadline. */
+.dd__searchBox {
   min-width: 0;
-  height: 100%;
+  margin: 0;
   padding: 0;
   border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--fs-body);
 }
-.dd__searchInput:focus {
-  outline: none;
+.dd__searchBox:disabled .dd__search {
+  opacity: 0.5;
 }
 
 .dd__rows {

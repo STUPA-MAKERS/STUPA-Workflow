@@ -21,6 +21,7 @@ import type { MailPreview, MailTemplate } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 
@@ -50,6 +51,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ListItemComponent,
     SkeletonComponent,
     EmptyStateComponent,
     FabComponent,

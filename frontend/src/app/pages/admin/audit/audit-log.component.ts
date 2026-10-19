@@ -24,7 +24,7 @@ import {
 } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
+  ConfigDiffComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -37,6 +37,7 @@ import type {
   ConfigRevisionDiff,
 } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 
 const PAGE_SIZE = 50;
@@ -212,18 +213,6 @@ export interface AuditDataRow {
   known: boolean;
 }
 
-/** One changed field of a config diff: the old value (`-`) and the new value (`+`). */
-export interface AuditDiffLine {
-  key: string;
-  before: string | null;
-  after: string | null;
-}
-
-/** A diff value as code: a string in quotes, any other value as JSON. */
-function diffValue(v: unknown): string {
-  return v === undefined ? 'null' : JSON.stringify(v);
-}
-
 /** The state of the chain check at the top of the page. */
 type VerifyState =
   | { status: 'loading' }
@@ -258,7 +247,8 @@ type VerifyState =
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    DialogComponent,
+    ConfigDiffComponent,
+    ConfirmDialogComponent,
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,
@@ -639,17 +629,6 @@ export class AuditLogComponent {
           ? { key, label: this.i18n.translate(labelKey), value: fmt(v), known: true }
           : { key, label: key, value: fmt(v), known: false };
       });
-  }
-
-  /** The changed fields of a config diff, in the order changed, added, removed. */
-  protected diffLines(d: ConfigRevisionDiff): AuditDiffLine[] {
-    const diff = d.diff;
-    if (!diff) return [];
-    return [
-      ...diff.changed.map((c) => ({ key: c.key, before: diffValue(c.old), after: diffValue(c.new) })),
-      ...diff.added.map((a) => ({ key: a.key, before: null, after: diffValue(a.value) })),
-      ...diff.removed.map((r) => ({ key: r.key, before: diffValue(r.value), after: null })),
-    ];
   }
 }
 
