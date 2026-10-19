@@ -3,6 +3,7 @@ import {
   blankField,
   blankOption,
   duplicateKeys,
+  fundingProblem,
   groupsFromFields,
   groupsToFields,
   moveQuestionTo,
@@ -360,5 +361,27 @@ describe('moveQuestionTo (drag and drop in the outline of the form editor)', () 
     expect(moveQuestionTo(before, { gi: 0, qi: 7 }, { gi: 0, qi: 0 })).toBeNull();
     expect(moveQuestionTo(before, { gi: 0, qi: -1 }, { gi: 0, qi: 0 })).toBeNull();
     expect(moveQuestionTo(before, { gi: 0, qi: 0 }, { gi: 3, qi: 0 })).toBeNull();
+  });
+});
+
+describe('fundingProblem (mirror of validate_definition)', () => {
+  const field = (key: string, type: FormFieldDef['type']): FormFieldDef => ({
+    key,
+    type,
+    label: { de: key },
+  });
+
+  it('accepts a form without funding, and one funding field beside positions', () => {
+    expect(fundingProblem([field('a', 'text')])).toBeNull();
+    expect(fundingProblem([field('p', 'positions'), field('f', 'funding')])).toBeNull();
+  });
+
+  it('rejects a funding field without positions', () => {
+    expect(fundingProblem([field('f', 'funding')])).toBe('admin.form.fundingNoPositions');
+  });
+
+  it('rejects a second funding field', () => {
+    const fields = [field('p', 'positions'), field('f', 'funding'), field('g', 'funding')];
+    expect(fundingProblem(fields)).toBe('admin.form.fundingTwice');
   });
 });

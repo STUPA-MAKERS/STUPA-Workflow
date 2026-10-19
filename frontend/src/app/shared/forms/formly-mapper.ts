@@ -1,8 +1,11 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
+import { tap } from 'rxjs';
 import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/models';
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
-import { CATALOG, de, type Locale } from '@core/i18n/translations';
+import { CATALOG, de, type Locale, type TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from './i18n-text';
+import { formatEuro } from './answer-format';
+import { normalizePositions, positionsTotal } from './positions';
 
 /** HTML `type` for the `input` variant (text/number/currency/date/file). */
 const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
@@ -12,6 +15,8 @@ const INPUT_HTML_TYPE: Partial<Record<FieldType, string>> = {
   currency: 'currency',
   date: 'date',
   file: 'text', // file upload (attachment reference). The full upload lands later.
+  // 'funding' is an amount in euro like 'currency', checked against the cost total.
+  funding: 'currency',
   email: 'email',
   iban: 'text', // the backend checks the format (mod-97), so this is a free text field.
 };
@@ -21,6 +26,7 @@ const FORMLY_TYPE: Record<FieldType, string> = {
   text: 'input',
   number: 'input',
   currency: 'input',
+  funding: 'input',
   date: 'input',
   file: 'input',
   textarea: 'textarea',
@@ -61,10 +67,11 @@ export function toFormlyFields(
 ): FormlyFieldConfig[] {
   // Render section and group markers as headings instead of discarding them. Question
   // groups then also appear grouped in the inline editor.
+  const costKeys = positionsKeys(fields);
   return fields.map((f) =>
     f.type === 'section'
       ? sectionHeading(f, lang)
-      : mapField(f, lang, extraContext),
+      : mapField(f, lang, extraContext, costKeys),
   );
 }
 
@@ -102,9 +109,10 @@ export function toFormlySections(
   const omit = new Set(options.omitKeys ?? []);
   const keep = (f: FormFieldDef) => !omit.has(f.key) && f.type !== 'section';
   const all = sections.flatMap((s) => s.fields);
+  const costKeys = positionsKeys(all);
   const title = all.find((f) => f.key === 'title' && keep(f));
   const group: FormlyFieldConfig[] = [];
-  if (title) group.push({ ...mapField(title, lang, extraContext), className: 'fe-full' });
+  if (title) group.push({ ...mapField(title, lang, extraContext, costKeys), className: 'fe-full' });
   for (const section of sections) {
     const fields = section.fields.filter((f) => keep(f) && f !== title);
     if (!fields.length) continue;
@@ -114,7 +122,7 @@ export function toFormlySections(
       props: { heading: true, label: resolveI18n(section.label, lang) },
     });
     for (const f of fields) {
-      const mapped = mapField(f, lang, extraContext);
+      const mapped = mapField(f, lang, extraContext, costKeys);
       // The edit form shows several choices as a dropdown (board Anträge-Bearbeiten), not
       // as the checkbox list of the wizard.
       if (f.type === 'multiselect') mapped.type = 'multiselect';
@@ -143,10 +151,66 @@ function ownHelp(f: FormFieldDef, label: string, lang: Lang | string): string | 
   return help.trim() && help.trim() !== label.trim() ? help : undefined;
 }
 
+/** The keys of the `positions` fields: their total caps the requested funding. */
+function positionsKeys(fields: readonly FormFieldDef[]): string[] {
+  return fields.filter((f) => f.type === 'positions').map((f) => f.key);
+}
+
+/** The cost total of the positions answers in the model. */
+function costTotal(field: FormlyFieldConfig, costKeys: readonly string[]): number {
+  const model = (field.model ?? {}) as Record<string, unknown>;
+  return costKeys.reduce((sum, key) => sum + positionsTotal(normalizePositions(model[key])), 0);
+}
+
+/** A UI text with `{total}` filled in, in the locale of the form. */
+function totalText(key: TranslationKey, lang: Lang | string, total: number): string {
+  const text = CATALOG[lang as Locale]?.[key] ?? de[key];
+  return text.replace('{total}', formatEuro(total, String(lang)) ?? String(total));
+}
+
+/**
+ * The requested funding: the hint shows the cost total, and a value above the total is
+ * an error with its own text. The server checks the same rule (`_check_funding_total`).
+ */
+function applyFunding(
+  config: FormlyFieldConfig,
+  help: string | undefined,
+  lang: Lang | string,
+  costKeys: readonly string[],
+): void {
+  const over = (field: FormlyFieldConfig): boolean => {
+    const raw: unknown = field.formControl?.value;
+    if (raw === null || raw === undefined || raw === '') return false;
+    const value = Number(raw);
+    return Number.isFinite(value) && value > costTotal(field, costKeys) + 1e-9;
+  };
+  config.validators = {
+    ...config.validators,
+    fundingMax: { expression: (_control: unknown, field: FormlyFieldConfig) => !over(field) },
+  };
+  // The cost positions are other controls: re-check the cap when any answer changes.
+  config.hooks = {
+    onInit: (field) =>
+      field.form?.valueChanges.pipe(
+        tap(() => field.formControl?.updateValueAndValidity({ emitEvent: false })),
+      ),
+  };
+  config.expressions = {
+    ...config.expressions,
+    'props.description': (field: FormlyFieldConfig) => {
+      const hint = totalText('forms.funding.hint', lang, costTotal(field, costKeys));
+      return help ? `${help} ${hint}` : hint;
+    },
+    'props.errorText': (field: FormlyFieldConfig) =>
+      over(field) ? totalText('forms.funding.max', lang, costTotal(field, costKeys)) : undefined,
+  };
+}
+
 function mapField(
   f: FormFieldDef,
   lang: Lang | string,
   extraContext: Record<string, unknown>,
+  costKeys: readonly string[] = [],
 ): FormlyFieldConfig {
   const label = resolveI18n(f.label, lang);
   // An info text whose help repeats its label counts as an info text without help.
@@ -192,6 +256,7 @@ function mapField(
 
   const expressions = buildExpressions(f, extraContext);
   if (expressions) config.expressions = expressions;
+  if (f.type === 'funding') applyFunding(config, help, lang, costKeys);
 
   return config;
 }
