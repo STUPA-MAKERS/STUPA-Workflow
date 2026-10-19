@@ -34,7 +34,7 @@ import {
   type IconName,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../../../features/todos/link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL } from '../../../features/todos/todos.util';
 
@@ -117,13 +117,16 @@ export class TicketTodoDialogComponent {
   readonly columnOptions = computed<SelectOption[]>(() =>
     (this.board()?.columns ?? []).map((c) => ({ value: c.id, label: c.name })),
   );
-  readonly memberOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('tickets.todo.nobody') },
-    ...this.members().map((m) => ({
-      value: m.principalId,
-      label: m.displayName ?? this.i18n.translate('chat.deletedPerson'),
-    })),
-  ]);
+  readonly memberOptions = computed<SelectFieldOption[]>(() => {
+    const nobody = this.i18n.translate('tickets.todo.nobody');
+    return [
+      { value: '', label: nobody, person: { name: nobody, icon: 'user' } },
+      ...this.members().map((m) => {
+        const label = m.displayName ?? this.i18n.translate('chat.deletedPerson');
+        return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
+      }),
+    ];
+  });
 
   readonly titleError = computed(() =>
     this.title().trim().length > MAX_TITLE ? this.i18n.translate('tickets.todo.titleTooLong', { max: MAX_TITLE }) : '',

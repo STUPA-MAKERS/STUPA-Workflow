@@ -31,9 +31,8 @@ import {
   SwitchComponent,
   ToastService,
   type SegmentedOption,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS, errorDetail } from '../meetings-display.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -164,11 +163,14 @@ export class VoteOpenDialogComponent {
   readonly isElection = computed(() => this.kind() === 'election');
 
   /** The roster members that are no candidate yet, for the picker. */
-  readonly memberOptions = computed<SelectOption[]>(() => {
+  readonly memberOptions = computed<SelectFieldOption[]>(() => {
     const taken = new Set(this.candidates().map((c) => c.principalId));
     return this.members()
       .filter((m) => !taken.has(m.principalId))
-      .map((m) => ({ value: m.principalId, label: m.displayName || m.email || m.principalId }));
+      .map((m) => {
+        const label = m.displayName || m.email || m.principalId;
+        return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
+      });
   });
 
   /**

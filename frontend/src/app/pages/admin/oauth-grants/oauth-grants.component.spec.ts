@@ -159,10 +159,14 @@ describe('AdminOAuthGrantsComponent', () => {
   it('offers every principal by name, email or placeholder — never an id', async () => {
     const { inst } = await setup();
     expect(inst.principalOptions()).toEqual([
-      { value: '', label: 'Alle Personen' },
-      { value: 'p-1', label: 'Alex Admin' },
-      { value: 'p-2', label: 'sam@x.de' },
-      { value: 'p-3', label: 'Person ohne Namen' },
+      { value: '', label: 'Alle Personen', person: { name: 'Alle Personen', icon: 'users' } },
+      { value: 'p-1', label: 'Alex Admin', person: { name: 'Alex Admin', principalId: 'p-1' } },
+      { value: 'p-2', label: 'sam@x.de', person: { name: 'sam@x.de', principalId: 'p-2' } },
+      {
+        value: 'p-3',
+        label: 'Person ohne Namen',
+        person: { name: 'Person ohne Namen', principalId: 'p-3' },
+      },
     ]);
   });
 

@@ -394,15 +394,23 @@ export class TodosComponent implements OnDestroy {
     return true;
   });
 
-  readonly assigneeOptions = computed<FilterSelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('todos.filter.all') },
-    { value: 'me', label: this.i18n.translate('todos.filter.me') },
-    { value: 'none', label: this.i18n.translate('todos.filter.nobody') },
-    ...this.members().map((m) => ({
-      value: m.principalId,
-      label: m.displayName ?? this.i18n.translate('chat.deletedPerson'),
-    })),
-  ]);
+  readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
+    const all = this.i18n.translate('todos.filter.all');
+    const nobody = this.i18n.translate('todos.filter.nobody');
+    return [
+      { value: '', label: all, person: { name: all, icon: 'users' } },
+      {
+        value: 'me',
+        label: this.i18n.translate('todos.filter.me'),
+        person: { name: this.auth.displayName(), principalId: 'me' },
+      },
+      { value: 'none', label: nobody, person: { name: nobody, icon: 'user' } },
+      ...this.members().map((m) => {
+        const label = m.displayName ?? this.i18n.translate('chat.deletedPerson');
+        return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
+      }),
+    ];
+  });
   /** "Alle" without a single card: the empty state instead of the rows. */
   readonly allEmpty = computed(() => this.all() && !this.filtered() && this.rowMatches() === 0);
   readonly labelOptions = computed<FilterSelectOption[]>(() =>

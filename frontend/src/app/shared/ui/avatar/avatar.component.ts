@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AvatarService } from './avatar.service';
 
@@ -25,6 +26,18 @@ export function initials(name: string): string {
 
 /** The edge length of an avatar in CSS pixels, per size. */
 const AVATAR_PX: Record<AvatarSize, number> = { md: 40, sm: 32, xs: 22 };
+/** The edge length of the icon in the circle of an avatar without a person, per size. */
+const ICON_PX: Record<AvatarSize, number> = { md: 20, sm: 16, xs: 13 };
+
+/**
+ * A person in front of a text (a select option, a chip): its name, its principal id for
+ * the image, or an icon for a choice that is no single person ("Niemand", "Alle").
+ */
+export interface AvatarPerson {
+  name: string;
+  principalId?: string | null;
+  icon?: IconName | null;
+}
 
 /**
  * The initials of a PERSON in a circle, or the Gravatar image of the person.
@@ -39,11 +52,15 @@ const AVATAR_PX: Record<AvatarSize, number> = { md: 40, sm: 32, xs: 22 };
  *
  * The full name is the accessible name and the tooltip. Set `decorative` when the name
  * is already written next to the avatar, so a screen reader does not read it twice.
+ *
+ * With `icon` the circle shows that icon in place of the initials and loads no image: the
+ * same circle for a choice among persons that is no single person ("Niemand", "Alle").
  */
 @Component({
   selector: 'app-avatar',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [IconComponent],
   host: {
     '[class.av--sm]': "size() === 'sm'",
     '[class.av--xs]': "size() === 'xs'",
@@ -67,14 +84,17 @@ export class AvatarComponent {
   readonly decorative = input(false);
   /** The principal id of the person, or `'me'`. Without it the avatar shows the initials. */
   readonly principalId = input<string | null | undefined>(null);
+  /** An icon in place of the initials, for a choice that is no single person. */
+  readonly icon = input<IconName | null | undefined>(null);
 
   private readonly avatars = inject(AvatarService);
 
   protected readonly letters = computed(() => initials(this.name()));
+  protected readonly iconPx = computed(() => ICON_PX[this.size()]);
 
-  /** The image URL, or `null` for the initials only. */
+  /** The image URL, or `null` for the initials (or the icon) only. */
   protected readonly src = computed(() =>
-    this.avatars.url(this.principalId(), AVATAR_PX[this.size()]),
+    this.icon() ? null : this.avatars.url(this.principalId(), AVATAR_PX[this.size()]),
   );
 
   /** The URL of the image that has loaded. A new URL starts hidden again. */

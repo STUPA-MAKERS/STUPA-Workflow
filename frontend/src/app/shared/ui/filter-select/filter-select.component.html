@@ -14,7 +14,14 @@
   (keydown)="onTriggerKey($event)"
 >
   @if (person(); as who) {
-    <app-avatar class="fs__av" size="xs" [decorative]="true" [name]="who.name" [principalId]="who.principalId" />
+    <app-avatar
+      class="fs__av"
+      size="xs"
+      [decorative]="true"
+      [name]="who.name"
+      [principalId]="who.principalId"
+      [icon]="who.icon"
+    />
   } @else if (icon(); as lead) {
     <app-icon [name]="lead" [size]="15" />
   }
@@ -61,6 +68,16 @@
                 <app-icon name="check" [size]="14" />
               }
             </span>
+          }
+          @if (opt.person; as who) {
+            <app-avatar
+              class="fs__optAv"
+              size="xs"
+              [decorative]="true"
+              [name]="who.name"
+              [principalId]="who.principalId"
+              [icon]="who.icon"
+            />
           }
           <span
             class="fs__label"

@@ -15,20 +15,19 @@ import { NgTemplateOutlet } from '@angular/common';
 import { IconComponent, MEDIA, type IconName } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { mediaQuerySignal } from '../../../layout/media-query';
-import { AvatarComponent } from '../avatar/avatar.component';
+import { AvatarComponent, type AvatarPerson } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 import { TruncatedDirective } from '../../truncated.directive';
 
-/** A person in front of the text of the chip. */
-export interface FilterSelectPerson {
-  name: string;
-  principalId?: string | null;
-}
+/** A person in front of the text of the chip or of an option. */
+export type FilterSelectPerson = AvatarPerson;
 
 /** One choice of a filter chip. */
 export interface FilterSelectOption {
   value: string;
   label: string;
+  /** The avatar in front of the label, in a list of persons (an assignee select). */
+  person?: FilterSelectPerson | null;
 }
 
 let nextId = 0;
