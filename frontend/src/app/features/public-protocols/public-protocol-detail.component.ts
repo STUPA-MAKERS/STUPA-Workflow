@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -10,15 +11,24 @@ import { NoteComponent } from '@shared/ui/note/note.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { formatSize } from '../apply/apply.util';
-import type { PublicDecision, PublicProtocolDetail } from './public-protocols.models';
+import type { PublicDecision, PublicProtocolDetail, PublicTop } from './public-protocols.models';
 import { electionCaption } from '../voting/election.util';
 import { PublicProtocolsService } from './public-protocols.service';
-import { longDate, optionKey, orderedCounts, shortDate, useNoindex } from './public-protocols.util';
+import {
+  longDate,
+  optionKey,
+  orderedCounts,
+  shortDate,
+  topParts,
+  useNoindex,
+  type TopPart,
+} from './public-protocols.util';
 
 /**
  * One public protocol (`/protokolle/:id`, no login): the public version of a final
  * protocol. The head names the gremium, the meeting and the dates; the agenda shows the
- * full text of each public item as rendered Markdown with its decisions. A non-public
+ * full text of each public item as rendered Markdown with its decisions. A vote callout
+ * in the text shows as the same decision box as a decision outside it. A non-public
  * item keeps its number and shows no title, text or decision. The attendance is counts
  * only. The PDF is the public version, streamed by the API. The page is `noindex`.
  */
@@ -27,6 +37,7 @@ import { longDate, optionKey, orderedCounts, shortDate, useNoindex } from './pub
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     IconComponent,
@@ -52,6 +63,21 @@ export class PublicProtocolDetailComponent {
     const id = this.protocol()?.id;
     return id ? (image: string) => this.api.imageUrl(id, image) : null;
   });
+
+  /** The text of each agenda item, split at the vote callouts of its decisions. */
+  private readonly parts = computed(
+    () =>
+      new Map(
+        (this.protocol()?.tops ?? []).map((top) => [
+          top.number,
+          top.markdown ? topParts(top.markdown, top.decisions) : [],
+        ]),
+      ),
+  );
+
+  protected partsOf(top: PublicTop): TopPart[] {
+    return this.parts().get(top.number) ?? [];
+  }
 
   /** "Di, 29.09.2026". */
   protected when(p: PublicProtocolDetail): string {
