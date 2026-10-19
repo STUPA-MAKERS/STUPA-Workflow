@@ -29,7 +29,7 @@
                 [ariaControls]="'vh-diff-' + rev.id"
                 (click)="toggleDiff(rev)"
               >
-                {{ 'admin.config.history.viewDiff' | t }}
+                <span>{{ 'admin.config.history.viewDiff' | t }}</span>
                 <app-icon [name]="openDiffId() === rev.id ? 'up' : 'down'" [size]="14" />
               </app-button>
               @if (!rev.isCurrent) {
