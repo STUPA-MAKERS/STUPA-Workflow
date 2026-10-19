@@ -26,9 +26,9 @@
 
     <header class="pd__head">
       <div class="pd__titles">
-        <span class="cap pd__gremium">{{ p.gremium.name }}</span>
         <h1 class="pd__title">{{ p.title }}</h1>
         <p class="pd__dates">
+          <span>{{ p.gremium.name }}</span>
           <span>{{ 'publicProtocols.detail.meetingOn' | t: { date: when(p) } }}</span>
           @if (finalized(p)) {
             <span>{{ 'publicProtocols.detail.finalizedOn' | t: { date: finalized(p) } }}</span>
@@ -36,10 +36,15 @@
         </p>
       </div>
       @if (p.hasPdf) {
-        <a class="pd__btn pd__btn--fill" [href]="pdfUrl(p)" download>
-          <app-icon name="download" [size]="17" />
-          {{ 'publicProtocols.pdf' | t }}
-        </a>
+        <div class="pd__pdf">
+          <a class="pd__btn pd__btn--fill" [href]="pdfUrl(p)" download>
+            <app-icon name="download" [size]="17" />
+            {{ 'publicProtocols.pdf' | t }}
+          </a>
+          @if (pdfSize(p)) {
+            <span class="pd__muted">PDF · {{ pdfSize(p) }}</span>
+          }
+        </div>
       }
     </header>
 
@@ -79,58 +84,16 @@
                       <span class="sr-only">{{ 'publicProtocols.detail.top' | t: { n: top.number } }}</span>
                       {{ top.title }}
                     </h3>
-                    @if (top.markdown) {
-                      <app-markdown-view class="pd__md" [src]="top.markdown" [imageSrc]="imageSrc()" />
+                    @for (part of partsOf(top); track $index) {
+                      @if (part.kind === 'text') {
+                        <app-markdown-view class="pd__md" [src]="part.markdown" [imageSrc]="imageSrc()" />
+                      } @else {
+                        <ng-container *ngTemplateOutlet="decisionBox; context: { $implicit: part.decision }" />
+                      }
                     }
                     @for (d of top.decisions; track $index) {
                       @if (!d.inText) {
-                      <figure class="pd__decision" [attr.aria-label]="'publicProtocols.decision.label' | t">
-                        <div class="pd__decHead">
-                          <app-icon name="vote" [size]="16" />
-                          <span class="cap">{{ 'publicProtocols.decision.label' | t }}</span>
-                        </div>
-                        @if (d.question) {
-                          <p class="pd__question">{{ d.question }}</p>
-                        }
-                        @if (d.kind === 'election') {
-                          <p class="pd__rule">{{ electionLine(d) }}</p>
-                          <p class="pd__elected">
-                            {{ (d.elected?.length ? 'election.result.elected' : 'election.result.nobody') | t: { names: (d.elected ?? []).join(', ') } }}
-                          </p>
-                          @if (d.otherCandidates) {
-                            <p class="pd__rule">{{ 'publicProtocols.decision.others' | t: { n: d.otherCandidates } }}</p>
-                          }
-                          @if (d.byLot) {
-                            <p class="pd__rule">{{ 'publicProtocols.decision.byLot' | t }}</p>
-                          }
-                        } @else {
-                        <div class="pd__tally">
-                          @for (c of counts(d); track c.label) {
-                            <span class="pd__cell">
-                              <span class="pd__cellLabel">{{ c.label }}</span>
-                              <span class="pd__cellNo mono">{{ c.count }}</span>
-                            </span>
-                          }
-                          @if (resultKey(d); as rk) {
-                            <span class="pd__cell pd__cell--result">
-                              <span class="pd__cellLabel">{{ 'publicProtocols.decision.result' | t }}</span>
-                              <span class="pd__res" [class.pd__res--no]="d.result !== 'passed'">{{ rk | t }}</span>
-                            </span>
-                          }
-                        </div>
-                        <p class="pd__rule">{{ ruleLine(d) }}</p>
-                        @if (d.conditions?.length) {
-                          <div class="pd__conds">
-                            <span class="cap">{{ 'decision.conditions' | t }}</span>
-                            <ol class="pd__condList">
-                              @for (c of d.conditions; track $index) {
-                                <li>{{ c }}</li>
-                              }
-                            </ol>
-                          </div>
-                        }
-                        }
-                      </figure>
+                        <ng-container *ngTemplateOutlet="decisionBox; context: { $implicit: d }" />
                       }
                     }
                     @if (!top.markdown && top.decisions.length === 0) {
@@ -176,17 +139,6 @@
             <li>{{ 'publicProtocols.version.nonPublic' | t }}</li>
             <li>{{ 'publicProtocols.version.internal' | t }}</li>
           </ul>
-        </section>
-        <section class="pd__box pd__box--pdf">
-          @if (p.hasPdf) {
-            <a class="pd__btn" [href]="pdfUrl(p)" download>
-              <app-icon name="download" [size]="16" />
-              {{ 'publicProtocols.pdf' | t }}
-            </a>
-            @if (pdfSize(p)) {
-              <span class="pd__muted">PDF · {{ pdfSize(p) }}</span>
-            }
-          }
           <a class="pd__more" routerLink="/protokolle" [queryParams]="{ gremium: p.gremium.id }">
             {{ 'publicProtocols.detail.allOf' | t: { name: p.gremium.name } }}
             <app-icon name="arrow" [size]="14" />
@@ -195,4 +147,54 @@
       </aside>
     </div>
   }
+
+  <ng-template #decisionBox let-d>
+    <figure class="pd__decision" [attr.aria-label]="'publicProtocols.decision.label' | t">
+      <div class="pd__decHead">
+        <app-icon name="vote" [size]="16" />
+        <span class="cap">{{ 'publicProtocols.decision.label' | t }}</span>
+      </div>
+      @if (d.question) {
+        <p class="pd__question">{{ d.question }}</p>
+      }
+      @if (d.kind === 'election') {
+        <p class="pd__rule">{{ electionLine(d) }}</p>
+        <p class="pd__elected">
+          {{ (d.elected?.length ? 'election.result.elected' : 'election.result.nobody') | t: { names: (d.elected ?? []).join(', ') } }}
+        </p>
+        @if (d.otherCandidates) {
+          <p class="pd__rule">{{ 'publicProtocols.decision.others' | t: { n: d.otherCandidates } }}</p>
+        }
+        @if (d.byLot) {
+          <p class="pd__rule">{{ 'publicProtocols.decision.byLot' | t }}</p>
+        }
+      } @else {
+        <div class="pd__tally">
+          @for (c of counts(d); track c.label) {
+            <span class="pd__cell">
+              <span class="pd__cellLabel">{{ c.label }}</span>
+              <span class="pd__cellNo mono">{{ c.count }}</span>
+            </span>
+          }
+          @if (resultKey(d); as rk) {
+            <span class="pd__cell pd__cell--result">
+              <span class="pd__cellLabel">{{ 'publicProtocols.decision.result' | t }}</span>
+              <span class="pd__res" [class.pd__res--no]="d.result !== 'passed'">{{ rk | t }}</span>
+            </span>
+          }
+        </div>
+        <p class="pd__rule">{{ ruleLine(d) }}</p>
+        @if (d.conditions?.length) {
+          <div class="pd__conds">
+            <span class="cap">{{ 'decision.conditions' | t }}</span>
+            <ol class="pd__condList">
+              @for (c of d.conditions; track $index) {
+                <li>{{ c }}</li>
+              }
+            </ol>
+          </div>
+        }
+      }
+    </figure>
+  </ng-template>
 </section>

@@ -41,7 +41,7 @@
     >
       @if (variant() === 'header') {
         <app-icon name="help" [size]="18" />
-        <span>{{ 'help.title' | t }}</span>
+        <span class="hm__headLabel">{{ 'help.title' | t }}</span>
       } @else {
         <span class="hm__ind"><app-icon name="help" [size]="22" /></span>
         <span class="hm__label">{{ 'help.title' | t }}</span>

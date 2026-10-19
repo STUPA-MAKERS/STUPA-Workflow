@@ -38,11 +38,9 @@ _ALLOWED: frozenset[str] = frozenset(
         "redirect_uri",
         "refresh_token",
         "error_description",
-        # Multipart field names of the attachment upload, plus the field the
-        # response echoes. `ApiClient.uploadAttachment` writes and reads exactly
-        # these names and maps them to camelCase in `mappers.ts`.
+        # The multipart field name of the attachment upload.
+        # `ApiClient.uploadAttachment` writes exactly this name.
         "field_key",
-        "is_comparison_offer",
         # The magic-link contract. `MagicLinkVerifyOut` in the frontend models
         # mirrors `application_id` as it is.
         "application_id",

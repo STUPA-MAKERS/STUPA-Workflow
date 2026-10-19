@@ -248,8 +248,8 @@ describe('ApiClient', () => {
 
   it('uploads an attachment as multipart FormData and maps the result', (done) => {
     const file = new File(['hello'], 'plan.pdf', { type: 'application/pdf' });
-    api.uploadAttachment('app-1', file, { isComparisonOffer: true }).subscribe((att) => {
-      expect(att.isComparisonOffer).toBe(true);
+    api.uploadAttachment('app-1', file).subscribe((att) => {
+      expect(att.filename).toBe('plan.pdf');
       expect(att.scanState).toBe('scanning');
       done();
     });
@@ -258,7 +258,6 @@ describe('ApiClient', () => {
     expect(req.request.body instanceof FormData).toBe(true);
     const form = req.request.body as FormData;
     expect((form.get('file') as File).name).toBe('plan.pdf');
-    expect(form.get('is_comparison_offer')).toBe('true');
     req.flush(
       {
         id: 'att-1',
@@ -266,7 +265,6 @@ describe('ApiClient', () => {
         mime: 'application/pdf',
         size: 5,
         scanned: false,
-        is_comparison_offer: true,
       },
       { status: 201, statusText: 'Created' },
     );
@@ -275,9 +273,9 @@ describe('ApiClient', () => {
   it('uploads the first draft file with ALTCHA and no token header (Z4)', (done) => {
     const file = new File(['hello'], 'Angebot.pdf', { type: 'application/pdf' });
     api
-      .uploadDraftAttachment(file, { altcha: 'sol', fieldKey: 'offer', isComparisonOffer: true })
+      .uploadDraftAttachment(file, { altcha: 'sol', fieldKey: 'offer' })
       .subscribe((res) => {
-        expect(res.attachment).toMatchObject({ id: 'd1', isComparisonOffer: true, scanState: 'scanning' });
+        expect(res.attachment).toMatchObject({ id: 'd1', scanState: 'scanning' });
         expect(res.draftToken).toBe('tok');
         expect(res.draftExpiresAt).toBe('2026-10-12T00:00:00Z');
         done();
@@ -288,7 +286,6 @@ describe('ApiClient', () => {
     const form = req.request.body as FormData;
     expect(form.get('altcha')).toBe('sol');
     expect(form.get('field_key')).toBe('offer');
-    expect(form.get('is_comparison_offer')).toBe('true');
     req.flush(
       {
         id: 'd1',
@@ -296,7 +293,6 @@ describe('ApiClient', () => {
         mime: 'application/pdf',
         size: 5,
         scanned: false,
-        is_comparison_offer: true,
         draftToken: 'tok',
         draftExpiresAt: '2026-10-12T00:00:00Z',
       },
@@ -312,7 +308,6 @@ describe('ApiClient', () => {
     const form = req.request.body as FormData;
     expect(form.has('altcha')).toBe(false);
     expect(form.has('field_key')).toBe(false);
-    expect(form.has('is_comparison_offer')).toBe(false);
     expect(req.request.urlWithParams).not.toContain('tok');
     req.flush({});
     api.uploadDraftAttachment(file).subscribe();
@@ -679,28 +674,26 @@ describe('ApiClient', () => {
     req.flush({ newStateId: 's3', statusEventId: 'e1', dispatchedActions: [] });
   });
 
-  it('uploads an attachment with a field key (and not a comparison offer)', () => {
+  it('uploads an attachment with a field key', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     api.uploadAttachment('app-1', file, { fieldKey: 'invoice' }).subscribe();
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.get('field_key')).toBe('invoice');
-    expect(form.has('is_comparison_offer')).toBe(false);
     req.flush(
-      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: false, is_comparison_offer: false },
+      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: false },
       { status: 201, statusText: 'Created' },
     );
   });
 
-  it('uploads an attachment with no opts (neither field_key nor offer flag)', () => {
+  it('uploads an attachment with no opts (no field_key)', () => {
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
     api.uploadAttachment('app-1', file).subscribe();
     const req = http.expectOne('/api/applications/app-1/attachments');
     const form = req.request.body as FormData;
     expect(form.has('field_key')).toBe(false);
-    expect(form.has('is_comparison_offer')).toBe(false);
     req.flush(
-      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true, is_comparison_offer: false },
+      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true },
       { status: 201, statusText: 'Created' },
     );
   });
@@ -714,7 +707,7 @@ describe('ApiClient', () => {
     const req = http.expectOne('/api/applications/app-1/attachments');
     expect(req.request.method).toBe('GET');
     req.flush([
-      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true, is_comparison_offer: false },
+      { id: 'att-1', filename: 'a.pdf', mime: 'application/pdf', size: 1, scanned: true },
     ]);
   });
 

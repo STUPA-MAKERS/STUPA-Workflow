@@ -21,7 +21,7 @@ def test_attachment_table_registered() -> None:
     assert "attachment" in Base.metadata.tables
     table = Attachment.__table__
     assert {"id", "application_id", "filename", "mime", "size", "storage_key",
-            "scanned", "scan_result", "is_comparison_offer"} <= set(table.columns.keys())
+            "scanned", "scan_result"} <= set(table.columns.keys())
 
 
 def test_attachment_size_check_constraint() -> None:

@@ -110,6 +110,32 @@ async def test_assemble_collects_public_tops(monkeypatch: pytest.MonkeyPatch) ->
     assert tops[2].title == "Tagesordnungspunkt" and tops[2].markdown is None
 
 
+async def test_assemble_titles_application_items_by_their_application(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    named, unnamed = uuid4(), uuid4()
+    items = [
+        SimpleNamespace(id=uuid4(), application_id=named, title=None, body="", non_public=False),
+        SimpleNamespace(id=uuid4(), application_id=unnamed, title=None, body="", non_public=False),
+        SimpleNamespace(id=uuid4(), application_id=None, title="Frei", body="", non_public=False),
+    ]
+    _Voting.views = {}
+    monkeypatch.setattr(protocol_service_mod, "VotingService", _Voting)
+    session = FakeSession(
+        results=[
+            result(*items),
+            result((named, {"title": " Lastenrad "}), (unnamed, {})),
+            result(),
+            result(),
+            result(),
+        ]
+    )
+    tops: list[PublicTop] = []
+    md = await _service(session)._assemble_from_agenda(MID, public=True, tops=tops)
+    assert [t.title for t in tops] == ["Lastenrad", "Tagesordnungspunkt", "Frei"]
+    assert md.startswith("# Lastenrad")
+
+
 async def test_finalize_public_gremium_renders_public_version(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

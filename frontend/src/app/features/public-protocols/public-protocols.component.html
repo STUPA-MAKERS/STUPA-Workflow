@@ -104,8 +104,12 @@
                         @for (part of parts(top.title); track $index) {
                           @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} }
                         }
-                        @for (r of top.results; track $index) {
-                          <span class="pp__result" [class.pp__result--no]="r !== 'passed' && r !== 'elected'">{{ resultLabel(r) | t }}</span>
+                        @if (top.results.length) {
+                          <span class="pp__results">
+                            @for (r of top.results; track $index) {
+                              <span class="pp__result" [class.pp__result--no]="r !== 'passed' && r !== 'elected'">{{ resultLabel(r) | t }}</span>
+                            }
+                          </span>
                         }
                       </span>
                     }

@@ -91,7 +91,6 @@ async def test_upload_clean_path_stores_and_enqueues() -> None:
     assert UPLOAD_AUDITS[0]["data"] == {
         "application_id": str(app_id),
         "hasFieldKey": False,
-        "isComparisonOffer": False,
         "mime": "application/pdf",
         "size": len(PDF),
     }
@@ -223,7 +222,6 @@ def _attachment(session: FakeSession, **kw: object) -> Attachment:
         storage_key="k/doc.pdf",
         scanned=False,
         scan_result=None,
-        is_comparison_offer=False,
     )
     att.id = uuid.uuid4()
     for key, value in kw.items():
