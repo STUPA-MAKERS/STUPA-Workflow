@@ -1,7 +1,7 @@
-import { HttpClient, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
+import { HttpClient, type HttpContext, HttpErrorResponse, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { type Observable, catchError, map, of, throwError } from 'rxjs';
-import { listContext } from '@core/cache/cache.interceptor';
+import { detailContext, listContext } from '@core/cache/cache.interceptor';
 import { I18nService } from '@core/i18n/i18n.service';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import { API_BASE_URL } from './api.config';
@@ -112,6 +112,17 @@ import type {
 export const DRAFT_TOKEN_HEADER = 'X-Draft-Token';
 
 /**
+ * The context of a detail read. `quiet` skips the loading bar; `detail` keeps the answer
+ * in the HTTP cache, for a read that the detail of a list row makes when it opens and
+ * that its list reads ahead (`prefetchDetails`). A refresh after a write leaves `detail`
+ * off, so it never paints an older answer first.
+ */
+function readContext(opts: { quiet?: boolean; detail?: boolean }): HttpContext | undefined {
+  if (opts.detail) return detailContext();
+  return opts.quiet ? skipLoading() : undefined;
+}
+
+/**
  * Typed REST client for the OpenAPI contracts.
  *
  * Responses arrive in the backend wire form (`*Wire`, camelCase via
@@ -194,9 +205,9 @@ export class ApiClient {
    * The result holds the fields the server validates against, even after the
    * active form version changed.
    */
-  applicationForm(applicationId: Uuid): Observable<EffectiveForm> {
+  applicationForm(applicationId: Uuid, opts: { detail?: boolean } = {}): Observable<EffectiveForm> {
     return this.http.get<EffectiveForm>(`${this.base}/applications/${applicationId}/form`, {
-      context: skipLoading(),
+      context: readContext({ quiet: true, ...opts }),
     });
   }
 
@@ -237,11 +248,11 @@ export class ApiClient {
   }
 
   /** `quiet` skips the global overlay for a background reload after a mutation. */
-  getApplication(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Application> {
+  getApplication(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<Application> {
     const lang = this.i18n.locale();
     return this.http
       .get<ApplicationOutWire>(`${this.base}/applications/${id}`, {
-        context: opts.quiet ? skipLoading() : undefined,
+        context: readContext(opts),
       })
       .pipe(map((wire) => mapApplication(wire, lang)));
   }
@@ -355,11 +366,11 @@ export class ApiClient {
   }
 
   /** `quiet` skips the global overlay for a refresh after a mutation. */
-  timeline(id: Uuid, opts: { quiet?: boolean } = {}): Observable<TimelineEntry[]> {
+  timeline(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<TimelineEntry[]> {
     const lang = this.i18n.locale();
     return this.http
       .get<TimelineEventOutWire[]>(`${this.base}/applications/${id}/timeline`, {
-        context: opts.quiet ? skipLoading() : undefined,
+        context: readContext(opts),
       })
       .pipe(map((events) => events.map((e) => mapTimelineEvent(e, lang))));
   }
@@ -370,19 +381,19 @@ export class ApiClient {
    * The diff is language-neutral and holds raw field values. It needs no `lang`
    * mapping.
    */
-  versions(id: Uuid): Observable<ApplicationVersion[]> {
+  versions(id: Uuid, opts: { detail?: boolean } = {}): Observable<ApplicationVersion[]> {
     return this.http
       .get<VersionOutWire[]>(`${this.base}/applications/${id}/versions`, {
-        context: skipLoading(),
+        context: readContext({ quiet: true, ...opts }),
       })
       .pipe(map((items) => items.map(mapVersion)));
   }
 
   /** `quiet` skips the global overlay for a background refresh. */
-  comments(id: Uuid, opts: { quiet?: boolean } = {}): Observable<ApplicationComment[]> {
+  comments(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<ApplicationComment[]> {
     return this.http
       .get<CommentOutWire[]>(`${this.base}/applications/${id}/comments`, {
-        context: opts.quiet ? skipLoading() : undefined,
+        context: readContext(opts),
       })
       .pipe(map((comments) => comments.map(mapComment)));
   }
@@ -441,11 +452,11 @@ export class ApiClient {
     return this.http.delete<void>(`${this.base}/applications/${id}/comments/${commentId}`);
   }
 
-  transitions(id: Uuid): Observable<Transition[]> {
+  transitions(id: Uuid, opts: { detail?: boolean } = {}): Observable<Transition[]> {
     const lang = this.i18n.locale();
     return this.http
       .get<TransitionOutWire[]>(`${this.base}/applications/${id}/transitions`, {
-        context: skipLoading(),
+        context: readContext({ quiet: true, ...opts }),
       })
       .pipe(map((items) => items.map((t) => mapTransition(t, lang))));
   }
@@ -555,9 +566,10 @@ export class ApiClient {
 
   /** GET /applications/{id}/attachments — existing attachments (panel hydration). */
   listAttachments(id: Uuid): Observable<Attachment[]> {
+    // Kept for the read ahead of a list; an upload or a delete under the same path drops it.
     return this.http
       .get<AttachmentOutWire[]>(`${this.base}/applications/${id}/attachments`, {
-        context: skipLoading(),
+        context: readContext({ quiet: true, detail: true }),
       })
       .pipe(map((list) => list.map(mapAttachment)));
   }
@@ -586,9 +598,9 @@ export class ApiClient {
    * `secret` vote the server returns only `counts` in `tally`.
    */
   /** `quiet` skips the global overlay for a tally refresh after casting. */
-  getVote(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Vote> {
+  getVote(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<Vote> {
     return this.http.get<Vote>(`${this.base}/votes/${id}`, {
-      context: opts.quiet ? skipLoading() : undefined,
+      context: readContext(opts),
     });
   }
 
@@ -712,10 +724,10 @@ export class ApiClient {
 
   /** GET /meetings/{id} — meeting state + votes. */
   /** `quiet` skips the global overlay for a background reload after a vote action. */
-  getMeeting(id: Uuid, opts: { quiet?: boolean } = {}): Observable<Meeting> {
+  getMeeting(id: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<Meeting> {
     return this.http
       .get<MeetingOutWire>(`${this.base}/meetings/${id}`, {
-        context: opts.quiet ? skipLoading() : undefined,
+        context: readContext(opts),
       })
       .pipe(map(mapMeeting));
   }
@@ -754,9 +766,9 @@ export class ApiClient {
 
   /** GET /meetings/{id}/attendance — roster of current members + status. */
   /** `quiet` skips the global overlay for a roster reload in a dialog. */
-  listAttendance(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Attendance[]> {
+  listAttendance(meetingId: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<Attendance[]> {
     return this.http.get<Attendance[]>(`${this.base}/meetings/${meetingId}/attendance`, {
-      context: opts.quiet ? skipLoading() : undefined,
+      context: readContext(opts),
     });
   }
 
@@ -798,9 +810,9 @@ export class ApiClient {
 
   /** GET /meetings/{id}/agenda — assigned applications (ordered). */
   /** `quiet` skips the global overlay for a reload after a WS event or mutation. */
-  listAgenda(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<AgendaItem[]> {
+  listAgenda(meetingId: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<AgendaItem[]> {
     return this.http.get<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda`, {
-      context: opts.quiet ? skipLoading() : undefined,
+      context: readContext(opts),
     });
   }
 
@@ -1081,10 +1093,10 @@ export class ApiClient {
 
       Use this route for reload and status polling. The default write rate limit
       does not apply to a GET. The 4s poll over the POST route soon hit 429. */
-  getProtocol(meetingId: Uuid, opts: { quiet?: boolean } = {}): Observable<Protocol> {
+  getProtocol(meetingId: Uuid, opts: { quiet?: boolean; detail?: boolean } = {}): Observable<Protocol> {
     return this.http
       .get<ProtocolOutWire>(`${this.base}/meetings/${meetingId}/protocol`, {
-        context: opts.quiet ? skipLoading() : undefined,
+        context: readContext(opts),
       })
       .pipe(map(mapProtocol));
   }

@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { LoadingService } from '@core/loading/loading.service';
 import { loadingInterceptor } from '@core/loading/loading.interceptor';
 import { cacheInterceptor, detailContext } from './cache.interceptor';
-import { prefetchDetails } from './detail-prefetch';
+import { prefetchDetails, provideDetailPrefetch } from './detail-prefetch';
 
 @Component({ standalone: true, template: '' })
 class ListHost {
@@ -33,6 +33,7 @@ describe('prefetchDetails', () => {
       providers: [
         provideHttpClient(withInterceptors([loadingInterceptor, cacheInterceptor])),
         provideHttpClientTesting(),
+        provideDetailPrefetch(),
       ],
     });
     mock = TestBed.inject(HttpTestingController);
@@ -66,7 +67,8 @@ describe('prefetchDetails', () => {
     host.read('c').subscribe((b) => seen.push(b));
     mock.expectOne('/api/things/c').flush({ id: 'c', changed: true });
     expect(seen).toEqual([{ id: 'b' }, { id: 'c' }, { id: 'c', changed: true }]);
-    expect(inc).toHaveBeenCalledTimes(2);
+    // A detail read never runs the bar: the detail paints the kept answer meanwhile.
+    expect(inc).not.toHaveBeenCalled();
   });
 
   it('joins a read ahead still in flight instead of reading twice', () => {

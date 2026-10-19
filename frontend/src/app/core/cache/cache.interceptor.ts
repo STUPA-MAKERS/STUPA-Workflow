@@ -70,9 +70,11 @@ export function listContext(offset: number | undefined): HttpContext {
  *
  * The list reads it ahead for the rows it shows (`prefetchDetails`), so a click paints
  * the detail at once. Only for a read whose subscriber takes a second emission, because a
- * hit emits twice when the fresh answer differs.
+ * hit emits twice when the fresh answer differs. It skips the loading bar: the detail
+ * shows its own loading state, and a hit that reads again behind the painted answer must
+ * not run the bar over it.
  */
-export function detailContext(base: HttpContext = new HttpContext()): HttpContext {
+export function detailContext(base: HttpContext = skipLoading()): HttpContext {
   return cached(DETAIL_TTL_MS, base);
 }
 
