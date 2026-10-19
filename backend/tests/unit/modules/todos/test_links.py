@@ -106,7 +106,7 @@ def _meeting(meeting_id: uuid.UUID = MEETING, gremium: uuid.UUID = G1) -> Any:
 
 
 def test_card_url() -> None:
-    assert card_url(G1, APP) == f"/todos/{G1}?card={APP}"
+    assert card_url(APP) == f"/todos?card={APP}"
 
 
 async def test_resolve_skips_empty_kinds_and_hides_missing_targets() -> None:
@@ -226,7 +226,7 @@ async def test_todos_follow_the_board_rule() -> None:
     c = card(b, col, title="Plakat")
     resolver = LinkResolver(ScriptedSession(execute=[[(c, b, col)]]), FakeAccess())  # type: ignore[arg-type]
     seen = (await resolver.resolve([("todo", c.id)], USER))[("todo", c.id)]
-    assert seen.title == "Plakat" and seen.url == card_url(b.id, c.id)
+    assert seen.title == "Plakat" and seen.url == card_url(c.id)
     assert seen.detail is not None and seen.detail.is_done is True
     denied = LinkResolver(ScriptedSession(execute=[[(c, b, col)]]), FakeAccess(read=False))  # type: ignore[arg-type]
     assert not await denied.readable("todo", c.id, USER)

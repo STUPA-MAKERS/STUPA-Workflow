@@ -66,9 +66,6 @@
 .df__sep {
   color: var(--color-text-subtle);
 }
-.df__tag {
-  flex: none;
-}
 .df__remove {
   display: inline-flex;
   flex: none;
@@ -108,9 +105,6 @@
   .df__spinner {
     animation-duration: 2s;
   }
-}
-.df__offer {
-  padding-inline: var(--space-1);
 }
 .df__error {
   margin: 0;

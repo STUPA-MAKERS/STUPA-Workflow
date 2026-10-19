@@ -222,7 +222,6 @@ export function mapAttachment(wire: AttachmentOutWire): Attachment {
     mime: wire.mime,
     size: wire.size,
     scanned: wire.scanned,
-    isComparisonOffer: wire.is_comparison_offer,
     // `scanned=true` only means "scan finished". The download decides clean or finding.
     scanState: wire.scanned ? 'clean' : 'scanning',
   };

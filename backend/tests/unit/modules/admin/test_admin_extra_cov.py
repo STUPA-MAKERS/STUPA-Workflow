@@ -3,7 +3,7 @@
 These tests add the service branches that the other suites leave open. They cover the
 Gremium role CRUD with its conflict, not-found, forced-role and in-use blocks. They cover
 the idempotent forced-role backfill and the membership validation. They cover the pure
-helpers ``_parse_dt``, ``_iso``, ``_sanitize_perms`` and ``_role_out``. They also cover
+helpers ``_iso``, ``_sanitize_perms`` and ``_role_out``. They also cover
 the site-config draft, activate, public and manifest paths with the fallback names.
 
 These tests need no DB. ``tests._support.auth_fakes.FakeSession`` serves prefilled result

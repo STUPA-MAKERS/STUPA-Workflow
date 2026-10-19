@@ -17,8 +17,6 @@ import {
   GUARD_COMBINATORS,
   GUARD_LEAF_OPERATORS,
   type Guard,
-  type GuardCombinator,
-  type GuardLeafOperator,
   NOTIFY_RECIPIENT_KINDS,
 } from './admin.models';
 
@@ -219,23 +217,4 @@ function validateRecipients(recipients: unknown): void {
       throw new GuardError('admin.flow.err.notifyRecipientNoRef', { kind });
     }
   }
-}
-
-export function isGuardValid(guard: Guard | null | undefined, allowActorOps = true): boolean {
-  try {
-    validateGuard(guard, allowActorOps);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-/** Build a leaf guard, e.g. `buildLeaf('roleIs', 'stupa')` → `{roleIs:'stupa'}`. */
-export function buildLeaf(op: GuardLeafOperator, value: unknown): Guard {
-  return { [op]: value };
-}
-
-/** Build a combinator guard (`and`/`or` with n children, `not` with exactly one). */
-export function combine(op: GuardCombinator, kids: Guard[]): Guard {
-  return op === 'not' ? { not: kids[0] } : { [op]: kids };
 }

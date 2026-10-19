@@ -18,7 +18,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 from sqlalchemy import select
 
@@ -69,33 +68,6 @@ async def cd_variant_key_for_gremium(db: AsyncSession, gremium: Gremium | None) 
     if gremium is None or gremium.cd_variant_id is None:
         return None
     return await db.scalar(select(CdVariant.key).where(CdVariant.id == gremium.cd_variant_id))
-
-
-async def resolve_cd_variant(
-    db: AsyncSession, storage: ObjectStorage | None, gremium_id: UUID | None
-) -> ResolvedCdVariant | None:
-    """Resolve the corporate design that a Gremium renders with.
-
-    Returns:
-        The resolved variant, or ``None`` when the Gremium does not exist, holds
-        no variant, or the referenced variant is gone.
-
-    Raises:
-        ServiceUnavailableError: The variant holds an uploaded logo, but the
-            object storage is off or unreachable. The render must fail loudly
-            instead of producing a document with a missing logo.
-    """
-    if gremium_id is None:
-        return None
-    variant_id = await db.scalar(
-        select(Gremium.cd_variant_id).where(Gremium.id == gremium_id)
-    )
-    if variant_id is None:
-        return None
-    variant = await db.get(CdVariant, variant_id)
-    if variant is None:  # pragma: no cover - the FK is RESTRICT, so this cannot happen
-        return None
-    return await _resolve(db, storage, variant)
 
 
 async def resolve_cd_variant_by_key(

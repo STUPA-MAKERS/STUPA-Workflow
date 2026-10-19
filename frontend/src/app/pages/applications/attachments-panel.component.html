@@ -71,10 +71,6 @@
               <span class="num">{{ size(att) }}</span>
               <span class="att__dot" aria-hidden="true">·</span>
               <app-status-text [kind]="st.kind">{{ st.key | t }}</app-status-text>
-              @if (att.isComparisonOffer) {
-                <span class="att__dot" aria-hidden="true">·</span>
-                <span>{{ 'applications.attachments.comparisonOffer' | t }}</span>
-              }
             </span>
           </div>
           <div class="att__actions">

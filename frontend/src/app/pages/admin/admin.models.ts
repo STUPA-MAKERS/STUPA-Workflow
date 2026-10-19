@@ -684,14 +684,6 @@ export interface MergeResult {
   mergedAt: string;
 }
 
-export interface ApplicationTypeAdmin {
-  id: Uuid;
-  key: string;
-  name: I18nMap;
-  gremiumId?: Uuid | null;
-  active: boolean;
-}
-
 /** Comparison-offers rule of an application type. */
 export interface ComparisonOffers {
   required: boolean;
@@ -855,9 +847,6 @@ export const GREMIUM_PERMISSIONS = [
   'protocol.write',
   'protocol.finalize',
 ] as const;
-
-/** One key of the fixed gremium permission catalogue. */
-export type GremiumPermission = (typeof GREMIUM_PERMISSIONS)[number];
 
 /**
  * The keys of the forced gremium roles, in display order. Every gremium has them and

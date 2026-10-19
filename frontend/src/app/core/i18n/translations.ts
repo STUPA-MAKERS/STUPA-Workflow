@@ -484,8 +484,6 @@ export const de = {
   'apply.files.hint': 'PDF, Bilder, Word, Excel, PowerPoint, OpenDocument · bis {size} je Datei',
   'apply.files.drop': 'Dateien hierher ziehen oder auswählen',
   'apply.files.pick': 'Auswählen',
-  'apply.files.asOffer': 'Als Vergleichsangebot hochladen',
-  'apply.files.offerTag': 'Vergleichsangebot',
   'apply.files.remove': '{name} entfernen',
   'apply.files.uploading': 'Wird hochgeladen …',
   'apply.files.lost': 'Nicht mehr vorhanden',
@@ -931,7 +929,6 @@ export const de = {
   'applications.attachments.drop': 'Dateien zum Hochladen ablegen',
   'applications.attachments.selectedCount': '{count} ausgewählt',
   'applications.attachments.deleteSelected': 'Auswahl löschen',
-  'applications.attachments.comparisonOffer': 'Vergleichsangebot',
   'applications.attachments.download': 'Herunterladen',
   'applications.attachments.preview': 'Vorschau',
   'applications.attachments.previewClose': 'Vorschau schließen',
@@ -2030,7 +2027,6 @@ export const de = {
   'admin.flow.err.notifyRecipientInvalid': 'Ungültiger Empfänger in der Benachrichtigungs-Aktion.',
   'admin.flow.err.notifyRecipientValue': 'Der Empfänger „{kind}“ braucht einen Wert.',
   'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
-  'admin.flow.preset': 'Vorlage',
   'admin.flow.addState': 'Status hinzufügen',
   'admin.flow.initial': 'Initial',
   'admin.flow.color': 'Farbe',
@@ -2197,8 +2193,6 @@ export const de = {
   'admin.flow.actionDesc.openVote':
     'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
-  'admin.flow.preset.simple': 'Einfach: Entwurf → Eingereicht → Entschieden',
-  'admin.flow.preset.vote': 'Mit Abstimmung: Entwurf → Prüfung → Abstimmung → Entschieden',
   // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versionen',
   'admin.flow.versionsClose': 'Zurück zur Bearbeitung',

@@ -37,7 +37,7 @@ from app.modules.admin.cd_logos import (
     SQUARE_LOGO_MIN_PX,
     check_square_logo,
 )
-from app.modules.admin.cd_resolver import resolve_cd_variant
+from app.modules.admin.cd_resolver import resolve_cd_variant_by_key
 from app.modules.admin.gremium_roles import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.admin.image_size import raster_dimensions
 from app.modules.admin.models import CdVariantLogo
@@ -389,8 +389,8 @@ async def test_resolver_never_hands_the_square_slot_to_the_renderer() -> None:
     variant = variant_row()
     square = _square(variant_id=variant.id)
     footer = logo_row(variant_id=variant.id, slot="footer", vendored_name="STUPA")
-    session = FakeSession([res(footer, square)], scalars=[variant.id], gets=[variant])
-    resolved = await resolve_cd_variant(session, FakeStorage(), uuid.uuid4())  # type: ignore[arg-type]
+    session = FakeSession([res(footer, square)], scalars=[variant])
+    resolved = await resolve_cd_variant_by_key(session, FakeStorage(), variant.key)  # type: ignore[arg-type]
     assert resolved is not None
     assert resolved.title_logos == () and resolved.footer_logos == ("STUPA",)
     assert resolved.assets == {}

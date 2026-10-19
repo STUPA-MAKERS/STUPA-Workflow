@@ -17,7 +17,6 @@ export const KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
  * reason the UI shows a dropdown and not free text.
  */
 export const PROMOTE_TARGETS = ['amount'] as const;
-export type PromoteTarget = (typeof PROMOTE_TARGETS)[number];
 
 export const FIELD_TYPES: readonly FieldType[] = [
   'text',
@@ -138,15 +137,6 @@ export function normalizeFormField(field: FormFieldDef): FormFieldDef {
     if (field.promoteTarget) out.promoteTarget = field.promoteTarget;
   }
   return out;
-}
-
-export function serializeFields(fields: FormFieldDef[]): string {
-  return JSON.stringify(fields.map(normalizeFormField), null, 2);
-}
-
-export function parseFields(json: string): FormFieldDef[] {
-  const parsed = JSON.parse(json) as FormFieldDef[];
-  return parsed.map(normalizeFormField);
 }
 
 export function blankField(type: FieldType = 'text', key = ''): FormFieldDef {

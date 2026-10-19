@@ -8,21 +8,20 @@
  * unknown ticket and a ticket the caller may not read both answer 404. The client only
  * binds the data; the server stays authoritative.
  */
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { type HttpContext, HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import type { Observable } from 'rxjs';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { IsoDateTime, MessageAttachment, MessageFiles, PersonRef, ScanState, Uuid } from '@core/api/models';
 import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@core/loading/loading.interceptor';
+import { detailContext } from '@core/cache/cache.interceptor';
 
 export type TicketKind = 'bug' | 'question' | 'idea';
 export type TicketStatus = 'new' | 'in_progress' | 'done' | 'rejected';
 
 /** The kinds in the order of the dialog and the filter. */
 export const TICKET_KINDS: readonly TicketKind[] = ['bug', 'question', 'idea'];
-/** The states in the order of the list groups and the filter. */
-export const TICKET_STATUSES: readonly TicketStatus[] = ['new', 'in_progress', 'done', 'rejected'];
 
 /** What the dialog sends along: every field optional, capped by the server. */
 export interface TicketContext {
@@ -217,6 +216,11 @@ export interface TicketCounts {
   rejected: number;
 }
 
+/** A quiet read; `detail` also keeps it in the HTTP cache. */
+function readContext(opts: { detail?: boolean }): HttpContext {
+  return opts.detail ? detailContext() : skipLoading();
+}
+
 /** The filters of `GET /tickets`. */
 export interface TicketQuery {
   status?: readonly TicketStatus[];
@@ -255,8 +259,9 @@ export class TicketsApiService {
     return this.http.get<MyTicketPage>(`${this.base}/tickets/mine`, { params, context: skipLoading() });
   }
 
-  getMine(id: Uuid): Observable<MyTicketDetail> {
-    return this.http.get<MyTicketDetail>(`${this.base}/tickets/mine/${id}`, { context: skipLoading() });
+  /** `detail` keeps the answer for the read ahead of the list (`prefetchDetails`). */
+  getMine(id: Uuid, opts: { detail?: boolean } = {}): Observable<MyTicketDetail> {
+    return this.http.get<MyTicketDetail>(`${this.base}/tickets/mine/${id}`, { context: readContext(opts) });
   }
 
   /** A message of the reporter: always public. */
@@ -285,8 +290,9 @@ export class TicketsApiService {
     return this.http.get<PersonRef[]>(`${this.base}/tickets/assignees`, { context: skipLoading() });
   }
 
-  get(id: Uuid): Observable<TicketDetail> {
-    return this.http.get<TicketDetail>(`${this.base}/tickets/${id}`, { context: skipLoading() });
+  /** `detail` keeps the answer for the read ahead of the list (`prefetchDetails`). */
+  get(id: Uuid, opts: { detail?: boolean } = {}): Observable<TicketDetail> {
+    return this.http.get<TicketDetail>(`${this.base}/tickets/${id}`, { context: readContext(opts) });
   }
 
   patch(id: Uuid, body: TicketPatch): Observable<TicketDetail> {

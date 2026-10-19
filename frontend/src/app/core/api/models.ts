@@ -543,8 +543,7 @@ export interface VersionOutWire {
 }
 
 /**
- * `AttachmentOut`. Attachment metadata. It is a plain `BaseModel` and not a
- * `_CamelModel`, so `is_comparison_offer` keeps its snake_case name.
+ * `AttachmentOut`. Attachment metadata.
  *
  * `scanned` means that the ClamAV run finished. It does not mean "clean". The API
  * hides the scan result (`scan_result`) on purpose. If the scan finds something,
@@ -557,7 +556,6 @@ export interface AttachmentOutWire {
   mime: string;
   size: number;
   scanned: boolean;
-  is_comparison_offer: boolean;
 }
 
 /**
@@ -879,14 +877,13 @@ export interface MessageFiles {
   draftToken?: string | null;
 }
 
-/** Attachment, frontend view. `isComparisonOffer` is camelCase. `scanState` is derived. */
+/** Attachment, frontend view. `scanState` is derived. */
 export interface Attachment {
   id: Uuid;
   filename: string;
   mime: string;
   size: number;
   scanned: boolean;
-  isComparisonOffer: boolean;
   scanState: ScanState;
 }
 
@@ -1470,11 +1467,6 @@ export interface MeetingPatchBody {
   guestsMode?: GuestsMode;
   /** Confirms an early open (`status: 'live'` before `confirmUntil`). */
   confirmEarly?: boolean;
-}
-
-/** Body for `PATCH /protocols/{id}`. It updates the markdown. */
-export interface ProtocolPatchBody {
-  markdown: string;
 }
 
 /** Body for `POST /protocols/{id}/votes`. It embeds votes. */
