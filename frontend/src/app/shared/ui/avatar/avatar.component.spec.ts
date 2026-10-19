@@ -28,6 +28,17 @@ describe('AvatarComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  it('shows an icon in place of the initials and loads no image', async () => {
+    const view = await render(AvatarComponent, {
+      inputs: { name: 'Niemand', principalId: 'p1', icon: 'user', size: 'xs' },
+    });
+    const host = view.fixture.nativeElement as HTMLElement;
+    expect(host.querySelector('app-icon')).not.toBeNull();
+    expect(host.querySelector('.av__letters')).toBeNull();
+    expect(host.querySelector('img')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Niemand' })).toBeInTheDocument();
+  });
+
   it('hides itself from screen readers when it is decorative', async () => {
     const view = await render(AvatarComponent, {
       inputs: { name: 'Mara Keller', decorative: true },

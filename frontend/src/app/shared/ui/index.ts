@@ -13,7 +13,7 @@
  * initial bundle too.
  */
 export { AvatarComponent, AvatarStackComponent, initials } from './avatar/avatar.component';
-export type { AvatarSize } from './avatar/avatar.component';
+export type { AvatarPerson, AvatarSize } from './avatar/avatar.component';
 export { ChatComponent } from './chat/chat.component';
 export { ChatDrafts } from './chat/chat-drafts';
 export { chatPeople, type ChatPerson } from './chat/chat-mentions';

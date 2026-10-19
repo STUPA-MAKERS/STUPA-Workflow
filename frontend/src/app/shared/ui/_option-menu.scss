@@ -106,6 +106,13 @@
   background: var(--color-surface-3);
 }
 
+// The avatar in front of the label of a person (or of "Niemand" among persons). Surface 4
+// lifts its circle off the surface 3 of the menu.
+@mixin avatar {
+  flex: none;
+  --avatar-bg: var(--color-surface-4);
+}
+
 // The check mark after the label of the chosen row.
 @mixin check {
   flex: none;

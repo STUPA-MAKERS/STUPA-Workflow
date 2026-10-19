@@ -25,7 +25,7 @@ import {
   ToastService,
   type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { longDate } from '../meetings-display.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
@@ -96,15 +96,18 @@ export class CreateMeetingDialogComponent {
   private lastPrefill = '';
 
   /** O20: only a member with `protocol.write` can keep the minutes (422 otherwise). */
-  readonly keeperOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('meetings.protokollant.none') },
-    ...this.members()
-      .filter((m) => m.canKeepProtocol)
-      .map((m) => ({
-        value: m.principalId,
-        label: m.displayName || m.email || this.i18n.translate('common.unnamed'),
-      })),
-  ]);
+  readonly keeperOptions = computed<SelectFieldOption[]>(() => {
+    const none = this.i18n.translate('meetings.protokollant.none');
+    return [
+      { value: '', label: none, person: { name: none, icon: 'user' } },
+      ...this.members()
+        .filter((m) => m.canKeepProtocol)
+        .map((m) => {
+          const label = m.displayName || m.email || this.i18n.translate('common.unnamed');
+          return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
+        }),
+    ];
+  });
 
   readonly step1Valid = computed(
     () => !!this.gremium() && !!this.date().trim() && !!this.time().trim(),

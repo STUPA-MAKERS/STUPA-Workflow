@@ -19,10 +19,9 @@ import {
   ButtonComponent,
   DialogComponent,
   IconComponent,
-  type SelectOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { Subscription } from 'rxjs';
 import { liveSearch } from '@shared/live-search';
 import { AdminApiService } from '../admin-api.service';
@@ -115,10 +114,17 @@ export class SubstitutePoolComponent {
   protected readonly adding = signal(false);
   protected readonly addError = signal('');
 
-  protected readonly memberOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('admin.substitutes.allMembers') },
-    ...this.memberList().map((m) => ({ value: m.id, label: m.name })),
-  ]);
+  protected readonly memberOptions = computed<SelectFieldOption[]>(() => {
+    const all = this.i18n.translate('admin.substitutes.allMembers');
+    return [
+      { value: '', label: all, person: { name: all, icon: 'users' } },
+      ...this.memberList().map((m) => ({
+        value: m.id,
+        label: m.name,
+        person: { name: m.name, principalId: m.id },
+      })),
+    ];
+  });
 
   private loads?: Subscription;
 

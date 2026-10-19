@@ -18,6 +18,7 @@ import { NG_VALUE_ACCESSOR, type ControlValueAccessor } from '@angular/forms';
 import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { mediaQuerySignal } from '../../../layout/media-query';
+import { AvatarComponent, type AvatarPerson } from '../avatar/avatar.component';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 
 /** One choice of {@link SelectFieldComponent}. The shape of the ui-kit `SelectOption`. */
@@ -27,6 +28,8 @@ export interface SelectFieldOption {
   disabled?: boolean;
   /** The heading of the group. Consecutive options with the same group form one group. */
   group?: string;
+  /** The avatar in front of the label, in a list of persons (an assignee select). */
+  person?: AvatarPerson | null;
 }
 
 /** One row of the list: an option, or the placeholder row that clears the value. */
@@ -36,6 +39,7 @@ interface Row {
   disabled: boolean;
   placeholder: boolean;
   index: number;
+  person: AvatarPerson | null;
 }
 
 /** Consecutive rows with the same group (or none). */
@@ -81,7 +85,7 @@ const PAGE = 10;
   selector: 'app-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, NgTemplateOutlet, SideSheetComponent, TranslatePipe],
+  imports: [AvatarComponent, IconComponent, NgTemplateOutlet, SideSheetComponent, TranslatePipe],
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: SelectFieldComponent, multi: true }],
   templateUrl: './select.component.html',
   styleUrl: './select.component.scss',
@@ -128,7 +132,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
     const rows: Row[] = [];
     const text = this.placeholder();
     if (text && this.clearable() && !this.required()) {
-      rows.push({ value: '', label: text, disabled: false, placeholder: true, index: 0 });
+      rows.push({ value: '', label: text, disabled: false, placeholder: true, index: 0, person: null });
     }
     for (const opt of this.options()) {
       rows.push({
@@ -137,6 +141,7 @@ export class SelectFieldComponent implements ControlValueAccessor {
         disabled: !!opt.disabled,
         placeholder: false,
         index: rows.length,
+        person: opt.person ?? null,
       });
     }
     return rows;

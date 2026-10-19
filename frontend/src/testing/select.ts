@@ -29,12 +29,15 @@ export async function pickOption(field: HTMLElement, option: string | RegExp): P
   await userEvent.click(within(list).getByRole('option', { name: option }));
 }
 
-/** The option labels of a select field, in order. Opens the list and closes it again. */
+/**
+ * The option labels of a select field, in order, without the initials of an avatar in
+ * front of them. Opens the list and closes it again.
+ */
 export async function optionLabels(field: HTMLElement): Promise<string[]> {
   const list = await openSelect(field);
   const labels = within(list)
     .getAllByRole('option')
-    .map((o) => o.textContent?.trim() ?? '');
+    .map((o) => (o.querySelector('.sel__label') ?? o).textContent?.trim() ?? '');
   await userEvent.click(field);
   return labels;
 }
