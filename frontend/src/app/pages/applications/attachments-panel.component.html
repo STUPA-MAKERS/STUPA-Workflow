@@ -131,24 +131,24 @@
   }
 </section>
 
-<!-- Large inline preview of an image or a PDF. It needs no download. -->
-<app-dialog
-  class="att__previewDlg"
-  size="lg"
-  [open]="previewing() !== null"
-  [title]="previewing()?.filename ?? ''"
-  [closeLabel]="'applications.attachments.previewClose' | t"
+<app-file-viewer
+  [items]="viewerItems()"
+  [index]="viewerIndex()"
+  (indexChange)="onViewerIndex($event)"
+  [(open)]="viewerOpen"
   (closed)="closePreview()"
 >
-  @if (previewing(); as att) {
-    @if (previewIsImage()) {
-      @if (previewUrl(); as url) {
-        <img class="att__previewImg" [src]="url" [alt]="att.filename" />
-      }
-    } @else {
-      @if (previewFrameUrl(); as frameUrl) {
-        <iframe class="att__previewFrame" [src]="frameUrl" [title]="att.filename"></iframe>
-      }
-    }
+  @if (viewerFile(); as file) {
+    <button
+      viewerActions
+      type="button"
+      class="fv__btn"
+      [attr.aria-label]="'applications.attachments.download' | t"
+      [title]="'applications.attachments.download' | t"
+      [disabled]="downloadingId() !== null"
+      (click)="download(file)"
+    >
+      <app-icon name="download" [size]="20" />
+    </button>
   }
-</app-dialog>
+</app-file-viewer>
