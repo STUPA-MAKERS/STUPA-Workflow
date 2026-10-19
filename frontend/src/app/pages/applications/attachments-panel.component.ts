@@ -125,10 +125,6 @@ export class AttachmentsPanelComponent {
   readonly selected = signal<ReadonlySet<Uuid>>(new Set());
   readonly bulkDeleting = signal(false);
   readonly selectedCount = computed(() => this.selected().size);
-  readonly allSelected = computed(() => {
-    const list = this.attachments();
-    return list.length > 0 && list.every((a) => this.selected().has(a.id));
-  });
 
   /** The scan state as coloured text. */
   readonly scan = scanStatus;
@@ -210,10 +206,6 @@ export class AttachmentsPanelComponent {
       else next.delete(id);
       return next;
     });
-  }
-
-  toggleSelectAll(checked: boolean): void {
-    this.selected.set(checked ? new Set(this.attachments().map((a) => a.id)) : new Set());
   }
 
   /** Delete the selected attachments sequentially (concatMap), then clear the selection. */

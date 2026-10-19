@@ -34,26 +34,19 @@
   </div>
 
   @if (attachments().length) {
-    @if (deleteAllowed()) {
+    @if (deleteAllowed() && selectedCount()) {
       <div class="att__bulkbar">
-        <app-checkbox
-          [ngModel]="allSelected()"
-          (ngModelChange)="toggleSelectAll($event)"
-          [attr.aria-label]="'applications.attachments.selectAll' | t"
-        >{{ 'applications.attachments.selectAll' | t }}</app-checkbox>
-        @if (selectedCount()) {
-          <span class="att__bulkcount">{{ 'applications.attachments.selectedCount' | t: { count: selectedCount() } }}</span>
-          <app-button
-            class="att__bulkdel"
-            variant="danger"
-            size="sm"
-            [loading]="bulkDeleting()"
-            [disabled]="bulkDeleting()"
-            (click)="bulkDelete()"
-          >
-            {{ 'applications.attachments.deleteSelected' | t }}
-          </app-button>
-        }
+        <span class="att__bulkcount">{{ 'applications.attachments.selectedCount' | t: { count: selectedCount() } }}</span>
+        <app-button
+          class="att__bulkdel"
+          variant="danger"
+          size="sm"
+          [loading]="bulkDeleting()"
+          [disabled]="bulkDeleting()"
+          (click)="bulkDelete()"
+        >
+          {{ 'applications.attachments.deleteSelected' | t }}
+        </app-button>
       </div>
     }
     <ul class="rowgroup att__list">
