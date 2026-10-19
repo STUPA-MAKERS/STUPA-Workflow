@@ -12,6 +12,7 @@ import { API_BASE_URL } from '@core/api/api.config';
 import type { I18nMap, IsoDateTime, MessageAttachment, MessageFiles, Page, PersonRef, Uuid } from '@core/api/models';
 import { messageFiles } from '@core/api/mappers';
 import { skipLoading } from '@core/loading/loading.interceptor';
+import { detailContext } from '@core/cache/cache.interceptor';
 import type { TicketStatus } from './tickets.service';
 
 export type TodoBoardKind = 'gremium' | 'personal' | 'team';
@@ -397,9 +398,9 @@ export class TodosApiService {
     });
   }
 
-  members(boardId: Uuid): Observable<TodoMember[]> {
+  members(boardId: Uuid, opts: { detail?: boolean } = {}): Observable<TodoMember[]> {
     return this.http.get<TodoMember[]>(`${this.base}/todos/boards/${boardId}/members`, {
-      context: skipLoading(),
+      context: opts.detail ? detailContext() : skipLoading(),
     });
   }
 
@@ -407,8 +408,11 @@ export class TodosApiService {
     return this.http.post<TodoCardDetail>(`${this.base}/todos/cards`, body);
   }
 
-  card(cardId: Uuid): Observable<TodoCardDetail> {
-    return this.http.get<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, { context: skipLoading() });
+  /** `detail` keeps the answer for the read ahead of a list (`prefetchDetails`). */
+  card(cardId: Uuid, opts: { detail?: boolean } = {}): Observable<TodoCardDetail> {
+    return this.http.get<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, {
+      context: opts.detail ? detailContext() : skipLoading(),
+    });
   }
 
   /** The tile of a live card, as the board read has it: what a live ping reads (404 when archived). */
@@ -590,9 +594,10 @@ export class TodosApiService {
   /** The readable, not archived cards that link the target: open first, then by due date. */
   linked(kind: Exclude<TodoLinkKind, 'todo'>, targetId: Uuid): Observable<TodoLinkedCard[]> {
     const params = new HttpParams().set('kind', kind).set('targetId', targetId);
+    // Kept for the read ahead of the list of the target: its detail shows the cards at once.
     return this.http.get<TodoLinkedCard[]>(`${this.base}/todos/linked`, {
       params,
-      context: skipLoading(),
+      context: detailContext(),
     });
   }
 }

@@ -367,13 +367,17 @@ export class VoteCastComponent implements OnDestroy {
       this.phase.set('error');
       return;
     }
-    this.loadDelegation(id);
-    this.api.getVote(id).subscribe({
+    this.loadDelegation(id, true);
+    // The list read the vote ahead: it shows at once, and a newer answer behind it
+    // replaces it, the voting right too.
+    this.api.getVote(id, { detail: true }).subscribe({
       next: (vote) => {
         if (this.currentId !== id) return;
+        const first = this.loaded() === null;
         this.loaded.set(vote);
-        if (vote.canCast !== true) this.notEligible.set(true);
+        this.notEligible.set(vote.canCast !== true || !!this.delegation()?.blocked);
         this.phase.set('ready');
+        if (!first) return;
         loadVoteContext(this.api, vote.meetingId, vote.agendaItemId).subscribe((ctx) => {
           if (this.currentId === id) this.context.set(ctx);
         });
@@ -444,12 +448,15 @@ export class VoteCastComponent implements OnDestroy {
    * the proxy row. `exercising` does not free the own ballot: an external substitute
    * casts the represented ballot only.
    */
-  private loadDelegation(id: string): void {
-    this.delegations.voteStatus(id).subscribe({
+  private loadDelegation(id: string, detail = false): void {
+    this.delegations.voteStatus(id, { detail }).subscribe({
       next: (status) => {
         if (this.currentId !== id) return;
+        const was = this.delegation();
         this.delegation.set(status);
         if (status.blocked) this.notEligible.set(true);
+        // A newer answer after the one read ahead can lift the block again.
+        else if (was?.blocked && this.loaded()?.canCast === true) this.notEligible.set(false);
       },
       error: () => {},
     });
