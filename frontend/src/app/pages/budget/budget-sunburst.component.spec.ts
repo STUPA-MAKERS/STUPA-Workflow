@@ -183,9 +183,10 @@ describe('BudgetSunburstComponent', () => {
     expect(c.tip()).toEqual({ x: 140 - 100 + 14, y: 80 - 50 + 14 });
   });
 
-  it('money() formats whole euros with no decimals', async () => {
-    const { c } = await setup();
-    const out = c.money(2500);
+  it('writes the total as whole euros with no decimals', async () => {
+    const only = node('only', { fiscalYearId: FY, allocated: '2500' });
+    const { container } = await setup({ root: node('root', { fiscalYearId: FY, allocated: '2500' }, [only]) });
+    const out = container.querySelector('.sb__center-val')?.textContent ?? '';
     expect(out).toContain('2.500');
     expect(out).toContain('€');
     expect(out).not.toMatch(/,\d\d/);

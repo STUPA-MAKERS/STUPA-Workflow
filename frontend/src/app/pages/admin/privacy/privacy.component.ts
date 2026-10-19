@@ -36,6 +36,7 @@ import type { AdminPrincipal, ErasureRequest } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The picker shows this many hits. A longer list means: type more. */
 const PERSON_HITS = 6;
@@ -171,7 +172,7 @@ export class PrivacyComponent {
 
   /** The name of an account; "Ohne Namen" when it has neither a name nor an e-mail (D7). */
   protected personName(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   protected pickPerson(p: AdminPrincipal): void {

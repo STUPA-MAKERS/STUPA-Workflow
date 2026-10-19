@@ -26,6 +26,7 @@ import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../ad
 import type { FilterSelectOption, RowMenuItem, RowMenuSection } from '@shared/ui';
 import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The choices of the chip "Letzte Anmeldung" (F3): older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
@@ -251,7 +252,7 @@ export class UsersComponent {
 
   /** The name of an account. Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
   protected userLabel(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   /** The tooltip of the name: the `sub` of a nameless account, for the admin detail (D7). */

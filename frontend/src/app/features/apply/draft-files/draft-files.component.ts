@@ -5,7 +5,8 @@ import { scanStatus } from '@shared/status-kind.util';
 import { FileDropZoneComponent } from '@shared/ui/file-drop-zone/file-drop-zone.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
-import { formatSize, UPLOAD_ACCEPT } from '../apply.util';
+import { formatBytes } from '@shared/format-bytes';
+import { UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';
 
 /**
@@ -67,20 +68,20 @@ export class DraftFilesComponent {
     return this.i18n.translate('apply.files.summary', {
       count: this.drafts.count(),
       max: limits.maxDraftFiles,
-      size: formatSize(this.drafts.bytes(), locale),
-      maxSize: formatSize(limits.maxDraftBytes, locale),
+      size: formatBytes(this.drafts.bytes(), locale, 'file'),
+      maxSize: formatBytes(limits.maxDraftBytes, locale, 'file'),
     });
   });
 
   /** "PDF, Bilder, Word, Excel, PowerPoint, OpenDocument · bis 10 MB je Datei". */
   protected readonly hint = computed(() =>
     this.i18n.translate('apply.files.hint', {
-      size: formatSize(this.drafts.limits().maxFileBytes, this.i18n.formatLocale()),
+      size: formatBytes(this.drafts.limits().maxFileBytes, this.i18n.formatLocale(), 'file'),
     }),
   );
 
   protected size(bytes: number): string {
-    return formatSize(bytes, this.i18n.formatLocale());
+    return formatBytes(bytes, this.i18n.formatLocale(), 'file');
   }
 
   protected scan(file: DraftFile) {

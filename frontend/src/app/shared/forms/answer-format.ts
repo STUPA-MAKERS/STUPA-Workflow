@@ -1,6 +1,7 @@
 import type { FormFieldDef } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
 import { resolveI18n } from './i18n-text';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * Stringify an answer value without a field definition.
@@ -61,19 +62,6 @@ export function formatDateRangeValue(value: unknown, locale: string): string {
   return ends[0] ?? '';
 }
 
-/** An amount in euro, in the given locale. A value that is no number gives `null`. */
-export function formatEuro(value: unknown, locale: string): string | null {
-  if (value === null || value === undefined || value === '' || typeof value === 'boolean') {
-    return null;
-  }
-  const n = Number(value);
-  if (!Number.isFinite(n)) return null;
-  return new Intl.NumberFormat(toFormatLocale(locale), {
-    style: 'currency',
-    currency: 'EUR',
-  }).format(n);
-}
-
 /** What `formatAnswer` needs besides the field and the value. */
 export interface AnswerFormatEnv {
   /** The UI language, for the i18n labels of the options. */
@@ -131,7 +119,7 @@ export function formatAnswer(field: FormFieldDef, value: unknown, env: AnswerFor
         : optionLabel(field, value, env.lang);
     case 'currency':
     case 'funding':
-      return formatEuro(value, env.lang) ?? formatFieldValue(value);
+      return formatMoney(value, toFormatLocale(env.lang)) || formatFieldValue(value);
     default:
       return formatFieldValue(value);
   }

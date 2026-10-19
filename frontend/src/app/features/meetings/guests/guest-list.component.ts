@@ -10,10 +10,10 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import type { StatusKind } from '@shared/status-kind.util';
 import { ButtonComponent, DialogComponent, InputComponent } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
-import { clockTime } from '../meetings-display.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { clock } from '@shared/date-format';
 
 interface GuestRow {
   g: MeetingGuest;
@@ -74,7 +74,7 @@ export class GuestListComponent {
   private row(g: MeetingGuest): GuestRow {
     const t = (k: TranslationKey, p?: Record<string, string | number>) => this.i18n.translate(k, p);
     const name = guestName(g, t);
-    const time = clockTime(g.admittedAt ?? g.decidedAt, this.i18n.locale());
+    const time = clock(g.admittedAt ?? g.decidedAt, this.i18n.formatLocale());
     const sub = [t('guests.list.admittedAt', { time })];
     if (g.decidedByName && g.status === 'admitted') sub.push(g.decidedByName);
     const closed = this.meeting().status === 'closed';

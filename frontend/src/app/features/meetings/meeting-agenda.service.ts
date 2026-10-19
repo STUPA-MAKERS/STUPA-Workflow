@@ -4,7 +4,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { AsyncSubject, type Observable, map, of, switchMap } from 'rxjs';
 import type { AgendaItem, Uuid } from '@core/api/models';
-import { errorDetail } from './meetings-display.util';
+import { problemDetail } from '@core/api/problem';
 
 /** Idle time after the last keystroke before the service autosaves the TOP body. */
 const AUTOSAVE_DELAY_MS = 1000;
@@ -64,7 +64,7 @@ export class MeetingAgendaService implements OnDestroy {
    * `agenda_item_has_vote`.
    */
   private failed(err: unknown): void {
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }

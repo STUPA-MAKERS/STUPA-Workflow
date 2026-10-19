@@ -22,11 +22,8 @@ import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import {
-  clockTime,
   meetingLine,
-  shortTime,
   voteOptionLabel,
-  weekdayDate,
 } from './meetings-display.util';
 import {
   type OwnAttendanceChange,
@@ -39,6 +36,7 @@ import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { clock, shortTime, weekdayDate } from '@shared/date-format';
 
 /** The length of the protocol excerpt on a phone, in characters. */
 const EXCERPT_LENGTH = 160;
@@ -225,15 +223,15 @@ export class MeetingFollowViewComponent {
   /** "Studierendenparlament · Di., 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
     const m = this.meeting();
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const parts: string[] = [];
     if (m.gremiumName) parts.push(m.gremiumName);
     if (m.date) parts.push(this.dateText(m.date));
-    const started = clockTime(m.startedAt, locale);
+    const started = clock(m.startedAt, locale);
     if (m.status === 'live' && started) {
       parts.push(this.i18n.translate('meetings.page.since', { time: started }));
     } else if (m.status === 'closed' && started) {
-      const closed = clockTime(m.closedAt, locale);
+      const closed = clock(m.closedAt, locale);
       parts.push(closed ? `${started}–${closed}` : started);
     } else if (m.startTime) {
       parts.push(shortTime(m.startTime));
@@ -244,7 +242,7 @@ export class MeetingFollowViewComponent {
   /** The phone keeps the time alone below the title: "seit 18:04". */
   protected readonly phoneSubLine = computed(() => {
     const m = this.meeting();
-    const started = clockTime(m.startedAt, this.i18n.locale());
+    const started = clock(m.startedAt, this.i18n.formatLocale());
     if (m.status === 'live' && started) {
       return this.i18n.translate('meetings.page.since', { time: started });
     }
@@ -277,7 +275,7 @@ export class MeetingFollowViewComponent {
 
   /** "Geschlossen um 21:12". */
   protected readonly closedLine = computed(() => {
-    const time = clockTime(this.meeting().closedAt, this.i18n.locale());
+    const time = clock(this.meeting().closedAt, this.i18n.formatLocale());
     return time
       ? this.i18n.translate('meetings.dock.closedAt', { time })
       : this.i18n.translate('meetings.status.closed');

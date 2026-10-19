@@ -28,6 +28,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { SideSheetComponent } from '../side-sheet/side-sheet.component';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { formatMoney } from '@shared/format-money';
 
 /** What a range chip filters: an amount in euro or a date (ISO `YYYY-MM-DD`). */
 export type RangeKind = 'amount' | 'date';
@@ -277,9 +278,7 @@ export class RangeChipComponent {
 
   private format(value: string): string {
     if (this.kind() === 'amount') {
-      const n = Number(value);
-      if (!Number.isFinite(n)) return value;
-      return n.toLocaleString(this.i18n.formatLocale(), { style: 'currency', currency: 'EUR' });
+      return formatMoney(value, this.i18n.formatLocale()) || value;
     }
     const [y, m, d] = value.split('-').map(Number);
     if (!y || !m || !d) return value;

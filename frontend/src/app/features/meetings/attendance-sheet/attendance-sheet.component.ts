@@ -48,6 +48,7 @@ import { JoinLinkComponent } from '../public-join/join-link.component';
 import { SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One attendance change. `note` is the reason of an excuse; omitted keeps the stored one. */
 export interface AttendanceChange {
@@ -337,7 +338,7 @@ export class AttendanceSheetComponent {
       this.conflictId() === a.principalId && a.status !== 'present' ? (delegation ?? 'unknown') : null;
     return {
       a,
-      name: a.displayName || a.email || '—',
+      name: personLabel(a, this.i18n, { fallbackText: '—' }),
       sub: sub.join(' · '),
       options,
       value: a.status ?? 'open',

@@ -1,9 +1,7 @@
 import type { AgendaItem, HandoverMode, KeeperPeriod, Meeting } from '@core/api/models';
-import type { TranslationKey } from '@core/i18n/translations';
-import { clockTime } from './meetings-display.util';
-
-/** The translate function of the I18nService. */
-type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+import { toFormatLocale } from '@core/i18n/i18n.service';
+import type { Translate } from '@core/i18n/translations';
+import { clock } from '@shared/date-format';
 
 /** The name of a keeper, or a dash when the server sent none. */
 function nameOf(p: KeeperPeriod): string {
@@ -25,8 +23,8 @@ function span(
   t: Translate,
   locale: string,
 ): string {
-  const fromTime = clockTime(p.fromAt, locale);
-  const toTime = clockTime(p.toAt, locale);
+  const fromTime = clock(p.fromAt, toFormatLocale(locale));
+  const toTime = clock(p.toAt, toFormatLocale(locale));
   const running = p.toAt === null;
   if (running) {
     if (p.fromPosition !== null) {

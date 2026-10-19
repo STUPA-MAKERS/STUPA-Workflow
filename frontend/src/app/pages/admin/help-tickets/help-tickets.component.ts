@@ -23,6 +23,7 @@ import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The choices of the retention chip, in months. */
 export const RETENTION_CHOICES: readonly number[] = [1, 3, 6, 12, 24, 36, 60, 120];
@@ -180,7 +181,9 @@ export class HelpTicketsComponent {
   /** The person, else the address. */
   protected senderName(b: TicketBlockedSender): string {
     if (b.kind === 'principal' && b.person) {
-      return b.person.displayName ?? b.email ?? this.i18n.translate('chat.deletedPerson');
+      return personLabel({ displayName: b.person.displayName, email: b.email }, this.i18n, {
+        fallback: 'chat.deletedPerson',
+      });
     }
     return b.email ?? '';
   }

@@ -71,7 +71,6 @@ import {
   defaultBoard,
   filterActive,
   insertTile,
-  isoDay,
   matchesFilter,
   moveErrorText,
   placeTile,
@@ -89,6 +88,7 @@ import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { isoDay } from '@shared/date-format';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;

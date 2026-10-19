@@ -24,10 +24,10 @@
     <div class="pie__hole" aria-hidden="true">
       @if (active(); as a) {
         <span class="pie__cap">{{ a.percent }} %</span>
-        <span class="pie__total mono">{{ money(a.value) }}</span>
+        <span class="pie__total mono">{{ a.value | money: { currency: currency(), whole: true } }}</span>
       } @else {
         <span class="pie__cap">{{ label() }}</span>
-        <span class="pie__total mono" [class.pie__total--empty]="empty()">{{ money(total()) }}</span>
+        <span class="pie__total mono" [class.pie__total--empty]="empty()">{{ total() | money: { currency: currency(), whole: true } }}</span>
       }
     </div>
   </div>
@@ -60,7 +60,7 @@
               [attr.title]="nameCut.truncated() ? a.label : null"
               >{{ a.label }}</span
             >
-            <span class="pie__val mono">{{ money(a.value) }}</span>
+            <span class="pie__val mono">{{ a.value | money: { currency: currency(), whole: true } }}</span>
           </button>
         </li>
       }

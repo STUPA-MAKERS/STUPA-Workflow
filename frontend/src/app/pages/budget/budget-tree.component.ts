@@ -47,6 +47,7 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { formatMoney } from '@shared/format-money';
 
 /** A visible tree row: a node, its depth and whether it has children. */
 interface Row {
@@ -381,13 +382,7 @@ export class BudgetTreeComponent {
 
   /** An amount in the currency of the node; cents only where they are not zero. */
   money(value: string | number | null | undefined, currency: string): string {
-    const n = value == null || value === '' ? 0 : Number(value);
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: Number.isInteger(n) ? 0 : 2,
-      maximumFractionDigits: 2,
-    }).format(n);
+    return formatMoney(value || 0, this.i18n.formatLocale(), { currency, short: true });
   }
 
   alloc(node: BudgetTreeNode) {

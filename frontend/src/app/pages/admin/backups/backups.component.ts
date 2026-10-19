@@ -23,7 +23,7 @@ import {
 } from '@shared/ui/row-menu/row-menu.component';
 import { downloadBlob } from '@shared/download.util';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
+import { formatBytes } from '@shared/format-bytes';
 import type { Backup, BackupKind } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
@@ -145,7 +145,7 @@ export class BackupsComponent implements OnDestroy {
 
   /** Human-readable size. Archives are megabytes to gigabytes, so bytes help nobody. */
   protected sizeLabel(bytes: number | null | undefined): string {
-    return formatBytes(bytes, this.i18n);
+    return formatBytes(bytes, this.i18n.formatLocale());
   }
 
   /** "Manuell · vor der Haushaltsabstimmung": the line under the restore title. */

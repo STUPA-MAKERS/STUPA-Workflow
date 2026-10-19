@@ -5,8 +5,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
-import { clockTime } from '../meetings-display.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
+import { clock } from '@shared/date-format';
 
 /** A request younger than this reads "gerade eben" (ms). */
 const JUST_NOW_MS = 60_000;
@@ -45,7 +45,7 @@ export class GuestRequestsComponent {
     const now = this.now() ?? Date.now();
     if (now - Date.parse(g.requestedAt) < JUST_NOW_MS) return this.i18n.translate('guests.request.justNow');
     return this.i18n.translate('guests.request.waitingSince', {
-      time: clockTime(g.requestedAt, this.i18n.locale()),
+      time: clock(g.requestedAt, this.i18n.formatLocale()),
     });
   }
 }

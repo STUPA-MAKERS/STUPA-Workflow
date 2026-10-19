@@ -3,9 +3,12 @@ import type { Uuid } from '@core/api/models';
 import type { TodoCardTile, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { Translate } from '@core/i18n/translations';
 import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
-import { LINK_ICON, dueInfo, linkLine, personName, shortDay, type Translate } from '../todos.util';
+import { LINK_ICON, dueInfo, linkLine } from '../todos.util';
+import { shortDay } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 /** The most labels a tile shows; the drawer shows all. */
 const TILE_LABELS = 2;
@@ -77,10 +80,7 @@ export class TodoCardTileComponent {
   readonly doneOn = computed(() => {
     const at = this.card().completedAt;
     if (!this.done() || !at) return null;
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) return null;
-    const day = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    return shortDay(day, this.today(), this.i18n.formatLocale());
+    return shortDay(at, this.i18n.formatLocale(), this.today()) || null;
   });
 
   readonly names = computed(() => this.card().assignees.map((a) => personName(a, this.t)));

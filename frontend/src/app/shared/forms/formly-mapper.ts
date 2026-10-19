@@ -4,7 +4,8 @@ import type { FieldType, FormFieldDef, FormSection, Lang } from '@core/api/model
 import { evalJsonLogic, isFieldVisible, JsonLogicError } from './jsonlogic';
 import { CATALOG, de, type Locale, type TranslationKey } from '@core/i18n/translations';
 import { resolveI18n } from './i18n-text';
-import { formatEuro } from './answer-format';
+import { toFormatLocale } from '@core/i18n/i18n.service';
+import { formatMoney } from '@shared/format-money';
 import { normalizePositions, positionsTotal } from './positions';
 
 /** HTML `type` for the `input` variant (text/number/currency/date/file). */
@@ -165,7 +166,7 @@ function costTotal(field: FormlyFieldConfig, costKeys: readonly string[]): numbe
 /** A UI text with `{total}` filled in, in the locale of the form. */
 function totalText(key: TranslationKey, lang: Lang | string, total: number): string {
   const text = CATALOG[lang as Locale]?.[key] ?? de[key];
-  return text.replace('{total}', formatEuro(total, String(lang)) ?? String(total));
+  return text.replace('{total}', formatMoney(total, toFormatLocale(String(lang))) || String(total));
 }
 
 /**
