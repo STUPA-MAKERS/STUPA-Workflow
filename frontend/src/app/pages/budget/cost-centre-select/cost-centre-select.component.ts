@@ -14,7 +14,16 @@ import {
   viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { IconComponent, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
+import {
+  anchorOutOfView,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  placeAtField,
+  showInTopLayer,
+  SideSheetComponent,
+  watchAnchoredPopover,
+} from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { simplifyPathKey } from '@shared/budget-path';
@@ -202,28 +211,20 @@ export class CostCentreSelectComponent {
   private timer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    const inside = (root: HTMLElement | undefined, target: EventTarget | null) =>
-      !!root && target instanceof Node && root.contains(target);
-    const onPointer = (e: Event) => {
-      if (this.popoverOpen() && !inside(this.host.nativeElement, e.target)) this.close(false);
-    };
-    const onViewport = (e: Event) => {
-      if (this.popoverOpen() && !inside(this.menu()?.nativeElement, e.target)) this.follow();
-    };
     // A resize across the phone limit swaps the popover and the sheet: close the list.
     effect(() => {
       this.phone();
       untracked(() => this.close(false));
     });
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('scroll', onViewport, true);
-    window.addEventListener('resize', onViewport);
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('scroll', onViewport, true);
-      window.removeEventListener('resize', onViewport);
-      this.clearTimer();
+    watchAnchoredPopover({
+      isOpen: () => this.popoverOpen(),
+      inside: () => [this.host.nativeElement, this.menu()?.nativeElement],
+      // A scroll inside the list itself does not move the field.
+      ownScroll: () => this.menu()?.nativeElement,
+      close: () => this.close(false),
+      follow: () => this.follow(),
     });
+    inject(DestroyRef).onDestroy(() => this.clearTimer());
   }
 
   protected optionId(c: CostCentreChoice): string {
@@ -373,7 +374,7 @@ export class CostCentreSelectComponent {
     this.open.set(true);
     if (this.phone()) {
       this.later(() => {
-        this.toTopLayer(this.layer()?.nativeElement);
+        showInTopLayer(this.layer()?.nativeElement);
         this.later(() => this.reveal());
       });
       return;
@@ -382,7 +383,7 @@ export class CostCentreSelectComponent {
     this.later(() => {
       const menu = this.menu()?.nativeElement;
       if (!menu) return;
-      this.toTopLayer(menu);
+      showInTopLayer(menu);
       this.place(menu);
       this.placed.set(true);
       menu.querySelector<HTMLInputElement>('input')?.focus();
@@ -399,11 +400,6 @@ export class CostCentreSelectComponent {
     if (returnFocus) this.trigger().nativeElement.focus();
   }
 
-  private toTopLayer(el: HTMLElement | undefined): void {
-    const pop = el as (HTMLElement & { showPopover?: () => void }) | undefined;
-    if (typeof pop?.showPopover === 'function') pop.showPopover();
-  }
-
   private reveal(): void {
     const id = this.activeId();
     const el = id ? document.getElementById(id) : null;
@@ -412,22 +408,19 @@ export class CostCentreSelectComponent {
 
   /** Under the field (above it when the room below is too small), inside the viewport. */
   private place(menu: HTMLElement): void {
-    const field = this.trigger().nativeElement.getBoundingClientRect();
-    const below = window.innerHeight - field.bottom - GAP - EDGE;
-    const above = field.top - GAP - EDGE;
-    const natural = Math.min(menu.scrollHeight, MAX_HEIGHT);
-    const up = natural > below && above > below;
-    const maxHeight = Math.max(0, Math.min(MAX_HEIGHT, up ? above : below));
-    const height = Math.min(natural, maxHeight);
-    const width = Math.min(Math.max(field.width, MIN_WIDTH), window.innerWidth - 2 * EDGE);
-    const left = Math.max(EDGE, Math.min(field.left, window.innerWidth - EDGE - width));
-    const top = up ? field.top - GAP - height : field.bottom + GAP;
-    this.position.set({ top, left, width, maxHeight });
+    this.position.set(
+      placeAtField(this.trigger().nativeElement.getBoundingClientRect(), menu.scrollHeight, {
+        gap: GAP,
+        edge: EDGE,
+        maxHeight: MAX_HEIGHT,
+        minWidth: MIN_WIDTH,
+      }),
+    );
   }
 
+  /** The page scrolled or resized: keep the list at its field; close it when it leaves. */
   private follow(): void {
-    const rect = this.trigger().nativeElement.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+    if (anchorOutOfView(this.trigger().nativeElement.getBoundingClientRect())) {
       this.close(false);
       return;
     }

@@ -75,16 +75,6 @@
 }
 
 /* A leg of a transfer under correction: fixed, on the selection surface. */
-.tf__fixed {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-  padding: var(--space-4) 18px;
-  border-radius: var(--radius-xl);
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
 .tf__fixedName {
   display: flex;
   align-items: center;
@@ -100,6 +90,7 @@
   border-radius: 3px;
 }
 .tf__code {
+  display: block;
   padding-inline-start: 20px;
   color: var(--color-text-muted);
   font-size: var(--fs-small);

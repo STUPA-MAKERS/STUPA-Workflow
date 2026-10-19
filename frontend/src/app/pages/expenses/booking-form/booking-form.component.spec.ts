@@ -174,8 +174,10 @@ const INVOICE: Invoice = {
 
 /** "Label Value" of each locked field. */
 const lockedTexts = (root: Element) =>
-  [...root.querySelectorAll('.mf__locked')].map((l) =>
-    [...l.children].map((c) => c.textContent?.replace(/\s+/g, ' ').trim()).join(' '),
+  [...root.querySelectorAll('app-locked-field')].map((l) =>
+    [...l.querySelectorAll('.lfld__label, .lfld__value')]
+      .map((c) => c.textContent?.replace(/\s+/g, ' ').trim())
+      .join(' '),
   );
 
 const tick = () => new Promise((r) => setTimeout(r));
@@ -256,13 +258,15 @@ describe('BookingFormComponent', () => {
       'Belegnummer RE-2026-0412',
       'Rechnungsdatum 12.09.2026',
     ]);
+    // Taken from the invoice: the selection surface of the kit locked field.
+    expect(view.container.querySelectorAll('.lfld--filled')).toHaveLength(3);
     expect(screen.queryByRole('textbox', { name: 'Belegnummer' })).toBeNull();
     // The payment date stays a field.
     expect(screen.getByText('Zahldatum')).toBeInTheDocument();
     // Without the invoice the fields are fields again, with the values kept.
     dialogs.onPickInvoice('');
     view.fixture.detectChanges();
-    expect(view.container.querySelectorAll('.mf__locked')).toHaveLength(0);
+    expect(view.container.querySelectorAll('app-locked-field')).toHaveLength(0);
     expect(dialogs.newReferenceNumber()).toBe('RE-2026-0412');
 
     dialogs.newApplicationId.set('app');

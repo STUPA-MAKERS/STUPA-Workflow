@@ -9,7 +9,9 @@ import {
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  LockedFieldComponent,
   SelectFieldComponent,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -65,8 +67,10 @@ interface LegFree {
     FormsModule,
     IconComponent,
     InputComponent,
+    LockedFieldComponent,
     NgTemplateOutlet,
     SelectFieldComponent,
+    TextareaComponent,
     TranslatePipe,
   ],
   templateUrl: './transfer-form.component.html',

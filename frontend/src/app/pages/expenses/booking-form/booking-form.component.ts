@@ -4,17 +4,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  AutocompleteComponent,
   ButtonComponent,
+  ChipGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  LockedFieldComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
   SelectFieldComponent,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -63,15 +67,17 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
  * Two equal columns. Start: the kind (Ausgabe | Einnahme), the amount, the description,
  * then "Zuordnung" with the cost centre (`app-cost-centre-select`: search, grouped by
  * top-level budget, the free amount of each), the fiscal year and the category, and the
- * application search. End: "Beleg" with the invoice, the payee, the reference number and
- * the two dates; "Zahlung" with the payment method as chips and the note.
+ * application search (`app-autocomplete`). End: "Beleg" with the invoice, the payee, the
+ * reference number and the two dates; "Zahlung" with the payment method
+ * (`app-chip-group`) and the note (`app-textarea`).
  *
  * A picked invoice fills the payee, the invoice date and the reference number; while it
- * stays picked those fields are locked (the selection surface with a lock). A linked
- * application gives the cost centre and the fiscal year, so both show locked.
+ * stays picked those fields are `app-locked-field filled` (the selection surface with a
+ * lock). A linked application gives the cost centre and the fiscal year, so both show
+ * filled and locked.
  *
- * Edit: the kind, the fiscal year, the application, and the cost centre of a bound
- * booking or a sub-booking are locked; a standalone booking can move to another cost
+ * Edit: the fiscal year, the application, and the cost centre of a bound booking or a
+ * sub-booking are fixed (`app-locked-field`); a standalone booking can move to another cost
  * centre. A parent booking shows its amount as the sum of its sub-bookings, and the
  * sub-bookings with their actions.
  *
@@ -86,7 +92,9 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     SumRowComponent,
     PaneFormHeadComponent,
     PaneFormFootComponent,
+    AutocompleteComponent,
     ButtonComponent,
+    ChipGroupComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
@@ -94,9 +102,11 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
     IconComponent,
     InputComponent,
     LocalizedDatePipe,
+    LockedFieldComponent,
     RowMenuComponent,
     SegmentedComponent,
     SelectFieldComponent,
+    TextareaComponent,
     TranslatePipe,
   ],
   templateUrl: './booking-form.component.html',
@@ -134,6 +144,9 @@ export class BookingFormComponent {
       ),
     })),
   );
+
+  /** The text of an application hit. */
+  protected readonly appTitle = (a: { title: string }): string => a.title;
 
   /** The application search lists its hits below the field while there are hits. */
   protected readonly suggestOpen = computed(() => this.state().appCandidates().length > 0);

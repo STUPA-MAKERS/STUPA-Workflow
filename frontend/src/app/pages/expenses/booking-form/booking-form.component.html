@@ -34,7 +34,7 @@
         <div class="mf__stack">
           @if (mode() === 'create') {
             <app-currency-input
-              class="mf__amount"
+              size="lg"
               name="amount"
               [label]="'expenses.field.amount' | t"
               [required]="true"
@@ -52,15 +52,12 @@
           } @else {
             @if (parentAmount(); as sum) {
               <!-- The parent amount is the sum of its sub-bookings and read-only on the server. -->
-              <div class="mf__locked">
-                <span class="mf__lockedLabel"
-                  ><app-icon name="lock" [size]="14" />{{ 'expenses.sub.parentAmount' | t }}</span
-                >
-                <span class="mf__lockedValue mono">{{ sum }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.sub.parentAmount' | t"
+                ><span class="mono">{{ sum }}</span></app-locked-field
+              >
             } @else {
               <app-currency-input
-                class="mf__amount"
+                size="lg"
                 name="eamount"
                 [label]="'expenses.field.amount' | t"
                 [required]="true"
@@ -79,16 +76,13 @@
         </div>
 
         <fieldset class="mf__sec">
-          <legend class="mf__secTitle">{{ 'expenses.form.assignment' | t }}</legend>
+          <legend class="sec mf__secTitle">{{ 'expenses.form.assignment' | t }}</legend>
           @if (mode() === 'create') {
             @if (s.newApplicationId()) {
               <!-- A linked application gives the cost centre and the fiscal year. -->
-              <div class="mf__locked">
-                <span class="mf__lockedLabel"
-                  ><app-icon name="lock" [size]="14" />{{ 'expenses.field.costCentre' | t }}</span
-                >
-                <span class="mf__lockedValue">{{ 'expenses.form.fromApplication' | t }}</span>
-              </div>
+              <app-locked-field filled [label]="'expenses.field.costCentre' | t">{{
+                'expenses.form.fromApplication' | t
+              }}</app-locked-field>
             } @else {
               <app-cost-centre-select
                 [id]="'bf-cc-' + mode()"
@@ -106,12 +100,9 @@
             }
             <div class="mf__grid">
               @if (s.newApplicationId()) {
-                <div class="mf__locked">
-                  <span class="mf__lockedLabel"
-                    ><app-icon name="lock" [size]="14" />{{ 'expenses.field.fiscalYear' | t }}</span
-                  >
-                  <span class="mf__lockedValue">{{ 'expenses.form.fromApplication' | t }}</span>
-                </div>
+                <app-locked-field filled [label]="'expenses.field.fiscalYear' | t">{{
+                  'expenses.form.fromApplication' | t
+                }}</app-locked-field>
               } @else {
                 <app-select
                   name="fy"
@@ -136,62 +127,21 @@
               />
             </div>
             @if (s.newKind() === 'expense') {
-              <!-- The application search: a combobox in a filled field like the kit inputs. -->
-              <div class="mf__app">
-                <div class="mf__box">
-                  <label class="mf__label" for="booking-app">{{
-                    'expenses.field.application' | t
-                  }}</label>
-                  @if (s.newApplicationId()) {
-                    <span class="mf__picked">
-                      <span class="ell" [title]="s.appQuery()">{{ s.appQuery() }}</span>
-                      <app-button
-                        variant="text"
-                        size="sm"
-                        [iconOnly]="true"
-                        [ariaLabel]="'expenses.field.unlink' | t"
-                        (click)="s.clearApp()"
-                      >
-                        <app-icon name="x" [size]="16" />
-                      </app-button>
-                    </span>
-                  } @else {
-                    <input
-                      id="booking-app"
-                      class="mf__control"
-                      type="search"
-                      autocomplete="off"
-                      name="appSearch"
-                      role="combobox"
-                      aria-autocomplete="list"
-                      aria-controls="booking-app-list"
-                      [attr.aria-expanded]="suggestOpen()"
-                      [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
-                      [ngModel]="s.appQuery()"
-                      (ngModelChange)="s.onAppSearch($event)"
-                    />
-                    <app-icon class="mf__searchIcon" name="search" [size]="20" />
-                  }
-                </div>
-                @if (suggestOpen()) {
-                  <ul id="booking-app-list" class="mf__suggest" role="listbox">
-                    @for (a of s.appCandidates(); track a.id) {
-                      <li role="presentation">
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected="false"
-                          class="mf__option ell"
-                          [title]="a.title"
-                          (click)="s.pickApp(a)"
-                        >
-                          {{ a.title }}
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                }
-              </div>
+              <app-autocomplete
+                inputId="booking-app"
+                name="appSearch"
+                [label]="'expenses.field.application' | t"
+                [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
+                [clearLabel]="'expenses.field.unlink' | t"
+                [query]="s.appQuery()"
+                [options]="s.appCandidates()"
+                [optionLabel]="appTitle"
+                [open]="suggestOpen()"
+                [picked]="s.newApplicationId() ? s.appQuery() : null"
+                (queryChange)="s.onAppSearch($event)"
+                (choose)="s.pickApp($event)"
+                (cleared)="s.clearApp()"
+              />
             }
           } @else if (e) {
             @if (editOwnsCostCentre()) {
@@ -209,20 +159,14 @@
                 (picked)="pickCostCentre($event)"
               />
             } @else {
-              <div class="mf__locked">
-                <span class="mf__lockedLabel"
-                  ><app-icon name="lock" [size]="14" />{{ 'expenses.field.costCentre' | t }}</span
-                >
-                <span class="mf__lockedValue">{{ ccTrail() }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.field.costCentre' | t">{{
+                ccTrail()
+              }}</app-locked-field>
             }
             <div class="mf__grid">
-              <div class="mf__locked">
-                <span class="mf__lockedLabel"
-                  ><app-icon name="lock" [size]="14" />{{ 'expenses.field.fiscalYear' | t }}</span
-                >
-                <span class="mf__lockedValue">{{ fyLabel() ?? '—' }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{
+                fyLabel() ?? '—'
+              }}</app-locked-field>
               <app-input
                 name="ecat"
                 [label]="'expenses.field.category' | t"
@@ -231,21 +175,16 @@
               />
             </div>
             @if (e.applicationId) {
-              <div class="mf__locked">
-                <span class="mf__lockedLabel"
-                  ><app-icon name="lock" [size]="14" />{{ 'expenses.field.application' | t }}</span
-                >
-                <span class="mf__lockedValue">{{
-                  e.applicationTitle || ('expenses.col.application' | t)
-                }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.field.application' | t">{{
+                e.applicationTitle || ('expenses.col.application' | t)
+              }}</app-locked-field>
             }
           }
         </fieldset>
 
         @if (mode() === 'edit' && e && !e.parentExpenseId) {
           <fieldset class="mf__sec">
-            <legend class="mf__secTitle">{{ 'expenses.sub.title' | t }}</legend>
+            <legend class="sec mf__secTitle">{{ 'expenses.sub.title' | t }}</legend>
             @if (subRows().length) {
               <div class="rowgroup" [class.rowgroup--bg3]="layout() === 'sheet'" role="list">
                 @for (r of subRows(); track r.id) {
@@ -275,7 +214,7 @@
 
       <div class="mf__col">
         <fieldset class="mf__sec">
-          <legend class="mf__secTitle">{{ 'expenses.form.receipt' | t }}</legend>
+          <legend class="sec mf__secTitle">{{ 'expenses.form.receipt' | t }}</legend>
           @if (mode() === 'create') {
             <app-select
               name="invoice"
@@ -287,14 +226,9 @@
             />
             <div class="mf__grid">
               @if (lock.correspondent) {
-                <div class="mf__locked">
-                  <span class="mf__lockedLabel"
-                    ><app-icon name="lock" [size]="14" />{{
-                      'expenses.field.correspondent' | t
-                    }}</span
-                  >
-                  <span class="mf__lockedValue">{{ s.newCorrespondent() }}</span>
-                </div>
+                <app-locked-field filled [label]="'expenses.field.correspondent' | t">{{
+                  s.newCorrespondent()
+                }}</app-locked-field>
               } @else {
                 <app-input
                   name="corr"
@@ -305,14 +239,9 @@
                 />
               }
               @if (lock.referenceNumber) {
-                <div class="mf__locked">
-                  <span class="mf__lockedLabel"
-                    ><app-icon name="lock" [size]="14" />{{
-                      'expenses.field.referenceNumber' | t
-                    }}</span
-                  >
-                  <span class="mf__lockedValue mono">{{ s.newReferenceNumber() }}</span>
-                </div>
+                <app-locked-field filled [label]="'expenses.field.referenceNumber' | t"
+                  ><span class="mono">{{ s.newReferenceNumber() }}</span></app-locked-field
+                >
               } @else {
                 <app-input
                   name="ref"
@@ -322,16 +251,9 @@
                 />
               }
               @if (lock.invoiceDate) {
-                <div class="mf__locked">
-                  <span class="mf__lockedLabel"
-                    ><app-icon name="lock" [size]="14" />{{
-                      'expenses.field.invoiceDate' | t
-                    }}</span
-                  >
-                  <span class="mf__lockedValue">{{
-                    s.newInvoiceDate() | ldate: 'mediumDate'
-                  }}</span>
-                </div>
+                <app-locked-field filled [label]="'expenses.field.invoiceDate' | t">{{
+                  s.newInvoiceDate() | ldate: 'mediumDate'
+                }}</app-locked-field>
               } @else {
                 <app-datepicker
                   name="invDate"
@@ -387,34 +309,17 @@
         </fieldset>
 
         <fieldset class="mf__sec">
-          <legend class="mf__secTitle">{{ 'expenses.form.payment' | t }}</legend>
-          <div
+          <legend class="sec mf__secTitle">{{ 'expenses.form.payment' | t }}</legend>
+          <app-chip-group
             class="mf__chips"
-            role="radiogroup"
-            [attr.aria-label]="'expenses.field.paymentMethod' | t"
-          >
-            @for (m of methods(); track m.value) {
-              <button
-                type="button"
-                class="chip mf__chip"
-                role="radio"
-                [class.on]="method() === m.value"
-                [attr.aria-checked]="method() === m.value"
-                (click)="setMethod(m.value)"
-              >
-                @if (method() === m.value) {
-                  <app-icon name="check" [size]="16" />
-                }
-                {{ m.label }}
-              </button>
-            }
-          </div>
-          <label class="mf__box mf__box--area" [for]="'booking-note-' + mode()">
-            <span class="mf__label">{{ 'expenses.field.note' | t }}</span>
+            [ariaLabel]="'expenses.field.paymentMethod' | t"
+            [options]="methods()"
+            [value]="method()"
+            (valueChange)="setMethod($event ?? '')"
+          />
+          <app-textarea [label]="'expenses.field.note' | t">
             @if (mode() === 'create') {
               <textarea
-                [id]="'booking-note-' + mode()"
-                class="mf__area"
                 name="note"
                 rows="3"
                 [ngModel]="s.newNote()"
@@ -422,15 +327,13 @@
               ></textarea>
             } @else {
               <textarea
-                [id]="'booking-note-' + mode()"
-                class="mf__area"
                 name="enote"
                 rows="3"
                 [ngModel]="s.editNote()"
                 (ngModelChange)="s.editNote.set($event)"
               ></textarea>
             }
-          </label>
+          </app-textarea>
         </fieldset>
       </div>
     </div>

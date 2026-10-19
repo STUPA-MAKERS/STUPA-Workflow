@@ -23,7 +23,7 @@
   <div class="mf__body">
     <div class="tf">
       <section class="mf__sec" aria-labelledby="tf-pair">
-        <h3 id="tf-pair" class="mf__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</h3>
+        <h3 id="tf-pair" class="sec mf__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</h3>
         @if (mode() === 'create') {
           @let legs = free();
           <div class="tf__legs">
@@ -85,12 +85,10 @@
         } @else if (pair(); as p) {
           <div class="tf__legs">
             @for (leg of [p.from, p.to]; track $index) {
-              <div class="tf__fixed">
-                <span class="mf__lockedLabel"
-                  ><app-icon name="lock" [size]="14" />{{
-                    ($index === 0 ? 'expenses.transferFrom' : 'expenses.transferTo') | t
-                  }}</span
-                >
+              <app-locked-field
+                class="tf__fixed"
+                [label]="($index === 0 ? 'expenses.transferFrom' : 'expenses.transferTo') | t"
+              >
                 <span class="tf__fixedName">
                   @if (leg.color) {
                     <span
@@ -102,7 +100,7 @@
                   {{ leg.name }}
                 </span>
                 <span class="tf__code mono">{{ leg.path }}</span>
-              </div>
+              </app-locked-field>
               @if ($index === 0) {
                 <div class="tf__mid">
                   <span class="tf__arrow" aria-hidden="true"
@@ -119,7 +117,8 @@
         <!-- The amount beside the year, the description below over the full width. -->
         <div class="tf__fields">
           <app-currency-input
-            class="mf__amount tf__amount"
+            class="tf__amount"
+            size="lg"
             name="tamount"
             [label]="'expenses.field.amount' | t"
             [required]="true"
@@ -155,7 +154,7 @@
         <div class="mf__cols">
           <div class="mf__stack">
             <app-currency-input
-              class="mf__amount"
+              size="lg"
               name="teamount"
               [label]="'expenses.field.amount' | t"
               [required]="true"
@@ -171,12 +170,9 @@
             />
           </div>
           <div class="mf__stack">
-            <div class="mf__locked">
-              <span class="mf__lockedLabel"
-                ><app-icon name="lock" [size]="14" />{{ 'expenses.field.fiscalYear' | t }}</span
-              >
-              <span class="mf__lockedValue">{{ fyLabel() ?? '—' }}</span>
-            </div>
+            <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{
+              fyLabel() ?? '—'
+            }}</app-locked-field>
             <div class="mf__grid">
               <app-datepicker
                 name="teinv"
@@ -191,17 +187,14 @@
                 (ngModelChange)="t.editPaymentDate.set($event)"
               />
             </div>
-            <label class="mf__box mf__box--area" for="transfer-note">
-              <span class="mf__label">{{ 'expenses.field.note' | t }}</span>
+            <app-textarea [label]="'expenses.field.note' | t">
               <textarea
-                id="transfer-note"
-                class="mf__area"
                 name="tenote"
                 rows="3"
                 [ngModel]="t.editNote()"
                 (ngModelChange)="t.editNote.set($event)"
               ></textarea>
-            </label>
+            </app-textarea>
           </div>
         </div>
       }
