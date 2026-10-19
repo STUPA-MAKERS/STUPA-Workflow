@@ -12,6 +12,7 @@ import { join } from 'node:path';
 
 const KIT_LIB = join(__dirname, '../../../../vendor/ui-kit/src/lib');
 const GLOBAL_STYLES = join(__dirname, '../../../styles.scss');
+const KIT_ROWGROUP = join(__dirname, '../../../../vendor/ui-kit/src/styles/rowgroup.scss');
 
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -35,8 +36,8 @@ function kitBlocks(): Set<string> {
   return out;
 }
 
-function globalBlocks(): Set<string> {
-  const src = readFileSync(GLOBAL_STYLES, 'utf8')
+function globalBlocks(path = GLOBAL_STYLES): Set<string> {
+  const src = readFileSync(path, 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/\/\/[^\n]*/g, '');
   return new Set([...src.matchAll(/(?<![\w-])\.([a-zA-Z][\w-]*)/g)].map((m) => block(m[1])));
@@ -57,7 +58,10 @@ describe('global app classes and ui-kit classes', () => {
   });
 
   it('the row group is not called `.seg`', () => {
-    expect(globalBlocks()).toContain('rowgroup');
+    // The row group is a global partial of the kit, which the app loads.
+    expect(globalBlocks(KIT_ROWGROUP)).toContain('rowgroup');
+    expect(globalBlocks(KIT_ROWGROUP)).not.toContain('seg');
     expect(globalBlocks()).not.toContain('seg');
+    expect(readFileSync(GLOBAL_STYLES, 'utf8')).toMatch(/meta\.load-css\('rowgroup'\)/);
   });
 });

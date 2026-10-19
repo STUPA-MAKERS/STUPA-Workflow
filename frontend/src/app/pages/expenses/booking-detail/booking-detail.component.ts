@@ -4,17 +4,20 @@ import type { Application } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
   SegBarComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
   SkeletonComponent,
   StatusTextComponent,
-  flowColorKind,
-  invoiceStatus,
-} from '@shared/ui';
+} from '@stupa-makers/ui-kit';
+import { flowColorKind, invoiceStatus } from '@shared/ui';
 import { simplifyPathKey } from '@shared/budget-path';
 import type { BudgetTreeNode, Expense, Invoice } from '../../budget/budget-tree.api';
 import {
@@ -29,8 +32,6 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 
 /**

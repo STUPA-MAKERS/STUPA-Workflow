@@ -2,11 +2,16 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import type { Meeting, MeetingGuest } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clockTime } from '../meetings-display.util';
-import { TruncatedDirective } from '@shared/truncated.directive';
 
 /** A request younger than this reads "gerade eben" (ms). */
 const JUST_NOW_MS = 60_000;

@@ -21,17 +21,19 @@ import type { Uuid } from '@core/api/models';
 import type { TodoBoard, TodoCardMove, TodoCardTile, TodoColumn, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import {
   ButtonComponent,
   IconComponent,
+  LongPressDirective,
   matchesMedia,
   MEDIA,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
   type TabItem,
   TabsComponent,
 } from '@stupa-makers/ui-kit';
-import { LongPressDirective } from '@shared/long-press.directive';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
 import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
 import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';

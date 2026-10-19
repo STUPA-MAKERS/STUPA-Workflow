@@ -4,8 +4,8 @@ import { fireEvent, render, screen, within } from '@testing-library/angular';
 import type { TodoBoard } from '@core/api/todos.service';
 import { DROP_ENTER, cardsOf } from '../../../features/todos/todos.util';
 import { TODAY, board, tile } from '../../../../testing/todo-fixtures';
-import { LONG_PRESS_MS } from '@shared/long-press.directive';
 import { DONE_PREVIEW, TodoBoardViewComponent } from './todo-board-view.component';
+import { LONG_PRESS_MS } from '@stupa-makers/ui-kit';
 
 const OUTPUTS = ['openCard', 'menu', 'moveCard', 'dropIn', 'quickAdd', 'addIn', 'settings', 'archive'] as const;
 

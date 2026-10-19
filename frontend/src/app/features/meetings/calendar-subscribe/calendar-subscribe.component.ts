@@ -12,19 +12,19 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { ApiClient } from '@core/api/api-client.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
   CopyButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
   placeBelow,
   showInTopLayer,
+  SideSheetComponent,
+  SkeletonComponent,
   watchAnchoredPopover,
 } from '@stupa-makers/ui-kit';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The gap between the anchor and the popover, and the least gap to the viewport edge. */
 const GAP = 6;

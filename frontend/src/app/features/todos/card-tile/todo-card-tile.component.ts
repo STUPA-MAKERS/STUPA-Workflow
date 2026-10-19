@@ -3,8 +3,7 @@ import type { Uuid } from '@core/api/models';
 import type { TodoCardTile, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { AvatarStackComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { LINK_ICON, dueInfo, linkLine, personName, shortDay, type Translate } from '../todos.util';
 
 /** The most labels a tile shows; the drawer shows all. */

@@ -7,11 +7,9 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import { IconComponent, type IconName, type StatusKind, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { StatusKind } from '../../status-kind.util';
-import { StatusTextComponent } from '../status-text/status-text.component';
 
 /** One changed field of an event, for example of a new version. */
 export interface HistoryChange {

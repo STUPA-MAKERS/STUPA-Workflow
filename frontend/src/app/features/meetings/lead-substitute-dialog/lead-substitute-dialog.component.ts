@@ -18,19 +18,19 @@ import {
 import type { Attendance, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;

@@ -6,36 +6,31 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { downloadBlob } from '@shared/download.util';
-import { liveSearch } from '@shared/live-search';
+import { PageHeaderComponent, erasureStatus } from '@shared/ui';
 import {
   AvatarComponent,
-  ListItemComponent,
-  PageHeaderComponent,
-  SearchPillComponent,
-  StatusTextComponent,
-  erasureStatus,
-} from '@shared/ui';
-import {
   ButtonComponent,
   CellDirective,
   type ColumnDef,
+  ConfirmDialogComponent,
   DataTableComponent,
   DialogComponent,
+  downloadBlob,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  ListItemComponent,
+  liveSearch,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
+  SearchPillComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, ErasureRequest } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The picker shows this many hits. A longer list means: type more. */
 const PERSON_HITS = 6;

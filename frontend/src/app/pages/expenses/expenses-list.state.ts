@@ -1,6 +1,5 @@
 import { computed, inject, signal, type WritableSignal } from '@angular/core';
 import type { SelectOption } from '@stupa-makers/ui-kit';
-import { downloadBlob } from '@shared/download.util';
 import {
   BudgetTreeApi,
   type BudgetTreeNode,
@@ -9,6 +8,7 @@ import {
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
 import { debounced } from '@shared/debounced';
+import { downloadBlob } from '@stupa-makers/ui-kit';
 
 export type ExpenseSortField = 'createdAt' | 'amount' | 'invoiceDate' | 'paymentDate';
 

@@ -4,30 +4,28 @@ import { forkJoin, type Observable, of, switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import {
-  NoteComponent,
-  PageHeaderComponent,
-  RowMenuComponent,
-  SkeletonComponent,
-  StatusTextComponent,
-  type RowMenuSection,
-} from '@shared/ui';
-import { keyParts } from '@shared/key-parts.util';
+import { PageHeaderComponent } from '@shared/ui';
 import {
   ButtonComponent,
+  CapitalizePipe,
   CheckboxComponent,
+  ConfirmDialogComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  keyParts,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  SkeletonComponent,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Draft for a new global role. */
 interface RoleDraft {

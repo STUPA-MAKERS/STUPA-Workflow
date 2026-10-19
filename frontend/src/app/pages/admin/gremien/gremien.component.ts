@@ -6,23 +6,24 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { PageHeaderComponent } from '@shared/ui';
 import {
+  ConfirmDialogComponent,
   EmptyStateComponent,
+  IconComponent,
   NoteComponent,
-  PageHeaderComponent,
   RowMenuComponent,
-  SkeletonComponent,
-  StatusTextComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui';
-import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { errorCode } from '../../../features/meetings/meetings-display.util';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting

@@ -22,13 +22,17 @@ import {
   ButtonComponent,
   CheckboxComponent,
   DialogComponent,
+  DropOverlayComponent,
+  EmptyStateComponent,
+  FileDropDirective,
   IconComponent,
   matchesMedia,
   MEDIA,
+  SelectionBarComponent,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { scanStatus } from '@shared/status-kind.util';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
   ImageThumbComponent,
   inlineUrl,
@@ -36,10 +40,6 @@ import {
 } from '@shared/ui/image-thumb/image-thumb.component';
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { formatBytes } from './applications.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
-import { FileDropDirective } from '@shared/file-drop.directive';
-import { SelectionBarComponent } from '@shared/ui/selection-bar/selection-bar.component';
 
 /**
  * Attachments panel.

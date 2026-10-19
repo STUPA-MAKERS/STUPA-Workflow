@@ -34,26 +34,27 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
-import { liveSearch } from '@shared/live-search';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
   ButtonComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   focusableIn,
   IconComponent,
+  liveSearch,
   MEDIA,
   mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
   SegmentedComponent,
   type SegmentedOption,
+  StickyBarComponent,
   ToastService,
   trapTab,
 } from '@stupa-makers/ui-kit';
@@ -88,7 +89,6 @@ import { TodoBoardSettingsComponent } from './board-settings/todo-board-settings
 import { TodoBoardSkeletonComponent } from './board-skeleton/todo-board-skeleton.component';
 import { TodoBoardViewComponent, boardDropId, type BoardMove } from './board-view/todo-board-view.component';
 import { TodoListViewComponent } from './list-view/todo-list-view.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The board reads itself again this often while the tab is visible. */
 export const BOARD_POLL_MS = 30_000;

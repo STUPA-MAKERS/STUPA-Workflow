@@ -18,13 +18,17 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { HighlightComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  HighlightComponent,
+  IconComponent,
+  type IconName,
+  isApplePlatform,
+  liveSearch,
+  StatusTextComponent,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 import { CommandPaletteService } from './command-palette.service';
 import { PageIndexService, type PageEntry } from './page-index.service';
-import { isApplePlatform } from './shortcut';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { liveSearch } from '@shared/live-search';
 
 /** One row of the palette. A page comes from the client, a record from the server. */
 interface PaletteRow {

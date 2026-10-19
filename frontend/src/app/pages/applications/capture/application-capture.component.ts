@@ -26,21 +26,22 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
 import { debounced } from '@shared/debounced';
-import { liveSearch } from '@shared/live-search';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   AutocompleteComponent,
   ButtonComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  liveSearch,
+  NoteComponent,
+  ScrollFadeDirective,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
   type SelectOption,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
   DRAFT_FILES_STORAGE_KEY,
   DraftAttachmentsService,
@@ -48,7 +49,6 @@ import {
 import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-files.component';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** Who the application is for: an account, or a new person without one. */
 export type ApplicantMode = 'account' | 'guest';

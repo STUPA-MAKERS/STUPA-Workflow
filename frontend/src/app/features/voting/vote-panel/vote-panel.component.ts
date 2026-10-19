@@ -6,9 +6,6 @@ import type { TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, Vote } from '@core/api/models';
 import { ElectionResultComponent } from '../election-result/election-result.component';
 import { electionCaption, electionOf } from '../election.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import {
   BallotComponent,
@@ -19,6 +16,12 @@ import {
 import { VoteBarsComponent } from '../vote-bars.component';
 import { VoteProgressComponent } from '../vote-progress/vote-progress.component';
 import { NO_CONTEXT, type VoteContext } from './vote-context';
+import {
+  NoteComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 
 /**
  * One vote as a card (board Arbeit-Abstimmungen) or as the phone page body (board

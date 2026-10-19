@@ -4,16 +4,21 @@ import type { Meeting, MeetingGuest } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import type { StatusKind } from '@shared/status-kind.util';
-import { ButtonComponent, DialogComponent, InputComponent } from '@stupa-makers/ui-kit';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  EmptyStateComponent,
+  InputComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  type StatusKind,
+  StatusTextComponent,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { clockTime } from '../meetings-display.util';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 interface GuestRow {
   g: MeetingGuest;

@@ -12,14 +12,18 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { downloadBlob } from '@shared/download.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, CopyButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  ConfirmDialogComponent,
+  CopyButtonComponent,
+  downloadBlob,
+  EmptyStateComponent,
+  IconComponent,
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import { scopeLabel } from './scope-labels';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** What the confirmation dialog asks: revoke one grant, or all of them. */
 type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };

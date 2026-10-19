@@ -18,8 +18,7 @@ import type { TodoBoardKind, TodoBoardSummary } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { IconComponent, type IconName, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+import { IconComponent, type IconName, MEDIA, mediaQuery, SideSheetComponent } from '@stupa-makers/ui-kit';
 
 export const BOARD_ICON: Record<TodoBoardKind, IconName> = {
   personal: 'user',

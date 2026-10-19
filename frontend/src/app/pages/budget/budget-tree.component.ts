@@ -20,33 +20,36 @@ import {
   CellDirective,
   CheckboxComponent,
   type ColumnDef,
+  ConfirmDialogComponent,
   CurrencyInputComponent,
   DataTableComponent,
   DialogComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   InputComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
   observeElementSize,
   RowDetailDirective,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
   type SelectOption,
+  StatusTextComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin/admin-api.service';
-import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
 import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** A visible tree row: a node, its depth and whether it has children. */
 interface Row {

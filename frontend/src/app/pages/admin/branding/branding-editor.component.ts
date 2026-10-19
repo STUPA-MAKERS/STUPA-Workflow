@@ -19,7 +19,6 @@ import {
   type SubmittedKind,
 } from '@core/branding/submitted-texts';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
@@ -29,8 +28,10 @@ import {
   InputComponent,
   MoveButtonsComponent,
   moveItem,
+  NoteComponent,
   SegmentedComponent,
   type SegmentedOption,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -47,7 +48,6 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { renderMarkdown } from '../../../features/meetings/meetings.util';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /** The language of the texts in the editor. */
 type TextLang = 'de' | 'en';

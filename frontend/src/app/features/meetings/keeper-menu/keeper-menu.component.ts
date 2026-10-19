@@ -11,10 +11,13 @@ import type { Attendance, Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { TruncatedDirective } from '@shared/truncated.directive';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  IconComponent,
+  SearchPillComponent,
+  TruncatedDirective,
+} from '@stupa-makers/ui-kit';
 
 /** One member of the picker. */
 interface Candidate {

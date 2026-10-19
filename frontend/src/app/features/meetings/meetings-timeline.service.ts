@@ -6,7 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { Meeting, MeetingPage, Uuid } from '@core/api/models';
 import type { SelectOption } from '@stupa-makers/ui-kit';
-import { liveSearch } from '@shared/live-search';
+import { liveSearch } from '@stupa-makers/ui-kit';
 
 /** A change of one meeting, see `MeetingsTimelineService.lastChange`. */
 export type MeetingChange =

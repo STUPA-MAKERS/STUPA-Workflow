@@ -7,8 +7,8 @@ import type {
   TicketStatus,
 } from '@core/api/tickets.service';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { StatusKind } from '@shared/status-kind.util';
 import type { IconName } from '@stupa-makers/ui-kit';
+import { type StatusKind } from '@stupa-makers/ui-kit';
 
 /** A translate function: the key and its parameters. */
 export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;

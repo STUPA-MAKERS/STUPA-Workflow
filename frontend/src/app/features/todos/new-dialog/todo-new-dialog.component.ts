@@ -33,12 +33,13 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
   type SelectOption,
   TextareaComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL, sortedColumns } from '../todos.util';
 

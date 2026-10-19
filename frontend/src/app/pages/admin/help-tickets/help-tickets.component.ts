@@ -16,13 +16,19 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
-import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { ButtonComponent, InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  InputComponent,
+  NoteComponent,
+  SwitchComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AdminApiService } from '../admin-api.service';
 import type { HelpTicketsSettings } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The choices of the retention chip, in months. */
 export const RETENTION_CHOICES: readonly number[] = [1, 3, 6, 12, 24, 36, 60, 120];

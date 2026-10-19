@@ -4,8 +4,7 @@ import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoLinkKind, type TodoLinkedCard } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarStackComponent, type AvatarSize } from '@shared/ui/avatar/avatar.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { type AvatarSize, AvatarStackComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { personName, type Translate } from '../todos.util';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 

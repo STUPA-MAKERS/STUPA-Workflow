@@ -2,8 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import type { Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { ButtonComponent, DialogComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, DialogComponent, IconComponent, NoteComponent } from '@stupa-makers/ui-kit';
 import { shortTime, weekdayDate } from '../meetings-display.util';
 
 /**

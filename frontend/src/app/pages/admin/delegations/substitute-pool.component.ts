@@ -16,26 +16,25 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   AvatarComponent,
-  ListItemComponent,
-  RowMenuComponent,
-  SearchPillComponent,
-  SkeletonComponent,
-  type RowMenuSection,
-} from '@shared/ui';
-import {
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  ListItemComponent,
+  liveSearch,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { Subscription } from 'rxjs';
-import { liveSearch } from '@shared/live-search';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {

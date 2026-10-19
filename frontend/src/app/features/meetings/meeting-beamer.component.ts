@@ -11,9 +11,7 @@ import type {
   VoteResult,
 } from '@core/api/models';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, SegBarComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { VoteBarsComponent } from '../voting/vote-bars.component';
 import { ElectionResultComponent } from '../voting/election-result/election-result.component';
 import { electionCaption, electionResultLine, electionStatus } from '../voting/election.util';

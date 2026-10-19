@@ -23,36 +23,34 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   CheckboxComponent,
-  IconComponent,
-  InfiniteScrollDirective,
-  MEDIA,
-  mediaQuery,
-  SegmentedComponent,
-  type SegmentedOption,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  ConfirmDialogComponent,
+  downloadBlob,
   EmptyStateComponent,
-  FabComponent,
   FilterSelectComponent,
   type FilterSelectOption,
+  IconComponent,
+  InfiniteScrollDirective,
   ListDetailLayoutComponent,
-  PageHeaderComponent,
   ListItemComponent,
+  MEDIA,
+  mediaQuery,
   RangeChipComponent,
   type RangeValue,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  ScrollFadeDirective,
   SearchPillComponent,
+  SegmentedComponent,
+  type SegmentedOption,
   SelectionBarComponent,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
   StickyBarComponent,
-} from '@shared/ui';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { downloadBlob } from '@shared/download.util';
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { FabComponent, PageHeaderComponent } from '@shared/ui';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import {
@@ -84,7 +82,6 @@ import { ExpensesListState, type ExpenseSortField } from './expenses-list.state'
 import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dialog.component';
 import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
 import { TransferFormComponent } from './transfer-form/transfer-form.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';

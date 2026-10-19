@@ -21,34 +21,32 @@ import type {
   VoteListItem,
 } from '@core/api/models';
 import {
+  AvatarComponent,
   CellDirective,
   type ColumnDef,
   DataTableComponent,
+  DateBlockComponent,
+  EmptyStateComponent,
   IconComponent,
+  ListItemComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SegBarComponent,
+  SideSheetComponent,
+  SkeletonComponent,
+  type StatusKind,
+  StatusTextComponent,
   type TabItem,
   TabsComponent,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import {
-  type StatusKind,
-  flowColorKind,
-  meetingVoteStatus,
-} from '@shared/status-kind.util';
+import { flowColorKind, meetingVoteStatus } from '@shared/status-kind.util';
 import { closedStatus } from '../../features/voting/election.util';
 import { shortTime } from '../../features/meetings/meetings-display.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
@@ -60,7 +58,6 @@ import {
   BudgetTreeApi,
   type FiscalYear,
 } from '../budget/budget-tree.api';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
 const ROWS = 25;

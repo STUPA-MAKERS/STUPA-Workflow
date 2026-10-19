@@ -21,7 +21,12 @@ import { cacheInterceptor } from '@core/cache/cache.interceptor';
 import { loadingInterceptor } from '@core/loading/loading.interceptor';
 import { LoadingService } from '@core/loading/loading.service';
 import { USE_MOCK_API } from '@core/api/api.config';
-import { UI_KIT_INTL, UI_KIT_LOADING, uiKitIntlFromLang } from '@stupa-makers/ui-kit';
+import {
+  UI_KIT_AVATAR_SOURCE,
+  UI_KIT_INTL,
+  UI_KIT_LOADING,
+  uiKitIntlFromLang,
+} from '@stupa-makers/ui-kit';
 import { LIVE_VOTE_SOURCE } from '@core/ws/live-vote.source';
 import { MockLiveVoteSource } from '@core/ws/mock-live-vote.source';
 import { WsService } from '@core/ws/ws.service';
@@ -29,6 +34,7 @@ import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { SwUpdateService } from '@core/pwa/sw-update.service';
+import { AvatarService } from '@shared/ui/avatar/avatar.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
 
@@ -77,6 +83,8 @@ export const appConfig: ApplicationConfig = {
       },
     },
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
+    // The person avatars of the kit load the Gravatar image through the API proxy.
+    { provide: UI_KIT_AVATAR_SOURCE, useExisting: AvatarService },
     provideAppInitializer(() => {
       inject(ThemeService).init();
       const i18n = inject(I18nService); // the constructor default sets document.lang

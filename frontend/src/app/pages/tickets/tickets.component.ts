@@ -27,26 +27,28 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
+  AvatarComponent,
+  ButtonComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { ListDetailLayoutComponent } from '@shared/ui/list-detail/list-detail-layout.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-kit';
+  IconComponent,
+  type IconName,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  liveSearch,
+  NoteComponent,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SkeletonComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';

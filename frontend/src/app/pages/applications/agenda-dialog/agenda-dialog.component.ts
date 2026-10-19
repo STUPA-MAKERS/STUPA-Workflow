@@ -16,17 +16,17 @@ import type { Meeting, ProblemDetail, Transition, Uuid } from '@core/api/models'
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
+  DateBlockComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  ScrollFadeDirective,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** A meeting row of the dialog. */
 interface MeetingChoice {

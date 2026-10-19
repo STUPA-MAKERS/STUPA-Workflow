@@ -20,19 +20,28 @@ import type { Meeting } from '@core/api/models';
 import { I18nService, toFormatLocale } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import type { RowMenuItem, RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { RowMenuComponent } from '@shared/ui/row-menu/row-menu.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import type { Seg } from '@shared/ui/seg-bar/seg-bar.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DateBlockComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  IconComponent,
+  ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  type Seg,
+  SegBarComponent,
+  SheetBarComponent,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText, shortTime, weekdayDate } from '../meetings-display.util';
@@ -61,9 +70,6 @@ import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
 import { beamerUrl } from '../../voting/beamer-link.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;

@@ -1,7 +1,7 @@
 import type { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
-import { formatBytes as formatBytesIn } from '@shared/format-bytes';
 import type { AuditVerification, AuditVerificationTrigger } from '../admin.models';
+import { formatBytes as formatBytesIn } from '@stupa-makers/ui-kit';
 
 /** The trigger of a stored chain check as words ("nächtliche Prüfung"). */
 const TRIGGER_KEYS: Record<AuditVerificationTrigger, TranslationKey> = {

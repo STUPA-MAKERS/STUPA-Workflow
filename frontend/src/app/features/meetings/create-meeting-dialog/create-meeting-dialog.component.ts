@@ -21,15 +21,16 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
+  SegBarComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  type SelectOption,
   TimeInputComponent,
   ToastService,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { longDate } from '../meetings-display.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 
 /**
  * "Sitzung anlegen" in two steps.

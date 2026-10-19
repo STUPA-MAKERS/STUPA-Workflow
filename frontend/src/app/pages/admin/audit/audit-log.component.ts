@@ -11,19 +11,20 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-  PageHeaderComponent,
-  RangeChipComponent,
-  type RangeValue,
-  SkeletonComponent,
-} from '@shared/ui';
+import { PageHeaderComponent } from '@shared/ui';
 import {
   ButtonComponent,
   ConfigDiffComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   InfiniteScrollDirective,
+  NoteComponent,
+  RangeChipComponent,
+  type RangeValue,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
@@ -34,9 +35,6 @@ import type {
   AuditVerification,
   ConfigRevisionDiff,
 } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 const PAGE_SIZE = 50;
 

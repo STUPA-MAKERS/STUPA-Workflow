@@ -5,10 +5,10 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  SwitchComponent,
+  SelectFieldComponent,
   type SelectOption,
+  SwitchComponent,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { TransitionDef } from '../admin.models';
 import { FlowColorComponent } from './flow-color.component';
 

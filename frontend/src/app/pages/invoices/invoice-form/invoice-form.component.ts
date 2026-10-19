@@ -15,18 +15,18 @@ import {
   ButtonComponent,
   CurrencyInputComponent,
   DatepickerComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
+  NoteComponent,
+  ScrollFadeDirective,
   SegmentedComponent,
   type SegmentedOption,
   type SelectOption,
   TextareaComponent,
 } from '@stupa-makers/ui-kit';
-import { formatBytes } from '@shared/format-bytes';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import type { FinanceFormLayout } from '../../expenses/booking-form/booking-form.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** What the import found: `parsed` (ZUGFeRD read), `manual` (no ZUGFeRD), or nothing. */
 export type InvoiceImportNotice = 'parsed' | 'manual' | null;

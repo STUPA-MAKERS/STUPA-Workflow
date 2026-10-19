@@ -27,14 +27,13 @@ import {
   MEDIA,
   mediaQuery,
   observeElementSize,
-} from '@stupa-makers/ui-kit';
-import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+  ScrollFadeDirective,
+  SideSheetComponent,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { meetingStatus } from '@shared/status-kind.util';
 import {
   type AgendaMove,
@@ -52,7 +51,6 @@ import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, votesInText } from '../meetings.util';
 import { clockTime, voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 
 /** The ids of the session menu. */

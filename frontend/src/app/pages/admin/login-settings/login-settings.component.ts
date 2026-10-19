@@ -5,10 +5,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import { InputComponent, NoteComponent, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { type LoginSettings, MAX_SESSION_DAYS } from '../admin.models';
 

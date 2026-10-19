@@ -2,9 +2,14 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output, si
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { scanStatus } from '@shared/status-kind.util';
-import { FileDropZoneComponent } from '@shared/ui/file-drop-zone/file-drop-zone.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { BadgeComponent, CheckboxComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  BadgeComponent,
+  CheckboxComponent,
+  FileDropZoneComponent,
+  IconComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { FormsModule } from '@angular/forms';
 import { formatSize, UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';

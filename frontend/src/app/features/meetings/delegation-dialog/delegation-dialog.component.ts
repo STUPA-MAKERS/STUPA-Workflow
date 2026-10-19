@@ -23,18 +23,18 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  liveSearch,
+  SearchPillComponent,
   SwitchComponent,
   ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { liveSearch } from '@shared/live-search';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 
 /**
  * "Vertretung einrichten" (board Teilnahme-Vertretung): the member picks who represents

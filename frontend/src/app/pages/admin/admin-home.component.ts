@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The page pane of `/admin` before an admin page is open (board Verwaltung).

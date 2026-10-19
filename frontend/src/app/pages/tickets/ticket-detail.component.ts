@@ -37,7 +37,6 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import type {
@@ -51,36 +50,29 @@ import type {
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import { chatPeople } from '@shared/ui/chat/chat-mentions';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import {
-  FieldGroupComponent,
-  FieldRowComponent,
-} from '@shared/ui/field-group/field-group.component';
-import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import {
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import {
-  SheetBarComponent,
-  SheetBarTitleDirective,
-} from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
   ButtonComponent,
   CheckboxComponent,
   copyText,
   DialogComponent,
+  EmptyStateComponent,
+  FieldGroupComponent,
+  FieldRowComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   InputComponent,
+  liveSearch,
   MEDIA,
   mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SkeletonComponent,
+  StatusTextComponent,
   type TabItem,
   TabsComponent,
   ToastService,

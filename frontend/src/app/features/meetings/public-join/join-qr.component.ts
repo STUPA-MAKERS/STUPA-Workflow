@@ -12,13 +12,13 @@ import type { Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { QrCodeComponent, formatJoinCode } from '@shared/ui/qr-code/qr-code.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import {
   ButtonComponent,
   CopyButtonComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
+  SideSheetComponent,
 } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService } from '../meeting-guests.service';
 import { JOIN_COPIED_MS } from './join-link.component';

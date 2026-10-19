@@ -14,9 +14,15 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageFrameService } from '../../../layout/page-frame.service';
-import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
-import { ButtonComponent } from '@stupa-makers/ui-kit';
-import { AvatarComponent, NoteComponent, PageHeaderComponent, SkeletonComponent } from '@shared/ui';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  CapitalizePipe,
+  EmptyStateComponent,
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui';
 import { AdminApiService } from '../admin-api.service';
 import {
   FORCED_GREMIUM_ROLE_KEYS,
@@ -27,7 +33,6 @@ import {
   MEMBER_GREMIUM_ROLE_KEY,
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** One row of the member list. */
 interface Member {

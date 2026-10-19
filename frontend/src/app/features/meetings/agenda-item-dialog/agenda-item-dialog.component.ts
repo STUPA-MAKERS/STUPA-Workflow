@@ -22,24 +22,24 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  ScrollFadeDirective,
+  SearchPillComponent,
   SegmentedComponent,
+  type SegmentedOption,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
-  type SegmentedOption,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { errorDetail } from '../meetings-display.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { cardsOf, isoDay, shortDay, sortedColumns } from '../../todos/todos.util';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** What the new agenda item is: an application of the Gremium, a to-do, or a free text. */
 export type AgendaItemKind = 'application' | 'todo' | 'freetext';

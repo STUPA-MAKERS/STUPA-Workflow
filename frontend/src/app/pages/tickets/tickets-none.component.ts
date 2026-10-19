@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TicketsComponent } from './tickets.component';
+import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The detail pane of `/tickets` before a ticket is open. Only the side-by-side layout

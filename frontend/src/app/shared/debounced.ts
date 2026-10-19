@@ -1,5 +1,5 @@
 import { DestroyRef, inject } from '@angular/core';
-import { LIVE_SEARCH_DEBOUNCE_MS } from './live-search';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@stupa-makers/ui-kit';
 
 /** A function that runs only after a pause. Make it with {@link debounced}. */
 export interface Debounced<A extends unknown[]> {

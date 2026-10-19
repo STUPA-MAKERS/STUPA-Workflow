@@ -25,18 +25,20 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SelectFieldComponent,
+  type SelectOption,
   SwitchComponent,
   ToastService,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { LABEL_COLORS, LABEL_COLOR_NAME, sortedColumns } from '../../../features/todos/todos.util';
 
 /** The default archive age when the switch turns on. */

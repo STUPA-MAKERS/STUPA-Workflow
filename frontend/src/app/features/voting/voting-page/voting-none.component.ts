@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { VotingComponent } from './voting.component';
+import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The detail pane of `/voting` before a vote is open. Only the side-by-side layout shows

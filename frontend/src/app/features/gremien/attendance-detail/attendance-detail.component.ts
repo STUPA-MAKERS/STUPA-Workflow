@@ -21,20 +21,20 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { StatusView } from '@shared/status-kind.util';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
+  AvatarComponent,
+  EmptyStateComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
   placeBelow,
   showInTopLayer,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
   watchAnchoredPopover,
 } from '@stupa-makers/ui-kit';
 import { dayMonth, monthLabel } from '../gremien.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The gap between the cell and the popover, and the least gap to the viewport edge. */
 const GAP = 6;

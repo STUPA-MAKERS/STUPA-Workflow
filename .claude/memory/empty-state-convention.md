@@ -6,7 +6,7 @@ metadata:
   type: project
 ---
 
-Every "nothing here" state is `<app-empty-state>` (`frontend/src/app/shared/ui/empty-state/`).
+Every "nothing here" state is `<app-empty-state>` (`EmptyStateComponent` of the ui-kit, `frontend/vendor/ui-kit/src/lib/empty-state/`).
 It has two looks (Frederik, 2026-10-17: "Ich meinte für Listen!"):
 
 - **List** (default): an empty list or a search without a match. Faint aria-hidden ghost rows

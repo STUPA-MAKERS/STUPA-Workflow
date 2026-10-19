@@ -1,8 +1,8 @@
+import { formatBytes } from '@stupa-makers/ui-kit';
 /**
  * Helpers of the public apply pages.
  */
 
-import { formatBytes } from '@shared/format-bytes';
 
 /**
  * File types the server takes (files/mime.py): PDF, images, Word, Excel, PowerPoint and

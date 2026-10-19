@@ -3,9 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import { InputComponent, NoteComponent, SkeletonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
 import { MAX_LEAD_MINUTES, type MeetingSettings } from '../../admin.models';
 

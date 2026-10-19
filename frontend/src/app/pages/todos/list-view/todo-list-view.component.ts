@@ -3,8 +3,7 @@ import type { Uuid } from '@core/api/models';
 import type { TodoBoard, TodoCardTile, TodoColumn, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { AvatarStackComponent, EmptyStateComponent, IconComponent } from '@stupa-makers/ui-kit';
 import {
   dueInfo,
   linkLine,
@@ -13,7 +12,6 @@ import {
   type DueInfo,
   type Translate,
 } from '../../../features/todos/todos.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 export type DueSort = 'none' | 'asc' | 'desc';
 

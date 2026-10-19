@@ -39,30 +39,31 @@ import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import { ChatOutbox, draftDropper, sendErrorKey } from '@shared/ui/chat/chat-outbox';
 import { ChatComponent } from '@shared/ui/chat/chat.component';
 import { ChatDrafts } from '@shared/ui/chat/chat-drafts';
 import type { ChatEdit, ChatEvent, ChatMessage, ChatRef, ChatSend } from '@shared/ui/chat/chat.models';
 import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/chat.util';
 import { chatPeople } from '@shared/ui/chat/chat-mentions';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import {
+  AvatarComponent,
   ButtonComponent,
   ChipComponent,
   copyText,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
   IconComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SegBarComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SkeletonComponent,
   type TabItem,
   TabsComponent,
   ToastService,

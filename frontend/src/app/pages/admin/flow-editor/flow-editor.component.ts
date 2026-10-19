@@ -14,21 +14,21 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
   observeElementSize,
-  type SelectOption,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+  ScrollFadeDirective,
+  type SelectOption,
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
+import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { AdminApiService } from '../admin-api.service';
 import {
   COMPARE_OPS,
@@ -83,8 +83,6 @@ import { StateInspectorComponent, type GuardPriorityRow } from './state-inspecto
 import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 
 /**
  * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).

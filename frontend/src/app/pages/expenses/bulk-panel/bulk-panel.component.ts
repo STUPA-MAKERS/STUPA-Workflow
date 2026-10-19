@@ -11,7 +11,13 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent, InputComponent } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  InputComponent,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+} from '@stupa-makers/ui-kit';
 import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
 import {
@@ -21,7 +27,6 @@ import {
   shortDate,
   signedEur,
 } from '../../budget/expense-display.util';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /**
  * The bulk actions of the selected bookings (board Fin-Buchungen-Auswahl). Side by side

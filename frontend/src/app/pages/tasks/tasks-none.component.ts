@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TasksComponent } from './tasks.component';
+import { EmptyStateComponent } from '@stupa-makers/ui-kit';
 
 /**
  * The detail pane of `/tasks` before a task is open. Only the side-by-side layout shows

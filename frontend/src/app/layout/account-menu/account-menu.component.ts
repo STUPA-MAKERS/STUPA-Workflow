@@ -17,10 +17,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ThemeService } from '@core/theme/theme.service';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { IconComponent, SwitchComponent } from '@stupa-makers/ui-kit';
+import { AvatarComponent, IconComponent, SwitchComponent, TruncatedDirective } from '@stupa-makers/ui-kit';
 import { LanguageSelectComponent } from '../language-select/language-select.component';
-import { TruncatedDirective } from '@shared/truncated.directive';
 
 /**
  * `popover`: the avatar at the foot of the rail, which opens the menu beside the rail.

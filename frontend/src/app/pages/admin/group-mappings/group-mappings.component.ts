@@ -8,16 +8,22 @@ import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import { PageHeaderComponent, RowMenuComponent, SkeletonComponent, type RowMenuSection } from '@shared/ui';
+import { PageHeaderComponent } from '@shared/ui';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  SelectFieldComponent,
   type SelectOption,
+  SkeletonComponent,
   ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import type {
   Gremium,
@@ -27,9 +33,6 @@ import type {
   GroupMapping,
   Role,
 } from '../admin.models';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** The three separate mapping kinds. Each has its own table and dialog. */
 export type MappingKind = 'global' | 'membership' | 'role';

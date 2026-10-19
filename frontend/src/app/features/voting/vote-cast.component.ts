@@ -18,14 +18,16 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, ProblemDetail, Vote } from '@core/api/models';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
+  RowMenuComponent,
+  type RowMenuSection,
+  ScrollFadeDirective,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -36,7 +38,6 @@ import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote
 import { VotingPageService } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 type Phase = 'loading' | 'error' | 'ready';
 

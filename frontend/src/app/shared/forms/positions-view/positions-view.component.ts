@@ -1,8 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { formatEuro } from '../answer-format';
 import {
   normalizePositions,

@@ -6,21 +6,22 @@ import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { PageHeaderComponent } from '@shared/ui';
 import {
+  ConfirmDialogComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-  PageHeaderComponent,
+  IconComponent,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuSection,
   SkeletonComponent,
-} from '@shared/ui';
-import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { Gremium } from '../admin.models';
 import { SubstitutePoolComponent } from './substitute-pool.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
 export function localToday(now = new Date()): string {

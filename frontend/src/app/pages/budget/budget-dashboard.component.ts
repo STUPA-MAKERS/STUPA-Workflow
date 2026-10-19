@@ -11,33 +11,31 @@ import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   DialogComponent,
-  IconComponent,
-  MEDIA,
-  mediaQuery,
-} from '@stupa-makers/ui-kit';
-import { AuthService } from '@core/auth/auth.service';
-import { downloadBlob } from '@shared/download.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { SimplifyPathPipe } from '@shared/budget-path';
-import {
+  downloadBlob,
   EmptyStateComponent,
   FilterSelectComponent,
+  IconComponent,
   ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  ScrollFadeDirective,
   SearchPillComponent,
   type Seg,
   SegBarComponent,
-  SideSheetComponent,
-  PageHeaderComponent,
   SheetBarComponent,
   SheetBarKickerDirective,
+  SideSheetComponent,
   SkeletonComponent,
-  StatusTextComponent,
   type StatusKind,
-  flowColorKind,
-} from '@shared/ui';
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
+import { AuthService } from '@core/auth/auth.service';
+import { SimplifyPathPipe } from '@shared/budget-path';
+import { PageHeaderComponent, flowColorKind } from '@shared/ui';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,
@@ -50,7 +48,6 @@ import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */
 export interface Figures {
