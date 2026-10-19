@@ -3,9 +3,6 @@
 }
 
 .wh {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -103,9 +100,6 @@
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);
-}
-.wh__statusTitle {
-  margin: 0;
 }
 .wh__grid {
   display: grid;

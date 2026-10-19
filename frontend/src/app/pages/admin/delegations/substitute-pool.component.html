@@ -3,7 +3,7 @@
      Mitglieder → Stellvertretung". -->
 <section class="sp" aria-labelledby="sp-title">
   <header class="sp__head">
-    <h2 class="sec" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
+    <h2 class="section-title" id="sp-title">{{ 'admin.substitutes.title' | t }}</h2>
     <span class="sp__actions">
       <ng-content select="[poolActions]" />
       <app-button variant="text" size="sm" (click)="openAdd()">
@@ -31,17 +31,11 @@
               <span class="sp__name">{{ entryName(s) }}</span>
             </span>
           </span>
-          <app-button
-            variant="text"
-            size="sm"
-            [iconOnly]="true"
-            [disabled]="removing().has(s.id)"
-            [ariaLabel]="('admin.substitutes.remove' | t) + ': ' + entryName(s)"
-            [title]="'admin.substitutes.remove' | t"
-            (click)="remove(s)"
-          >
-            <app-icon name="trash" />
-          </app-button>
+<app-row-menu
+            [sections]="rowMenu()"
+            [label]="('ui.rowMenu.trigger' | t) + ': ' + entryName(s)"
+            (selected)="remove(s)"
+          />
         </li>
       }
     </ul>
@@ -116,7 +110,7 @@
   <div dialog-footer class="sp__foot">
     <app-button variant="text" (click)="addOpen.set(false)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!selected()" [loading]="adding()" (click)="add()">{{
-      'admin.substitutes.addAction' | t
+      'admin.common.add' | t
     }}</app-button>
   </div>
 </app-dialog>

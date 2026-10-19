@@ -1,4 +1,4 @@
-<section class="fe" [class.fe--wide]="wide()">
+<section class="fe admin-page" [class.fe--wide]="wide()">
   <app-page-header [flush]="true" [title]="'admin.flow.title' | t" [meta]="versionMeta()">
     @if (loaded()) {
       <app-status-text heading class="fe__validity" [kind]="validation().valid ? 'accent' : 'error'">

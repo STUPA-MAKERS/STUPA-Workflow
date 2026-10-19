@@ -14,17 +14,13 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
-  IconComponent,
   InputComponent,
-  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   RowMenuComponent,
-  type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import { type ApplicationTypeFull, type Gremium, slugify } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -67,7 +63,6 @@ function emptyForm(): NewForm {
     DialogComponent,
     DataTableComponent,
     CellDirective,
-    IconComponent,
     InputComponent,
     NoteComponent,
     PageHeaderComponent,
@@ -95,19 +90,13 @@ export class FormsListComponent {
   /** Delete needs its own permission. This gate is UX only. The server is authoritative. */
   protected readonly canDelete = computed(() => this.auth.can('admin.types_delete'));
   protected readonly confirmDelete = signal<ApplicationTypeFull | null>(null);
-  /** A phone shows cards: the actions of a type go into the ⋮ menu of its card. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  protected readonly rowMenu = computed<RowMenuSection[]>(() => {
-    const items: RowMenuItem[] = [{ id: 'edit', label: this.i18n.translate('admin.forms.edit'), icon: 'edit' }];
-    if (this.canDelete()) {
-      items.push({ id: 'delete', label: this.i18n.translate('admin.forms.delete'), icon: 'trash', danger: true });
-    }
-    return [{ items }];
-  });
+  /** The ⋮ menu of a type: delete is its only action. The row itself opens the editor. */
+  protected readonly rowMenu = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'delete', label: this.i18n.translate('admin.forms.delete'), icon: 'trash', danger: true }] },
+  ]);
 
-  protected onRowMenu(type: ApplicationTypeFull, item: RowMenuItem): void {
-    if (item.id === 'edit') void this.router.navigate(['/admin/forms', type.id]);
-    else if (item.id === 'delete') this.askDelete(type);
+  protected open(type: ApplicationTypeFull): void {
+    void this.router.navigate(['/admin/forms', type.id]);
   }
   protected readonly deleting = signal(false);
 
@@ -156,7 +145,7 @@ export class FormsListComponent {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '6rem',
+      width: '3.5rem',
       card: 'actions',
     },
   ]);

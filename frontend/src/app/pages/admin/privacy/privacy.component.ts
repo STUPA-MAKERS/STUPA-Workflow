@@ -22,7 +22,6 @@ import {
   DialogComponent,
   IconComponent,
   InputComponent,
-  MEDIA,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
@@ -30,7 +29,6 @@ import {
   type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, ErasureRequest } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -118,9 +116,7 @@ export class PrivacyComponent {
     () => this.savedRetention() !== null && this.retentionMonths() !== this.savedRetention(),
   );
 
-  /** A phone shows cards: the actions of a request go into the ⋮ menu of its card. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  /** The ⋮ menu of an open request on a phone: the same two actions as the buttons. */
+  /** The ⋮ menu of an open request. */
   protected readonly rowMenu = computed<RowMenuSection[]>(() => [
     {
       items: [
@@ -144,7 +140,7 @@ export class PrivacyComponent {
       key: 'actions',
       label: this.i18n.translate('admin.common.actions'),
       align: 'end',
-      width: '13rem',
+      width: '3.5rem',
       card: 'actions',
     },
   ]);

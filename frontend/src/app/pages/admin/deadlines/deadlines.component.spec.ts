@@ -319,10 +319,17 @@ describe('AdminDeadlinesComponent', () => {
     expect(c.draft().offsetDays).toBeNull();
   });
 
-  it('names each row in its action buttons and shows the guest settings with the right', async () => {
-    await setup();
-    expect(screen.getByRole('button', { name: 'Bearbeiten: Semesterfrist' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Entfernen: Bearbeitung' })).toBeInTheDocument();
+  it('names each row in its menu, opens the edit on a row click and removes from the menu', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    expect(screen.getByRole('button', { name: 'Aktionen: Semesterfrist' })).toBeInTheDocument();
+    await userEvent.click(screen.getByText('Semesterfrist'));
+    expect(c.draft()).not.toBeNull();
+    c.close();
+    fixture.detectChanges();
+    await userEvent.click(screen.getByRole('button', { name: 'Aktionen: Bearbeitung' }));
+    expect(await screen.findByRole('menuitem', { name: 'Entfernen' })).toBeInTheDocument();
   });
 
   it('canSave for recurring needs at least one non-empty date', async () => {

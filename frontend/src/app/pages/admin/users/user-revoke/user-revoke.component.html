@@ -54,7 +54,7 @@
       @if (p.gremien.length) {
         <section class="ur__sec" aria-labelledby="ur-gremien">
           <div class="ur__secHead">
-            <h3 class="sec ur__secTitle" id="ur-gremien">
+            <h3 class="section-title ur__secTitle" id="ur-gremien">
               {{ 'admin.users.revoke.gremien' | t: { n: p.gremien.length } }}
             </h3>
             <app-button variant="text" size="sm" [disabled]="p.isSelf" (click)="toggleAll()">{{
@@ -103,7 +103,7 @@
       @if (p.globalRoles.length) {
         <section class="ur__sec" aria-labelledby="ur-roles">
           <div class="ur__secHead">
-            <h3 class="sec ur__secTitle" id="ur-roles">
+            <h3 class="section-title ur__secTitle" id="ur-roles">
               {{ 'admin.users.revoke.roles' | t: { n: p.globalRoles.length } }}
             </h3>
           </div>

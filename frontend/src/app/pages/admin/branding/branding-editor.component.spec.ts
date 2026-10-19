@@ -27,8 +27,10 @@ async function setup() {
 }
 
 /** The version line under the header (the version list below repeats the number). */
+/** The version (the `meta` of the header) and the draft note under the header. */
 function stateLine(container: Element): string {
-  return container.querySelector('.br__state')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  const text = (sel: string) => container.querySelector(sel)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  return [text('.ph__meta'), text('.br__state')].filter(Boolean).join(' · ');
 }
 
 function emptyBranding(): Branding {
@@ -331,9 +333,9 @@ describe('BrandingEditorComponent', () => {
       await fixture.whenStable();
       fixture.detectChanges();
       expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
-      const internal = screen.getByRole('textbox', { name: 'Intern — angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
       expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
-      expect(screen.getByRole('textbox', { name: 'Extern — Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
+      expect(screen.getByRole('textbox', { name: 'Extern: Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
         'placeholder',
         expect.stringMatching(/persönlichen Link/),
       );
@@ -345,13 +347,13 @@ describe('BrandingEditorComponent', () => {
       const { fixture, api } = await setupWithStub({});
       await fixture.whenStable();
       fixture.detectChanges();
-      const internal = screen.getByRole('textbox', { name: 'Intern — angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
       await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
       expect(screen.getByTestId('submitted-preview-internal').innerHTML).toContain('<strong>sehr</strong>');
       expect(screen.getByTestId('submitted-preview-internal').querySelector('b')).toBeNull();
       expect(screen.getAllByText('Standardtext')).toHaveLength(1);
       await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-      const en = screen.getByRole('textbox', { name: 'Intern — angemeldet mit Konto (EN)' });
+      const en = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (EN)' });
       expect(en).toHaveValue('');
       expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

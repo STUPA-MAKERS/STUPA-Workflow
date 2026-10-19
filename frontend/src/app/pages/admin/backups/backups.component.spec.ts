@@ -71,6 +71,14 @@ async function setup(api = makeApi()) {
   return { ...view, api, toast };
 }
 
+/** Opens the ⋮ of a row and picks one item. */
+async function pick(row: number, item: string): Promise<HTMLElement> {
+  await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[row]);
+  const entry = await screen.findByRole('menuitem', { name: item });
+  await userEvent.click(entry);
+  return entry;
+}
+
 describe('BackupsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => jest.useRealTimers());
@@ -101,7 +109,9 @@ describe('BackupsComponent', () => {
   it('hides restore when the platform cannot decrypt its own archives', async () => {
     const api = makeApi({ listBackups: jest.fn(() => of(list({ restoreEnabled: false }))) });
     await setup(api);
-    expect(screen.queryByRole('button', { name: /^Wiederherstellen/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await screen.findByRole('menuitem', { name: 'Herunterladen' });
+    expect(screen.queryByRole('menuitem', { name: 'Wiederherstellen' })).not.toBeInTheDocument();
   });
 
   it('says why the import is dead rather than leaving a greyed-out button', async () => {
@@ -138,26 +148,29 @@ describe('BackupsComponent', () => {
     (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
     const open = jest.spyOn(window, 'open').mockImplementation(() => null);
     const { api } = await setup();
-    await userEvent.click(screen.getAllByRole('button', { name: /^Herunterladen: / })[0]);
+    await pick(0, 'Herunterladen');
     expect(api.exportBackup).toHaveBeenCalledWith('b-1');
     expect(open).not.toHaveBeenCalled();
     open.mockRestore();
   });
 
-  it('names the archive in each row button and draws a pin, not a paperclip', async () => {
-    const { container } = await setup();
+  it('names the archive in each row menu and draws a pin, not a paperclip', async () => {
+    await setup();
     const labels = screen
-      .getAllByRole('button', { name: /^(Herunterladen|Anheften|Lösen|Wiederherstellen|Löschen): / })
+      .getAllByRole('button', { name: /^Aktionen: / })
       .map((b) => b.getAttribute('aria-label'));
     // Every label names its archive by date, so the rows differ.
     expect(labels.every((l) => /: \d{2}\.\d{2}\.\d{4}/.test(l ?? ''))).toBe(true);
+    await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[0]);
+    await screen.findByRole('menuitem', { name: 'Anheften' });
+    const container = document.body;
     expect(container.querySelector('[data-icon="clip"], [data-icon="clipslash"]')).toBeNull();
     expect(container.querySelector('[data-icon="pin"]')).not.toBeNull();
   });
 
   it('pins and unpins an archive', async () => {
     const { api } = await setup();
-    await userEvent.click(screen.getAllByRole('button', { name: /^Anheften: / })[0]);
+    await pick(0, 'Anheften');
     expect(api.updateBackup).toHaveBeenCalledWith('b-1', { pinned: true });
   });
 
@@ -165,14 +178,14 @@ describe('BackupsComponent', () => {
   describe('restore', () => {
     it('stays disabled until the confirmation word is typed', async () => {
       await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Wiederherstellen: / })[0]);
+      await pick(0, 'Wiederherstellen');
       const confirm = screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!;
       expect(confirm).toBeDisabled();
     });
 
     it('does not fire on a near miss', async () => {
       const { api } = await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Wiederherstellen: / })[0]);
+      await pick(0, 'Wiederherstellen');
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'restor');
       expect(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!).toBeDisabled();
       expect(api.restoreBackup).not.toHaveBeenCalled();
@@ -180,7 +193,7 @@ describe('BackupsComponent', () => {
 
     it('fires once the word matches, and warns that the session ends', async () => {
       const { api, toast } = await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Wiederherstellen: / })[0]);
+      await pick(0, 'Wiederherstellen');
       await userEvent.type(screen.getByLabelText(/RESTORE/i), 'RESTORE');
       await userEvent.click(screen.getAllByRole('button', { name: 'Wiederherstellen' }).at(-1)!);
       expect(api.restoreBackup).toHaveBeenCalledWith('b-1');
@@ -191,15 +204,17 @@ describe('BackupsComponent', () => {
   describe('delete', () => {
     it('deletes after the confirmation', async () => {
       const { api } = await setup();
-      await userEvent.click(screen.getAllByRole('button', { name: /^Löschen: / })[0]);
+      await pick(0, 'Löschen');
       await userEvent.click(screen.getAllByRole('button', { name: 'Löschen' }).at(-1)!);
       expect(api.deleteBackup).toHaveBeenCalledWith('b-1');
     });
 
     it('refuses a pinned archive in the UI, not only in the API', async () => {
       await setup();
-      // The second row is pinned, so its delete button is disabled.
-      expect(screen.getAllByRole('button', { name: /^Löschen: / })[1]).toBeDisabled();
+      // The second row is pinned, so its delete item is disabled.
+      await userEvent.click(screen.getAllByRole('button', { name: /^Aktionen: / })[1]);
+      const del = await screen.findByRole('menuitem', { name: 'Löschen' });
+      expect(del).toHaveAttribute('aria-disabled', 'true');
     });
   });
 

@@ -212,8 +212,8 @@ describe('WebhooksComponent', () => {
 
   it('renders a delete control that opens the confirm dialog', async () => {
     await setup(HOOKS);
-    const remove = screen.getByRole('button', { name: 'Entfernen: A' });
-    await userEvent.click(remove);
+    await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen: A' }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Entfernen' }));
     expect(screen.getByText(/„A“ wird mit seiner Zustellhistorie gelöscht/)).toBeInTheDocument();
   });
 

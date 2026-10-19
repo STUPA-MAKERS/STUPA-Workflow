@@ -3,9 +3,6 @@
 }
 
 .ns {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -44,11 +41,6 @@
 }
 .ns__head app-switch {
   flex: none;
-}
-.ns__title {
-  margin: 0;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
 }
 .ns__fields {
   display: grid;

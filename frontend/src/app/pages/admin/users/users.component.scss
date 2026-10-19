@@ -3,9 +3,6 @@
 }
 
 .au {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
   container-type: inline-size;
 }
 
@@ -67,12 +64,6 @@
   gap: var(--space-2);
   min-width: 0;
   font-weight: var(--fw-semibold);
-}
-.au__offTag {
-  flex: none;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-regular);
-  color: var(--color-text-muted);
 }
 /* An e-mail address wraps; it is never cut. */
 .au__mail {

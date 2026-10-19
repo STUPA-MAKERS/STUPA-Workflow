@@ -1,4 +1,4 @@
-<section class="al">
+<section class="al admin-page">
   <app-page-header [flush]="true" [title]="'admin.audit.title' | t" />
 
   <!-- The chain check: the newest stored result and "Jetzt prüfen". -->
@@ -71,7 +71,7 @@
             (click)="toggle(e.id)"
           >
             <time class="al__time mono" [attr.datetime]="e.at">{{ e.at | ldate: 'medium' }}</time>
-            <span class="al__action ell" [title]="actionLabel(e.action)">{{ actionLabel(e.action) }}</span>
+            <span class="al__action">{{ actionLabel(e.action) }}</span>
             <span class="al__actor ell" [title]="actorLabel(e)">{{ actorLabel(e) }}</span>
             <span class="al__target ell" [title]="targetText(e)">{{ targetText(e) }}</span>
             <app-icon class="al__chev" [name]="isOpen(e.id) ? 'up' : 'down'" [size]="16" />

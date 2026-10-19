@@ -1,4 +1,4 @@
-<section class="dl">
+<section class="dl admin-page">
   <app-page-header
     [flush]="true"
     [title]="'admin.deleg.title' | t"
@@ -6,7 +6,7 @@
 
   <section class="dl__section" aria-labelledby="dl-active-title">
     <header class="dl__head">
-      <h2 class="sec" id="dl-active-title">{{ 'admin.deleg.active' | t }}</h2>
+      <h2 class="section-title" id="dl-active-title">{{ 'admin.deleg.active' | t }}</h2>
       @if (!loading() && !loadError()) {
         <span class="dl__count">{{ active().length }}</span>
       }
@@ -45,15 +45,11 @@
                   }
                 </span>
                 <span class="dl__act">
-                  <app-button
-                    variant="danger"
-                    size="sm"
-                    [ariaLabel]="
-                      ('admin.deleg.revoke' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')
-                    "
-                    (click)="askRevoke(d)"
-                    >{{ 'admin.deleg.revoke' | t }}</app-button
-                  >
+                  <app-row-menu
+                    [sections]="rowMenu()"
+                    [label]="('ui.rowMenu.trigger' | t) + ': ' + who(d, 'from') + ' → ' + who(d, 'to')"
+                    (selected)="askRevoke(d)"
+                  />
                 </span>
               </li>
             }

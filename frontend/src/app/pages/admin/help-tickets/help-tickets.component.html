@@ -1,4 +1,4 @@
-<section class="ht">
+<section class="ht admin-page">
   <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
     @if (loadState() === 'ok' && !loading() && dirty()) {
       <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
@@ -12,14 +12,14 @@
          and the switch rows with their real labels. The bars show after 300ms. -->
     <div class="ht__form" aria-hidden="true">
       <section class="ht__sec">
-        <h2 class="sec ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+        <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
         <span class="ht__skelField">
           <span class="ht__skelFieldLabel">{{ 'admin.helpTickets.wikiUrl' | t }}</span>
           <span class="ht__skelFieldValue skel-in"><span class="skel-text"></span></span>
         </span>
       </section>
       <section class="ht__sec">
-        <h2 class="sec ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+        <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
         <div class="ht__rows">
           @for (key of skelSwitches; track key) {
             <div class="ht__row ht__row--split">
@@ -40,7 +40,7 @@
   } @else {
     <form class="ht__form" (submit)="$event.preventDefault(); save()">
       <section class="ht__sec" aria-labelledby="ht-wiki">
-        <h2 id="ht-wiki" class="sec ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+        <h2 id="ht-wiki" class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
         <app-input
           type="url"
           name="wikiUrl"
@@ -53,7 +53,7 @@
       </section>
 
       <section class="ht__sec" aria-labelledby="ht-reports">
-        <h2 id="ht-reports" class="sec ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+        <h2 id="ht-reports" class="section-title ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
         <div class="ht__rows">
           <app-switch
             class="ht__row"
@@ -87,7 +87,7 @@
 
   @if (canBlock()) {
     <section class="ht__sec" aria-labelledby="ht-blocked">
-      <h2 id="ht-blocked" class="sec ht__secTitle" tabindex="-1">{{ 'admin.helpTickets.blocked' | t }}</h2>
+      <h2 id="ht-blocked" class="section-title ht__secTitle" tabindex="-1">{{ 'admin.helpTickets.blocked' | t }}</h2>
       @if (blocked(); as list) {
         @if (blockedError()) {
           <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.error.blocked' | t }}</app-note>

@@ -1,4 +1,4 @@
-<section class="mt">
+<section class="mt admin-page">
   <app-page-header [flush]="true" [title]="'admin.mailTemplates.title' | t" />
 
   <div class="mt__layout">
@@ -26,7 +26,7 @@
           >
             <span class="mt__itemLabel">{{ keyLabel(tpl.key) }}</span>
             @if (tpl.source === 'override') {
-              <span class="mt__custom">{{ 'admin.mailTemplates.customized' | t }}</span>
+              <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
           </button>
         } @empty {
@@ -43,7 +43,7 @@
           <h2 class="mt__title" id="mt-title">{{ keyLabel(d.key) }}</h2>
           <span class="mt__headEnd">
             @if (d.source === 'override') {
-              <span class="mt__custom">{{ 'admin.mailTemplates.customized' | t }}</span>
+              <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
             <app-segmented width="equal" [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.mailTemplates.lang' | t" />
           </span>
@@ -74,7 +74,7 @@
 
         @if (placeholderList().length) {
           <div class="mt__block">
-            <h3 class="cap mt__cap">{{ 'admin.mailTemplates.placeholders' | t }}</h3>
+            <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.placeholders' | t }}</h3>
             <ul class="mt__chips">
               @for (p of placeholderList(); track p.key) {
                 <li><code class="mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
@@ -85,7 +85,7 @@
 
         @if (preview(); as pv) {
           <div class="mt__block">
-            <h3 class="cap mt__cap">{{ 'admin.mailTemplates.previewHeading' | t }} ({{ pv.lang | uppercase }})</h3>
+            <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.previewHeading' | t }} ({{ pv.lang | uppercase }})</h3>
             <div class="mt__preview">
               <p class="mt__previewSubj">{{ pv.subject }}</p>
               <p class="mt__previewText">{{ pv.text }}</p>

@@ -4,12 +4,6 @@
   display: block;
 }
 
-.bk {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
 .bk__cards {
   display: grid;
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
@@ -28,11 +22,6 @@
   padding: var(--space-5);
   border-radius: var(--radius-xl);
   background: var(--color-surface-2);
-}
-.bk__cardTitle {
-  margin: 0;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
 }
 .bk__disabledHint {
   margin: 0;
@@ -99,11 +88,6 @@
   display: block;
   font-size: var(--fs-sm);
   color: var(--color-danger);
-}
-.bk__actions {
-  display: inline-flex;
-  gap: 2px;
-  justify-content: flex-end;
 }
 
 .bk__restore {

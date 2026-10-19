@@ -3,16 +3,7 @@
 }
 
 .gmm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
   container-type: inline-size;
-}
-
-.gmm__total {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-  white-space: nowrap;
 }
 
 .gmm__noteLink {

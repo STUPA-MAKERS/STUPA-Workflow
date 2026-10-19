@@ -14,7 +14,7 @@ import { type DelegationSubstitute, DelegationsApiService } from '@core/api/dele
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent, SkeletonComponent } from '@shared/ui';
+import { AvatarComponent, RowMenuComponent, SkeletonComponent, type RowMenuSection } from '@shared/ui';
 import {
   ButtonComponent,
   DialogComponent,
@@ -66,6 +66,7 @@ const SEARCH_LIMIT = 8;
     ButtonComponent,
     DialogComponent,
     IconComponent,
+    RowMenuComponent,
     SelectFieldComponent,
     SkeletonComponent,
   ],
@@ -91,6 +92,10 @@ export class SubstitutePoolComponent {
   protected readonly removing = signal<ReadonlySet<string>>(new Set());
 
   // --- add dialog -------------------------------------------------------------
+  /** The ⋮ menu of a pool entry: remove is its only action. */
+  protected readonly rowMenu = computed<readonly RowMenuSection[]>(() => [
+    { items: [{ id: 'remove', label: this.i18n.translate('admin.substitutes.remove'), icon: 'trash', danger: true }] },
+  ]);
   protected readonly addOpen = signal(false);
   protected readonly candidates = signal<AdminPrincipal[]>([]);
   /**

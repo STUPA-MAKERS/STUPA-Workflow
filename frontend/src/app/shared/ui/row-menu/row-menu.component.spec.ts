@@ -460,6 +460,53 @@ describe('RowMenuComponent', () => {
     expect(screen.getByRole('menu').style.left).toBe('8px');
   });
 
+  describe('keeps the menu on the screen', () => {
+    const box = (left: number, width: number, top = 100, height = 40) => ({
+      top, bottom: top + height, left, right: left + width, width, height, x: left, y: top,
+      toJSON: () => ({}),
+    });
+
+    it('moves an end-aligned menu in from the start edge', async () => {
+      const { trigger, user } = await setup();
+      jest.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(box(20, 40));
+      const spy = jest
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(box(0, 240, 0, 200));
+      await user.click(trigger);
+      const menu = screen.getByRole('menu');
+      await waitFor(() => expect(menu.style.left).toBe('8px'));
+      expect(menu.style.right).toBe('');
+      spy.mockRestore();
+    });
+
+    it('moves a start-aligned menu in from the end edge', async () => {
+      const user = userEvent.setup();
+      await render(RowMenuComponent, { inputs: { align: 'start', sections: SECTIONS } });
+      const trigger = screen.getByRole('button', { name: 'Weitere Aktionen' });
+      const vw = window.innerWidth;
+      jest.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(box(vw - 50, 40));
+      const spy = jest
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(box(0, 240, 0, 200));
+      await user.click(trigger);
+      const menu = screen.getByRole('menu');
+      await waitFor(() => expect(menu.style.left).toBe(`${vw - 8 - 240}px`));
+      spy.mockRestore();
+    });
+
+    it('leaves a menu alone that fits', async () => {
+      const { trigger, user } = await setup();
+      jest.spyOn(trigger, 'getBoundingClientRect').mockReturnValue(box(900, 40));
+      const spy = jest
+        .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+        .mockReturnValue(box(0, 240, 0, 200));
+      await user.click(trigger);
+      await waitFor(() => expect(focusedName()).toBe('Prüfung beginnen'));
+      expect(screen.getByRole('menu').style.right).toBe(`${window.innerWidth - 940}px`);
+      spy.mockRestore();
+    });
+  });
+
   it('has no a11y violations, closed or open', async () => {
     const { trigger, user, view } = await setup();
     expect(await runAxe(view.container)).toHaveNoViolations();

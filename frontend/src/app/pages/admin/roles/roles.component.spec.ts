@@ -72,14 +72,24 @@ describe('AdminRolesComponent', () => {
     expect(inst.isLocked({ key: 'member' })).toBe(false);
   });
 
-  it('marks admin and member as fixed, without a delete button (N40)', async () => {
+  it('marks admin and member as fixed, without a delete menu (N40)', async () => {
     const { inst } = await setup();
     expect(inst.isFixed({ key: 'admin' })).toBe(true);
     expect(inst.isFixed({ key: 'member' })).toBe(true);
     expect(inst.isFixed({ key: 'referent' })).toBe(false);
     expect(screen.getAllByText('fest')).toHaveLength(2);
-    // Only the referent row has a delete button.
-    expect(screen.getAllByRole('button', { name: /^Rolle löschen/ })).toHaveLength(1);
+    // Only the referent row has a ⋮ menu, and delete is its one item.
+    const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
+    expect(menus).toHaveLength(1);
+    expect(menus[0]).toHaveAccessibleName('Weitere Aktionen: Referent');
+    await userEvent.click(menus[0]);
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rolle löschen' }));
+    expect(inst.confirmRole()).toEqual(ROLES[2]);
+  });
+
+  it('breaks a permission key only after a dot or an underscore', async () => {
+    const { inst } = await setup();
+    expect(inst.permParts('application.force_status')).toEqual(['application.', 'force_', 'status']);
   });
 
   it('opens and closes a row with its toggle', async () => {
@@ -112,7 +122,7 @@ describe('AdminRolesComponent', () => {
     for (const name of ['Anträge', 'Budget', 'Sitzungen und Abstimmungen', 'Verwaltung', 'Sicherheit und Daten', 'Weitere']) {
       expect(screen.getByRole('group', { name })).toBeInTheDocument();
     }
-    expect(within(screen.getByRole('group', { name: 'Weitere' })).getByText('x.new')).toBeInTheDocument();
+    expect(within(screen.getByRole('group', { name: 'Weitere' })).getByRole('checkbox', { name: 'x.new' })).toBeInTheDocument();
     expect(screen.queryByText('vote.cast')).toBeNull();
     expect(screen.getByRole('checkbox', { name: 'budget.view' })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: 'application.read' })).not.toBeChecked();
@@ -168,7 +178,7 @@ describe('AdminRolesComponent', () => {
     const { api } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Rolle anlegen' }));
     await userEvent.type(screen.getByRole('textbox', { name: /Schlüssel/ }), 'kultur');
-    await userEvent.click(screen.getByRole('button', { name: 'Hinzufügen' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Anlegen' }));
     expect(api.createRole).toHaveBeenCalledWith({ key: 'kultur', label: {}, permissions: [] });
   });
 

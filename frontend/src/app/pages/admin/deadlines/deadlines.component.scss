@@ -2,12 +2,6 @@
   display: block;
 }
 
-.dl {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-}
-
 .dl__name {
   display: block;
   font-weight: var(--fw-semibold);
