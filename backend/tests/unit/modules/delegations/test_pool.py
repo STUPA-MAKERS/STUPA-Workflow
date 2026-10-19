@@ -31,11 +31,11 @@ async def test_substitutes_for_reads_the_pool_table_only() -> None:
     assert "substitute_group" not in sql
 
 
-async def test_substitute_gremien_by_id_and_by_sub() -> None:
+async def test_substitute_gremien_by_sub_is_one_statement() -> None:
     g = uuid4()
-    db = fake_session(result(g), result(g))
-    assert await pool.substitute_gremien(db, uuid4()) == {g}
+    db = fake_session(result(g))
     assert await pool.substitute_gremien_for_sub(db, "sub-1") == {g}
-    assert "principal" in _sql(db.statements[1])
-    assert "substitute_group" not in _sql(db.statements[0])
-    assert len(db.statements) == 2
+    sql = _sql(db.statements[0])
+    assert "principal" in sql
+    assert "substitute_group" not in sql
+    assert len(db.statements) == 1

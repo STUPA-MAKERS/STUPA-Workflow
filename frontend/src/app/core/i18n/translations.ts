@@ -2030,7 +2030,6 @@ export const de = {
   'admin.flow.err.notifyRecipientInvalid': 'Ungültiger Empfänger in der Benachrichtigungs-Aktion.',
   'admin.flow.err.notifyRecipientValue': 'Der Empfänger „{kind}“ braucht einen Wert.',
   'admin.flow.loadFailed': 'Flow konnte nicht geladen werden (fehlende Berechtigung?).',
-  'admin.flow.preset': 'Vorlage',
   'admin.flow.addState': 'Status hinzufügen',
   'admin.flow.initial': 'Initial',
   'admin.flow.color': 'Farbe',
@@ -2197,8 +2196,6 @@ export const de = {
   'admin.flow.actionDesc.openVote':
     'Öffnet eine Abstimmung für den Antrag in der laufenden Sitzung.',
   'admin.flow.actionDesc.requeue': 'Legt den Antrag zur erneuten Bearbeitung/Wiedervorlage zurück.',
-  'admin.flow.preset.simple': 'Einfach: Entwurf → Eingereicht → Entschieden',
-  'admin.flow.preset.vote': 'Mit Abstimmung: Entwurf → Prüfung → Abstimmung → Entschieden',
   // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versionen',
   'admin.flow.versionsClose': 'Zurück zur Bearbeitung',

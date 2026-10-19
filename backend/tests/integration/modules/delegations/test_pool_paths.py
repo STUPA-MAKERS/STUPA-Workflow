@@ -21,7 +21,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.modules.admin.models import Gremium
 from app.modules.delegations.pool import (
-    substitute_gremien,
+    substitute_gremien_for_sub,
     substitutes_for,
 )
 from tests.integration.modules.delegations.conftest import (
@@ -110,11 +110,11 @@ async def test_personal_and_gremium_wide_entries(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
     gid = await gremium(maker)
-    _, mia = await member(maker, gid, "Mia")
+    mia_sub, mia = await member(maker, gid, "Mia")
     _, ben = await member(maker, gid, "Ben")
-    _, personal = await person(maker, "P")
-    _, wide = await person(maker, "W")
-    _, foreign = await person(maker, "F")
+    personal_sub, personal = await person(maker, "P")
+    wide_sub, wide = await person(maker, "W")
+    foreign_sub, foreign = await person(maker, "F")
     other = await gremium(maker)
     await pool_entry(maker, gid, personal, for_member=mia)
     await pool_entry(maker, gid, wide)
@@ -123,8 +123,8 @@ async def test_personal_and_gremium_wide_entries(
         assert await substitutes_for(session, gid, mia) == {personal, wide}
         # Ben has no personal entry: only the gremium-wide entry.
         assert await substitutes_for(session, gid, ben) == {wide}
-        assert await substitute_gremien(session, personal) == {gid}
-        assert await substitute_gremien(session, foreign) == {other}
-        assert await substitute_gremien(session, wide) == {gid}
+        assert await substitute_gremien_for_sub(session, personal_sub) == {gid}
+        assert await substitute_gremien_for_sub(session, foreign_sub) == {other}
+        assert await substitute_gremien_for_sub(session, wide_sub) == {gid}
         # A member gives no pool standing.
-        assert await substitute_gremien(session, mia) == set()
+        assert await substitute_gremien_for_sub(session, mia_sub) == set()

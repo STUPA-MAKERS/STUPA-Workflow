@@ -71,11 +71,6 @@ class _FakeService:
     ) -> SignedUrlOut:
         return SignedUrlOut(url=f"/api/attachments/{attachment_id}/download", expiresIn=300)
 
-    async def download_bytes(
-        self, attachment_id: UUID, *, allow_unconfirmed: bool = True
-    ) -> tuple[bytes, str, str]:
-        return b"PDF-BYTES", "doc.pdf", "application/pdf"
-
     async def download_stream(
         self, attachment_id: UUID, *, allow_unconfirmed: bool = True
     ) -> tuple[AsyncIterator[bytes], str, str, int]:

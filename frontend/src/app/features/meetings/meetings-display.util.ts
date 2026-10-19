@@ -11,7 +11,7 @@ import type {
   MeetingVote,
   SelfAttendanceStatus,
 } from '@core/api/models';
-import type { BadgeVariant, IconName } from '@stupa-makers/ui-kit';
+import type { BadgeVariant } from '@stupa-makers/ui-kit';
 import type { ServerMessage } from '@core/ws/ws-messages';
 
 /** Canonical ballot options. The pass/fail evaluation needs yes, no and abstain. */
@@ -21,14 +21,6 @@ export const FIXED_VOTE_OPTIONS = ['yes', 'no', 'abstain'] as const;
  * The status mappers return status variants only (coloured text). `neutral` is a tag
  * (a grey plate), so a status that has no colour of its own uses `info` (muted text).
  */
-export function meetingStatusVariant(status: Meeting['status']): BadgeVariant {
-  return status === 'live' ? 'success' : 'info';
-}
-
-export function meetingStatusKey(status: Meeting['status']): TranslationKey {
-  return `meetings.status.${status}` as TranslationKey;
-}
-
 export function voteStatusVariant(status: MeetingVote['status']): BadgeVariant {
   if (status === 'open') return 'success';
   if (status === 'closed') return 'info';
@@ -47,27 +39,6 @@ export function voteResultVariant(result: string | null | undefined): BadgeVaria
   return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'info';
 }
 
-export function attendanceKey(status: AttendanceStatus | 'unknown'): TranslationKey {
-  return `meetings.attendance.${status}` as TranslationKey;
-}
-
-export function attendanceButtonVariant(
-  status: AttendanceStatus,
-): 'primary' | 'secondary' | 'danger' {
-  return status === 'present' ? 'primary' : status === 'excused' ? 'secondary' : 'danger';
-}
-
-export function attendanceIcon(status: AttendanceStatus): IconName {
-  return status === 'present' ? 'check' : status === 'excused' ? 'half' : 'x';
-}
-
-export function attendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
-  return status === 'present' ? 'success' : status === 'excused' ? 'warning' : 'danger';
-}
-
-/** The statuses a member reports for the own record (Z2). Only the lead records `absent`. */
-export const SELF_ATTENDANCE_STATUSES: readonly SelfAttendanceStatus[] = ['present', 'excused'];
-
 /** The member labels: "Anwesend / Abwesend", where "Abwesend" is `excused` (Z2). */
 export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey {
   return status === 'present' ? 'meetings.attendance.selfPresent' : 'meetings.attendance.selfExcused';
@@ -80,11 +51,6 @@ export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey 
  */
 export function memberAttendanceKey(status: AttendanceStatus): TranslationKey {
   return selfAttendanceKey(status === 'present' ? 'present' : 'excused');
-}
-
-/** The badge colour that a member sees. `excused` and `absent` look the same (Z2). */
-export function memberAttendanceBadgeVariant(status: AttendanceStatus): BadgeVariant {
-  return status === 'present' ? 'success' : 'warning';
 }
 
 /**
@@ -188,12 +154,6 @@ export function shortTime(value: string | null | undefined): string {
   const raw = (value ?? '').trim();
   const match = /^([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d(?:\.\d+)?)?$/.exec(raw);
   return match ? `${match[1].padStart(2, '0')}:${match[2]}` : raw;
-}
-
-/** `", 18:00"` suffix behind a meeting date, or an empty string. */
-export function meetingTimeSuffix(value: string | null | undefined): string {
-  const time = shortTime(value);
-  return time ? `, ${time}` : '';
 }
 
 /** Placeholder vote for a live `vote_opened` that was not loaded yet (follower). */

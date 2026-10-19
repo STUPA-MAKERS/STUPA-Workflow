@@ -1987,7 +1987,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.err.notifyRecipientInvalid': 'Invalid recipient in the notify action.',
   'admin.flow.err.notifyRecipientValue': 'The recipient "{kind}" needs a value.',
   'admin.flow.loadFailed': 'Could not load flow (missing permission?).',
-  'admin.flow.preset': 'Template',
   'admin.flow.addState': 'Add state',
   'admin.flow.initial': 'Initial',
   'admin.flow.color': 'Color',
@@ -2150,8 +2149,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.actionDesc.budgetBook': 'Books the amount out of the cost centre for good.',
   'admin.flow.actionDesc.openVote': 'Opens a vote for the application in the running meeting.',
   'admin.flow.actionDesc.requeue': 'Puts the application back for re-processing / requeue.',
-  'admin.flow.preset.simple': 'Simple: Draft → Submitted → Decided',
-  'admin.flow.preset.vote': 'With vote: Draft → Review → Vote → Decided',
   // Flow editor (FE12b): header, toolbar, legend, colours, guard builder, versions.
   'admin.flow.versions': 'Versions',
   'admin.flow.versionsClose': 'Back to editing',

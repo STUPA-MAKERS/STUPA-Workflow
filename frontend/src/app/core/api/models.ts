@@ -1472,11 +1472,6 @@ export interface MeetingPatchBody {
   confirmEarly?: boolean;
 }
 
-/** Body for `PATCH /protocols/{id}`. It updates the markdown. */
-export interface ProtocolPatchBody {
-  markdown: string;
-}
-
 /** Body for `POST /protocols/{id}/votes`. It embeds votes. */
 export interface ProtocolVotesBody {
   voteIds: Uuid[];

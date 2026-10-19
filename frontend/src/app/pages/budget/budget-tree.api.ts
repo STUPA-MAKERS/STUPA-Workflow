@@ -282,12 +282,6 @@ export interface InvoiceFileResult {
   fileMime: string;
 }
 
-/** Minimal invoice choice for the booking dropdown. */
-export interface InvoiceOption {
-  id: Uuid;
-  label: string;
-}
-
 /** Filter and paging of the invoice list. The server does the fuzzy match and the filter. */
 export interface InvoiceQuery {
   /** The exact invoice, for a deep link such as a global-search hit. */
@@ -742,26 +736,5 @@ export function flattenBudgetOptions(nodes: BudgetTreeNode[]): { value: Uuid; la
     }
   };
   walk(nodes);
-  return out;
-}
-
-/** An indented tree row (for a tree picker without a real tree widget). */
-export interface BudgetTreeRow {
-  id: Uuid;
-  key: string;
-  name: string;
-  depth: number;
-}
-
-/** Tree (recursive) -> indented flat list (pre-order) with depth per node. */
-export function flattenBudgetTreeRows(nodes: BudgetTreeNode[]): BudgetTreeRow[] {
-  const out: BudgetTreeRow[] = [];
-  const walk = (ns: BudgetTreeNode[], depth: number): void => {
-    for (const n of ns) {
-      out.push({ id: n.id, key: n.key, name: n.name, depth });
-      if (n.children?.length) walk(n.children, depth + 1);
-    }
-  };
-  walk(nodes, 0);
   return out;
 }

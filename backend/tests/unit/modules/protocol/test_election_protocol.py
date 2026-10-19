@@ -17,7 +17,6 @@ from app.modules.protocol.markdown import (
     ElectionLine,
     ElectionSnippet,
     build_election_snippet,
-    replace_vote_block,
     replace_vote_blocks,
     votes_in_body,
 )
@@ -140,8 +139,9 @@ def test_build_snippet_without_candidates_and_nobody_elected() -> None:
 def test_replace_vote_block() -> None:
     body = "Text\n> [!abstimmung] **Q**\n> A: 3 · B: 1\n> Gewählt: A\nMehr"
     new = "> [!abstimmung] **Q**\n> Gewählt: A"
-    assert replace_vote_block(body, new) == "Text\n> [!abstimmung] **Q**\n> Gewählt: A\nMehr"
-    assert replace_vote_block("Nichts", new) == "Nichts"
+    pairs = [(new, new)]
+    assert replace_vote_blocks(body, pairs) == "Text\n> [!abstimmung] **Q**\n> Gewählt: A\nMehr"
+    assert replace_vote_blocks("Nichts", pairs) == "Nichts"
 
 
 ONE = "> [!abstimmung] **Q**\n> Wahl · 1 Posten\n> Gewählt: A"

@@ -1,30 +1,40 @@
 ---
 name: positions-field-shape
-description: "exact JSON shape for \"positions\"/Kostenaufstellung form fields when creating applications via MCP"
-metadata: 
+description: "Exact JSON shape of a positions (Kostenaufstellung) answer when you create an application through the MCP or the API"
+metadata:
   node_type: memory
   type: reference
 ---
 
-A form field of type `positions` carries the German label "Kostenaufstellung". When you create an application (MCP `create_application` or API), the value of such a field is an **array of position objects**. Each position:
+A form field of type `positions` carries the German label "Kostenaufstellung". When you create
+an application (MCP `create_application`, or `POST /api/applications`), the answer of such a
+field is an **array of position objects**:
 
 ```json
 {
   "label": "string (required, non-empty)",
   "offers": [
-    { "label": "string (req)", "value": 199.99, "preferred": true },
+    { "label": "string (required)", "value": 199.99, "preferred": true },
     { "label": "string", "value": 219.5, "preferred": false }
   ]
 }
 ```
 
-Rules (backend `backend/app/modules/forms/validation.py:399` `_validate_positions`):
-- Offer keys are `label` / `value` (number > 0, finite) / `preferred` — **NOT** `vendor`/`amount`/`quantity`. Wrong keys → `422: Invalid application data.`
-- **Exactly one** offer per position must have `preferred: true` (else "exactly one offer must be marked preferred").
-- `minOffers` default 3, `minPositions` default 1 (validation aliases minOffers/minPositions, `config_schemas.py:152`).
-- Promoted `amount` = sum of preferred offer values across positions (`positions_total`, no isPromoted flag needed).
-- Data key in payload = the form field's `key` (e.g. `kostenaufstellung`), not the literal `positions`.
+Rules (`_validate_positions` in `backend/app/modules/forms/validation.py`):
 
-422 errors come back as `application/problem+json` with `errors: [{field, msg}]` (e.g. `positions[0].offers[0]`).
+- The offer keys are `label` / `value` (a finite number > 0) / `preferred`, **NOT**
+  `vendor` / `amount` / `quantity`. Wrong keys give `422 Invalid application data.`
+- **Exactly one** offer per position has `preferred: true`.
+- At least `minPositions` positions (default 1) and `minOffers` offers per position
+  (default 3). The engine caps a field at 200 positions and 50 offers per position.
+- A position can skip the comparison offers with `"noOffers": true` and a non-empty
+  `"noOffersReason"`, when the field allows it (`allowNoOffers`, on by default). Such a
+  position needs exactly one offer.
+- The answer key is the form field's `key` (for example `kostenaufstellung`), not the literal
+  `positions`.
+- The promoted `amount` is the sum of the preferred offer values over all positions
+  (`positions_total`); no `isPromoted` flag is needed.
 
-We verified this on 2026-06-15 by creating the VSM "Testantrag" (type key `vsm`). Note: `create_application` is IP-rate-limited (`429: Too many application submissions from this IP`).
+A 422 comes back as `application/problem+json` with `errors: [{field, msg}]`, where `field` is
+for example `kostenaufstellung[0].offers[0]`. The public create is rate-limited per IP
+(`429 Too many application submissions from this IP`).

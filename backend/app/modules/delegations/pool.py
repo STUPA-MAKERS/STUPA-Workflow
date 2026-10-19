@@ -49,12 +49,6 @@ def _substitute_gremien_stmt(principal: UUID | ScalarSelect[UUID]) -> Select[UUI
     )
 
 
-async def substitute_gremien(session: AsyncSession, principal_id: UUID) -> set[UUID]:
-    """Return the gremien in which `principal_id` is a pool substitute."""
-    stmt = _substitute_gremien_stmt(principal_id)
-    return set((await session.execute(stmt)).scalars().all())
-
-
 async def substitute_gremien_for_sub(session: AsyncSession, sub: str) -> set[UUID]:
     """Return the gremien in which the principal with `sub` is a pool substitute.
 
