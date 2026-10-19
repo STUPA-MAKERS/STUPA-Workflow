@@ -1,0 +1,10 @@
+@use '../swatch';
+
+:host {
+  display: inline;
+}
+.ccl__mark {
+  @include swatch.mark(var(--ccl-size, 10px));
+  margin-inline-end: var(--ccl-gap, 6px);
+  vertical-align: 0;
+}

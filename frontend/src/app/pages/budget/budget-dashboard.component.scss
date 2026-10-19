@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'swatch';
 
 :host {
   display: flex;
@@ -109,43 +110,14 @@
   gap: var(--space-2);
   min-width: 0;
 }
+/* The path chip (the global `.chip`) shrinks with a long path: its text ends in an
+   ellipsis. */
 .bd__pathChip {
+  flex: 0 1 auto;
+  min-width: 0;
   max-width: 100%;
 }
 
-/* A chip: 32px, outlined; `--on` is the selected look. The year and the metric are a
-   native select inside the chip, so the keyboard and the phone picker work as usual. */
-.bd-chip {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  height: 2rem;
-  padding: 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: 0.84375rem;
-  font-weight: var(--fw-medium);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.bd-chip:hover {
-  background: var(--color-surface-2);
-}
-.bd-chip--on,
-.bd-chip--on:hover {
-  border-color: transparent;
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.bd-chip:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
 /* ------------------------------------------------------------------ fades
    An end of a scrolling list fades only when there is more content past it
    (`appScrollFade` sets the classes). The tree and the wide sheet share the mask. */
@@ -262,10 +234,7 @@ button.tn__chev:hover:not(:disabled) {
   min-width: 0;
 }
 .tn__swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  @include swatch.mark($radius: 3px);
 }
 .tn__name {
   flex: 1 1 0;

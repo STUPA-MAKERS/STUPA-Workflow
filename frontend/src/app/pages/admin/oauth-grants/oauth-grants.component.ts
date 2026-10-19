@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { Uuid } from '@core/api/models';
+import { errorStatus } from '@core/api/problem';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
@@ -17,6 +18,7 @@ import { ButtonComponent, ToastService } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AdminPrincipal, OAuthGrantAdmin } from '../admin.models';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { personLabel } from '@shared/person-label.util';
 
 /* A token usually carries every scope. Showing all of them wrapped each row over three
    lines and set the height of the whole table, so the rest are counted instead. */
@@ -24,15 +26,6 @@ const MAX_VISIBLE_SCOPES = 3;
 
 /** Rows per page. The backend caps `limit` at 200 and defaults to 50. */
 const PAGE_SIZE = 25;
-
-/** HTTP status of a failed request, or 0 when the error carries none. */
-function errorStatus(err: unknown): number {
-  if (typeof err === 'object' && err !== null && 'status' in err) {
-    const status = Number((err as { status: unknown }).status);
-    return Number.isFinite(status) ? status : 0;
-  }
-  return 0;
-}
 
 /**
  * Agent access (OAuth grants) of EVERY principal, with a kill switch (boards
@@ -100,7 +93,7 @@ export class AdminOAuthGrantsComponent {
     return [
       { value: '', label: all, person: { name: all, icon: 'users' } },
       ...this.principals().map((p) => {
-        const label = p.displayName || p.email || this.i18n.translate('admin.oauthGrants.unknownOwner');
+        const label = personLabel(p, this.i18n, { fallback: 'admin.oauthGrants.unknownOwner' });
         return { value: p.id, label, person: { name: label, principalId: p.id } };
       }),
     ];

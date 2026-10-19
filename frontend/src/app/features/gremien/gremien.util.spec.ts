@@ -2,19 +2,12 @@ import type { GremiumAttendanceMonth, GremiumAttendanceRow } from '@core/api/gre
 import {
   cellStrength,
   cellView,
-  clock,
-  dayMonth,
-  euro,
   fileSlug,
-  fullDate,
-  isoDay,
   localized,
   monthAverages,
   monthDate,
   monthKey,
-  monthLabel,
   oneDecimal,
-  parseDay,
   personName,
   presetRange,
   rangeLabel,
@@ -24,7 +17,6 @@ import {
   shiftMonth,
   sortRows,
   toCsv,
-  weekdayDay,
 } from './gremien.util';
 
 const MONTHS: GremiumAttendanceMonth[] = [
@@ -72,9 +64,6 @@ describe('gremien.util', () => {
   });
 
   it('names months and ranges', () => {
-    expect(monthLabel('2026-10', 'de')).toBe('Okt');
-    expect(monthLabel('2026-10', 'de', 'long')).toBe('Oktober 2026');
-    expect(monthLabel('2026-10', 'en')).toBe('Oct');
     expect(rangeLabel('2026-05', '2026-10', 'de')).toBe('Mai – Okt 2026');
     expect(rangeLabel('2025-11', '2026-04', 'de')).toBe('Nov 2025 – Apr 2026');
     expect(rangeLabel('2026-10', '2026-10', 'de')).toBe('Okt 2026');
@@ -153,32 +142,6 @@ describe('gremien.util', () => {
     expect(monthAverages(rows, MONTHS.slice(0, 2)).months).toEqual([null, 1.5]);
     expect(oneDecimal(27, 'de')).toBe('27,0');
     expect(oneDecimal(2.25, 'en')).toBe('2.3');
-  });
-
-  it('reads and writes days', () => {
-    expect(parseDay(null)).toBeNull();
-    expect(parseDay('nope')).toBeNull();
-    expect(parseDay('2026-10-20')?.getDate()).toBe(20);
-    expect(parseDay('2026-10-20T10:00:00Z')).not.toBeNull();
-    expect(dayMonth('2026-10-20', 'de')).toBe('20.10.');
-    expect(dayMonth(null, 'de')).toBe('');
-    expect(weekdayDay('2026-10-20', 'de')).toBe('Di, 20.10.');
-    expect(weekdayDay('', 'de')).toBe('');
-    expect(weekdayDay('2026-10-20', 'de', true)).toBe('Di, 20.10.2026');
-    expect(fullDate('2025-10-01', 'de')).toBe('01.10.2025');
-    expect(fullDate(undefined, 'de')).toBe('');
-    expect(clock('18:00:00')).toBe('18:00');
-    expect(clock(null)).toBe('');
-    expect(isoDay(new Date(2026, 0, 5))).toBe('2026-01-05');
-  });
-
-  it('formats an amount in euro', () => {
-    const plain = (v: string) => v.replace(/\s/g, ' ');
-    expect(plain(euro('2890.00', 'de'))).toBe('2.890,00 €');
-    expect(euro(12, 'en')).toBe('€12.00');
-    expect(euro(null, 'de')).toBe('');
-    expect(euro('', 'de')).toBe('');
-    expect(euro('abc', 'de')).toBe('');
   });
 
   it('writes a CSV for a spreadsheet', () => {

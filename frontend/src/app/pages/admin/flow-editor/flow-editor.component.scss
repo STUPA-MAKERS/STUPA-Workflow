@@ -1,7 +1,7 @@
 // Flow editor (board Admin-Flow-Editor): the canvas sheet with its toolbar and legend,
 // and the inspector beside it.
 @use 'breakpoints' as bp;
-@use '../../../features/meetings/scroll-fade' as fade;
+@use '../../../shared/ui/scroll-fade' as fade;
 
 :host {
   display: flex;

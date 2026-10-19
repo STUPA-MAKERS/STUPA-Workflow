@@ -13,7 +13,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
   ConfigDiffComponent,
-  DialogComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -23,6 +22,7 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * Version sidebar for the immutable config snapshots of an entity.
@@ -46,7 +46,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
     LocalizedDatePipe,
     ButtonComponent,
     ConfigDiffComponent,
-    DialogComponent,
+    ConfirmDialogComponent,
     IconComponent,
   ],
   templateUrl: './version-history.component.html',

@@ -49,12 +49,13 @@ import {
   type MeetingsView,
   overviewGroups,
   topsLabel,
-  weekdayShort,
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
-import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
 import { beamerUrl } from '../../voting/beamer-link.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
+import { weekdayName } from '@shared/date-format';
 
 /**
  * The list view of the meeting overview (`/meetings`, board Sitzungen, variant A): a
@@ -76,6 +77,8 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MeetingsViewActionsComponent,
+    RowChevronComponent,
     PageHeaderComponent,
     NgTemplateOutlet,
     TranslatePipe,
@@ -94,7 +97,6 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
     StickyBarComponent,
     ScrollFadeDirective,
     MeetingDetailSheetComponent,
-    MeetingsViewSwitchComponent,
     CalendarSubscribeComponent,
   ],
   templateUrl: './meetings-list.component.html',
@@ -171,14 +173,6 @@ export class MeetingsListComponent {
   );
 
   /** The filter offers a choice only when the user reads more than one Gremium. */
-  readonly showFilter = computed(() => this.timeline.filterGremien().length > 1);
-  readonly filterLabel = computed(() => {
-    const options = this.timeline.filterGremiumOptions();
-    const value = this.timeline.gremiumFilter();
-    // An unknown value (a Gremium that left the list) reads as "Alle Gremien".
-    return options.find((o) => o.value === value)?.label ?? options[0].label;
-  });
-
   /** The ⋮ menu of the phone header: the calendar subscription. */
   readonly phoneMenu = computed<RowMenuSection[]>(() => [
     {
@@ -314,7 +308,7 @@ export class MeetingsListComponent {
     if (t.since) return this.i18n.translate('meetings.list.since', { time: t.text });
     const start = t.text.split('–')[0];
     if (!m.date) return start;
-    const weekday = weekdayShort(m.date, this.i18n.locale());
+    const weekday = weekdayName(m.date, this.i18n.formatLocale());
     return start ? `${weekday}, ${start}` : weekday;
   }
 

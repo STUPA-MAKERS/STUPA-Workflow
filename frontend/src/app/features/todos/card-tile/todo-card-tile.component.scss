@@ -1,7 +1,3 @@
-@use '../todo-labels' as lbl;
-
-@include lbl.colors;
-
 /* A tile a step above its column: white on the grey column in the light theme, surface 3
    on the surface 1 column in the dark theme. `--stack-ring` gives the avatar rings the
    colour of the tile. */
@@ -46,14 +42,6 @@
   margin: 0;
   font-size: 0.75rem;
   color: var(--color-text-muted);
-}
-.tt__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.tt__dot {
-  @include lbl.dot;
 }
 
 .tt__title {
@@ -144,14 +132,6 @@
 .tt__fact--muted {
   color: var(--color-text-subtle);
 }
-.tt__fact--overdue {
-  color: var(--color-danger);
-  font-weight: var(--fw-semibold);
-}
-.tt__fact--soon {
-  color: var(--color-warning);
-  font-weight: var(--fw-semibold);
-}
 .tt__people {
   display: inline-flex;
   margin-inline-start: auto;
@@ -161,13 +141,4 @@
   width: 1.5rem;
   height: 1.5rem;
   font-size: 0.625rem;
-}
-.tt__nobody {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
-  color: var(--color-text-subtle);
 }

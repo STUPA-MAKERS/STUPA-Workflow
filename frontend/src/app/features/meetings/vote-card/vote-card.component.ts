@@ -13,7 +13,6 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MeetingStatus, MeetingVote, MyBallot, Uuid, Vote } from '@core/api/models';
 import { ButtonComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
 import {
@@ -23,14 +22,15 @@ import {
 } from '../../voting/ballot/ballot.component';
 import { ElectionResultComponent } from '../../voting/election-result/election-result.component';
 import { electionCaption, electionOf, electionStatus } from '../../voting/election.util';
+import { VoteProgressComponent } from '../../voting/vote-progress/vote-progress.component';
 import {
   countEntries,
-  errorDetail,
   guestComposition,
   voteMetaLine,
   voteOptionLabel,
   voteOptionsFor,
 } from '../meetings-display.util';
+import { problemDetail } from '@core/api/problem';
 
 /**
  * One vote of the open agenda item, as a card beside the sheet.
@@ -60,7 +60,7 @@ import {
     ButtonComponent,
     ElectionResultComponent,
     IconComponent,
-    SegBarComponent,
+    VoteProgressComponent,
     StatusTextComponent,
   ],
   templateUrl: './vote-card.component.html',
@@ -119,7 +119,7 @@ export class VoteCardComponent {
   protected readonly notCast: MyBallot = { cast: false, choice: null };
 
   protected onBallotFailed(failure: BallotFailure): void {
-    const detail = failure.alreadyVoted ? '' : errorDetail(failure.error);
+    const detail = failure.alreadyVoted ? '' : problemDetail(failure.error);
     const base = this.i18n.translate(
       failure.alreadyVoted ? 'voting.cast.toast.alreadyVoted' : 'meetings.toast.actionFailed',
     );
@@ -163,16 +163,6 @@ export class VoteCardComponent {
     };
   });
 
-  protected readonly percent = computed(() => {
-    const v = this.vote();
-    return v.present > 0 ? Math.min(100, Math.round((v.voted / v.present) * 100)) : 0;
-  });
-
-  protected readonly progressLabel = computed(() => {
-    const v = this.vote();
-    return this.i18n.translate('meetings.vote.progress', { voted: v.voted, present: v.present });
-  });
-
   /** The counts are visible: after the close, or once every present member voted. */
   protected readonly showCounts = computed(() => {
     const v = this.vote();
@@ -185,11 +175,6 @@ export class VoteCardComponent {
   /** The own ballot is in: from this session or from the server. */
   protected readonly hasVoted = computed(
     () => this.myChoice() !== null || this.vote().myBallot?.cast === true,
-  );
-
-  /** The hint below an open vote whose counts are still hidden. */
-  protected readonly hiddenKey = computed<TranslationKey>(() =>
-    this.vote().secret ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
   );
 
   /** Plan, cancel and delete: only while the meeting is planned or live (O24). */

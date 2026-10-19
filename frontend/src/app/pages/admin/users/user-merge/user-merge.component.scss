@@ -22,34 +22,12 @@
   padding: 0;
   list-style: none;
 }
-
-/* The whole row is the button: a click anywhere on it picks the account. */
-.um__hit {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 3.5rem;
-  padding: var(--space-3) var(--space-4);
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
+.um__hits {
+  --li-hover: var(--color-selected);
 }
-.um__hit:hover {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.um__hit:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.um__hit app-icon {
-  pointer-events: none;
+/* The row clips the hover surface of its list item to the corners of the row group. */
+.um__hits > li {
+  overflow: hidden;
 }
 
 .um__hitWho {
@@ -82,10 +60,8 @@
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-.um__hit:hover .um__mail,
-.um__hit:hover .um__hitLogin,
-.um__hit:hover .um__tag {
-  color: inherit;
+.um__hitLogin--sub {
+  display: none;
 }
 .um__chev {
   color: var(--color-text-muted);
@@ -216,15 +192,10 @@
     justify-self: center;
     transform: rotate(90deg);
   }
-  .um__hit {
-    grid-template-columns: auto minmax(0, 1fr) auto;
+  .um__hitLogin--sub {
+    display: block;
   }
-  .um__hitLogin {
-    grid-column: 2;
-    grid-row: 2;
-  }
-  .um__chev {
-    grid-column: 3;
-    grid-row: 1 / span 2;
+  .um__hitLogin--trail {
+    display: none;
   }
 }

@@ -25,6 +25,9 @@ import { formatBytes } from '@shared/format-bytes';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import type { Invoice, InvoiceStatus } from '../../budget/budget-tree.api';
 import type { FinanceFormLayout } from '../../expenses/booking-form/booking-form.component';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 
 /** What the import found: `parsed` (ZUGFeRD read), `manual` (no ZUGFeRD), or nothing. */
 export type InvoiceImportNotice = 'parsed' | 'manual' | null;
@@ -104,6 +107,9 @@ export interface InvoiceFormHost {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
+    NoteComponent,
     ButtonComponent,
     CurrencyInputComponent,
     DatepickerComponent,

@@ -6,21 +6,17 @@ import {
   attendanceCounts,
   byStart,
   gridRange,
-  isoDay,
   matchesQuery,
   meetingsByDay,
   monthGrid,
-  monthLabel,
   monthOf,
   openVoteOf,
   overviewGroups,
-  parseDay,
   readStoredView,
   shiftMonth,
   storeView,
   topsLabel,
   weekdayNames,
-  weekdayShort,
 } from './meetings-overview.util';
 
 function meeting(id: string, over: Partial<Meeting> = {}): Meeting {
@@ -107,16 +103,12 @@ describe('meetings-overview.util', () => {
     it('moves months across the year', () => {
       expect(shiftMonth({ year: 2026, month: 11 }, 1)).toEqual({ year: 2027, month: 0 });
       expect(shiftMonth({ year: 2026, month: 0 }, -1)).toEqual({ year: 2025, month: 11 });
-      expect(monthOf(parseDay('2026-10-13'))).toEqual({ year: 2026, month: 9 });
-      expect(isoDay(new Date(2026, 0, 5))).toBe('2026-01-05');
+      expect(monthOf(new Date(2026, 9, 13))).toEqual({ year: 2026, month: 9 });
     });
 
-    it('names the month and the weekdays', () => {
-      expect(monthLabel({ year: 2026, month: 9 }, 'de')).toBe('Oktober 2026');
-      expect(monthLabel({ year: 2026, month: 9 }, 'en')).toBe('October 2026');
-      expect(weekdayNames('de')).toEqual(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']);
-      expect(weekdayNames('en')[0]).toBe('Mon');
-      expect(weekdayShort('2026-10-13', 'de')).toBe('Di');
+    it('names the weekdays', () => {
+      expect(weekdayNames('de-DE')).toEqual(['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']);
+      expect(weekdayNames('en-GB')[0]).toBe('Mon');
     });
   });
 

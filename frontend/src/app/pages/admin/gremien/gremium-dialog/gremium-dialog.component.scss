@@ -1,6 +1,6 @@
-:host {
-  display: contents;
-}
+@use '../../../../shared/ui/dialog-form' as df;
+
+@include df.host;
 
 .gd {
   display: flex;
@@ -94,11 +94,6 @@
 }
 .gd__mailInput::placeholder {
   color: var(--color-text-muted);
-}
-
-.gd__error {
-  margin: 0;
-  color: var(--color-danger);
 }
 
 .gd__foot {

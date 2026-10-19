@@ -10,6 +10,9 @@ import {
   IconComponent,
   InputComponent,
 } from '@stupa-makers/ui-kit';
+import { formatMoney } from '@shared/format-money';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
@@ -18,7 +21,6 @@ import {
   costCentreFigures,
   costCentreLabel,
   findBudgetNode,
-  formatEur,
 } from '../../budget/expense-display.util';
 import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -53,6 +55,8 @@ interface LegFree {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PaneFormHeadComponent,
+    PaneFormFootComponent,
     ButtonComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
@@ -134,7 +138,7 @@ export class TransferFormComponent {
   }
 
   money(value: number): string {
-    return formatEur(value, this.i18n.locale());
+    return formatMoney(value, this.i18n.formatLocale());
   }
 
   close(): void {

@@ -1,6 +1,6 @@
 @let m = meeting();
 <article class="ms" [class.ms--split]="split()" aria-labelledby="ms-title">
-  <header class="ms__head">
+  <header class="sheet-head ms__head">
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="ms-title" class="sheet-title ms__title">{{ m.title }}</h2>
       @if (m.canManage && !phone()) {

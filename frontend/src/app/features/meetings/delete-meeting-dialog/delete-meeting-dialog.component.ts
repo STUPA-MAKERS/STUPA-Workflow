@@ -15,7 +15,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { errorCode, errorDetail } from '../meetings-display.util';
+import { problemCode, problemDetail } from '@core/api/problem';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
@@ -108,11 +108,11 @@ export class DeleteMeetingDialogComponent {
       },
       error: (err: unknown) => {
         this.deleting.set(false);
-        if (errorCode(err) === 'open_vote') {
+        if (problemCode(err) === 'open_vote') {
           this.toast.error(this.i18n.translate('meetings.toast.closeOpenVote'));
           return;
         }
-        const detail = errorDetail(err);
+        const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);
       },

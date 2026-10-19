@@ -14,9 +14,7 @@
     [value]="role()"
     (valueChange)="role.set($event)"
     [text]="roleText()"
-    [active]="role() !== ''"
-    [icon]="role() ? 'check' : null"
-    [chevron]="!role()"
+    filled
   />
   @if (!phone()) {
     <app-filter-select
@@ -74,7 +72,7 @@
           <span class="gat__cardHead">
             <span class="gat__cardName">{{ m.name }}</span>
             <span class="mono gat__cardSum">{{ m.totals.present }}/{{ m.totals.held }}</span>
-            <app-icon class="gat__chev" name="right" [size]="16" />
+            <app-row-chevron [size]="16" />
           </span>
           <span class="gat__cardCells">
             @for (c of m.cells; track c.month) {

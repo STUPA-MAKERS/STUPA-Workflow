@@ -2,16 +2,15 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  inject,
   input,
   output,
   signal,
 } from '@angular/core';
-import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import type { BudgetTreeNode } from './budget-tree.api';
 import { nodeColors } from './budget-color.util';
+import { MoneyPipe } from '@shared/pipes/money.pipe';
 
 /** Overview metrics (tab selector in the overlay). */
 export type SunburstMetric = 'allocated' | 'available' | 'expended';
@@ -51,11 +50,10 @@ const R_MAX = SIZE / 2 - 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './budget-sunburst.component.html',
-  imports: [TranslatePipe, SimplifyPathPipe],
+  imports: [TranslatePipe, SimplifyPathPipe, MoneyPipe],
   styleUrl: './budget-sunburst.component.scss',
 })
 export class BudgetSunburstComponent {
-  private readonly i18n = inject(I18nService);
 
   readonly root = input<BudgetTreeNode | null>(null);
   readonly fyId = input<string>('');
@@ -145,13 +143,6 @@ export class BudgetSunburstComponent {
     this.tip.set({ x: event.clientX - host.left + 14, y: event.clientY - host.top + 14 });
   }
 
-  protected money(value: number): string {
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0,
-    }).format(value);
-  }
 }
 
 /** SVG path of an annular segment between two angles and two radii. */

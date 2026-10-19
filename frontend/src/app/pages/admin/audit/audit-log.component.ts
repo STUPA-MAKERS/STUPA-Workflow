@@ -24,7 +24,7 @@ import {
 } from '@shared/ui';
 import {
   ButtonComponent,
-  DialogComponent,
+  ConfigDiffComponent,
   IconComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -37,7 +37,9 @@ import type {
   ConfigRevisionDiff,
 } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { expandSet } from '@shared/expand-set';
 
 const PAGE_SIZE = 50;
 
@@ -212,18 +214,6 @@ export interface AuditDataRow {
   known: boolean;
 }
 
-/** One changed field of a config diff: the old value (`-`) and the new value (`+`). */
-export interface AuditDiffLine {
-  key: string;
-  before: string | null;
-  after: string | null;
-}
-
-/** A diff value as code: a string in quotes, any other value as JSON. */
-function diffValue(v: unknown): string {
-  return v === undefined ? 'null' : JSON.stringify(v);
-}
-
 /** The state of the chain check at the top of the page. */
 type VerifyState =
   | { status: 'loading' }
@@ -258,7 +248,8 @@ type VerifyState =
     TranslatePipe,
     LocalizedDatePipe,
     ButtonComponent,
-    DialogComponent,
+    ConfigDiffComponent,
+    ConfirmDialogComponent,
     IconComponent,
     FilterSelectComponent,
     PageHeaderComponent,
@@ -281,7 +272,7 @@ export class AuditLogComponent {
   protected readonly loading = signal(false);
   protected readonly loadError = signal(false);
   /** Ids of the expanded entries. Their detail area is visible. */
-  protected readonly open = signal<ReadonlySet<number>>(new Set());
+  protected readonly open = expandSet<number>();
 
   /** The `audit.revert` permission as a front-end gate. The backend stays authoritative. The
    *  value is reactive because the principal loads asynchronously. */
@@ -440,17 +431,11 @@ export class AuditLogComponent {
   }
 
   protected isOpen(id: number): boolean {
-    return this.open().has(id);
+    return this.open.has(id);
   }
 
   protected toggle(id: number): void {
-    this.open.update((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    if (this.isOpen(id)) {
+    if (this.open.toggle(id)) {
       const entry = this.entries().find((e) => e.id === id);
       if (entry) this.loadDiff(entry);
     }
@@ -544,7 +529,7 @@ export class AuditLogComponent {
     this.entries.set([]);
     this.cursor.set(null);
     this.hasMore.set(false);
-    this.open.set(new Set());
+    this.open.clear();
     this.load(true);
   }
 
@@ -639,17 +624,6 @@ export class AuditLogComponent {
           ? { key, label: this.i18n.translate(labelKey), value: fmt(v), known: true }
           : { key, label: key, value: fmt(v), known: false };
       });
-  }
-
-  /** The changed fields of a config diff, in the order changed, added, removed. */
-  protected diffLines(d: ConfigRevisionDiff): AuditDiffLine[] {
-    const diff = d.diff;
-    if (!diff) return [];
-    return [
-      ...diff.changed.map((c) => ({ key: c.key, before: diffValue(c.old), after: diffValue(c.new) })),
-      ...diff.added.map((a) => ({ key: a.key, before: null, after: diffValue(a.value) })),
-      ...diff.removed.map((r) => ({ key: r.key, before: diffValue(r.value), after: null })),
-    ];
   }
 }
 

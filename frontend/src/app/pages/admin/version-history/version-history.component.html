@@ -59,17 +59,13 @@
   }
 </section>
 
-<app-dialog
-  [open]="!!confirmRestore()"
+@let restoreRev = confirmRestore();
+<app-confirm-dialog
+  [open]="!!restoreRev"
   [title]="'admin.config.restore.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmRestore.set(null)"
->
-  @if (confirmRestore(); as rev) {
-    <p class="vh__confirm">{{ 'admin.config.restore.confirm' | t: { version: rev.version } }}</p>
-  }
-  <div dialog-footer class="vh__foot">
-    <app-button variant="text" (click)="confirmRestore.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="doRestore()">{{ 'admin.config.history.restore' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="restoreRev ? ('admin.config.restore.confirm' | t: { version: restoreRev.version }) : ''"
+  [confirmLabel]="'admin.config.history.restore' | t"
+  [danger]="false"
+  (confirm)="doRestore()"
+  (cancel)="confirmRestore.set(null)"
+/>

@@ -1,17 +1,15 @@
 @let m = meeting();
 @let top = shownTop();
 
-<header class="fv__head">
-  <app-button class="fv__back" variant="text" [iconOnly]="true" [ariaLabel]="'meetings.page.back' | t" (click)="back.emit()">
-    <app-icon name="back" />
-  </app-button>
-  <div class="fv__titles">
-    <div class="fv__titleLine">
-      <h1 class="fv__title" [title]="m.title">{{ m.title }}</h1>
-      <app-status-text class="fv__status" [kind]="status().kind">{{ status().key | t }}</app-status-text>
-    </div>
-    <span class="fv__sub">{{ phone() ? phoneSubLine() : subLine() }}</span>
-  </div>
+<header
+  appMeetingHead
+  class="fv__head"
+  [heading]="m.title"
+  [statusKind]="status().kind"
+  [statusText]="status().key | t"
+  [sub]="phone() ? phoneSubLine() : subLine()"
+  (back)="back.emit()"
+>
   @if (!wide()) {
     @if (phone()) {
       <app-button variant="text" [iconOnly]="true" [ariaLabel]="'meetings.dock.agenda' | t" (click)="agendaOpen.set(true)">

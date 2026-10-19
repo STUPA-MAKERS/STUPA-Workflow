@@ -24,6 +24,7 @@ import type { BallotCaster } from '../voting/ballot/ballot.component';
 import { VotePanelComponent } from '../voting/vote-panel/vote-panel.component';
 import { guestVoteToVote } from './guest-vote.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { TopBadgeComponent } from '../meetings/top-badge/top-badge.component';
 
 /** One agenda row of the guest view. */
 interface AgendaRow {
@@ -49,6 +50,7 @@ interface AgendaRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TopBadgeComponent,
     EmptyStateComponent,
     TranslatePipe,
     ButtonComponent,

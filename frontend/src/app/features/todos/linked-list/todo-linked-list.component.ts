@@ -1,13 +1,15 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { TodosApiService, type TodoLinkKind, type TodoLinkedCard } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
+import type { Translate } from '@core/i18n/translations';
+import { dayMonth } from '@shared/date-format';
+import { AvatarStackComponent, type AvatarSize } from '@shared/ui/avatar/avatar.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
-import { personName, type Translate } from '../todos.util';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
+import { personName } from '@shared/person-label.util';
 
 /**
  * The back-reference "To-Dos" of an object (an application, an agenda item, a vote, an
@@ -16,6 +18,9 @@ import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
  * column, the due date and the people. A row opens the card on its board.
  *
  * Nothing linked, or the read fails: the component shows nothing.
+ *
+ * A page that needs the cards itself (the ticket page counts the open ones) passes them
+ * as `items`; the list then reads nothing.
  */
 @Component({
   selector: 'app-todo-linked-list',
@@ -41,14 +46,19 @@ export class TodoLinkedListComponent {
    * under the TOP title; the section keeps the name for the screen reader.
    */
   readonly showTitle = input(true);
+  /** The cards to show, read by the page. `null` reads them here. */
+  readonly items = input<readonly TodoLinkedCard[] | null>(null);
+  readonly avatarSize = input<AvatarSize>('sm');
 
-  readonly cards = signal<TodoLinkedCard[]>([]);
+  private readonly loaded = signal<readonly TodoLinkedCard[]>([]);
+  readonly cards = computed(() => this.items() ?? this.loaded());
   private seq = 0;
 
   constructor() {
     effect(() => {
       const kind = this.kind();
       const id = this.targetId();
+      if (this.items() !== null) return;
       untracked(() => this.load(kind, id, false));
     });
     // A card linked to this target elsewhere on the page: read again, keeping the list shown.
@@ -57,6 +67,7 @@ export class TodoLinkedListComponent {
       const change = this.refresh.last();
       if (!change || change === seen) return;
       untracked(() => {
+        if (this.items() !== null) return;
         if (change.keys.has(linkedKey(this.kind(), this.targetId()))) this.load(this.kind(), this.targetId(), true);
       });
     });
@@ -64,10 +75,10 @@ export class TodoLinkedListComponent {
 
   private load(kind: Exclude<TodoLinkKind, 'todo'>, id: Uuid, keep: boolean): void {
     const seq = ++this.seq;
-    if (!keep) this.cards.set([]);
+    if (!keep) this.loaded.set([]);
     this.api.linked(kind, id).subscribe({
       next: (cards) => {
-        if (seq === this.seq) this.cards.set(cards);
+        if (seq === this.seq) this.loaded.set(cards);
       },
       error: () => undefined,
     });
@@ -75,7 +86,7 @@ export class TodoLinkedListComponent {
 
   sub(card: TodoLinkedCard): string {
     const parts = [card.boardName, card.columnName];
-    if (card.dueDate) parts.push(this.t('todos.linked.due', { date: this.shortDate(card.dueDate) }));
+    if (card.dueDate) parts.push(this.t('todos.linked.due', { date: dayMonth(card.dueDate, this.i18n.formatLocale()) }));
     return parts.join(' · ');
   }
 
@@ -85,13 +96,5 @@ export class TodoLinkedListComponent {
 
   ids(card: TodoLinkedCard): (string | null)[] {
     return card.assignees.map((a) => a.principalId);
-  }
-
-  /** `YYYY-MM-DD` as "17.10.". */
-  private shortDate(date: string): string {
-    const [y, m, d] = date.split('-').map(Number);
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), { day: '2-digit', month: '2-digit' }).format(
-      new Date(y, m - 1, d),
-    );
   }
 }

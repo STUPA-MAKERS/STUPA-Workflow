@@ -34,11 +34,13 @@ import {
   ToastService,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
-import { errorDetail, resolveI18n } from '../meetings-display.util';
+import { resolveI18n } from '@shared/forms/i18n-text';
+import { problemDetail } from '@core/api/problem';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { cardsOf, isoDay, shortDay, sortedColumns } from '../../todos/todos.util';
+import { cardsOf, sortedColumns } from '../../todos/todos.util';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { isoDay, shortDay } from '@shared/date-format';
 
 /** What the new agenda item is: an application of the Gremium, a to-do, or a free text. */
 export type AgendaItemKind = 'application' | 'todo' | 'freetext';
@@ -271,7 +273,7 @@ export class AgendaItemDialogComponent {
           id: card.id,
           title: card.title,
           sub: card.dueDate
-            ? `${col.name} · ${this.i18n.translate('meetings.agenda.todoDue', { date: shortDay(card.dueDate, today, locale) })}`
+            ? `${col.name} · ${this.i18n.translate('meetings.agenda.todoDue', { date: shortDay(card.dueDate, locale, today) })}`
             : col.name,
         })),
       );
@@ -348,7 +350,7 @@ export class AgendaItemDialogComponent {
       error: (err: unknown) => {
         this.saving.set(false);
         // A closed meeting answers 409 `meeting_closed`. Show the server reason.
-        const detail = errorDetail(err);
+        const detail = problemDetail(err);
         const base = this.i18n.translate('meetings.toast.actionFailed');
         this.toast.error(detail ? `${base}: ${detail}` : base);
       },

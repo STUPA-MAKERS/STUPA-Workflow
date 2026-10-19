@@ -25,6 +25,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { toFormlySections } from '@shared/forms/formly-mapper';
 import { applyServerErrors, clearServerErrors } from '@shared/forms/server-errors';
+import { debounced } from '@shared/debounced';
+import { liveSearch } from '@shared/live-search';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
@@ -45,6 +47,10 @@ import {
 import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-files.component';
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
+import { NoteComponent } from '@shared/ui/note/note.component';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { localToday } from '@shared/date-format';
 
 /** Who the application is for: an account, or a new person without one. */
 export type ApplicantMode = 'account' | 'guest';
@@ -95,6 +101,9 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
+    NoteComponent,
     FormsModule,
     FormlyForm,
     TranslatePipe,
@@ -140,7 +149,20 @@ export class ApplicationCaptureComponent {
   readonly mode = signal<ApplicantMode>('account');
   readonly query = signal('');
   readonly candidates = signal<ApplicantCandidate[]>([]);
-  readonly searching = signal(false);
+  /**
+   * The account search behind the field: after a pause, from two characters on; a new
+   * text cancels the request that is still out, so a late answer never replaces a newer
+   * one, and a failed search clears the hits.
+   */
+  private readonly applicantSearch = liveSearch<ApplicantCandidate[]>({
+    run: (q) => this.api.searchOnBehalfApplicants(q),
+    result: (hits) => this.candidates.set(hits),
+    reset: () => this.candidates.set([]),
+    error: () => this.candidates.set([]),
+    minLength: APPLICANT_SEARCH_MIN,
+    debounceMs: APPLICANT_SEARCH_DELAY_MS,
+  });
+  readonly searching = this.applicantSearch.pending;
   readonly picked = signal<ApplicantCandidate | null>(null);
   readonly guestName = signal('');
   readonly guestEmail = signal('');
@@ -149,9 +171,6 @@ export class ApplicationCaptureComponent {
    * account and says so ("Zu dieser E-Mail gibt es ein Konto: <Name>").
    */
   readonly emailMatch = signal<ApplicantCandidate | null>(null);
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
-  private searchSeq = 0;
-  private emailTimer: ReturnType<typeof setTimeout> | null = null;
   private emailSeq = 0;
 
   // --- application ---------------------------------------------------------------
@@ -242,13 +261,6 @@ export class ApplicationCaptureComponent {
     return p ? candidateLabel(p) : '';
   });
 
-  constructor() {
-    this.destroyRef.onDestroy(() => {
-      if (this.searchTimer) clearTimeout(this.searchTimer);
-      if (this.emailTimer) clearTimeout(this.emailTimer);
-    });
-  }
-
   // --- applicant -----------------------------------------------------------------
 
   setMode(value: string): void {
@@ -259,44 +271,21 @@ export class ApplicationCaptureComponent {
   /** The search field: it searches by itself after a short pause. */
   onSearch(text: string): void {
     this.query.set(text);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    const q = text.trim();
-    if (q.length < APPLICANT_SEARCH_MIN) {
-      this.searchSeq++;
-      this.candidates.set([]);
-      this.searching.set(false);
-      return;
-    }
-    this.searching.set(true);
-    this.searchTimer = setTimeout(() => this.search(q), APPLICANT_SEARCH_DELAY_MS);
-  }
-
-  private search(q: string): void {
-    const seq = ++this.searchSeq;
-    this.api.searchOnBehalfApplicants(q).subscribe({
-      next: (hits) => {
-        if (seq !== this.searchSeq) return;
-        this.candidates.set(hits);
-        this.searching.set(false);
-      },
-      error: () => {
-        if (seq !== this.searchSeq) return;
-        this.candidates.set([]);
-        this.searching.set(false);
-      },
-    });
+    this.applicantSearch.set(text);
   }
 
   pick(candidate: ApplicantCandidate): void {
     this.picked.set(candidate);
     this.candidates.set([]);
     this.query.set(candidateLabel(candidate));
+    this.applicantSearch.sync(this.query());
   }
 
   clearPick(): void {
     this.picked.set(null);
     this.emailMatch.set(null);
     this.query.set('');
+    this.applicantSearch.sync('');
   }
 
   /**
@@ -306,25 +295,27 @@ export class ApplicationCaptureComponent {
    */
   onGuestEmail(value: string): void {
     this.guestEmail.set(value);
-    if (this.emailTimer) clearTimeout(this.emailTimer);
+    this.lookUpEmail.cancel();
     const email = value.trim();
     const seq = ++this.emailSeq;
-    if (!EMAIL.test(email)) return;
-    this.emailTimer = setTimeout(() => {
-      this.api.searchOnBehalfApplicants(email).subscribe({
-        next: (hits) => {
-          if (seq !== this.emailSeq || this.mode() !== 'guest') return;
-          const match = hits.find((h) => h.email?.toLowerCase() === email.toLowerCase());
-          if (!match) return;
-          this.pick(match);
-          this.emailMatch.set(match);
-          this.mode.set('account');
-        },
-        // A failed lookup leaves the new person; the server matches again.
-        error: () => undefined,
-      });
-    }, APPLICANT_SEARCH_DELAY_MS);
+    if (EMAIL.test(email)) this.lookUpEmail(email, seq);
   }
+
+  /** After a pause: switch to the account that the typed e-mail belongs to. */
+  private readonly lookUpEmail = debounced((email: string, seq: number) => {
+    this.api.searchOnBehalfApplicants(email).subscribe({
+      next: (hits) => {
+        if (seq !== this.emailSeq || this.mode() !== 'guest') return;
+        const match = hits.find((h) => h.email?.toLowerCase() === email.toLowerCase());
+        if (!match) return;
+        this.pick(match);
+        this.emailMatch.set(match);
+        this.mode.set('account');
+      },
+      // A failed lookup leaves the new person; the server matches again.
+      error: () => undefined,
+    });
+  }, APPLICANT_SEARCH_DELAY_MS);
 
   /** "Neue Person": the search text moves into the name or the e-mail field. */
   useAsGuest(): void {
@@ -466,10 +457,4 @@ function daysAgo(days: number, now: Date = new Date()): Date {
   const d = new Date(now);
   d.setDate(d.getDate() - days);
   return d;
-}
-
-/** Today in the local timezone as `YYYY-MM-DD`. */
-export function localToday(now: Date = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }

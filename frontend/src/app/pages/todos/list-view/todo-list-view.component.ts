@@ -3,17 +3,19 @@ import type { Uuid } from '@core/api/models';
 import type { TodoBoard, TodoCardTile, TodoColumn, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import {
   dueInfo,
   linkLine,
-  personName,
   sortedColumns,
   type DueInfo,
-  type Translate,
 } from '../../../features/todos/todos.util';
+import type { Translate } from '@core/i18n/translations';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { TodoLabelComponent } from '../../../features/todos/card-facts/todo-label.component';
+import { TodoDueComponent } from '../../../features/todos/card-facts/todo-due.component';
+import { TodoAssigneesComponent } from '../../../features/todos/card-facts/todo-assignees.component';
+import { personName } from '@shared/person-label.util';
 
 export type DueSort = 'none' | 'asc' | 'desc';
 
@@ -41,7 +43,7 @@ interface ListGroup {
   selector: 'app-todo-list-view',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, AvatarStackComponent, IconComponent, EmptyStateComponent],
+  imports: [TodoAssigneesComponent, TodoDueComponent, TodoLabelComponent, TranslatePipe, IconComponent, EmptyStateComponent],
   templateUrl: './todo-list-view.component.html',
   styleUrl: './todo-list-view.component.scss',
 })

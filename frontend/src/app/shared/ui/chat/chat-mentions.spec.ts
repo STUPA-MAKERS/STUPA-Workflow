@@ -134,6 +134,9 @@ describe('chat mentions', () => {
       expect(highlightMentions('@A &amp; B', ['A & B'])).toBe(
         '<span class="chat__mention">@A &amp; B</span>',
       );
+      expect(highlightMentions('@Jo O&#39;Neil', ["Jo O'Neil"])).toBe(
+        '<span class="chat__mention">@Jo O&#39;Neil</span>',
+      );
       expect(highlightMentions('@Anna Maria', ['Anna', 'Anna Maria'])).toBe(
         '<span class="chat__mention">@Anna Maria</span>',
       );

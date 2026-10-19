@@ -1,6 +1,6 @@
 <app-dialog
   [open]="open()"
-  [title]="'todos.new.title' | t"
+  [title]="heading() | t"
   [closeLabel]="'action.close' | t"
   size="form"
   (closed)="cancel()"
@@ -78,19 +78,21 @@
       </div>
     </div>
 
-    <label class="tn__field" for="tn-desc">
-      <span class="tn__label">{{ 'todos.new.description' | t }}</span>
-      <textarea
-        id="tn-desc"
-        class="tn__textarea"
-        name="description"
-        rows="3"
-        maxlength="20000"
-        appMarkdownImageUpload
-        [ngModel]="description()"
-        (ngModelChange)="description.set($event)"
-      ></textarea>
-    </label>
+    @if (withDescription()) {
+      <label class="tn__field" for="tn-desc">
+        <span class="tn__label">{{ 'todos.new.description' | t }}</span>
+        <textarea
+          id="tn-desc"
+          class="tn__textarea"
+          name="description"
+          rows="3"
+          maxlength="20000"
+          appMarkdownImageUpload
+          [ngModel]="description()"
+          (ngModelChange)="description.set($event)"
+        ></textarea>
+      </label>
+    }
   </form>
   <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
   <app-button dialog-footer variant="fill" [loading]="saving()" [disabled]="!canSave()" (click)="save()">

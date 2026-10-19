@@ -11,6 +11,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -26,6 +27,8 @@ import {
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
 interface Member {
@@ -56,6 +59,7 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,
@@ -111,7 +115,7 @@ export class GremiumMembersComponent {
       const role = this.rolesById().get(m.gremiumRoleId);
       rows.push({
         id: m.principalId,
-        name: m.displayName || m.email || this.i18n.translate('admin.gremien.unknownMember'),
+        name: personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
         email: m.email ?? null,
         role: role ? this.roleName(role) : '—',
         rank: this.rank(role),
@@ -172,7 +176,7 @@ export class GremiumMembersComponent {
   }
 
   private roleName(role: GremiumRole): string {
-    return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
+    return i18nLabel(role.name, this.i18n.locale(), role.key);
   }
 
   private rank(role: GremiumRole | undefined): number {

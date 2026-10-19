@@ -4,7 +4,7 @@ import type { JoinLink, Meeting, MeetingGuest, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ToastService } from '@stupa-makers/ui-kit';
-import { errorDetail } from './meetings-display.util';
+import { problemDetail } from '@core/api/problem';
 
 /** The name of a guest: the own name, or "Gast n" once the name is pseudonymized. */
 export function guestName(
@@ -224,7 +224,7 @@ export class MeetingGuestsService {
   }
 
   private report(err: unknown): void {
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.i18n.translate('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }

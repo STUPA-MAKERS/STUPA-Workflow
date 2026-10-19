@@ -60,14 +60,13 @@ import {
 } from '@shared/ui';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { downloadBlob } from '@shared/download.util';
+import { exportDownload } from '@shared/download.util';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { ApplicationsPageService } from './applications-page.service';
-import { groupByMonth, type MonthGroup } from './applications.util';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
@@ -77,9 +76,12 @@ import {
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
-import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { debounced } from '@shared/debounced';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { AmountComponent } from '@shared/ui/amount/amount.component';
+import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
+import { formatMoney } from '@shared/format-money';
 import { applicationReads } from './application-reads';
 
 /**
@@ -148,6 +150,7 @@ type FilterSheet = 'budget' | 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AmountComponent,
     NoteComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
@@ -249,8 +252,8 @@ export class ApplicationsListComponent implements OnDestroy {
    * load of the next page in that time still sends the applied search only.
    */
   readonly searchText = signal('');
-  /** Debounce timer of the search (about 250 ms, like /expenses). */
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The search writes the URL after a pause (about 250 ms, like /expenses). */
+  private readonly applySearch = debounced(() => this.navigate({ q: this.searchText().trim() || null }));
   readonly typeId = signal('');
   /** The chosen flow states. `state` repeats in the URL and in the request (A4). */
   readonly states = signal<readonly string[]>([]);
@@ -410,7 +413,7 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly groups = computed<MonthGroup<ListRow>[]>(() => {
     const rows = this.rows();
     if (this.sortField() !== 'createdAt') return rows.length ? [{ key: 'all', label: '', items: rows }] : [];
-    return groupByMonth(rows, this.i18n.locale());
+    return groupByMonth(rows, (r) => r.createdAt, this.i18n.formatLocale());
   });
 
   /** The sort menu: one checked item per order. */
@@ -524,7 +527,6 @@ export class ApplicationsListComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.frame.fill.set(false);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
   /** Application title from the system title field, with the fallback "untitled". */
@@ -543,12 +545,7 @@ export class ApplicationsListComponent implements OnDestroy {
 
   private money(item: ApplicationListItem): string | null {
     if (item.amount === null) return null;
-    const value = Number(item.amount);
-    if (!Number.isFinite(value)) return item.amount;
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: item.currency ?? 'EUR',
-    }).format(value);
+    return formatMoney(item.amount, this.i18n.formatLocale(), { currency: item.currency }) || item.amount;
   }
 
   // --- navigation ---------------------------------------------------------
@@ -598,11 +595,7 @@ export class ApplicationsListComponent implements OnDestroy {
    */
   onSearch(value: string): void {
     this.searchText.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(
-      () => this.navigate({ q: this.searchText().trim() || null }),
-      LIVE_SEARCH_DEBOUNCE_MS,
-    );
+    this.applySearch();
   }
 
   /**
@@ -666,7 +659,7 @@ export class ApplicationsListComponent implements OnDestroy {
     for (const f of this.filters) f.signal.set(f.empty);
     this.states.set([]);
     this.searchText.set('');
-    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.applySearch.cancel();
     this.navigate({ ...this.filterParams(true), state: null });
   }
 
@@ -689,22 +682,19 @@ export class ApplicationsListComponent implements OnDestroy {
    * Without `mine`, see `exportShown`.
    */
   onExport(): void {
-    if (this.exporting() || !this.exportShown()) return;
-    this.exporting.set(true);
-    const query = this.buildQuery(0);
-    delete query.limit;
-    delete query.offset;
-    delete query.mine;
-    this.api.exportApplicationsXlsx(query).subscribe({
-      next: (blob) => {
-        downloadBlob(blob, 'applications.xlsx');
-        this.exporting.set(false);
+    if (!this.exportShown()) return;
+    exportDownload(
+      this.exporting,
+      () => {
+        const query = this.buildQuery(0);
+        delete query.limit;
+        delete query.offset;
+        delete query.mine;
+        return this.api.exportApplicationsXlsx(query);
       },
-      error: () => {
-        this.exporting.set(false);
-        this.toast.error(this.i18n.translate('applications.list.exportError'));
-      },
-    });
+      'applications.xlsx',
+      () => this.toast.error(this.i18n.translate('applications.list.exportError')),
+    );
   }
 
   /** Append the next page. The visible sentinel or the "load more" button calls this. */

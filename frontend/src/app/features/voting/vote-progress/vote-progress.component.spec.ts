@@ -1,7 +1,9 @@
 import { render, screen } from '@testing-library/angular';
 import { VoteProgressComponent } from './vote-progress.component';
 
-async function setup(inputs: Partial<{ voted: number; total: number; basis: 'present' | 'eligible'; secret: boolean; hidden: boolean }>) {
+async function setup(
+  inputs: Partial<{ voted: number; total: number; basis: 'present' | 'eligible'; secret: boolean; hidden: boolean; size: 'normal' | 'fat' }>,
+) {
   return render(VoteProgressComponent, { inputs: { voted: 14, total: 19, ...inputs } });
 }
 
@@ -46,5 +48,11 @@ describe('VoteProgressComponent', () => {
     fixture.componentRef.setInput('total', 4);
     fixture.detectChanges();
     expect(screen.getByText('100 %')).toBeInTheDocument();
+  });
+
+  it('draws the thick bar of the meeting vote card', async () => {
+    const { fixture } = await setup({ size: 'fat' });
+    expect(fixture.nativeElement).toHaveClass('vp--fat');
+    expect(screen.getByRole('img', { name: '14 von 19 Anwesenden haben abgestimmt' })).toHaveClass('bar--fat');
   });
 });

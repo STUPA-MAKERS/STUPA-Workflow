@@ -6,9 +6,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { downloadBlob } from '@shared/download.util';
 import { liveSearch } from '@shared/live-search';
 import {
   AvatarComponent,
+  ListItemComponent,
   PageHeaderComponent,
   SearchPillComponent,
   StatusTextComponent,
@@ -34,6 +36,7 @@ import type { AdminPrincipal, ErasureRequest } from '../admin.models';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The picker shows this many hits. A longer list means: type more. */
 const PERSON_HITS = 6;
@@ -72,6 +75,7 @@ const PERSON_HITS = 6;
     PageHeaderComponent,
     SearchPillComponent,
     AvatarComponent,
+    ListItemComponent,
     StatusTextComponent,
     RowMenuComponent,
   ],
@@ -168,7 +172,7 @@ export class PrivacyComponent {
 
   /** The name of an account; "Ohne Namen" when it has neither a name nor an e-mail (D7). */
   protected personName(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   protected pickPerson(p: AdminPrincipal): void {
@@ -234,12 +238,7 @@ export class PrivacyComponent {
     if (!email) return;
     this.api.downloadAuskunft(email).subscribe({
       next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'auskunft.xlsx';
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, 'auskunft.xlsx');
         this.toast.success(this.i18n.translate('admin.privacy.auskunftDone'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),

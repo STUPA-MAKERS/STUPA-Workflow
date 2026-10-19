@@ -4,14 +4,8 @@ import {
   costCentreIndex,
   costCentreLabel,
   costCentreTrail,
-  daysUntil,
   findBudgetNode,
   findTopBudgetNode,
-  formatEur,
-  monthGroups,
-  problemCode,
-  problemDetail,
-  shortDate,
   signedEur,
   vatRate,
 } from './expense-display.util';
@@ -39,21 +33,6 @@ function node(id: string, children: BudgetTreeNode[] = []): BudgetTreeNode {
 }
 
 describe('expense-display.util', () => {
-  it('formatEur formats per locale', () => {
-    expect(formatEur(120, 'de').replace(/\s/g, ' ')).toContain('120,00');
-    expect(formatEur(120, 'en')).toMatch(/120\.00/);
-    expect(formatEur(-42.5, 'de').replace(/\s/g, ' ')).toContain('-42,50');
-  });
-
-  it('problemDetail / problemCode read problem+json fields defensively', () => {
-    expect(problemDetail({ error: { detail: 'Zu wenig Budget' } })).toBe('Zu wenig Budget');
-    expect(problemDetail({ error: {} })).toBeNull();
-    expect(problemDetail(undefined)).toBeNull();
-    expect(problemDetail({ error: { detail: '' } })).toBeNull();
-    expect(problemCode({ error: { code: 'x' } })).toBe('x');
-    expect(problemCode(null)).toBeUndefined();
-  });
-
   it('findTopBudgetNode returns the root containing the target id', () => {
     const tree = [node('top-1', [node('child-1')]), node('top-2')];
     expect(findTopBudgetNode(tree, 'child-1')?.id).toBe('top-1');
@@ -112,8 +91,8 @@ describe('finance helpers (FE10c)', () => {
   ];
 
   it('signs an amount by its kind', () => {
-    expect(signedEur('expense', '12.5', 'de').replace(/\s/g, ' ')).toBe('−12,50 €');
-    expect(signedEur('income', '12.5', 'en')).toMatch(/^\+€12\.50$/);
+    expect(signedEur('expense', '12.5', 'de-DE').replace(/\s/g, ' ')).toBe('−12,50 €');
+    expect(signedEur('income', '12.5', 'en-GB')).toMatch(/^\+€12\.50$/);
   });
 
   it('finds a node and its trail below the root', () => {
@@ -135,27 +114,6 @@ describe('finance helpers (FE10c)', () => {
     expect(costCentreFigures(null, 'fy')).toBeNull();
   });
 
-  it('groups rows by month in their order, a row without a date on its own', () => {
-    const rows = ['2026-09-28', '2026-09-01', null, '2026-08-12', '2026-09-03'];
-    const groups = monthGroups(rows, (r) => r, 'de');
-    expect(groups.map((g) => [g.key, g.label, g.items.length])).toEqual([
-      ['2026-09', 'September 2026', 2],
-      ['none', '', 1],
-      ['2026-08', 'August 2026', 1],
-      ['2026-09', 'September 2026', 1],
-    ]);
-    expect(monthGroups(rows, (r) => r, 'de', false)).toEqual([{ key: 'all', label: '', items: rows }]);
-    expect(monthGroups([], (r) => r, 'de')).toEqual([]);
-    expect(monthGroups(['2026-01-02'], (r) => r, 'en')[0].label).toBe('January 2026');
-  });
-
-  it('shows a short date and nothing for a missing or broken one', () => {
-    expect(shortDate('2026-09-28', 'de')).toBe('28.09.');
-    expect(shortDate('2026-09-28T10:00:00Z', 'en')).toBe('28/09');
-    expect(shortDate(null, 'de')).toBe('');
-    expect(shortDate('x', 'de')).toBe('');
-  });
-
   it('knows the common VAT rates only', () => {
     expect(vatRate('2428.57', '461.43')).toBe(19);
     expect(vatRate('100', '7')).toBe(7);
@@ -164,13 +122,5 @@ describe('finance helpers (FE10c)', () => {
     expect(vatRate(null, '19')).toBeNull();
     expect(vatRate('100', null)).toBeNull();
     expect(vatRate('0', '0')).toBeNull();
-  });
-
-  it('counts the calendar days to a date', () => {
-    const today = new Date(2026, 9, 5, 23, 30);
-    expect(daysUntil('2026-10-08', today)).toBe(3);
-    expect(daysUntil('2026-10-05', today)).toBe(0);
-    expect(daysUntil('2026-10-01', today)).toBe(-4);
-    expect(typeof daysUntil('2026-10-01')).toBe('number');
   });
 });

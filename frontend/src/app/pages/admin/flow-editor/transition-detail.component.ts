@@ -20,7 +20,7 @@ import {
   type NotifyRecipient,
   type TransitionDef,
 } from '../admin.models';
-import { CostCentrePickerComponent } from './cost-centre-picker.component';
+import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import { GuardEditorComponent } from './guard-editor.component';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';

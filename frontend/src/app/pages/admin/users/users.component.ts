@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -25,6 +26,7 @@ import type { AdminPrincipal, GroupMapping, PrincipalFilters, Role } from '../ad
 import type { FilterSelectOption, RowMenuItem, RowMenuSection } from '@shared/ui';
 import { UserMergeComponent } from './user-merge/user-merge.component';
 import { UserRevokeComponent } from './user-revoke/user-revoke.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** The choices of the chip "Letzte Anmeldung" (F3): older than n days, or never. */
 export const LAST_LOGIN_FILTERS = ['', '90', '180', '365', 'never'] as const;
@@ -238,7 +240,7 @@ export class UsersComponent {
   protected roleLabel(roleId: string): string {
     const role = this.rolesById().get(roleId);
     if (!role) return roleId;
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+    return i18nLabel(role.label, this.i18n.locale(), role.key);
   }
 
   /** The global roles of one principal as one line, for example "Administration, Mitglied". */
@@ -250,7 +252,7 @@ export class UsersComponent {
 
   /** The name of an account. Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
   protected userLabel(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   /** The tooltip of the name: the `sub` of a nameless account, for the admin detail (D7). */

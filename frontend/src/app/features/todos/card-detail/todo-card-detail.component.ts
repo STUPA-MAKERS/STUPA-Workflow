@@ -34,7 +34,7 @@ import {
 } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
@@ -53,6 +53,7 @@ import {
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
@@ -72,15 +73,14 @@ import { TodoTransferDialogComponent, type TodoTransferTarget } from '../transfe
 import {
   LINK_ICON,
   eventText,
-  isoDay,
   linkSub,
   linkTitle,
-  longDay,
-  personName,
   relativeDays,
   splitUrl,
-  type Translate,
 } from '../todos.util';
+import { copyToClipboard } from '@shared/clipboard';
+import { isoDay, weekdayDate } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 type CardTab = 'details' | 'activity';
 
@@ -141,6 +141,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     MarkdownViewComponent,
     NoteComponent,
     RowMenuComponent,
+    SegBarComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     SkeletonComponent,
@@ -312,8 +313,7 @@ export class TodoCardDetailComponent {
   readonly createdParts = computed<string[]>(() => {
     const c = this.card();
     if (!c) return [];
-    const d = new Date(c.createdAt);
-    const day = Number.isNaN(d.getTime()) ? '' : longDay(isoDay(d), this.i18n.formatLocale());
+    const day = weekdayDate(c.createdAt, this.i18n.formatLocale());
     const by = this.t('todos.card.createdBy', { name: personName(c.createdBy, this.t) });
     return day ? [by, day] : [by];
   });
@@ -321,8 +321,7 @@ export class TodoCardDetailComponent {
   readonly archivedLine = computed(() => {
     const at = this.card()?.archivedAt;
     if (!at) return null;
-    const d = new Date(at);
-    return Number.isNaN(d.getTime()) ? null : longDay(isoDay(d), this.i18n.formatLocale());
+    return weekdayDate(at, this.i18n.formatLocale()) || null;
   });
 
   readonly canWrite = computed(() => {
@@ -369,10 +368,6 @@ export class TodoCardDetailComponent {
   readonly items = computed(() => [...(this.card()?.checklistItems ?? [])].sort((a, b) => a.position - b.position));
   readonly openItems = computed(() => this.items().filter((i) => !i.done));
   readonly doneItems = computed(() => this.items().filter((i) => i.done));
-  readonly progress = computed(() => {
-    const total = this.items().length;
-    return total ? Math.round((this.doneItems().length / total) * 100) : 0;
-  });
 
   readonly linkedKeys = computed(
     () => new Set((this.card()?.links ?? []).map((l) => linkKey(l.kind, l.targetId))),
@@ -1002,14 +997,8 @@ export class TodoCardDetailComponent {
     if (!c) return;
     // The card only: the link stays valid when the card moves to another board.
     const url = `${location.origin}/todos?card=${c.id}`;
-    const clip = navigator.clipboard;
-    if (!clip) {
-      this.toast.error(this.t('todos.card.linkFailed'));
-      return;
-    }
-    clip.writeText(url).then(
-      () => this.toast.success(this.t('todos.card.linkCopied')),
-      () => this.toast.error(this.t('todos.card.linkFailed')),
+    void copyToClipboard(url).then((ok) =>
+      ok ? this.toast.success(this.t('todos.card.linkCopied')) : this.toast.error(this.t('todos.card.linkFailed')),
     );
   }
 

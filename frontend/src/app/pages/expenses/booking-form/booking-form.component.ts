@@ -12,6 +12,11 @@ import {
   SegmentedComponent,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
+import { formatMoney } from '@shared/format-money';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
@@ -25,7 +30,6 @@ import {
   type CostCentreLabel,
   costCentreLabel,
   costCentreTrail,
-  formatEur,
   signedEur,
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -76,6 +80,10 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    BookingRowComponent,
+    SumRowComponent,
+    PaneFormHeadComponent,
+    PaneFormFootComponent,
     ButtonComponent,
     CostCentreSelectComponent,
     CurrencyInputComponent,
@@ -133,7 +141,7 @@ export class BookingFormComponent {
   /** A parent booking: its amount is the sum of its sub-bookings and read-only. */
   protected readonly parentAmount = computed(() => {
     const e = this.editingRow();
-    return e && (e.childCount ?? 0) > 0 ? formatEur(Number(e.amount), this.i18n.locale()) : null;
+    return e && (e.childCount ?? 0) > 0 ? formatMoney(e.amount, this.i18n.formatLocale()) : null;
   });
 
   /** Only a standalone booking moves to another cost centre. A bound booking and a
@@ -216,7 +224,7 @@ export class BookingFormComponent {
   }
 
   protected signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   close(): void {

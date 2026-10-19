@@ -29,9 +29,7 @@
             [value]="kindFilter()"
             (valueChange)="setKind($event)"
             [text]="kindChipLabel()"
-            [active]="kindFilter() !== ''"
-            [icon]="kindFilter() ? 'check' : null"
-            [chevron]="!kindFilter()"
+            filled
           />
           @if (manager) {
             <app-filter-select
@@ -41,9 +39,7 @@
               [value]="assigneeFilter()"
               (valueChange)="setAssignee($event)"
               [text]="assigneeChipLabel()"
-              [active]="assigneeFilter() !== ''"
-              [icon]="assigneeFilter() ? 'check' : null"
-              [chevron]="!assigneeFilter()"
+              filled
             />
           }
           @if (activeFilterCount() > 0) {
@@ -118,7 +114,7 @@
                           </span>
                         }
                         @if (!split()) {
-                          <app-icon class="tk__chev" name="right" [size]="17" />
+                          <app-row-chevron />
                         }
                       </span>
                     </app-list-item>

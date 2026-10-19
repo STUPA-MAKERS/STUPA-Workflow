@@ -60,9 +60,7 @@
 
   <!-- Catalogue -->
   <section class="bk__list" aria-labelledby="bk-list">
-    <header class="bk__listHead">
-      <h2 class="section-title" id="bk-list">{{ 'admin.backups.listTitle' | t }}</h2>
-    </header>
+    <app-section-header class="bk__listHead" headingId="bk-list" [heading]="'admin.backups.listTitle' | t" />
     @if (loading() || rows().length) {
       <app-data-table
         surface="rowgroup"

@@ -1,14 +1,13 @@
 import type { TicketEvent } from '@core/api/tickets.service';
-import { de } from '@core/i18n/translations';
+import { de, type Translate } from '@core/i18n/translations';
 import {
   eventText,
   isOpen,
-  personName,
   reporterName,
   reporterRowName,
   ticketAge,
-  type Translate,
 } from './tickets.util';
+import { personName } from '@shared/person-label.util';
 
 /** The German texts with their parameters filled in. */
 const t: Translate = (key, params = {}) =>

@@ -22,7 +22,8 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { nodeColors } from '../budget-color.util';
 import type { BudgetTreeNode } from '../budget-tree.api';
-import { costCentreFigures, findBudgetNode, formatEur } from '../expense-display.util';
+import { formatMoney } from '@shared/format-money';
+import { costCentreFigures, findBudgetNode } from '../expense-display.util';
 
 let nextId = 0;
 
@@ -338,7 +339,7 @@ export class CostCentreSelectComponent {
       name,
       color: this.colors().get(n.id) ?? null,
       depth,
-      free: free === null ? null : formatEur(free, this.i18n.locale()),
+      free: free === null ? null : formatMoney(free, this.i18n.formatLocale()),
       negative: free !== null && free < 0,
       index,
     };

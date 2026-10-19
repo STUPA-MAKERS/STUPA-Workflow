@@ -28,29 +28,8 @@
 .td__loadError {
   margin: var(--space-5) 0;
 }
-.td__backLink {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control-height);
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-}
-.td__backLink:hover {
-  background: var(--color-surface-4);
-}
 
 /* ------------------------------------------------------------------ header */
-.td__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sheet-head-gap);
-  padding-bottom: 22px;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 .td__line {
   display: flex;
   flex-wrap: wrap;
@@ -201,58 +180,6 @@
 }
 .td__select ::ng-deep .fs__text {
   max-width: none;
-}
-
-/* The linked to-dos: a circle, the title over "Board · Spalte · fällig", the people. */
-.td__todos {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.td__todo {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.td__todoIcon {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.td__todo--done .td__todoIcon {
-  color: var(--color-accent-text);
-}
-.td__todoText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.td__todoTitle {
-  color: var(--color-text);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
-}
-/* The whole row opens the card. */
-.td__todoTitle::after {
-  position: absolute;
-  inset: 0;
-  content: '';
-}
-.td__todoTitle:hover {
-  text-decoration: underline;
-}
-.td__todoTitle:focus-visible {
-  outline: none;
-}
-.td__todo:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.td__todoSub {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
 }
 
 /* ------------------------------------------------------------------ thread */

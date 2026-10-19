@@ -9,7 +9,8 @@ import { ToastService } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { AdminApiService } from '../admin-api.service';
 import type { NotificationSettings } from '../admin.models';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import type { LoadState } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 
 /**
  * Admin notification settings (board Admin-Benachrichtigungen, permission
@@ -25,7 +26,7 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SkeletonComponent,
+    LoadStateComponent,
     FormsModule,
     TranslatePipe,
     FabComponent,
@@ -48,6 +49,10 @@ export class NotificationSettingsComponent {
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
   readonly dirty = signal(false);
+  /** The read: loading, then the form, or the error note of a failed read. */
+  protected readonly loadState = computed<LoadState>(() =>
+    this.loading() ? 'loading' : this.settings() ? 'ok' : 'error',
+  );
 
   /** A whole number of days. The reminder needs at least 1, the repeat at least 0. */
   readonly afterDaysError = computed(() => {

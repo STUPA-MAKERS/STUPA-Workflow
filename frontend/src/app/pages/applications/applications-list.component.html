@@ -101,9 +101,7 @@
             [values]="states()"
             (valuesChange)="setStates($event)"
             [text]="stateChipLabel()"
-            [active]="states().length > 0"
-            [icon]="states().length ? 'check' : null"
-            [chevron]="!states().length"
+            filled
             [resetLabel]="'applications.list.filter.reset' | t"
             [emptyText]="'applications.list.filter.stateNone' | t"
           />
@@ -134,9 +132,7 @@
               [value]="typeId()"
               (valueChange)="setFilter('type', $event)"
               [text]="typeChipLabel()"
-              [active]="typeId() !== ''"
-              [icon]="typeId() ? 'check' : null"
-              [chevron]="!typeId()"
+              filled
             />
           }
           <app-filter-select
@@ -146,9 +142,8 @@
             [value]="archived()"
             (valueChange)="setFilter('archived', $event)"
             [text]="archivedChipLabel()"
-            [active]="archived() !== 'false'"
-            [icon]="archived() !== 'false' ? 'check' : null"
-            [chevron]="archived() === 'false'"
+            filled
+            unsetValue="false"
           />
           @if (activeFilterCount() > 0) {
             <app-button variant="text" size="sm" (click)="reset()">
@@ -229,15 +224,8 @@
                         }
                       </span>
                       <span trail class="apps__trail">
-                        @if (row.approved) {
-                          <!-- F1: the approved amount, the requested one struck through below. -->
-                          <span class="apps__amounts">
-                            <span class="mono apps__amount">{{ row.approved }}</span>
-                            <s class="mono apps__amountStruck">{{ row.amount }}</s>
-                          </span>
-                        } @else if (row.amount) {
-                          <span class="mono apps__amount">{{ row.amount }}</span>
-                        }
+                        <!-- F1: the approved amount, the requested one struck through below. -->
+                        <app-amount [amount]="row.amount" [approved]="row.approved" layout="stack" />
                         <span class="apps__menuSlot">
                           @if (!split()) {
                             <span class="apps__chev" aria-hidden="true">

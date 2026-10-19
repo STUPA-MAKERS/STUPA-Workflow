@@ -6,23 +6,24 @@ import {
   input,
   model,
   output,
-  signal,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { ButtonComponent, IconComponent, InputComponent } from '@stupa-makers/ui-kit';
-import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
+import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
   costCentreLabel,
-  formatEur,
-  shortDate,
   signedEur,
 } from '../../budget/expense-display.util';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { dayMonth } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The bulk actions of the selected bookings (board Fin-Buchungen-Auswahl). Side by side
@@ -37,10 +38,12 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SumRowComponent,
+    BookingRowComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
-    CostCentreTreeComponent,
+    CostCentrePickerComponent,
     FormsModule,
     IconComponent,
     InputComponent,
@@ -72,7 +75,6 @@ export class BulkPanelComponent {
   readonly remove = output<void>();
   readonly closed = output<void>();
 
-  protected readonly treeOpen = signal(false);
 
   /** The sum of the selection, signed. */
   protected readonly sum = computed(() => {
@@ -80,8 +82,7 @@ export class BulkPanelComponent {
       (acc, e) => acc + (e.kind === 'income' ? 1 : -1) * Number(e.amount),
       0,
     );
-    const text = formatEur(Math.abs(total), this.i18n.locale());
-    return total > 0 ? `+${text}` : total < 0 ? `−${text}` : text;
+    return formatMoney(total, this.i18n.formatLocale(), { signed: true });
   });
 
   /** The cost centre all selected rows share, else null. */
@@ -109,7 +110,6 @@ export class BulkPanelComponent {
 
   protected pick(id: string): void {
     this.budgetId.set(id);
-    this.treeOpen.set(false);
   }
 
   costCentre(e: Expense): CostCentreLabel {
@@ -117,11 +117,13 @@ export class BulkPanelComponent {
   }
 
   signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   day(iso: string | null): string {
-    return shortDate(iso, this.i18n.locale());
+    // Only the date part counts (a `createdAt` keeps the day the server wrote), as in the
+    // month groups.
+    return dayMonth(iso?.slice(0, 10), this.i18n.formatLocale());
   }
 
   /** "„A“ und „B“": the bound rows, by name, for the hint. */

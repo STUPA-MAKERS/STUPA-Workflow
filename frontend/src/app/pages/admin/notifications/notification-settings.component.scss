@@ -1,3 +1,4 @@
+@use '../../../shared/ui/surface-card' as sc;
 :host {
   display: block;
 }
@@ -8,15 +9,8 @@
 
 /* The card of the task reminders: icon, title and switch, then the two fields. */
 .ns__card {
-  /* The fields sit on surface 2 here, so they take surface 3. */
-  --color-surface-sunken: var(--color-surface-3);
-  --color-text-subtle: var(--color-text-muted);
-  display: flex;
+  @include sc.card($gap: var(--space-4), $direction: row);
   align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-5);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-2);
 }
 .ns__icon {
   flex: none;

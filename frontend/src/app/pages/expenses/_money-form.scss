@@ -39,15 +39,6 @@
   gap: var(--space-3);
   padding: var(--space-5) var(--space-6) var(--space-4);
 }
-.mf__title {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-xl);
-  line-height: 1.3;
-  font-weight: var(--fw-semibold);
-  overflow-wrap: anywhere;
-}
 
 .mf__body {
   flex: 1 1 auto;
@@ -315,13 +306,6 @@
   padding: var(--space-3) 0;
   border-radius: 0;
   background: var(--color-surface-2);
-}
-.mf__footEnd {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  margin-inline-start: auto;
 }
 .mf__btn {
   display: inline-flex;

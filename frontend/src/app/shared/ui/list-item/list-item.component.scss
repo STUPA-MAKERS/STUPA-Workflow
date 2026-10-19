@@ -3,14 +3,15 @@
   min-width: 0;
 }
 
-/* `--li-pad-x` and `--li-gap` let a narrow list give more width to the text. */
+/* `--li-pad-x` and `--li-gap` let a narrow list give more width to the text.
+   `--li-min-height` and `--li-pad-y` make a dense list (a side list of short names). */
 .li {
   position: relative;
   display: flex;
   align-items: center;
   gap: var(--li-gap, var(--space-4));
-  min-height: 4rem;
-  padding: 10px var(--li-pad-x, var(--space-4));
+  min-height: var(--li-min-height, 4rem);
+  padding: var(--li-pad-y, 10px) var(--li-pad-x, var(--space-4));
   border-radius: var(--li-radius, var(--radius-lg));
   background: var(--li-bg, transparent);
   color: var(--li-color, var(--color-text));
@@ -129,6 +130,10 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.li--subWrap .li__sub {
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .li__sub ::ng-deep app-status-text {
   display: inline;

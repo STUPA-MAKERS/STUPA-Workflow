@@ -9,19 +9,15 @@
   (submit)="submit($event)"
 >
   @if (layout() !== 'sheet') {
-    <header class="mf__head">
-      <h2 class="mf__title" [id]="'tf-title-' + mode()">
-        {{ (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t }}
-      </h2>
-      <app-button
-        variant="tonal"
-        [iconOnly]="true"
-        [ariaLabel]="'action.close' | t"
-        (click)="close()"
-      >
-        <app-icon name="x" />
-      </app-button>
-    </header>
+    <header
+      class="mf__head"
+      appPaneFormHead
+      [heading]="
+        (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t
+      "
+      [headingId]="'tf-title-' + mode()"
+      (closed)="close()"
+    ></header>
   }
 
   <div class="mf__body">
@@ -210,49 +206,37 @@
     </div>
   </div>
 
-  <footer class="mf__foot">
-    @if (mode() === 'edit') {
-      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
+  <footer
+    class="mf__foot"
+    appPaneFormFoot
+    [deletable]="mode() === 'edit'"
+    [compact]="layout() === 'sheet'"
+    (removed)="remove.emit()"
+    (cancelled)="close()"
+  >
+    @if (mode() === 'create') {
       <app-button
-        variant="danger"
-        [iconOnly]="layout() === 'sheet'"
-        [ariaLabel]="'action.delete' | t"
-        (click)="remove.emit()"
+        class="mf__primary"
+        variant="fill"
+        size="lg"
+        [disabled]="!d.canSubmitTransfer()"
+        [loading]="saving()"
+        (click)="submit($event)"
       >
-        <span class="mf__btn"
-          ><app-icon name="trash" />
-          @if (layout() !== 'sheet') {
-            {{ 'action.delete' | t }}
-          }
-        </span>
+        <span class="mf__btn"><app-icon name="swap" />{{ submitLabel() }}</span>
+      </app-button>
+    } @else {
+      <app-button
+        class="mf__primary"
+        variant="fill"
+        size="lg"
+        [disabled]="!t.canSubmitEdit()"
+        [loading]="saving()"
+        (click)="submit($event)"
+      >
+        <span class="mf__btn"><app-icon name="check" />{{ 'action.save' | t }}</span>
       </app-button>
     }
-    <div class="mf__footEnd">
-      <app-button variant="text" size="lg" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-      @if (mode() === 'create') {
-        <app-button
-          class="mf__primary"
-          variant="fill"
-          size="lg"
-          [disabled]="!d.canSubmitTransfer()"
-          [loading]="saving()"
-          (click)="submit($event)"
-        >
-          <span class="mf__btn"><app-icon name="swap" />{{ submitLabel() }}</span>
-        </app-button>
-      } @else {
-        <app-button
-          class="mf__primary"
-          variant="fill"
-          size="lg"
-          [disabled]="!t.canSubmitEdit()"
-          [loading]="saving()"
-          (click)="submit($event)"
-        >
-          <span class="mf__btn"><app-icon name="check" />{{ 'action.save' | t }}</span>
-        </app-button>
-      }
-    </div>
   </footer>
 </form>
 

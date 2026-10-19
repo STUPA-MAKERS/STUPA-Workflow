@@ -1,9 +1,9 @@
 @use 'breakpoints' as bp;
+@use '../../shared/ui/scroll-fade' as fade;
+@use '../../shared/ui/list-pane' as lp;
 
 :host {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 /* One pane at a time the host takes at least the free height of the shell main. Side by
    side it is a pane page (`.pane-page`), which sets its own flex. */
@@ -15,27 +15,20 @@
   min-width: 0;
 }
 .inv:not(.inv--split) {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
+  @include lp.single-column;
 }
 .inv:not(.inv--split) > app-list-detail {
   flex: 1 0 auto;
 }
 .inv--split {
-  flex: 1 1 0;
-  min-height: 0;
+  @include lp.split-column;
 }
 
 /* ------------------------------------------------------------------ list pane */
 /* The column, its header and the search bar are the shared list geometry: `.ld-pane`
    (styles.scss) and `app-page-header` with `pane`. */
 .inv__chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+  @include lp.chips;
 }
 
 .inv__count {
@@ -57,56 +50,26 @@
 
 /* ------------------------------------------------------------------ rows */
 .inv__scroll {
-  --inv-fade: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.scroll(--inv-fade);
   /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .inv--split .inv__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--inv-fade);
+  @include lp.split-scroll(--inv-fade);
 }
 .inv--split .inv__scroll > * {
   flex: none;
 }
 /* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.inv__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--inv-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--inv-fade));
-}
-.inv__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--inv-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--inv-fade));
-}
-.inv__scroll.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--inv-fade),
-    #000 calc(100% - var(--inv-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--inv-fade),
-    #000 calc(100% - var(--inv-fade)),
-    transparent
-  );
+.inv__scroll {
+  @include fade.fade-y(var(--inv-fade));
 }
 
 .inv__group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 .inv__month {
-  padding: 18px var(--space-4) 6px;
+  @include lp.month;
 }
 .inv__group:first-child .inv__month,
 .inv__skel .inv__month {
@@ -117,9 +80,7 @@
   width: 7rem;
 }
 .inv__rows {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 /* The sub line: status, invoice number, date, with a dot between two of them, also
    after a wrap (DECISIONS: never a dot at a line start). The invoice number is a
@@ -173,49 +134,13 @@
 /* With a pointer, the row menu shows on hover, on focus and while it is open. It keeps
    its place, so nothing shifts. One pane at a time a chevron sits in that place while
    the menu is hidden. Without hover (touch), the menu always shows. */
-.inv__menuSlot {
-  position: relative;
-  display: inline-flex;
-}
-.inv__chev {
-  display: none;
-}
-@media (hover: hover) {
-  .inv__menu,
-  .inv__chev {
-    transition: opacity var(--motion-fast) var(--ease-standard);
-  }
-  .inv__menu {
-    opacity: 0;
-  }
-  .inv__chev {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-text-muted);
-    pointer-events: none;
-  }
-  .inv__row:hover .inv__menu,
-  .inv__row:focus-within .inv__menu,
-  .inv__menu:has([aria-expanded='true']) {
-    opacity: 1;
-  }
-  .inv__row:hover .inv__chev,
-  .inv__row:focus-within .inv__chev,
-  .inv__menuSlot:has([aria-expanded='true']) .inv__chev {
-    opacity: 0;
-  }
-}
+@include lp.hover-menu(inv);
 
 .inv__sentinel {
   height: 1px;
 }
 .inv__more {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-3);
+  @include lp.more;
 }
 
 /* ------------------------------------------------------------------ detail pane */
@@ -227,46 +152,6 @@
   min-height: 0;
 }
 /* The empty sheet: the same surface the open booking sits on, so nothing jumps. */
-.inv__none {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-height: 0;
-}
-.inv--split .inv__none {
-  border-radius: var(--radius-2xl);
-  background: var(--color-surface-1);
-}
-.inv__none--skeleton {
-  gap: var(--space-4);
-  padding: 76px var(--space-6) var(--space-6);
-}
-.inv__ghost {
-  display: block;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-}
-.inv__ghost--title {
-  width: 45%;
-  height: 30px;
-}
-.inv__ghost--meta {
-  width: 30%;
-  height: 12px;
-}
-.inv__ghost--rule {
-  height: 1px;
-  margin-block: var(--space-2);
-  background: var(--color-border);
-}
-.inv__ghostCols {
-  display: grid;
-  grid-template-columns: 1.3fr 1fr;
-  gap: var(--space-5);
-}
-.inv__ghost--card {
-  height: 120px;
-}
 
 .inv {
   position: relative;
@@ -278,41 +163,6 @@
 }
 .inv__zone {
   flex: none;
-}
-
-/* Board Fin-Rechnung-Ablegen: a PDF dragged over the page makes the whole page the drop
-   target. */
-.inv__dropOverlay {
-  position: fixed;
-  inset: var(--space-3) var(--space-3) var(--space-3) calc(var(--rail-width, 0px) + var(--space-3));
-  z-index: var(--z-dialog);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed var(--color-accent);
-  border-radius: var(--radius-2xl);
-  background: color-mix(in srgb, var(--color-bg) 82%, transparent);
-  pointer-events: none;
-}
-.inv__dropInner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  text-align: center;
-}
-.inv__dropIcon {
-  display: grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.inv__dropTitle {
-  font-size: var(--fs-xl);
-  font-weight: var(--fw-semibold);
 }
 
 @include bp.phone {
@@ -332,37 +182,7 @@
   }
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .inv__chips {
-    --inv-chip-fade: var(--space-6);
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .inv__chips::-webkit-scrollbar {
-    display: none;
-  }
-  .inv__chips.is-fade-start {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--inv-chip-fade));
-    mask-image: linear-gradient(to right, transparent, #000 var(--inv-chip-fade));
-  }
-  .inv__chips.is-fade-end {
-    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--inv-chip-fade));
-    mask-image: linear-gradient(to left, transparent, #000 var(--inv-chip-fade));
-  }
-  .inv__chips.is-fade-start.is-fade-end {
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--inv-chip-fade),
-      #000 calc(100% - var(--inv-chip-fade)),
-      transparent
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent,
-      #000 var(--inv-chip-fade),
-      #000 calc(100% - var(--inv-chip-fade)),
-      transparent
-    );
+    @include lp.phone-chips(--inv-chip-fade);
   }
   .inv__month {
     padding-inline: var(--space-1);

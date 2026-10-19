@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import type { Subscription } from 'rxjs';
 import type { I18nMap } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -47,6 +48,8 @@ import {
   type RevokeEntry,
 } from './revoke-selection';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One line under an entry: what the person has there and what the revoke does with it. */
 export interface RevokeLine {
@@ -98,6 +101,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     EmptyStateComponent,
     FormsModule,
     TranslatePipe,
@@ -215,7 +219,7 @@ export class UserRevokeComponent {
   }
 
   protected name(p: { displayName?: string | null; email?: string | null } | null): string {
-    return p?.displayName || p?.email || this.i18n.translate('admin.users.merge.unnamed');
+    return personLabel(p, this.i18n, { fallback: 'admin.users.merge.unnamed' });
   }
 
   /** "vor 8 Monaten", "vor 12 Tagen", "heute". */
@@ -231,7 +235,7 @@ export class UserRevokeComponent {
   }
 
   protected label(map: I18nMap, key: string): string {
-    return map[this.i18n.locale()] || map['de'] || key;
+    return i18nLabel(map, this.i18n.locale(), key);
   }
 
   protected gEntry(g: RevokeGremium): RevokeEntry {

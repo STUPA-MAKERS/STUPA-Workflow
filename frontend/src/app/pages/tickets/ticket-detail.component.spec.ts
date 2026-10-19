@@ -3,7 +3,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { screen } from '@testing-library/angular';
+import { screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
@@ -599,22 +599,21 @@ describe('TicketDetailComponent', () => {
   });
 
   it('lists the linked to-dos and links each to its board', async () => {
-    const { cmp } = await start('/tickets/t40', {
+    const { cmp, todosApi } = await start('/tickets/t40', {
       todos: of([
-        card(),
+        card({ assignees: [MARA, { principalId: null, displayName: null }] }),
         card({ id: 'c2', title: 'Zweite', isDone: true, dueDate: null, assignees: [] }),
       ]),
       split: true,
     });
     const link = screen.getByRole('link', { name: 'PDF-Kopf: Beginn statt Ende verwenden' });
     expect(link).toHaveAttribute('href', '/todos?card=c1');
-    expect(cmp.todoSub(card())).toBe('Plattform · In Arbeit · fällig 17.10.');
-    expect(cmp.todoSub(card({ dueDate: null }))).toBe('Plattform · In Arbeit');
-    expect(
-      cmp.todoNames(card({ assignees: [MARA, { principalId: null, displayName: null }] })),
-    ).toEqual(['Mara Keller', 'Gelöschte Person']);
-    expect(cmp.todoIds(card())).toEqual(['p1']);
+    expect(screen.getByText('Plattform · In Arbeit · fällig 17.10.')).toBeInTheDocument();
+    expect(screen.getByText('Plattform · In Arbeit')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Mara Keller, Gelöschte Person' })).toBeInTheDocument();
     expect(cmp.openTodos().map((c) => c.id)).toEqual(['c1']);
+    // The list shows the cards of the page and reads nothing itself.
+    expect(todosApi.linked).toHaveBeenCalledTimes(1);
   });
 
   it('opens the to-do dialog and reloads after a new card', async () => {
@@ -622,6 +621,13 @@ describe('TicketDetailComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: /To-Do anlegen/ }));
     harness.detectChanges();
     expect(cmp.todoOpen()).toBe(true);
+    // The shared dialog starts from the ticket: its title and the link to it.
+    await harness.fixture.whenStable();
+    harness.detectChanges();
+    const dialog = screen.getByRole('dialog', { name: 'To-Do aus Ticket anlegen' });
+    expect(within(dialog).getByRole('textbox', { name: /Titel/ })).toHaveValue(cmp.ticket()!.title);
+    expect(within(dialog).getByText(`Ticket · ${cmp.ticket()!.number} ${cmp.ticket()!.title}`)).toBeInTheDocument();
+    expect(within(dialog).queryByLabelText('Beschreibung (Markdown)')).toBeNull();
     api.get.mockClear();
     todosApi.linked.mockClear();
     cmp.onTodoCreated();

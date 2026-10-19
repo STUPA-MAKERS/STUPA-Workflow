@@ -13,22 +13,20 @@
     } @else {
       <nav class="mt__list" appScrollFade="y" [attr.aria-label]="'admin.mailTemplates.title' | t">
         @if (loading()) {
-          <app-skeleton variant="lines" [count]="8" />
+          <app-skeleton variant="items" [count]="8" />
         }
         @for (tpl of templates(); track tpl.key) {
-          <button
-            type="button"
-            class="mt__item"
-            [class.mt__item--on]="selectedKey() === tpl.key"
-            [attr.aria-current]="selectedKey() === tpl.key ? 'true' : null"
-            [title]="tpl.key"
-            (click)="select(tpl.key)"
+          <app-list-item
+            [title]="keyLabel(tpl.key)"
+            [wrap]="true"
+            [selected]="selectedKey() === tpl.key"
+            [attr.title]="tpl.key"
+            (activate)="select(tpl.key)"
           >
-            <span class="mt__itemLabel">{{ keyLabel(tpl.key) }}</span>
             @if (tpl.source === 'override') {
-              <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
+              <app-status-text status kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
-          </button>
+          </app-list-item>
         } @empty {
           @if (!loading()) {
             <app-empty-state rows="3" [heading]="'admin.mailTemplates.empty' | t" />
@@ -45,7 +43,7 @@
             @if (d.source === 'override') {
               <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
-            <app-segmented width="equal" [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.mailTemplates.lang' | t" />
+            <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
           </span>
         </header>
 

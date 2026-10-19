@@ -1,0 +1,32 @@
+:host {
+  display: contents;
+}
+.amt__value {
+  color: var(--color-text);
+}
+.amt__value--stack {
+  color: inherit;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+.amt__value--approved {
+  font-weight: var(--fw-semibold);
+  color: var(--color-accent-text);
+}
+.amt__struck {
+  color: var(--color-text-muted);
+}
+/* The approved amount over the struck requested one. */
+.amt__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.amt__struck--stack {
+  font-size: 0.71875rem;
+  line-height: 0.9375rem;
+  white-space: nowrap;
+}
+.amt__struck--inline {
+  margin-left: var(--space-2);
+}

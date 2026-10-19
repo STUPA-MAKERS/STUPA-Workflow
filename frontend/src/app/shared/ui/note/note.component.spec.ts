@@ -45,4 +45,27 @@ describe('NoteComponent', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Laden fehlgeschlagen');
     expect(await runAxe(container)).toHaveNoViolations();
   });
+
+  it('takes the surface of a sheet and the ok tone', async () => {
+    const { container } = await render(
+      `<app-note kind="ok" icon="check" [surface]="3">Importiert</app-note><app-note>Seite</app-note>`,
+      { imports: [NoteComponent] },
+    );
+    const [sheet, page] = Array.from(container.querySelectorAll('app-note'));
+    expect(sheet).toHaveClass('note--ok');
+    expect(sheet).toHaveClass('note--s3');
+    expect(page).not.toHaveClass('note--s3');
+  });
+
+  it('shows a projected action after the text', async () => {
+    const open = jest.fn();
+    const { container } = await render(
+      `<app-note kind="warn"><span>Gibt es schon</span><button noteAction type="button" (click)="open()">Öffnen</button></app-note>`,
+      { imports: [NoteComponent], componentProperties: { open } },
+    );
+    const button = screen.getByRole('button', { name: 'Öffnen' });
+    expect(container.querySelector('.note__text')).not.toContainElement(button);
+    button.click();
+    expect(open).toHaveBeenCalledTimes(1);
+  });
 });
