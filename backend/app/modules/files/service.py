@@ -171,7 +171,6 @@ class FilesService:
         data: bytes,
         by: str,
         field_key: str | None = None,
-        is_comparison_offer: bool = False,
     ) -> AttachmentOut:
         """Validate the file, store in MinIO, create the row, enqueue the scan.
 
@@ -212,7 +211,6 @@ class FilesService:
             storage_key=storage_key,
             scanned=False,
             scan_result=None,
-            is_comparison_offer=is_comparison_offer,
         )
         self.session.add(attachment)
         await audit_record(
@@ -854,7 +852,6 @@ def upload_audit_data(attachment: Attachment) -> dict[str, object]:
     return {
         **_owner_data(attachment),
         "hasFieldKey": attachment.field_key is not None,
-        "isComparisonOffer": attachment.is_comparison_offer,
         "mime": attachment.mime,
         "size": attachment.size,
     }
@@ -876,5 +873,4 @@ def _attachment_out(attachment: Attachment) -> AttachmentOut:
         mime=attachment.mime,
         size=attachment.size,
         scanned=attachment.scanned,
-        is_comparison_offer=attachment.is_comparison_offer,
     )

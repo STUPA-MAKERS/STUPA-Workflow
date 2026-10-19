@@ -41,7 +41,6 @@ class _FakeService:
         data: bytes,
         by: str,
         field_key: str | None = None,
-        is_comparison_offer: bool = False,
     ) -> AttachmentOut:
         self.uploaded.append((application_id, filename, len(data)))
         return AttachmentOut(
@@ -50,7 +49,6 @@ class _FakeService:
             mime="application/pdf",
             size=len(data),
             scanned=False,
-            is_comparison_offer=is_comparison_offer,
         )
 
     async def get_attachment(self, attachment_id: UUID) -> Attachment:
@@ -123,7 +121,7 @@ class _FakeService:
         return [
             AttachmentOut(
                 id=ATT_ID, filename="doc.pdf", mime="application/pdf",
-                size=3, scanned=True, is_comparison_offer=False,
+                size=3, scanned=True,
             )
         ]
 
@@ -211,13 +209,12 @@ def test_upload_ok(app: FastAPI, client: TestClient, fake_service: _FakeService)
     r = client.post(
         f"/api/applications/{APP_ID}/attachments",
         files={"file": ("doc.pdf", b"%PDF-data", "application/pdf")},
-        data={"is_comparison_offer": "true"},
     )
     assert r.status_code == 201
     body = r.json()
     assert body["filename"] == "doc.pdf"
     assert body["scanned"] is False
-    assert body["is_comparison_offer"] is True
+    assert "is_comparison_offer" not in body
     assert fake_service.uploaded[0][0] == APP_ID
 
 

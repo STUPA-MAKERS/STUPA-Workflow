@@ -63,7 +63,6 @@ def _draft(session: FakeSession) -> Attachment:
         storage_key="drafts/x/d.pdf",
         scanned=False,
         scan_result=None,
-        is_comparison_offer=False,
         draft_token_hash=b"h",
         draft_expires_at=datetime.now(UTC) + timedelta(days=7),
     )

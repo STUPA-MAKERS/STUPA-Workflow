@@ -286,7 +286,6 @@ async def test_detail_maps_notes_events_attachments_and_duplicate() -> None:
         mime="image/png",
         size=3,
         scanned=True,
-        is_comparison_offer=False,
     )
     detail = await _svc(session, files=FakeFiles([att]), todos=_Todos(2)).detail(ticket.id, VIEWER)
     assert detail.duplicate_of is not None

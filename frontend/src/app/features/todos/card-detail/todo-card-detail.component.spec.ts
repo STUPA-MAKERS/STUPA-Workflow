@@ -1128,7 +1128,7 @@ describe('TodoCardDetailComponent', () => {
     const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
     const drafts = chat().injector.get(DraftAttachmentsService);
     const old = chat().componentInstance;
-    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, isComparisonOffer: false, scanState: 'scanning' as const };
+    const file = { id: 'd1', filename: 'a.png', mime: 'image/png', size: 3, scanned: false, scanState: 'scanning' as const };
     drafts.files.set([file]);
     phone = true;
     for (const fn of [...listeners]) fn({ matches: true } as MediaQueryListEvent);

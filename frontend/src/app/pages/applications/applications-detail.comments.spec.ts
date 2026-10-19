@@ -449,7 +449,6 @@ describe('ApplicationsDetailComponent — comments in app-chat', () => {
       mime: 'application/pdf',
       size: 4,
       scanned: false,
-      is_comparison_offer: false,
       draftToken: 'tok',
       draftExpiresAt: '2999-01-01T00:00:00Z',
     });
