@@ -1,16 +1,11 @@
 @use 'field' as f;
+@use '../../../shared/ui/dialog-form' as df;
 
 /* The dialog adds no box to the shell; a closed dialog takes no room. */
-:host {
-  display: contents;
-}
+@include df.host;
 
 .rd {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-  margin: 0;
+  @include df.form;
 }
 
 /* The handbook as a quiet accent row: a real link, opened in a new tab. */

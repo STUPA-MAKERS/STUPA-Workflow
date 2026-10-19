@@ -82,6 +82,8 @@ import { SubBookingDialogComponent } from './sub-booking-dialog/sub-booking-dial
 import { TransferDetailComponent } from './transfer-detail/transfer-detail.component';
 import { TransferFormComponent } from './transfer-form/transfer-form.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
+import { CostCentreLabelComponent } from '../budget/cost-centre-label/cost-centre-label.component';
 import { dayMonth } from '@shared/date-format';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
@@ -127,6 +129,8 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    CostCentreLabelComponent,
+    DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     BookingDetailComponent,

@@ -1,0 +1,7 @@
+@if (lock()) {
+  <app-icon name="lock" [size]="iconSize()" />
+} @else if (state() === 'done') {
+  <app-icon name="check" [size]="iconSize()" />
+} @else {
+  {{ number() }}
+}

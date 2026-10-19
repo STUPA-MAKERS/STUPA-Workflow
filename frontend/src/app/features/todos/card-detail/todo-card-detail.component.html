@@ -3,7 +3,7 @@
        sections, so nothing moves when the card arrives. The fixed labels and headings are
        real text; the bars show after 300ms (`skel-in`). The close button works. -->
   <article class="cd cd--busy" aria-busy="true">
-    <header class="cd__head">
+    <header class="sheet-head cd__head">
       @if (phone() && mode() === 'drawer') {
         <button type="button" class="cd__back" (click)="closed.emit()">
           <app-icon name="back" [size]="18" />
@@ -60,7 +60,7 @@
   </div>
 } @else if (card(); as card) {
   <article class="cd" aria-labelledby="cd-title">
-    <header class="cd__head">
+    <header class="sheet-head cd__head">
       @if (phone() && mode() === 'drawer') {
         <button type="button" class="cd__back" (click)="closed.emit()">
           <app-icon name="back" [size]="18" />

@@ -138,29 +138,12 @@
   background: var(--color-selected);
 }
 .gv__badge {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--color-surface-3);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-semibold);
-}
-.gv__badge--now {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
+  --tb-size: 28px;
+  --tb-font: var(--fs-small);
+  --tb-nums: normal;
 }
 /* A border, not an inset shadow, so the ring is equally wide on every side (see the
    agenda pane). */
-.gv__badge--done {
-  background: transparent;
-  box-sizing: border-box;
-  border: 1.5px solid var(--color-accent);
-  color: var(--color-accent-text);
-}
 .gv__itemText {
   display: flex;
   flex-direction: column;

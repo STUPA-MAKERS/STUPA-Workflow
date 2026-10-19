@@ -4,11 +4,13 @@ import type { TodoCardTile, TodoLabel } from '@core/api/todos.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
 import { IconComponent } from '@stupa-makers/ui-kit';
 import { LINK_ICON, dueInfo, linkLine } from '../todos.util';
 import { shortDay } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
+import { TodoLabelComponent } from '../card-facts/todo-label.component';
+import { TodoDueComponent } from '../card-facts/todo-due.component';
+import { TodoAssigneesComponent } from '../card-facts/todo-assignees.component';
 
 /** The most labels a tile shows; the drawer shows all. */
 const TILE_LABELS = 2;
@@ -27,7 +29,7 @@ const TILE_LABELS = 2;
   selector: 'app-todo-card-tile',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, AvatarStackComponent, IconComponent],
+  imports: [TodoAssigneesComponent, TodoDueComponent, TodoLabelComponent, TranslatePipe, IconComponent],
   host: {
     class: 'tt',
     '[class.tt--done]': 'done()',

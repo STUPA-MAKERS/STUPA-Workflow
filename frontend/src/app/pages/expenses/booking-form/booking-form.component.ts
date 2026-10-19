@@ -38,6 +38,10 @@ import {
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
 import { formatMoney } from '@shared/format-money';
 
 /** Which booking the form writes: a new one, or the one in `state.editing`. */
@@ -81,6 +85,10 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SumRowComponent,
+    BookingRowComponent,
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
     NoteComponent,
     ButtonComponent,
     CostCentrePickerComponent,

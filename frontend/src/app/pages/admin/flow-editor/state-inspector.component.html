@@ -12,8 +12,12 @@
   (ngModelChange)="keyChange.emit($event)"
 />
 <div class="ins__pair">
-  <app-input [label]="'admin.common.labelDe' | t" [ngModel]="state().label['de']" (ngModelChange)="labelChange.emit({ lang: 'de', value: $event })" />
-  <app-input [label]="'admin.common.labelEn' | t" [ngModel]="state().label['en']" (ngModelChange)="labelChange.emit({ lang: 'en', value: $event })" />
+  <app-i18n-input
+    [de]="state().label['de']"
+    (deChange)="labelChange.emit({ lang: 'de', value: $event })"
+    [en]="state().label['en']"
+    (enChange)="labelChange.emit({ lang: 'en', value: $event })"
+  />
 </div>
 
 <app-flow-color [value]="state().color" (changed)="colorChange.emit($event)" />

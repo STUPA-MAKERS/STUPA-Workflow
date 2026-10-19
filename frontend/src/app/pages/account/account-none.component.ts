@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 
 /**
  * The sheet of `/account` before an account page is open. Only the wide frame shows it,
@@ -10,8 +10,8 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   selector: 'app-account-none',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [TranslatePipe, EmptyStateComponent],
+  imports: [TranslatePipe, DetailNoneComponent],
   templateUrl: './account-none.component.html',
-  styleUrl: './account-none.component.scss',
+  styleUrl: '../../shared/ui/detail-none/detail-none-host.scss',
 })
 export class AccountNoneComponent {}

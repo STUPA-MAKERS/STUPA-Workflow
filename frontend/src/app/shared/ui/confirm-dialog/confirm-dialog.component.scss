@@ -1,10 +1,10 @@
+@use '../dialog-form' as df;
+
 /* An overlay, like `app-dialog` (see styles.scss): open or closed, the host adds no box,
    so it takes no gap and no track in the flex column or the grid of the page that holds
    it. With a box, every confirm dialog in the column of the meetings page took one gap
    and the meeting dock rose by 48px. */
-:host {
-  display: contents;
-}
+@include df.host;
 
 /* The text and the content below it (a note, an error). */
 .cfd {

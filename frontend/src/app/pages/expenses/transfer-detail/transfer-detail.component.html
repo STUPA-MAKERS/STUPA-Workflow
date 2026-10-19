@@ -1,22 +1,16 @@
 @let t = transfer();
 <article class="fd" [class.fd--split]="split()" aria-labelledby="tdt-title">
-  <header class="fd__head">
+  <header class="sheet-head fd__head">
     <app-sheet-bar [bleed]="split()">
       <h2 appSheetBarTitle id="tdt-title" class="sheet-title fd__title">{{ t.description }}</h2>
       @if (canManage()) {
-        @if (phone()) {
-          <app-button variant="tonal" size="sm" (click)="edit.emit()">
-            <span class="fd__btn"><app-icon name="edit" />{{ 'action.edit' | t }}</span>
-          </app-button>
-        } @else {
-          <app-button
-            variant="text"
-            [iconOnly]="true"
-            [ariaLabel]="'expenses.transfers.editTitle' | t"
-            [title]="'expenses.transfers.editTitle' | t"
-            (click)="edit.emit()"
-          ><app-icon name="edit" /></app-button>
-        }
+        <app-sheet-action
+          icon="edit"
+          [label]="'action.edit' | t"
+          [ariaLabel]="'expenses.transfers.editTitle' | t"
+          [phone]="phone()"
+          (pressed)="edit.emit()"
+        />
       }
       @if (menu().length) {
         <app-row-menu [label]="'expenses.detail.menu' | t" [sections]="menu()" (selected)="onMenu($event)" />
@@ -39,29 +33,9 @@
     <div class="fd__col">
       <div class="td__legsBox">
         <div class="td__legs">
-          <div class="td__leg">
-            <span class="td__legKind">{{ 'expenses.transfers.expenseOn' | t }}</span>
-            <span class="td__legName">
-              @if (from().color) {
-                <span class="fd__swatch" aria-hidden="true" [style.background]="from().color"></span>
-              }
-              {{ from().name }}
-            </span>
-            <span class="td__legPath mono">{{ from().path }}</span>
-            <span class="td__legAmount mono">−{{ amount() }}</span>
-          </div>
+          <app-transfer-leg direction="out" [name]="from().name" [color]="from().color" [path]="from().path" [amount]="amount()" fit />
           <span class="td__arrow" aria-hidden="true"><app-icon name="arrow" [size]="18" /></span>
-          <div class="td__leg">
-            <span class="td__legKind">{{ 'expenses.transfers.incomeOn' | t }}</span>
-            <span class="td__legName">
-              @if (to().color) {
-                <span class="fd__swatch" aria-hidden="true" [style.background]="to().color"></span>
-              }
-              {{ to().name }}
-            </span>
-            <span class="td__legPath mono">{{ to().path }}</span>
-            <span class="td__legAmount td__legAmount--in mono">+{{ amount() }}</span>
-          </div>
+          <app-transfer-leg direction="in" [name]="to().name" [color]="to().color" [path]="to().path" [amount]="amount()" fit />
         </div>
       </div>
 

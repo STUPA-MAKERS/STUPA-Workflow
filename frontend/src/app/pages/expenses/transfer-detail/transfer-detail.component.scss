@@ -13,44 +13,6 @@
   align-items: stretch;
   gap: var(--space-3);
 }
-.td__leg {
-  /* The container of the amount size below. */
-  container-type: inline-size;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-}
-.td__legKind {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.td__legName {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  overflow-wrap: anywhere;
-}
-.td__legPath {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-/* The amount shrinks with the leg, so a 5- or 6-digit amount stays in the card.
-   "−125.000,00 €" has 13 mono characters, about 7.8em: 12cqi fits it. The wrap is
-   the last resort for an amount that is still too wide at the smallest size. */
-.td__legAmount {
-  margin-top: var(--space-2);
-  font-size: clamp(var(--fs-sm), 12cqi, var(--fs-xl));
-  overflow-wrap: anywhere;
-}
-.td__legAmount--in {
-  color: var(--color-accent-text);
-}
 .td__arrow {
   align-self: center;
   display: grid;

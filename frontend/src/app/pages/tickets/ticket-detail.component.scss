@@ -28,29 +28,8 @@
 .td__loadError {
   margin: var(--space-5) 0;
 }
-.td__backLink {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control-height);
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-3);
-  color: var(--color-text);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-}
-.td__backLink:hover {
-  background: var(--color-surface-4);
-}
 
 /* ------------------------------------------------------------------ header */
-.td__head {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sheet-head-gap);
-  padding-bottom: 22px;
-  border-bottom: var(--border-width) solid var(--color-border);
-}
 .td__line {
   display: flex;
   flex-wrap: wrap;

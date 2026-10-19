@@ -1,7 +1,8 @@
 @use 'breakpoints' as bp;
 
 /* The shared parts of the four sub-tabs of a gremium: the chip row, a group of rows with
-   its heading, a sub line with a dot between its parts and the chevron. */
+   its heading, and a sub line with a dot between its parts. The arrow at the end of a
+   row is `app-row-chevron`. */
 
 /* The chips (and a search) in one row; on a phone the chips scroll sideways. */
 @mixin tools {
@@ -50,10 +51,4 @@
     margin-inline: 6px;
     color: var(--color-text-subtle);
   }
-}
-
-@mixin chevron {
-  display: inline-flex;
-  margin-inline-end: calc(-1 * var(--space-2));
-  color: var(--color-text-muted);
 }

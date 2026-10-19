@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent } from '@stupa-makers/ui-kit';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import type { BudgetTransfer } from '../../budget/budget-tree.api';
 import {
@@ -11,6 +11,8 @@ import {
 } from '../../budget/expense-display.util';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { TransferLegComponent } from '../transfer-leg/transfer-leg.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 import { formatMoney } from '@shared/format-money';
 
 /**
@@ -23,7 +25,7 @@ import { formatMoney } from '@shared/format-money';
   selector: 'app-transfer-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NoteComponent, SheetBarComponent, SheetBarTitleDirective, ButtonComponent, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
+  imports: [SheetActionComponent, TransferLegComponent, NoteComponent, SheetBarComponent, SheetBarTitleDirective, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
   templateUrl: './transfer-detail.component.html',
   styleUrl: './transfer-detail.component.scss',
 })

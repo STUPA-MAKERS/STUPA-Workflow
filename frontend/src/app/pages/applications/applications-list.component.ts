@@ -79,6 +79,7 @@ import { ApplicationCaptureComponent } from './capture/application-capture.compo
 import { debounced } from '@shared/debounced';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { applicationReads } from './application-reads';
@@ -149,6 +150,7 @@ type FilterSheet = 'budget' | 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AmountComponent,
     NoteComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,

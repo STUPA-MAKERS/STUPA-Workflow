@@ -70,6 +70,7 @@ import {
 } from './invoice-form/invoice-form.component';
 import { debounced } from '@shared/debounced';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { dayMonth } from '@shared/date-format';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
@@ -117,6 +118,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,

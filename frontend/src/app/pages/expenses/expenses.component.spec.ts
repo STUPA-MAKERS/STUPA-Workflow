@@ -2654,7 +2654,7 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(await screen.findByText('Keine Buchungen gefunden.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Filter zurücksetzen' })).toBeNull();
     // An empty list leaves a neutral sheet beside it.
-    expect(fixture.nativeElement.querySelector('.exp__none--skeleton')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('app-detail-none .dn__ghost')).not.toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     c.kind.set('income');

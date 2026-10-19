@@ -109,9 +109,7 @@
           [value]="filter().assignee"
           (valueChange)="setAssignee($event)"
           [text]="assigneeText()"
-          [active]="filter().assignee !== ''"
-          [icon]="filter().assignee ? 'check' : null"
-          [chevron]="!filter().assignee"
+          filled
         />
         @if (labelOptions().length) {
           <app-filter-select
@@ -121,9 +119,7 @@
             [values]="filter().labels"
             (valuesChange)="setLabels($event)"
             [text]="labelText()"
-            [active]="filter().labels.length > 0"
-            [icon]="filter().labels.length ? 'check' : null"
-            [chevron]="!filter().labels.length"
+            filled
             [resetLabel]="'todos.filter.all' | t"
           />
         }
@@ -133,9 +129,7 @@
           [value]="filter().due"
           (valueChange)="setDue($event)"
           [text]="dueText()"
-          [active]="filter().due !== ''"
-          [icon]="filter().due ? 'check' : null"
-          [chevron]="!filter().due"
+          filled
         />
         @if (filtered()) {
           <button type="button" class="td__reset" data-testid="td-reset" (click)="resetFilters()">

@@ -11,8 +11,6 @@ import {
   IconComponent,
   InputComponent,
   MEDIA,
-  SegmentedComponent,
-  type SegmentedOption,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
@@ -24,9 +22,9 @@ import { FabComponent } from '@shared/ui/fab/fab.component';
 import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 
-const LANGS = ['de', 'en'] as const;
-type Lang = (typeof LANGS)[number];
+type Lang = ContentLang;
 
 /** The text fields of a template that the editor changes. */
 const TEXT_FIELDS = ['subjectI18n', 'bodyI18n', 'bodyHtmlI18n'] as const;
@@ -64,7 +62,7 @@ function sameTexts(a: Record<string, string>, b: Record<string, string>): boolea
     IconComponent,
     InputComponent,
     PageHeaderComponent,
-    SegmentedComponent,
+    ContentLangSwitchComponent,
     StatusTextComponent,
   ],
   templateUrl: './mail-templates.component.html',
@@ -75,7 +73,6 @@ export class MailTemplatesComponent {
   private readonly i18n = inject(I18nService);
   private readonly toast = inject(ToastService);
 
-  readonly langOptions: SegmentedOption[] = LANGS.map((l) => ({ value: l, label: l.toUpperCase() }));
   /** Phone: a chip picks the template instead of the list column. */
   readonly phone = mediaQuerySignal(MEDIA.phone);
   private readonly templates_ = signal<MailTemplate[]>([]);
@@ -118,10 +115,6 @@ export class MailTemplatesComponent {
       label: t.source === 'override' ? `${this.keyLabel(t.key)} · ${custom}` : this.keyLabel(t.key),
     }));
   });
-
-  setLang(value: string | null): void {
-    this.lang.set(value === 'en' ? 'en' : 'de');
-  }
 
   readonly placeholderList = computed<{ key: string; desc: string; token: string }[]>(() => {
     const d = this.draft();

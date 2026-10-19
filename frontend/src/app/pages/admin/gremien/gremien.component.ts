@@ -23,6 +23,7 @@ import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
 import { GremiumDialogComponent } from './gremium-dialog/gremium-dialog.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { expandSet } from '@shared/expand-set';
 
 /**
  * The message of a refused gremium delete. The delete applies the rules of the meeting
@@ -94,7 +95,7 @@ export class AdminGremienComponent {
   /** CD variants from `GET /cd-variants`: the dropdown source and the read-out names. */
   readonly cdVariants = signal<CdVariantOption[]>([]);
   /** The ids of the open rows. */
-  protected readonly expanded = signal<ReadonlySet<string>>(new Set());
+  protected readonly expanded = expandSet<string>();
   /** The extra protocol recipients of the open rows, by gremium id. */
   private readonly recipients = signal<ReadonlyMap<string, string[] | null>>(new Map());
 
@@ -117,18 +118,11 @@ export class AdminGremienComponent {
   }
 
   protected isOpen(g: Gremium): boolean {
-    return this.expanded().has(g.id);
+    return this.expanded.has(g.id);
   }
 
   protected toggle(g: Gremium): void {
-    const next = new Set(this.expanded());
-    if (next.has(g.id)) {
-      next.delete(g.id);
-    } else {
-      next.add(g.id);
-      this.loadRecipients(g.id);
-    }
-    this.expanded.set(next);
+    if (this.expanded.toggle(g.id)) this.loadRecipients(g.id);
   }
 
   private loadRecipients(id: Uuid): void {
@@ -263,7 +257,7 @@ export class AdminGremienComponent {
       ),
     );
     // A new gremium opens, so its roles show at once.
-    if (event.created) this.expanded.update((s) => new Set(s).add(event.gremium.id));
+    if (event.created) this.expanded.open(event.gremium.id);
     this.reload(false);
   }
 
@@ -273,7 +267,7 @@ export class AdminGremienComponent {
    */
   protected onBaseSaved(event: { gremium: Gremium; created: boolean }): void {
     if (event.created && !this.isOpen(event.gremium)) {
-      this.expanded.update((s) => new Set(s).add(event.gremium.id));
+      this.expanded.open(event.gremium.id);
       // The recipients of the new gremium are not saved: read what the server has.
       this.loadRecipients(event.gremium.id);
     }

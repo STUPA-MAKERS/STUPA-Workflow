@@ -78,6 +78,7 @@ import {
   relativeDays,
   splitUrl,
 } from '../todos.util';
+import { copyToClipboard } from '@shared/clipboard';
 import { isoDay, weekdayDate } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
 
@@ -996,14 +997,8 @@ export class TodoCardDetailComponent {
     if (!c) return;
     // The card only: the link stays valid when the card moves to another board.
     const url = `${location.origin}/todos?card=${c.id}`;
-    const clip = navigator.clipboard;
-    if (!clip) {
-      this.toast.error(this.t('todos.card.linkFailed'));
-      return;
-    }
-    clip.writeText(url).then(
-      () => this.toast.success(this.t('todos.card.linkCopied')),
-      () => this.toast.error(this.t('todos.card.linkFailed')),
+    void copyToClipboard(url).then((ok) =>
+      ok ? this.toast.success(this.t('todos.card.linkCopied')) : this.toast.error(this.t('todos.card.linkFailed')),
     );
   }
 

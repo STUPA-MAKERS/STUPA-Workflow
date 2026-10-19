@@ -154,7 +154,7 @@ describe('AdminRolesComponent', () => {
     inst.openAdd();
     inst.patchDraft('key', 'kultur');
     inst.createRole();
-    expect(inst.expanded().has('r-new')).toBe(true);
+    expect(inst.expanded.has('r-new')).toBe(true);
   });
 
   it('shows a 422 and a 409 of the create under the key field', async () => {

@@ -1,6 +1,6 @@
-// Shared layout of the meeting dialogs (create, settings, agenda item, vote, close,
-// delete). Emulated encapsulation scopes styles per component, so each dialog
-// component includes these mixins in its own stylesheet.
+// Shared layout of the form dialogs (the meeting dialogs, the decision, the agenda, the
+// sub booking, the to-do transfer and the report). Emulated encapsulation scopes styles
+// per component, so each dialog component includes these mixins in its own stylesheet.
 
 // The host of a dialog component. It adds no box, so the dialog takes no gap in a flex
 // column of the page (`app-dialog` itself adds no box either).

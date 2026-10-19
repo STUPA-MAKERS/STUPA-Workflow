@@ -1,11 +1,11 @@
 @use 'breakpoints' as bp;
+@use '../../shared/ui/scroll-fade' as fade;
+@use '../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications and the voting page. */
 
 :host {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 :host(:not(.pane-page)) {
   flex: 1 0 auto;
@@ -15,16 +15,13 @@
   min-width: 0;
 }
 .tk:not(.tk--split) {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
+  @include lp.single-column;
 }
 .tk:not(.tk--split) > app-list-detail {
   flex: 1 0 auto;
 }
 .tk--split {
-  flex: 1 1 0;
-  min-height: 0;
+  @include lp.split-column;
 }
 
 /* ------------------------------------------------------------------ list pane */
@@ -32,11 +29,7 @@
   flex: 1 0 auto;
 }
 .tk__chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+  @include lp.chips;
 }
 .tk__chip {
   max-width: 100%;
@@ -44,56 +37,26 @@
 
 /* ------------------------------------------------------------------ rows */
 .tk__scroll {
-  --tk-fade: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.scroll(--tk-fade);
 }
 .tk:not(.tk--split) .tk__scroll {
   flex: 1 0 auto;
 }
 .tk--split .tk__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--tk-fade);
+  @include lp.split-scroll(--tk-fade);
 }
 .tk--split .tk__scroll > * {
   flex: none;
 }
-.tk__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--tk-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--tk-fade));
-}
-.tk__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--tk-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--tk-fade));
-}
-.tk__scroll.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--tk-fade),
-    #000 calc(100% - var(--tk-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--tk-fade),
-    #000 calc(100% - var(--tk-fade)),
-    transparent
-  );
+.tk__scroll {
+  @include fade.fade-y(var(--tk-fade));
 }
 
 .tk__group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 .tk__groupTitle {
-  padding: 18px var(--space-4) 6px;
+  @include lp.month;
 }
 .tk__group:first-child .tk__groupTitle {
   padding-top: var(--space-2);
@@ -104,9 +67,7 @@
   font-weight: var(--fw-regular);
 }
 .tk__rows {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 
 /* The kind as an icon on a small tile: a thing, never initials. */
@@ -142,12 +103,6 @@
   background: var(--color-surface-3);
   color: var(--color-text-muted);
 }
-.tk__chev {
-  display: inline-flex;
-  margin-inline-end: calc(-1 * var(--space-2));
-  color: var(--color-text-muted);
-}
-
 .tk__showClosed {
   display: inline-flex;
   align-items: center;
@@ -174,17 +129,12 @@
   margin: var(--space-4) 0;
 }
 .tk__more {
-  display: flex;
-  justify-content: center;
-  margin-top: var(--space-3);
+  @include lp.more;
 }
 
 /* ------------------------------------------------------------------ detail pane */
 .tk__detail {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.detail;
 }
 .tk--split .tk__detail {
   min-height: 0;
@@ -192,13 +142,7 @@
 
 @include bp.phone {
   .tk__chips {
-    --tk-chip-fade: var(--space-6);
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .tk__chips::-webkit-scrollbar {
-    display: none;
+    @include lp.phone-chips(--tk-chip-fade, $fade-ends: false);
   }
   .tk__chips.is-fade-start {
     -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--tk-chip-fade));
@@ -222,7 +166,7 @@
   --li-gap: var(--space-3);
 }
 /* One view at a time a row ends with a chevron after the person: the gap and the 17px
-   icon, of which `.tk__chev` pulls 8px into the row padding. */
+   icon, of which `app-row-chevron` pulls 8px into the row padding. */
 .tk:not(.tk--split) .tk__skelRows {
   --sk-trail-end: 17px;
 }

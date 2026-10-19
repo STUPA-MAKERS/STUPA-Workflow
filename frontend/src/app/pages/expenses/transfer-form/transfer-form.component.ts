@@ -30,6 +30,9 @@ import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
 import type { ExpenseTransfersState } from '../expense-transfers.state';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { TransferLegComponent } from '../transfer-leg/transfer-leg.component';
 import { formatMoney } from '@shared/format-money';
 
 /** A new transfer, or a correction of the one in `transfers.editing`. */
@@ -59,6 +62,9 @@ interface Leg {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TransferLegComponent,
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
     NoteComponent,
     ButtonComponent,
     CostCentrePickerComponent,

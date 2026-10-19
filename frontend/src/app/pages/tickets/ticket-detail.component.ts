@@ -101,6 +101,7 @@ import {
   reporterEventText,
   reporterName,
 } from './tickets.util';
+import { copyToClipboard } from '@shared/clipboard';
 import { clock, dayMonth } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
 
@@ -646,10 +647,9 @@ export class TicketDetailComponent {
 
   /** Copy the link of the ticket. */
   async copyLink(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(location.href.split('?')[0]);
+    if (await copyToClipboard(location.href.split('?')[0])) {
       this.toast.success(this.t('tickets.detail.linkCopied'));
-    } catch {
+    } else {
       this.toast.error(this.t('tickets.detail.linkFailed'));
     }
   }

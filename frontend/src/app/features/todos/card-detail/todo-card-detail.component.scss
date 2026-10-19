@@ -29,12 +29,7 @@
 
 /* ------------------------------------------------------------------ head */
 .cd__head {
-  display: flex;
   flex: none;
-  flex-direction: column;
-  gap: var(--sheet-head-gap);
-  padding-bottom: 22px;
-  border-bottom: 1px solid var(--color-border);
 }
 .cd__back {
   display: inline-flex;

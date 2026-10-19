@@ -17,7 +17,6 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { type StatusKind, type StatusView, meetingStatus } from '@shared/status-kind.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
@@ -37,6 +36,7 @@ import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
 import { clock, shortTime, weekdayDate } from '@shared/date-format';
 
 /** The length of the protocol excerpt on a phone, in characters. */
@@ -72,13 +72,13 @@ const EXCERPT_LENGTH = 160;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ParticipantVoteService],
   imports: [
+    MeetingHeadComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ScrollFadeDirective,
     ButtonComponent,
     IconComponent,
-    StatusTextComponent,
     SideSheetComponent,
     AgendaPaneComponent,
     TopSheetComponent,

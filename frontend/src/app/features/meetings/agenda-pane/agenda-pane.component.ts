@@ -32,6 +32,7 @@ import {
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { TopBadgeComponent } from '../top-badge/top-badge.component';
 
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
@@ -77,6 +78,7 @@ export interface AgendaMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TopBadgeComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     CdkDrag,

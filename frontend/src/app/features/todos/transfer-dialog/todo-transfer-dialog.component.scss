@@ -1,13 +1,9 @@
-:host {
-  display: contents;
-}
+@use '../../../shared/ui/dialog-form' as df;
+
+@include df.host;
 
 .tt {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-  min-width: 0;
-  margin: 0;
+  @include df.form;
 }
 
 .tt__error {

@@ -1,3 +1,4 @@
+@use '../../../shared/ui/surface-card' as sc;
 :host {
   display: block;
 }
@@ -62,11 +63,11 @@
   min-width: 0;
 }
 .br__secHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  min-height: 2.25rem;
+  --sh-wrap: nowrap;
+  --sh-gap: var(--space-2);
+  --sh-min-height: 2.25rem;
+  --sh-inset: 0;
+  --sh-title-inset: var(--space-1);
 }
 .br__secTitle {
   padding-inline: var(--space-1);
@@ -178,13 +179,7 @@
 /* Texts after the submission: a card per kind on the next surface, as the footer
    columns: the field, then the Markdown preview as the page shows it. */
 .br__subm {
-  --color-surface-sunken: var(--color-surface-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-2);
+  @include sc.card($pad: var(--space-3), $gap: var(--space-2), $muted-label: false);
 }
 .br__submPv {
   display: flex;
@@ -221,13 +216,7 @@
 
 /* Footer columns: a card per column on the next surface. */
 .br__column {
-  --color-surface-sunken: var(--color-surface-3);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-2);
+  @include sc.card($pad: var(--space-3), $gap: var(--space-2), $muted-label: false);
 }
 .br__columnHead {
   display: flex;

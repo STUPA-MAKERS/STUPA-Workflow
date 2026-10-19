@@ -212,31 +212,21 @@
           />
         }
         @case ('missing') {
-          <div class="inv__none">
-            <app-empty-state plain icon="search"
-              [fill]="true"
-              [heading]="'invoices.notFound' | t"
-              [body]="'invoices.notFoundBody' | t"
-            />
-          </div>
+          <app-detail-none
+            [surface]="split() ? 'sheet' : 'flat'"
+            [inset]="false"
+            icon="search"
+            [heading]="'invoices.notFound' | t"
+            [body]="'invoices.notFoundBody' | t"
+          />
         }
         @default {
           @if (split()) {
             @if (!loading() && !items().length) {
               <!-- Board Fin-Rechnungen-Leer: an empty list leaves a neutral sheet. -->
-              <div class="inv__none inv__none--skeleton" aria-hidden="true">
-                <span class="inv__ghost inv__ghost--title"></span>
-                <span class="inv__ghost inv__ghost--meta"></span>
-                <span class="inv__ghost inv__ghost--rule"></span>
-                <div class="inv__ghostCols">
-                  <span class="inv__ghost inv__ghost--card"></span>
-                  <span class="inv__ghost inv__ghost--card"></span>
-                </div>
-              </div>
+              <app-detail-none [inset]="false" [ghost]="true" />
             } @else {
-              <div class="inv__none">
-                <app-empty-state plain icon="receipt" [fill]="true" [heading]="'invoices.none' | t" />
-              </div>
+              <app-detail-none [inset]="false" icon="receipt" [heading]="'invoices.none' | t" />
             }
           }
         }

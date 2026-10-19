@@ -1,4 +1,4 @@
-@use '../../../features/meetings/scroll-fade' as fade;
+@use '../../../shared/ui/scroll-fade' as fade;
 
 :host {
   display: block;
@@ -12,19 +12,7 @@
 }
 
 .sp__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  min-height: 2.5rem;
-  padding-inline: var(--space-1);
-}
-.sp__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+  --sh-min-height: 2.5rem;
 }
 
 .sp__list {
