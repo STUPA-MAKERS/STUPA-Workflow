@@ -1,5 +1,6 @@
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
+import { Injectable } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
@@ -23,7 +24,16 @@ import { BOARDS, MEMBERS, asPhone, board, detail, tile } from '../../../testing/
 import { type FakeTodoLive } from '../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
 import { provideFakeTodoLive } from '../../../testing/todo-live';
+import { TodoCacheService } from '../../features/todos/todo-cache.service';
 import { ALL_BOARDS, BOARD_POLL_MS, TodosComponent } from './todos.component';
+
+/** Keeps what the page reads but reads nothing ahead, so a test counts the reads of the page. */
+@Injectable()
+class QuietCache extends TodoCacheService {
+  override prefetch(): void {
+    return;
+  }
+}
 
 interface Opts {
   boards?: TodoBoardSummary[];
@@ -38,6 +48,10 @@ interface Opts {
   /** The boards of "Alle", or a subject that keeps the read in flight. */
   all?: TodoAssignedBoard[] | Subject<TodoAssignedPoll>;
   transfer?: () => Observable<TodoCardDetail>;
+  /** The page reads every board and card ahead; off by default (`QuietCache`). */
+  readAhead?: boolean;
+  /** Each board read answers with a board of that id (the read ahead keeps them apart). */
+  perBoard?: boolean;
 }
 
 async function start(url: string, opts: Opts = {}) {
@@ -48,8 +62,10 @@ async function start(url: string, opts: Opts = {}) {
   ] });
   const api = {
     boards: jest.fn(() => (opts.boardsFail ? throwError(() => new Error('x')) : of(opts.boards ?? BOARDS))),
-    pollBoard: jest.fn((): Observable<TodoBoardPoll> =>
-      opts.pending ? new Subject<TodoBoardPoll>() : of({ board: b, etag: 'W/"1"' }),
+    pollBoard: jest.fn((id: string, _etag: string | null): Observable<TodoBoardPoll> =>
+      opts.pending
+        ? new Subject<TodoBoardPoll>()
+        : of(opts.perBoard ? { board: { ...b, id }, etag: `W/"${id}"` } : { board: b, etag: 'W/"1"' }),
     ),
     pollMineBoards: jest.fn((): Observable<TodoAssignedPoll> => opts.rowsRead ?? of({ boards: opts.rows ?? [], etag: 'W/"r"' })),
     pollAllBoards: jest.fn((): Observable<TodoAssignedPoll> =>
@@ -79,6 +95,11 @@ async function start(url: string, opts: Opts = {}) {
       { provide: ToastService, useValue: toast },
     ],
   });
+  if (!opts.readAhead) {
+    TestBed.overrideComponent(TodosComponent, {
+      set: { providers: [{ provide: TodoCacheService, useClass: QuietCache }] },
+    });
+  }
   const auth = TestBed.inject(AuthService);
   (auth as unknown as { _principal: { set(v: unknown): void } })._principal.set({
     id: 'me',
@@ -299,6 +320,36 @@ describe('TodosComponent', () => {
     cmp.pickBoard('b-1');
     await settle();
     expect(router.url).toBe('/todos/b-1');
+  });
+
+  it('reads every board and its cards ahead, so a board change shows the board at once', async () => {
+    const { cmp, api, router, harness, settle } = await start('/todos/b-1', { readAhead: true, perBoard: true });
+    expect(api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-0', 'b-2', 'b-3', 'b-1']);
+    expect(api.pollAllBoards).toHaveBeenCalledWith(null);
+    expect(api.card).toHaveBeenCalledWith('k-1');
+    api.pollBoard.mockReturnValue(new Subject<TodoBoardPoll>());
+    await router.navigateByUrl('/todos/b-2');
+    harness.detectChanges();
+    expect(cmp.loading()).toBe(false);
+    expect(cmp.board()).not.toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-todo-board-skeleton')).toBeNull();
+    expect(cmp.board()?.id).toBe('b-2');
+    expect(api.pollBoard).toHaveBeenLastCalledWith('b-2', 'W/"b-2"');
+    await settle();
+  });
+
+  it('shows a board read ahead that the read behind it no longer finds as missing', async () => {
+    const { cmp, api, router, settle } = await start('/todos/b-1', { readAhead: true, perBoard: true });
+    api.pollBoard.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+    await router.navigateByUrl('/todos/b-2');
+    await settle();
+    expect(cmp.board()).toBeNull();
+    expect(cmp.notFound()).toBe(true);
+    api.pollBoard.mockReturnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+    await router.navigateByUrl('/todos/b-3');
+    await settle();
+    expect(cmp.error()).toBe(false);
+    expect(cmp.board()).not.toBeNull();
   });
 
   it('shows a missing board and a failed one with retry', async () => {
@@ -916,7 +967,7 @@ describe('TodosComponent', () => {
       expect(cmp.skeleton().natural).toBe(false);
     });
 
-    it('draws the skeleton of a board again with the columns it had, and resets the row count', async () => {
+    it('shows a board it showed before at once on a return, with its rows, and reads it behind', async () => {
       const three = board({
         id: 'b-0',
         name: 'Meine To-Dos',
@@ -935,11 +986,16 @@ describe('TodosComponent', () => {
       await router.navigateByUrl('/todos/b-1');
       await settle();
       expect(cmp.rowMatches()).toBeNull();
+      expect(cmp.loading()).toBe(true);
       await router.navigateByUrl('/todos/b-0');
       await settle();
-      const skel = harness.routeNativeElement!.querySelector('app-todo-board-skeleton')!;
-      expect(skel.querySelectorAll('.bv__col')).toHaveLength(3);
-      expect(skel).toHaveClass('bv-host--natural');
+      const root = harness.routeNativeElement!;
+      expect(root.querySelector('app-todo-board-skeleton')).toBeNull();
+      expect(cmp.loading()).toBe(false);
+      expect(cmp.board()?.columns).toHaveLength(3);
+      expect(cmp.rowMatches()).toBe(1);
+      expect(api.pollBoard).toHaveBeenLastCalledWith('b-0', 'W/"1"');
+      expect(api.pollMineBoards).toHaveBeenLastCalledWith('W/"r"');
     });
 
     it('opens a row card in the drawer and passes the changes of the drawer to the rows', async () => {
