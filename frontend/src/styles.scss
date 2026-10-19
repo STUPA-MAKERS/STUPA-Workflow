@@ -2,6 +2,7 @@
 @use 'tokens';
 @use 'base';
 @use 'surface';
+@use 'breakpoints' as bp;
 
 // Tailwind adds utilities only. tailwind.config.js disables preflight, so there is no
 // base reset and no visual change. Sass passes the unknown at-rules through to PostCSS
@@ -208,6 +209,30 @@ app-dialog {
 // token, so the titles sit at the same height on every page.
 :root {
   --sheet-head-gap: 10px;
+}
+
+// The title of a detail sheet (`.sheet-title`) and the status line below it
+// (`.sheet-line`): one size on every detail view, so the views do not set them.
+.sheet-title {
+  margin: 0;
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--tracking-tight);
+  overflow-wrap: anywhere;
+}
+.sheet-line {
+  margin: 0;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  line-height: var(--lh-h3);
+}
+@include bp.phone {
+  .sheet-title {
+    font-size: var(--fs-h1);
+    line-height: var(--lh-h1);
+  }
 }
 
 // The text button of `app-row-menu` (the "…" of the budget breadcrumb): its minimum

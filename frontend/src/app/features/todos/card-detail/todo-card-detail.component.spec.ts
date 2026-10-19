@@ -149,7 +149,9 @@ describe('TodoCardDetailComponent', () => {
     expect(api.card).toHaveBeenCalledWith('k-1');
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
-    expect(document.querySelector('.cd__kicker')).toHaveTextContent('Studierendenparlament · To-Do');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     // Each part of the line wraps as a whole; the dot ends the first part.
     const created = [...document.querySelectorAll('.cd__created .cd__seg')].map((e) => e.textContent);
     expect(created).toEqual(['Angelegt von Selin Yıldız\u00a0·', expect.stringMatching(/2026$/)]);
@@ -316,8 +318,10 @@ describe('TodoCardDetailComponent', () => {
     detect();
     expect(cmp.loading()).toBe(true);
     expect(screen.getByRole('status')).toHaveTextContent('Karte wird geladen');
-    // The kicker names the board, which the page already has.
-    expect(cmp.loadingKicker()).toBe('Studierendenparlament · To-Do');
+    // No context line above the title.
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelectorAll('.cd__skelIcon')).toHaveLength(2);
     expect(document.querySelector('.cd__chat .sk__composer')).not.toBeNull();
     expect(document.querySelectorAll('.cd__fields dt').length).toBe(4);
@@ -325,18 +329,15 @@ describe('TodoCardDetailComponent', () => {
     expect(closed).toHaveBeenCalled();
   });
 
-  it('draws no composer while it loads for a board the person may not write to, and no kicker without a board', async () => {
-    const { cmp, api, detect, fixture } = await setup({ board: board({ canWrite: false }) });
+  it('draws no composer while it loads for a board the person may not write to', async () => {
+    const { api, detect, fixture } = await setup({ board: board({ canWrite: false }) });
     api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
     fixture.componentRef.setInput('cardId', 'k-2');
     detect();
     expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
-    fixture.componentRef.setInput('board', null);
-    detect();
-    expect(cmp.loadingKicker()).toBe('');
   });
 
-  it('names no board while it loads a card of another board, and counts no foreign columns', async () => {
+  it('counts no foreign columns while it loads a card of another board', async () => {
     const { cmp, api, detect, fixture } = await setup({ board: board({ id: 'b-0', name: 'Meine To-Dos' }) });
     const late = new Subject<TodoCardDetail>();
     api.card.mockReturnValueOnce(late);
@@ -344,16 +345,9 @@ describe('TodoCardDetailComponent', () => {
     fixture.componentRef.setInput('cardId', 'k-9');
     detect();
     expect(cmp.loading()).toBe(true);
-    expect(cmp.loadingKicker()).toBe('');
     expect(document.querySelector('.cd__chat .sk__composer')).toBeNull();
     late.next(detail({ id: 'k-9', boardId: 'b-7', boardName: 'AStA' }));
     detect();
-    expect(cmp.kicker()).toBe('AStA · To-Do');
-    // The board in the kicker links to the board.
-    const boardLink = screen.getByTestId('cd-board');
-    expect(boardLink).toHaveTextContent('AStA');
-    expect(boardLink).toHaveAttribute('href', '/todos/b-7');
-    expect(boardLink.closest('.sheet-bar__kicker')).not.toBeNull();
     expect(cmp.moveColumns().every((col) => col.count === null)).toBe(true);
   });
 
@@ -969,7 +963,6 @@ describe('TodoCardDetailComponent', () => {
     }
     expect(cmp.titleDraft()).toBe('');
     expect(cmp.descDraft()).toBe('');
-    expect(cmp.kicker()).toBe('');
     expect(cmp.createdParts()).toEqual([]);
     expect(cmp.moveColumns()).toEqual([]);
     expect(cmp.boardLink()).toBeNull();
@@ -1269,12 +1262,11 @@ describe('TodoCardDetailComponent', () => {
       expect(closed).toHaveBeenCalled();
     });
 
-    it('puts "Im Board öffnen" into the ⋮ menu of the pane and lets the kicker wrap', async () => {
+    it('puts "Im Board öffnen" into the ⋮ menu of the pane', async () => {
       const { cmp, fixture } = await setup({ mode: 'pane' });
       const router = TestBed.inject(Router);
       const nav = jest.spyOn(router, 'navigate').mockResolvedValue(true);
       expect(screen.queryByRole('link', { name: /Im Board öffnen/ })).toBeNull();
-      expect(document.querySelector('.cd__kicker')).not.toHaveClass('ell');
       expect(fixture.nativeElement.querySelector('app-sheet-bar')).not.toHaveClass('sheet-bar--bleed');
       expect(cmp.menuSections()[0].items.map((i) => [i.id, i.icon])).toEqual([['openInBoard', 'kanban']]);
       cmp.onMenu(cmp.menuSections()[0].items[0]);

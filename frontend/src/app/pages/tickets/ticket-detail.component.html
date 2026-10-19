@@ -6,17 +6,16 @@
   <article class="td" [class.td--split]="split()" aria-busy="true">
     <header class="td__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
-        <span appSheetBarKicker class="skel-in"><span class="skel-text skel-text--muted td__skelKicker"></span></span>
+        <h2 appSheetBarTitle class="sheet-title td__title skel-in">
+          <span class="skel-text td__skelTitle"></span>
+          @if (!split()) {
+            <span class="skel-text td__skelTitle td__skelTitle--second"></span>
+          }
+        </h2>
         <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
         <span class="td__skelIcon skel-in"><span class="skel-box"></span></span>
       </app-sheet-bar>
-      <h2 class="td__title skel-in">
-        <span class="skel-text td__skelTitle"></span>
-        @if (!split()) {
-          <span class="skel-text td__skelTitle td__skelTitle--second"></span>
-        }
-      </h2>
-      <p class="td__line skel-in"><span><span class="skel-text skel-text--muted td__skelLine"></span></span></p>
+      <p class="sheet-line td__line skel-in"><span><span class="skel-text skel-text--muted td__skelLine"></span></span></p>
       @if (manager) {
         <div class="td__actions skel-in">
           <span class="td__act"><span class="skel-box td__skelButton"></span></span>
@@ -59,7 +58,7 @@
   <article class="td" [class.td--split]="split()" aria-labelledby="td-title">
     <header class="td__head">
       <app-sheet-bar [bleed]="split()">
-        <span appSheetBarKicker class="ell" [title]="kicker()">{{ kickerParts().before }}<span class="mono">{{ kickerParts().number }}</span>{{ kickerParts().after }}</span>
+        <h2 appSheetBarTitle id="td-title" class="sheet-title td__title">{{ ticket.title }}</h2>
         <app-button
           variant="text"
           [iconOnly]="true"
@@ -75,9 +74,10 @@
         }
       </app-sheet-bar>
 
-      <h2 id="td-title" class="td__title">{{ ticket.title }}</h2>
-      <p class="td__line">
+      <p class="sheet-line td__line">
         <app-status-text [kind]="statusKind()">{{ statusLabel() }}</app-status-text>
+        <span class="td__dot" aria-hidden="true">·</span>
+        <span class="mono">{{ ticket.number }}</span>
         <span class="td__dot" aria-hidden="true">·</span>
         <span>{{ kindLabel() }}</span>
         @if (manager) {

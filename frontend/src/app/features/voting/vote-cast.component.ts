@@ -35,7 +35,6 @@ import { VotePanelComponent } from './vote-panel/vote-panel.component';
 import { NO_CONTEXT, type VoteContext, loadVoteContext } from './vote-panel/vote-context';
 import { VotingPageService } from './voting-page/voting-page.service';
 import { BEAMER_FROM_PARAM } from './beamer-link.util';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { TodoLinkedListComponent } from '../todos/linked-list/todo-linked-list.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
@@ -85,7 +84,6 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ConfirmDialogComponent,
-    SheetBarComponent,
     RouterLink,
     ButtonComponent,
     EmptyStateComponent,
@@ -199,14 +197,6 @@ export class VoteCastComponent implements OnDestroy {
       ? this.auth.canInGremium(gremiumId, 'session.manage')
       : this.auth.canInAnyGremium('session.manage');
     return allowed ? ['/voting/beamer', meetingId] : null;
-  });
-
-  /** The line at the top of the sheet: the gremium of the meeting, else of the list row. */
-  readonly sheetMeta = computed(() => {
-    const fromMeeting = this.context().meeting?.gremiumName;
-    if (fromMeeting) return fromMeeting;
-    const id = this.loaded()?.id;
-    return (id && this.page?.gremiumNames().get(id)) || null;
   });
 
   /**

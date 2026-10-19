@@ -433,9 +433,6 @@ export class VotingComponent implements OnDestroy {
   }
 
   private collectGremien(items: VoteListItem[]): void {
-    const names = new Map(this.page.gremiumNames());
-    for (const item of items) if (item.gremiumName) names.set(item.id, item.gremiumName);
-    this.page.gremiumNames.set(names);
     const next = new Map(this.seenGremien());
     let changed = false;
     for (const item of items) {
@@ -552,7 +549,8 @@ export class VotingComponent implements OnDestroy {
     const ended = item.status === 'closed' || item.status === 'cancelled';
     const status =
       item.status === 'closed' && item.result ? closedStatus(item.kind, item.result) : this.statusOf(item.status);
-    let where: string | null = item.gremiumName;
+    // The row names its meeting; a vote without one names no gremium either.
+    let where: string | null = null;
     if (item.meetingTitle) {
       where =
         item.agendaPosition === null

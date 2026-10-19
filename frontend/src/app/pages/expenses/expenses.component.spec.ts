@@ -3119,7 +3119,6 @@ describe('ExpensesComponent (list/detail)', () => {
     http.match((r) => r.url.includes('/fiscal-years')).forEach((r) => r.flush([{ ...FY_ACTIVE, id: 'fy-1' }]));
     fixture.detectChanges();
     expect(screen.getByRole('heading', { name: 'Druckkosten Flyer' })).toBeInTheDocument();
-    expect(screen.getByText('Buchung · HHJ 2026')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Buchung bearbeiten' }));
     expect(c.editing()?.id).toBe('e-1');
     // The form replaces the detail.

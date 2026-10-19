@@ -377,6 +377,21 @@ describe('TasksComponent', () => {
       expect(screen.getByText('ohne Datum')).toBeInTheDocument();
     });
 
+    it('filters the applications and the To-Dos by the search, a board name included', async () => {
+      const { cmp, harness } = await start('/tasks', [THREE], { todos: TODOS });
+      expect(screen.getByRole('searchbox', { name: 'Aufgaben durchsuchen' })).toBeInTheDocument();
+      cmp.search.set('informatik');
+      cmp.search.flush();
+      harness.detectChanges();
+      expect(screen.queryByRole('link', { name: 'Erster' })).toBeNull();
+      expect(screen.getByRole('link', { name: 'Bus anfragen' })).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: 'Raum buchen' })).toBeNull();
+      cmp.search.set('nichts davon');
+      cmp.search.flush();
+      harness.detectChanges();
+      expect(screen.getByText('Keine Aufgabe passt zur Suche.')).toBeInTheDocument();
+    });
+
     it('puts the applications of all months in one list without month headings', async () => {
       const { harness } = await start('/tasks', [THREE], { todos: TODOS });
       const container = harness.fixture.nativeElement as HTMLElement;

@@ -13,11 +13,6 @@
   display: flex;
   align-items: baseline;
   gap: 10px;
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
 }
 .vpn__where {
   min-width: 0;
@@ -88,11 +83,9 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.vpn__q--phone {
-  margin-top: -12px;
-  font-size: var(--fs-h1);
-  line-height: 1.75rem;
-  letter-spacing: 0;
+/* On a phone the meta line follows the question as closely as on the page. */
+:host(.vpn--phone) .sheet-title + .vpn__meta {
+  margin-top: calc(-1 * var(--space-3));
 }
 
 /* The card of a side column (board Teilnahme-Live): a 14px rhythm, and the same 18px
@@ -147,4 +140,10 @@
   :host(:not(.vpn--phone):not(.vpn--card):not(.vpn--flat)) {
     padding: var(--space-5);
   }
+}
+
+/* The meta line sits under the question at the distance the status line of a detail sheet
+   keeps from its title. */
+.vpn__bar + .vpn__meta {
+  margin-top: calc(-1 * var(--space-3));
 }

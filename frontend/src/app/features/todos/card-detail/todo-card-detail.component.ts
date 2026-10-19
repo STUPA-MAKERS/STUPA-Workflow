@@ -53,7 +53,7 @@ import {
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
@@ -142,7 +142,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     NoteComponent,
     RowMenuComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
+    SheetBarTitleDirective,
     SkeletonComponent,
     TabsComponent,
     TodoDueChipComponent,
@@ -302,17 +302,6 @@ export class TodoCardDetailComponent {
     if (c && c.id === this.cardId()) return c.boardId === b.id ? b : null;
     const id = this.cardId();
     return b.cards.some((x) => x.id === id) ? b : null;
-  });
-
-  /** The kicker while the card loads: the board is known from the page when it holds the card. */
-  readonly loadingKicker = computed(() => {
-    const name = this.pageBoard()?.name;
-    return name ? this.t('todos.card.kicker', { board: name }) : '';
-  });
-
-  readonly kicker = computed(() => {
-    const c = this.card();
-    return c ? this.t('todos.card.kicker', { board: c.boardName }) : '';
   });
 
   /**

@@ -7,34 +7,47 @@
         [title]="'tasks.title' | t"
       />
 
-      @if (hasTodos()) {
-        <div class="tasks__chips" role="group" [attr.aria-label]="'tasks.show.group' | t">
-          <app-filter-select
-            [label]="'tasks.show.label' | t"
-            [options]="showOptions()"
-            [value]="show()"
-            (valueChange)="setShow($event)"
-            [text]="showText()"
-            [active]="true"
-          />
-          <app-filter-select
-            [label]="'todos.filter.due' | t"
-            [options]="dueOptions()"
-            [value]="due()"
-            (valueChange)="setDue($event)"
-            [text]="dueText()"
-            [active]="due() !== ''"
-            [icon]="due() ? 'check' : null"
-            [chevron]="!due()"
-          />
-        </div>
-      }
+      <!-- The search and the chips, as on every list: one pane at a time they stick to the
+           top of the viewport; side by side only the rows below them scroll. -->
+      <app-sticky-bar class="ld-pane__filters">
+        <app-search-pill
+          [placeholder]="'tasks.search' | t"
+          [value]="search.text()"
+          [clearable]="true"
+          (valueChange)="search.set($event)"
+          (commit)="search.flush()"
+        />
+        @if (hasTodos()) {
+          <div class="tasks__chips" role="group" [attr.aria-label]="'tasks.show.group' | t">
+            <app-filter-select
+              [label]="'tasks.show.label' | t"
+              [options]="showOptions()"
+              [value]="show()"
+              (valueChange)="setShow($event)"
+              [text]="showText()"
+              [active]="true"
+            />
+            <app-filter-select
+              [label]="'todos.filter.due' | t"
+              [options]="dueOptions()"
+              [value]="due()"
+              (valueChange)="setDue($event)"
+              [text]="dueText()"
+              [active]="due() !== ''"
+              [icon]="due() ? 'check' : null"
+              [chevron]="!due()"
+            />
+          </div>
+        }
+      </app-sticky-bar>
 
       <div class="tasks__scroll" appScrollFade="y">
         @if (error()) {
           <app-note class="tasks__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tasks.error' | t }}</app-note>
         } @else if (loading()) {
           <app-skeleton variant="rows" [count]="6" [label]="'tasks.loading' | t" />
+        } @else if (query() && !rows().length && !todoRows().length) {
+          <app-empty-state rows="3" [heading]="'tasks.noMatch' | t" />
         } @else if (!rows().length && !hasTodos()) {
           @if (split()) {
             <!-- Side by side the detail pane carries the line below the heading. -->
@@ -51,7 +64,7 @@
               {{ 'tasks.group.applications' | t }}
             </h2>
             @if (!rows().length) {
-              <app-empty-state rows="3" [heading]="'tasks.empty' | t" />
+              <app-empty-state rows="3" [heading]="(query() ? 'tasks.noMatch' : 'tasks.empty') | t" />
             }
           }
           @for (group of showApplications() ? groups() : []; track group.key + $index) {
