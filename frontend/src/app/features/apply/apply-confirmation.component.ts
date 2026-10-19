@@ -7,9 +7,7 @@ import { BrandingService } from '@core/branding/branding.service';
 import { submittedMarkdown } from '@core/branding/submitted-texts';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonLinkComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonLinkComponent, IconComponent, NoteComponent, StatusTextComponent } from '@stupa-makers/ui-kit';
 import { renderMarkdown } from '../meetings/meetings.util';
 import { shortRef } from './apply.util';
 

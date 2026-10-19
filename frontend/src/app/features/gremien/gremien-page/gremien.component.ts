@@ -18,24 +18,26 @@ import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import {
-  FilterSelectComponent,
-  type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { ListDetailLayoutComponent } from '@shared/ui/list-detail/list-detail-layout.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  type FilterSelectOption,
+  IconComponent,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SkeletonComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { GremienApiService } from '@core/api/gremien.service';
@@ -44,7 +46,6 @@ import { GremienStore } from '../gremien.store';
 import { localized } from '../gremien.util';
 import { weekdayDate } from '@shared/date-format';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 /** The permission that shows every gremium, also without a membership. */

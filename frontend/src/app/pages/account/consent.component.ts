@@ -6,13 +6,13 @@ import { LOCATION } from '@core/browser/location.token';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
   CheckboxComponent,
   ChipGroupComponent,
   IconComponent,
+  NoteComponent,
+  SkeletonComponent,
 } from '@stupa-makers/ui-kit';
 import { scopeDesc, scopeLabel } from './scope-labels';
 

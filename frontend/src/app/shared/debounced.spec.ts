@@ -5,8 +5,8 @@ import {
   runInInjectionContext,
 } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { LIVE_SEARCH_DEBOUNCE_MS } from './live-search';
 import { debounced } from './debounced';
+import { LIVE_SEARCH_DEBOUNCE_MS } from '@stupa-makers/ui-kit';
 
 describe('debounced', () => {
   beforeEach(() => jest.useFakeTimers());

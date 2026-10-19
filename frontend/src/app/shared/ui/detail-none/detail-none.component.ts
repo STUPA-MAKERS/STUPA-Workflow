@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import type { IconName } from '@stupa-makers/ui-kit';
-import { EmptyStateComponent } from '../empty-state/empty-state.component';
+import {
+  EmptyStateComponent,
+  type IconName,
+} from '@stupa-makers/ui-kit';
 
 /**
  * What the list shows: `busy` while it loads or failed (the pane stays empty),

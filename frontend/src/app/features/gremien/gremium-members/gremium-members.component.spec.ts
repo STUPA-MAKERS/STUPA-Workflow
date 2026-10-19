@@ -1,14 +1,17 @@
 import { render, screen } from '@testing-library/angular';
 import { of, throwError } from 'rxjs';
 import { GremienApiService } from '@core/api/gremien.service';
-import { downloadBlob } from '@shared/download.util';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { downloadBlob, MEDIA } from '@stupa-makers/ui-kit';
 import { runAxe } from '../../../../testing/a11y';
 import { gremienApiMock, member } from '../../../../testing/gremien-fixtures';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { GremiumMembersComponent } from './gremium-members.component';
 
-jest.mock('@shared/download.util', () => ({ downloadBlob: jest.fn() }));
+jest.mock('@stupa-makers/ui-kit', () => ({
+  __esModule: true,
+  ...jest.requireActual('@stupa-makers/ui-kit'),
+  downloadBlob: jest.fn(),
+}));
 
 function readBlob(blob: Blob): Promise<string> {
   return new Promise((resolve) => {

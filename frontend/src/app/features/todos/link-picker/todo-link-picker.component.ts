@@ -24,14 +24,14 @@ import { TodosApiService, type TodoLinkKind, type TodoLinkTarget } from '@core/a
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import {
   ButtonComponent,
   focusableIn,
   IconComponent,
+  liveSearch,
   MEDIA,
   mediaQuery,
+  SideSheetComponent,
   trapTab,
 } from '@stupa-makers/ui-kit';
 import { LINK_ICON, linkSub } from '../todos.util';

@@ -14,10 +14,20 @@ import type { AgendaItem, Attendance, Meeting, MeetingVote, Uuid } from '@core/a
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { type StatusKind, type StatusView, meetingStatus } from '@shared/status-kind.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+import {
+  type StatusView,
+  meetingStatus,
+} from '@shared/status-kind.util';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ScrollFadeDirective,
+  SideSheetComponent,
+  type StatusKind,
+} from '@stupa-makers/ui-kit';
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import {
@@ -34,7 +44,6 @@ import { ParticipantVoteService } from './participant-vote/participant-vote.serv
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
 import { clock, shortTime, weekdayDate } from '@shared/date-format';
 

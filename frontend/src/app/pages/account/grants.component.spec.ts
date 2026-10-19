@@ -4,7 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
 import type { McpSetup, OAuthGrant } from '@core/api/models';
-import * as downloadUtil from '@shared/download.util';
+import * as downloadUtil from '@stupa-makers/ui-kit';
+
+// The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain
+// copy of the module lets each test spy on it.
+jest.mock('@stupa-makers/ui-kit', () => ({
+  __esModule: true,
+  ...jest.requireActual('@stupa-makers/ui-kit'),
+}));
 import { AccountGrantsComponent } from './grants.component';
 
 const GRANTS: OAuthGrant[] = [

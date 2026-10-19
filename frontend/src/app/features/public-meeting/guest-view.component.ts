@@ -16,14 +16,19 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { MarkdownViewComponent } from '@shared/markdown/markdown-view.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { voteResultStatus } from '@shared/status-kind.util';
-import { ButtonComponent, IconComponent, SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  NoteComponent,
+  SegmentedComponent,
+  type SegmentedOption,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import type { BallotCaster } from '../voting/ballot/ballot.component';
 import { VotePanelComponent } from '../voting/vote-panel/vote-panel.component';
 import { guestVoteToVote } from './guest-vote.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TopBadgeComponent } from '../meetings/top-badge/top-badge.component';
 
 /** One agenda row of the guest view. */

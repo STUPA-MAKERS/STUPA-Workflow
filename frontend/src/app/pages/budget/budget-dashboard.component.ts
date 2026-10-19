@@ -11,32 +11,33 @@ import type { Uuid } from '@core/api/models';
 import {
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
   IconComponent,
+  ListItemComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  type Seg,
+  SegBarComponent,
+  SheetBarComponent,
+  SheetBarKickerDirective,
+  SideSheetComponent,
+  SkeletonComponent,
+  type StatusKind,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SimplifyPathPipe } from '@shared/budget-path';
 import {
-  EmptyStateComponent,
-  FilterSelectComponent,
-  ListItemComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-  SearchPillComponent,
-  type Seg,
-  SegBarComponent,
-  SideSheetComponent,
   PageHeaderComponent,
-  SheetBarComponent,
-  SheetBarKickerDirective,
-  SkeletonComponent,
-  StatusTextComponent,
-  type StatusKind,
   flowColorKind,
 } from '@shared/ui';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
@@ -51,7 +52,6 @@ import { BudgetCrumbsComponent } from './budget-crumbs.component';
 import { BudgetPieComponent, type PieSlice } from './budget-pie.component';
 import { BudgetSunburstComponent, type SunburstMetric } from './budget-sunburst.component';
 import { nodeColors, resolveNodeColors } from './budget-color.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { formatMoney } from '@shared/format-money';
 
 /** The amounts of one cost centre in one fiscal year, as numbers. */

@@ -9,18 +9,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  ButtonComponent,
+  DateBlockComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { liveSearch } from '@shared/live-search';
-import { ButtonComponent, HighlightComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { formatBytes } from '@shared/format-bytes';
+  formatBytes,
+  HighlightComponent,
+  IconComponent,
+  liveSearch,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import type {
   PublicGremium,
   PublicProtocolSummary,

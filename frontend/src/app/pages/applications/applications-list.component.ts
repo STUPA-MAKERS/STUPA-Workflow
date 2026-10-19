@@ -34,33 +34,35 @@ import { AuthService } from '@core/auth/auth.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import {
   ButtonComponent,
+  ConfirmDialogComponent,
   CurrencyInputComponent,
   DatepickerComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
   IconComponent,
   InfiniteScrollDirective,
+  ListDetailLayoutComponent,
+  ListItemComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SideSheetComponent,
+  SkeletonComponent,
+  type StatusKind,
+  StatusTextComponent,
+  StickyBarComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   FabComponent,
-  FilterSelectComponent,
-  ListDetailLayoutComponent,
   PageHeaderComponent,
-  ListItemComponent,
-  RowMenuComponent,
-  SearchPillComponent,
-  StickyBarComponent,
-  SideSheetComponent,
-  SkeletonComponent,
-  StatusTextComponent,
   flowColorKind,
-  type RowMenuItem,
-  type RowMenuSection,
-  type StatusKind,
 } from '@shared/ui';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { exportDownload } from '@shared/download.util';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
@@ -77,8 +79,6 @@ import {
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
 import { debounced } from '@shared/debounced';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';

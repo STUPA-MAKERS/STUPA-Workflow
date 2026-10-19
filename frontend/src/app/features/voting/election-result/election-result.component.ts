@@ -15,11 +15,16 @@ import type { ElectionConfig, ElectionResult, Uuid, Vote, VoteResult } from '@co
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SegBarComponent, type SegTone } from '@shared/ui/seg-bar/seg-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import type { StatusKind } from '@shared/status-kind.util';
-import { ButtonComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  NoteComponent,
+  SegBarComponent,
+  type SegTone,
+  type StatusKind,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { problemDetail } from '@core/api/problem';
 import {
   type ElectionBar,

@@ -7,10 +7,12 @@ import type {
   TicketStatus,
 } from '@core/api/tickets.service';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
-import type { StatusKind } from '@shared/status-kind.util';
 import type { IconName } from '@stupa-makers/ui-kit';
 import { daysUntil, shortDay } from '@shared/date-format';
 import { personLabel, personName } from '@shared/person-label.util';
+import {
+  type StatusKind,
+} from '@stupa-makers/ui-kit';
 
 export const KIND_ICON: Record<TicketKind, IconName> = {
   bug: 'bug',

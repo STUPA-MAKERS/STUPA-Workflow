@@ -17,27 +17,26 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { FieldType, FormFieldDef, I18nMap, Uuid } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import {
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import {
   ButtonComponent,
   CheckboxComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
   MEDIA,
   mediaQuery,
   MoveButtonsComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SelectFieldComponent,
   type SelectOption,
+  SideSheetComponent,
+  StatusTextComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
@@ -55,7 +54,6 @@ import {
   normalizeFormField,
   validateFormField,
 } from '../form-field.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 

@@ -27,13 +27,12 @@ import {
   MEDIA,
   mediaQuery,
   observeElementSize,
-} from '@stupa-makers/ui-kit';
-import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
+  ScrollFadeDirective,
+  SideSheetComponent,
+} from '@stupa-makers/ui-kit';
 import { meetingStatus } from '@shared/status-kind.util';
 import {
   type AgendaMove,
@@ -51,7 +50,6 @@ import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, votesInText } from '../meetings.util';
 import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { JoinQrComponent } from '../public-join/join-qr.component';
 import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
 import { clock, weekdayDate } from '@shared/date-format';

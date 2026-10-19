@@ -21,21 +21,27 @@ import { prefetchDetails } from '@core/cache/detail-prefetch';
 import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { FilterSelectComponent } from '@shared/ui/filter-select/filter-select.component';
-import { ListDetailLayoutComponent } from '@shared/ui/list-detail/list-detail-layout.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import type { RowMenuItem, RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { RowMenuComponent } from '@shared/ui/row-menu/row-menu.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DateBlockComponent,
+  EmptyStateComponent,
+  FilterSelectComponent,
+  IconComponent,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import {
   MeetingDetailSheetComponent,

@@ -16,10 +16,11 @@ import {
   IconComponent,
   InputComponent,
   LockedFieldComponent,
+  NoteComponent,
+  ScrollFadeDirective,
+  SelectFieldComponent,
   TextareaComponent,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
@@ -31,7 +32,6 @@ import {
 import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
 import type { ExpenseTransfersState } from '../expense-transfers.state';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
 import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { TransferLegComponent } from '../transfer-leg/transfer-leg.component';

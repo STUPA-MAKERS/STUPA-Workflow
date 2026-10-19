@@ -5,8 +5,7 @@ import { filter } from 'rxjs';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, SideSheetComponent } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../account-menu/account-menu.component';

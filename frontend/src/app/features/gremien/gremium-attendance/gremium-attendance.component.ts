@@ -18,14 +18,19 @@ import {
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { downloadBlob } from '@shared/download.util';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
+  ButtonComponent,
+  downloadBlob,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import { AttendanceDetailComponent } from '../attendance-detail/attendance-detail.component';
 import { GREMIEN_NOW } from '../gremien.store';
 import {
@@ -49,8 +54,6 @@ import {
   toCsv,
 } from '../gremien.util';
 import { monthShort, monthYear } from '@shared/date-format';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];

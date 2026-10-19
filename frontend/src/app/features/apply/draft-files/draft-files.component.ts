@@ -2,10 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { scanStatus } from '@shared/status-kind.util';
-import { FileDropZoneComponent } from '@shared/ui/file-drop-zone/file-drop-zone.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
-import { formatBytes } from '@shared/format-bytes';
+import {
+  FileDropZoneComponent,
+  formatBytes,
+  IconComponent,
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { UPLOAD_ACCEPT } from '../apply.util';
 import { DraftAttachmentsService, type DraftFile } from '../draft-attachments.service';
 

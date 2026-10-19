@@ -1,7 +1,9 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarStackComponent } from '@shared/ui/avatar/avatar.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import {
+  AvatarStackComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 
 /**
  * The people of a to-do card: up to three small avatars, or an empty circle with a person

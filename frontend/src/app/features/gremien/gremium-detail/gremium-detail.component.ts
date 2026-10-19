@@ -14,19 +14,18 @@ import type { GremiumOverview } from '@core/api/gremien.service';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import {
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
+  EmptyStateComponent,
   IconComponent,
   MEDIA,
   mediaQuery,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+  SkeletonComponent,
   type TabItem,
   TabsComponent,
 } from '@stupa-makers/ui-kit';

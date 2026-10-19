@@ -25,21 +25,22 @@ import {
 import {
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
   MoveButtonsComponent,
   moveItem,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
+  type SelectFieldOption,
   SwitchComponent,
   TextareaComponent,
   ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { FIXED_VOTE_OPTIONS } from '../meetings-display.util';
 import { problemDetail } from '@core/api/problem';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { personLabel } from '@shared/person-label.util';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];

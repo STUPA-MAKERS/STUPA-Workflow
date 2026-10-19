@@ -19,12 +19,12 @@ import {
   ButtonComponent,
   CopyButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   InputComponent,
-  ToastService,
+  SelectFieldComponent,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /**
  * The public share links of one application (`application.share`): mint a link, read it

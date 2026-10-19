@@ -12,20 +12,23 @@ import type { Subscription } from 'rxjs';
 import { GremienApiService, type GremiumMember } from '@core/api/gremien.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { downloadBlob } from '@shared/download.util';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  AvatarComponent,
+  ButtonComponent,
+  downloadBlob,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
 import { fileSlug, localized, roleRank, toCsv } from '../gremien.util';
 import { dayMonthYear } from '@shared/date-format';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { personLabel } from '@shared/person-label.util';
 
 export interface MemberGroup {

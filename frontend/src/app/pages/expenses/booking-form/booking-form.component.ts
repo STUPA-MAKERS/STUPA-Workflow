@@ -19,14 +19,17 @@ import {
   IconComponent,
   InputComponent,
   LockedFieldComponent,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  ScrollFadeDirective,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
   TextareaComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type {
   BudgetTreeNode,
@@ -41,7 +44,6 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
 import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';

@@ -19,21 +19,23 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  DateBlockComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
+  IconComponent,
+  ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { topsLabel } from '../../meetings/meetings-overview.util';
 import { GREMIEN_NOW } from '../gremien.store';
 import { monthKey, shiftMonth } from '../gremien.util';
 import { isoDay, monthYear, shortTime, weekdayDate } from '@shared/date-format';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 export type MeetingsRange = '' | 'upcoming' | 'past6' | 'past12';

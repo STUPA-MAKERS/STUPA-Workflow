@@ -13,11 +13,11 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { Meeting } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import {
   ButtonComponent,
   DialogComponent,
   IconComponent,
+  NoteComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { problemCode, problemDetail } from '@core/api/problem';

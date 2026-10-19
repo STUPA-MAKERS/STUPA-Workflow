@@ -14,9 +14,13 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const SRC = join(__dirname, '../../../..');
+const SRC = join(__dirname, '../../..');
 const APP = join(SRC, 'app');
-const GLOBAL_STYLES = join(SRC, 'styles.scss');
+const KIT = join(SRC, '../vendor/ui-kit/src');
+/** The tokens and the list column of the geometry: a global partial of the ui-kit. */
+const GLOBAL_STYLES = join(KIT, 'styles/list-detail.scss');
+const APP_STYLES = join(SRC, 'styles.scss');
+const LAYOUT_SCSS = join(KIT, 'lib/list-detail/list-detail-layout.component.scss');
 const PAGE_HEADER_DIR = join(APP, 'shared/ui/page-header');
 
 /**
@@ -74,14 +78,18 @@ describe('the one list/detail geometry', () => {
     const global = code(GLOBAL_STYLES);
     expect(global).not.toMatch(/\.ld--split[^{]*\.ld-pane/);
     expect(global).toMatch(/\.ld-pane\s*\{[^}]*height:\s*var\(--ld-pane-height,\s*auto\)/);
-    const layout = code(join(APP, 'shared/ui/list-detail/list-detail-layout.component.scss'));
+    const layout = code(LAYOUT_SCSS);
     expect(layout).toMatch(/:host\(\.ld--split\) \.ld__list \{[^}]*--ld-pane-height:\s*100%/);
   });
 
-  it('defines the column width and the gap once, in styles.scss', () => {
+  it('defines the column width and the gap once, in the list/detail partial of the kit', () => {
     const global = code(GLOBAL_STYLES);
     expect(global).toMatch(/--ld-list-width:\s*clamp\(/);
     expect(global).toMatch(/--ld-gap:/);
+    // The app loads the partial and defines neither token itself.
+    const app = code(APP_STYLES);
+    expect(app).toMatch(/meta\.load-css\('list-detail'\)/);
+    expect(app).not.toMatch(/--ld-(list-width|gap)\s*:/);
   });
 
   it('no component sets the column width or the gap itself', () => {
@@ -90,7 +98,7 @@ describe('the one list/detail geometry', () => {
   });
 
   it('the list-detail layout reads the tokens and has no default of its own', () => {
-    const scss = code(join(APP, 'shared/ui/list-detail/list-detail-layout.component.scss'));
+    const scss = code(LAYOUT_SCSS);
     expect(scss).toContain('width: var(--ld-list-width)');
     expect(scss).toContain('gap: var(--ld-gap)');
   });

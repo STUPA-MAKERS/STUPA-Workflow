@@ -14,9 +14,11 @@ import type { Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ToastService } from '@stupa-makers/ui-kit';
+import {
+  ConfirmDialogComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { problemCode, problemDetail } from '@core/api/problem';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /**
  * "Sitzung löschen": the confirmation before a meeting goes for good.

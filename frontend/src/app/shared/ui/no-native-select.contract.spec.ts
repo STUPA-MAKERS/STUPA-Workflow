@@ -1,16 +1,18 @@
 /**
- * Every dropdown of the app opens the app's own option list (product decision,
- * 2026-10-16): a filter chip uses `app-filter-select`, a form field uses the app's
- * `app-select` (`SelectFieldComponent`). The browser's own list never shows.
+ * Every dropdown of the app opens the option list of the ui-kit (product decision,
+ * 2026-10-16): a filter chip uses `app-filter-select`, a form field uses `app-select`
+ * (`SelectFieldComponent`). The browser's own list never shows.
  *
- * jsdom applies no styles, so this spec reads the sources. It fails when a template has a
- * native `<select>` or `<datalist>`, or when code imports the ui-kit `SelectComponent`,
- * which renders a native `<select>` under the same selector.
+ * jsdom applies no styles, so this spec reads the sources of the app and of the kit. It
+ * fails when a template has a native `<select>` or `<datalist>`, or when code imports a
+ * `SelectComponent` from the kit (the old kit select rendered a native `<select>` under
+ * the same selector).
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const APP = join(__dirname, '../../..');
+const APP = join(__dirname, '../..');
+const KIT_LIB = join(__dirname, '../../../../vendor/ui-kit/src/lib');
 
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
@@ -26,7 +28,7 @@ function code(path: string): string {
     .replace(/<!--[\s\S]*?-->/g, '');
 }
 
-const sources = files(APP).filter(
+const sources = [...files(APP), ...files(KIT_LIB)].filter(
   (f) => (f.endsWith('.html') || f.endsWith('.ts')) && !f.endsWith('.spec.ts'),
 );
 

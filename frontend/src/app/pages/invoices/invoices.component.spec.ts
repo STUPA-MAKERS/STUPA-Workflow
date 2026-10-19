@@ -8,7 +8,14 @@ import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { USE_MOCK_API } from '@core/api/api.config';
 import { ToastService } from '@stupa-makers/ui-kit';
-import * as downloadUtil from '@shared/download.util';
+import * as downloadUtil from '@stupa-makers/ui-kit';
+
+// The kit re-exports `downloadBlob` through getters, which a spy cannot replace. A plain
+// copy of the module lets each test spy on it.
+jest.mock('@stupa-makers/ui-kit', () => ({
+  __esModule: true,
+  ...jest.requireActual('@stupa-makers/ui-kit'),
+}));
 import { InvoicesComponent } from './invoices.component';
 import type {
   Invoice,

@@ -22,14 +22,15 @@ import {
   DatepickerComponent,
   DialogComponent,
   InputComponent,
+  SegBarComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  type SelectOption,
   TimeInputComponent,
   ToastService,
-  type SelectOption,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
-import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { longDate } from '@shared/date-format';
 import { personLabel } from '@shared/person-label.util';
 

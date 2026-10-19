@@ -6,8 +6,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
 import { dayMonth } from '@shared/date-format';
-import { AvatarStackComponent, type AvatarSize } from '@shared/ui/avatar/avatar.component';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import {
+  type AvatarSize,
+  AvatarStackComponent,
+  IconComponent,
+} from '@stupa-makers/ui-kit';
 import { TodoLinkedRefresh, linkedKey } from './todo-linked-refresh';
 import { personName } from '@shared/person-label.util';
 

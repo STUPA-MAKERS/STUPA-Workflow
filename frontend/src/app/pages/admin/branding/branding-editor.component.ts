@@ -20,21 +20,22 @@ import {
   type SubmittedKind,
 } from '@core/branding/submitted-texts';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   ButtonComponent,
   FilePickerComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
   MoveButtonsComponent,
   moveItem,
+  NoteComponent,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '@shared/format-bytes';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
@@ -46,7 +47,6 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { renderMarkdown } from '../../../features/meetings/meetings.util';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';

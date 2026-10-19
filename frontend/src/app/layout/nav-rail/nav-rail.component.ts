@@ -2,10 +2,9 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { BrandingService } from '@core/branding/branding.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { IconComponent } from '@stupa-makers/ui-kit';
+import { IconComponent, searchShortcutKeys } from '@stupa-makers/ui-kit';
 import { HelpMenuComponent } from '../../features/help/help-menu/help-menu.component';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
-import { searchShortcutKeys } from '../../features/search/shortcut';
 import { AccountMenuComponent } from '../account-menu/account-menu.component';
 import { NavMarkComponent } from '../nav-mark/nav-mark.component';
 import { NavService } from '../nav.service';

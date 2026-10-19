@@ -15,19 +15,18 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { liveSearch } from '@shared/live-search';
 import {
   AvatarComponent,
-  ListItemComponent,
-  NoteComponent,
-  SearchPillComponent,
-  SkeletonComponent,
-} from '@shared/ui';
-import {
   ButtonComponent,
   CheckboxComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  ListItemComponent,
+  liveSearch,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../../admin-api.service';
@@ -41,7 +40,6 @@ import type {
   MergePreview,
   MergeResult,
 } from '../../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { personLabel } from '@shared/person-label.util';
 
 /** The steps of the merge: pick the account that stays, check the preview, the result. */

@@ -12,8 +12,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MeetingStatus, MeetingVote, MyBallot, Uuid, Vote } from '@core/api/models';
-import { ButtonComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import { ButtonComponent, IconComponent, StatusTextComponent, ToastService } from '@stupa-makers/ui-kit';
 import { meetingVoteStatus, voteResultStatus, type StatusView } from '@shared/status-kind.util';
 import {
   BallotComponent,

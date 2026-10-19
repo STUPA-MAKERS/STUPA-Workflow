@@ -1,8 +1,11 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
-import type { StatusKind } from '@shared/status-kind.util';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+import {
+  ButtonComponent,
+  IconComponent,
+  type StatusKind,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 
 /**
  * The head of a meeting view: "Zurück", the title with the status after it, and a quiet

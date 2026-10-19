@@ -13,28 +13,28 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
+  ButtonComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  EmptyStateComponent,
+  FilePickerComponent,
+  formatBytes,
+  IconComponent,
+  InputComponent,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import {
-  ButtonComponent,
-  DialogComponent,
-  FilePickerComponent,
-  IconComponent,
-  InputComponent,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
   type SelectOption,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '@shared/format-bytes';
 import {
   CD_BASE_VARIANTS,
   CD_LOGO_ACCEPT,
@@ -60,8 +60,6 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
