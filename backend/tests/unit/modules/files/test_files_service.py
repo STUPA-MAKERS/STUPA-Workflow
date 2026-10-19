@@ -271,38 +271,6 @@ async def test_signed_url_without_storage_503() -> None:
         await _service(session, storage=None).signed_url(att.id)
 
 
-async def test_download_bytes_clean_returns_data() -> None:
-    session = FakeSession()
-    att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
-    storage = FakeStorage()
-    storage.objects["k/doc.pdf"] = (b"the-bytes", "application/pdf")  # = att.storage_key
-    data, filename, mime = await _service(session, storage=storage).download_bytes(att.id)
-    assert data == b"the-bytes"
-    assert filename == "doc.pdf"
-    assert mime == "application/pdf"
-
-
-async def test_download_bytes_storage_failure_503() -> None:
-    session = FakeSession()
-    att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)
-    with pytest.raises(ServiceUnavailableError):
-        await _service(session, storage=FailingStorage()).download_bytes(att.id)
-
-
-async def test_download_bytes_still_scanning_409() -> None:
-    session = FakeSession()
-    att = _attachment(session, scanned=False)
-    with pytest.raises(ConflictError):
-        await _service(session, storage=FakeStorage()).download_bytes(att.id)
-
-
-async def test_download_bytes_infected_410() -> None:
-    session = FakeSession()
-    att = _attachment(session, scanned=True, scan_result="Eicar-Test", storage_key=None)
-    with pytest.raises(GoneError):
-        await _service(session, storage=FakeStorage()).download_bytes(att.id)
-
-
 async def test_download_stream_clean_yields_chunks() -> None:
     session = FakeSession()
     att = _attachment(session, scanned=True, scan_result=SCAN_RESULT_CLEAN)

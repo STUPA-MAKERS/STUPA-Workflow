@@ -5,7 +5,6 @@ import { API_BASE_URL } from '@core/api/api.config';
 import {
   BudgetTreeApi,
   flattenBudgetOptions,
-  flattenBudgetTreeRows,
   simplifyPathKey,
   type BudgetTreeNode,
 } from './budget-tree.api';
@@ -420,34 +419,5 @@ describe('flattenBudgetOptions', () => {
   it('handles a node whose children property is empty (no recursion)', () => {
     const tree = [node({ id: 'a', pathKey: 'VS', name: 'Root', children: [] })];
     expect(flattenBudgetOptions(tree)).toEqual([{ value: 'a', label: 'VS – Root' }]);
-  });
-});
-
-describe('flattenBudgetTreeRows', () => {
-  it('pre-order flattens with depth per node', () => {
-    const tree = [
-      node({
-        id: 'a',
-        key: 'VS',
-        name: 'Root',
-        children: [
-          node({
-            id: 'b',
-            key: '800',
-            name: 'Child',
-            children: [node({ id: 'c', key: '40', name: 'Grandchild', children: [] })],
-          }),
-        ],
-      }),
-    ];
-    expect(flattenBudgetTreeRows(tree)).toEqual([
-      { id: 'a', key: 'VS', name: 'Root', depth: 0 },
-      { id: 'b', key: '800', name: 'Child', depth: 1 },
-      { id: 'c', key: '40', name: 'Grandchild', depth: 2 },
-    ]);
-  });
-
-  it('returns an empty list for no nodes', () => {
-    expect(flattenBudgetTreeRows([])).toEqual([]);
   });
 });

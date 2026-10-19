@@ -281,7 +281,7 @@
             <li class="td__todo" [class.td__todo--done]="card.isDone">
               <app-icon class="td__todoIcon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
               <span class="td__todoText">
-                <a class="td__todoTitle" [routerLink]="['/todos', card.boardId]" [queryParams]="{ card: card.id }">{{ card.title }}</a>
+                <a class="td__todoTitle" routerLink="/todos" [queryParams]="{ card: card.id }">{{ card.title }}</a>
                 <span class="td__todoSub">{{ todoSub(card) }}</span>
               </span>
               @if (card.assignees.length) {

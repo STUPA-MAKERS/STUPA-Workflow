@@ -68,17 +68,6 @@ def intervals_overlap(
     return a_start <= b_end and b_start <= a_end
 
 
-def overlaps_any(
-    new_start: date,
-    new_end: date,
-    existing: Iterable[tuple[date, date]],
-) -> bool:
-    """Check whether `[new_start, new_end]` intersects any existing interval."""
-    return any(
-        intervals_overlap(new_start, new_end, s, e) for s, e in existing
-    )
-
-
 def fiscal_year_delete_blocker(
     has_bookings: bool, has_allocations: bool, has_applications: bool
 ) -> str | None:

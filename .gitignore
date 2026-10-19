@@ -53,3 +53,6 @@ AUDIT-REPORT.md
 # under frontend/public/icons, so this rule is anchored to the root only.
 /*.png
 
+
+# PR screenshots belong in the PR body, not in the repository
+docs/pr-screenshots/

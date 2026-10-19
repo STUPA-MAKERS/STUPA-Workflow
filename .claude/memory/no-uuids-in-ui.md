@@ -1,23 +1,24 @@
 ---
 name: no-uuids-in-ui
-description: never surface raw UUIDs/ids in the UI — always resolve to human-readable names
-metadata: 
+description: Never show a raw UUID, principal id or sub in the UI. Resolve ids to names on the server through auth/identity.py
+metadata:
   node_type: memory
   type: feedback
 ---
 
-NEVER show a raw UUID, principal id or `sub` anywhere in the UI. Always show something
-human-readable: display name, then email, then a generic label. Reported case: the
-application timeline (German label "Verlauf") showed `von e03ad7d7-…`, because the
-backend serialized the actor as `principal.sub`.
+NEVER show a raw UUID, principal id or `sub` anywhere in the UI. Show something
+human-readable: the display name, else the email, else a generic label.
 
 **Why:** a UUID means nothing to a user. The platform is for student-government members.
 
-**How to apply:** resolve ids → names SERVER-SIDE in the serializer. The frontend renders
-what it gets. Backend helper: `ApplicationService._author_names(subs) ->
-{sub: display_name|email|sub}` (applications/service/service_base.py) maps `principal.sub` to a name.
-We changed `timeline()` (actor) and `versions()` (changedBy) to use it (2026-06-14). The
-same class of bug hit meetings (protokollantId compared to sub) — see
-[[sessions-protokollant-redesign]] and the `isProtokollant` flag. When you add any "by X", "owner" or
-"assigned to" field, resolve the id before you return it. If you see a UUID on screen, a
-serializer skipped the name resolution.
+**How to apply:** resolve ids to names on the SERVER, in the serializer. The frontend renders
+what it gets. Every name lookup goes through `app/modules/auth/identity.py`:
+`refs_by_sub(session, subs)` and `refs_by_id(session, ids)` return a `PrincipalRef` per known
+principal in one query. `.name` is the display name, else the email; it is `None` for an
+anonymized account. The lookup follows an account merge, so an old `sub` shows the name of the
+account it was merged into. Example: `ApplicationService._author_refs` /
+`_resolve_actors` (`applications/service/service_base.py`) for the timeline and the versions.
+
+When a lookup finds no name, leave the field empty or use a generic label; never fall back to
+the raw id. When you add any "by X", "owner" or "assigned to" field, resolve the id before you
+return it. A UUID on screen means a serializer skipped the name resolution.
