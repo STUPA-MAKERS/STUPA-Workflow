@@ -1,11 +1,12 @@
 import {
   HttpContext,
   HttpContextToken,
+  type HttpEvent,
   type HttpInterceptorFn,
   HttpResponse,
 } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { concat, of, tap } from 'rxjs';
+import { type Observable, concat, filter, finalize, of, share, tap } from 'rxjs';
 import { skipLoading } from '@core/loading/loading.interceptor';
 import { HttpCacheService } from './http-cache.service';
 
@@ -22,6 +23,13 @@ const DEFAULT_TTL_MS = 60_000;
  * spinner on every page switch.
  */
 export const LIST_TTL_MS = 120_000;
+
+/**
+ * How old a read-ahead detail may be and still be painted while it revalidates. Like
+ * {@link LIST_TTL_MS}: a hit always reads again, so this only decides whether a clicked
+ * row shows at once or as a loading state.
+ */
+export const DETAIL_TTL_MS = 120_000;
 
 /** Per-request opt-in. `0` (the default) means "do not cache this". */
 const CACHE_TTL = new HttpContextToken<number>(() => 0);
@@ -58,6 +66,17 @@ export function listContext(offset: number | undefined): HttpContext {
 }
 
 /**
+ * The request context for a read that the detail of a list row makes when it opens.
+ *
+ * The list reads it ahead for the rows it shows (`prefetchDetails`), so a click paints
+ * the detail at once. Only for a read whose subscriber takes a second emission, because a
+ * hit emits twice when the fresh answer differs.
+ */
+export function detailContext(base: HttpContext = new HttpContext()): HttpContext {
+  return cached(DETAIL_TTL_MS, base);
+}
+
+/**
  * Serve-then-revalidate for reference data, and invalidate on every mutation.
  *
  * A cached GET emits **twice**: the stored answer at once, then the fresh one when it
@@ -84,17 +103,45 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   if (ttl <= 0) return next(req);
 
   const key = req.urlWithParams;
+  const hit = cache.get(key, ttl);
+  if (hit === undefined) {
+    // A read ahead that is still in flight: join it rather than ask a second time, so a
+    // click right after the list appeared waits for one answer, not two.
+    const flying = inflight.get(key);
+    if (flying) return flying;
+    const fresh = next(req).pipe(
+      tap((event) => {
+        if (event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
+      }),
+      finalize(() => inflight.delete(key)),
+      share(),
+    );
+    inflight.set(key, fresh);
+    return fresh;
+  }
+
   const fresh = next(req).pipe(
     tap((event) => {
       if (event instanceof HttpResponse && event.status === 200) cache.set(key, event.body);
     }),
+    // The same answer again is no news: the subscriber is not called a second time, so
+    // an unchanged detail does not render twice.
+    filter((event) => !(event instanceof HttpResponse && sameBody(event.body, hit))),
   );
-
-  const hit = cache.get(key, ttl);
-  if (hit === undefined) return fresh;
 
   // The cached body first, then the network answer. `concat` keeps the order and does not
   // start the request until the cached value is delivered, so the subscriber always sees
   // something to paint before anything else happens.
   return concat(of(new HttpResponse({ body: hit, status: 200 })), fresh);
 };
+
+/** The cached reads in flight by key, shared between the reader ahead and a click. */
+const inflight = new Map<string, Observable<HttpEvent<unknown>>>();
+
+function sameBody(a: unknown, b: unknown): boolean {
+  try {
+    return JSON.stringify(a) === JSON.stringify(b);
+  } catch {
+    return false;
+  }
+}
