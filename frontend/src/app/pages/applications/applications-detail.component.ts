@@ -37,9 +37,8 @@ import type {
 } from '@core/api/models';
 import { resolveI18n } from '@shared/forms/i18n-text';
 import { actorLabel } from '@shared/actor-label.util';
-import { localToday } from './capture/application-capture.component';
 import { toFormlySections } from '@shared/forms/formly-mapper';
-import { formatAnswer, formatEuro, formatFieldValue } from '@shared/forms/answer-format';
+import { formatAnswer, formatFieldValue } from '@shared/forms/answer-format';
 import {
   normalizePositions,
   positionValue,
@@ -103,7 +102,7 @@ import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
 import { DecisionSectionComponent } from '@shared/decision/decision-section.component';
-import { decisionHistoryLine, formatMoney } from '@shared/decision/decision.util';
+import { decisionHistoryLine } from '@shared/decision/decision.util';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
@@ -115,6 +114,8 @@ import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { localToday } from '@shared/date-format';
+import { formatMoney } from '@shared/format-money';
 
 /** Field types whose old and new value do not fit on one line of the history. The
  *  history opens them as blocks below the change ("Werte anzeigen"). */
@@ -553,7 +554,7 @@ export class ApplicationsDetailComponent {
 
   /** An amount in euro; a missing value counts as 0, as on the server. */
   private money(value: number | null): string {
-    return formatEuro(Number(value), this.i18n.locale()) ?? '';
+    return formatMoney(value ?? 0, this.i18n.formatLocale());
   }
 
   /** The label of a field of the diff, or its key when the form does not define it. */
@@ -1107,12 +1108,7 @@ export class ApplicationsDetailComponent {
 
   amount(app: Application): string {
     if (app.amount === null) return this.i18n.translate('applications.detail.notProvided');
-    const value = Number(app.amount);
-    if (Number.isNaN(value)) return app.amount;
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: app.currency ?? 'EUR',
-    }).format(value);
+    return formatMoney(app.amount, this.i18n.formatLocale(), { currency: app.currency }) || app.amount;
   }
 
   /**
@@ -1122,7 +1118,7 @@ export class ApplicationsDetailComponent {
   approvedAmount(app: Application): string {
     if (app.approvedAmount === null || app.approvedAmount === undefined || app.amount === null) return '';
     if (Number(app.approvedAmount) === Number(app.amount)) return '';
-    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), app.currency);
+    return formatMoney(app.approvedAmount, this.i18n.formatLocale(), { currency: app.currency });
   }
 
   startEdit(app: Application): void {

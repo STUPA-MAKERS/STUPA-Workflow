@@ -14,13 +14,13 @@
       }
       <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="R_CENTER - 6" class="sb__center" (click)="rootClick()" />
       <text [attr.x]="CX" [attr.y]="CY - 6" text-anchor="middle" class="sb__center-name">{{ root()?.name }}</text>
-      <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ money(total()) }}</text>
+      <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ total() | money: { whole: true } }}</text>
     </svg>
     @if (hovered(); as h) {
       <div class="sb__tip" [style.left.px]="tip().x" [style.top.px]="tip().y" role="status">
         <strong>{{ h.name }}</strong>
         <span class="text-muted">{{ h.pathKey | simplifyPath }}</span>
-        <span>{{ money(h.value) }} · {{ h.percent }}%</span>
+        <span>{{ h.value | money: { whole: true } }} · {{ h.percent }}%</span>
       </div>
     }
   } @else {
@@ -34,7 +34,7 @@
       <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="R_EMPTY" [attr.stroke-width]="W_EMPTY" class="sb__ring" />
       <circle [attr.cx]="CX" [attr.cy]="CY" [attr.r]="R_CENTER - 6" class="sb__center sb__center--empty" />
       <text [attr.x]="CX" [attr.y]="CY - 6" text-anchor="middle" class="sb__center-name">{{ root()?.name }}</text>
-      <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ money(0) }}</text>
+      <text [attr.x]="CX" [attr.y]="CY + 14" text-anchor="middle" class="sb__center-val">{{ 0 | money: { whole: true } }}</text>
     </svg>
   }
 </div>

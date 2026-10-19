@@ -21,8 +21,8 @@ import {
   APPLICANT_SEARCH_DELAY_MS,
   ApplicationCaptureComponent,
   candidateLabel,
-  localToday,
 } from './application-capture.component';
+import { localToday } from '@shared/date-format';
 
 const TYPES: ApplicationType[] = [
   { id: 't1', name: 'Förderantrag', active: true, hasBudget: true, activeFormVersionId: 'v1', key: null, gremiumId: null },
@@ -460,9 +460,8 @@ describe('ApplicationCaptureComponent', () => {
     expect(s.search).not.toHaveBeenCalled();
   });
 
-  it('labels a candidate and formats today', () => {
+  it('labels a candidate', () => {
     expect(candidateLabel(ANNA)).toBe('Anna Antrag · anna@example.org');
     expect(candidateLabel({ id: 'x', displayName: null, email: 'x@example.org' })).toBe('x@example.org');
-    expect(localToday(new Date(2026, 0, 5))).toBe('2026-01-05');
   });
 });

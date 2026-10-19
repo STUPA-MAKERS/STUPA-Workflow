@@ -67,7 +67,7 @@ describe('PublicMeetingComponent', () => {
   it('offers the login to a member and names the watch mode', async () => {
     const { auth } = await setup(err(401), { ...guestMe().meeting, guestsMode: 'watch', status: 'planned', startedAt: null });
     expect(screen.getByText(/Verfolge die Sitzung live/)).toBeInTheDocument();
-    expect(screen.getByText(/Fachschaft Informatik · Di\., 06\.10\.2026, 18:15/)).toBeInTheDocument();
+    expect(screen.getByText(/Fachschaft Informatik · Di, 06\.10\.2026, 18:15/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Mit Konto anmelden' }));
     expect(auth.login).toHaveBeenCalled();
   });
@@ -228,7 +228,7 @@ describe('PublicMeetingComponent', () => {
       startedAt: null,
       startTime: null,
     });
-    expect(fixture.componentInstance['metaLine']()).toMatch(/^Di\., 06\.10\.2026$/);
+    expect(fixture.componentInstance['metaLine']()).toMatch(/^Di, 06\.10\.2026$/);
     fixture.componentInstance['startTicker']();
     fixture.componentInstance['startTicker']();
     fixture.destroy();

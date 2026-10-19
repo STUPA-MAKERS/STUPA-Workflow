@@ -1,10 +1,8 @@
 import { InjectionToken } from '@angular/core';
 import type { Attendance, Meeting, MeetingVote } from '@core/api/models';
 import { toFormatLocale } from '@core/i18n/i18n.service';
-import type { TranslationKey } from '@core/i18n/translations';
-
-/** The translate function of `I18nService`. */
-export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+import type { Translate } from '@core/i18n/translations';
+import { isoDay, monthYear, weekdayName } from '@shared/date-format';
 
 /** "8 TOPs", "1 TOP" or "keine TOPs". */
 export function topsLabel(n: number, t: Translate): string {
@@ -43,18 +41,6 @@ export function storeView(view: MeetingsView): void {
   } catch {
     // Nothing to do: the view is a convenience, not data.
   }
-}
-
-/** A local day as `YYYY-MM-DD`. */
-export function isoDay(d: Date): string {
-  const pad = (n: number): string => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-/** The local date of a `YYYY-MM-DD` string (midnight). */
-export function parseDay(iso: string): Date {
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d);
 }
 
 /** One day cell of the month grid. */
@@ -150,26 +136,10 @@ function fold(text: string): string {
     .toLowerCase();
 }
 
-/** The month name with the year: "Oktober 2026". */
-export function monthLabel(ref: MonthRef, i18nLocale: string): string {
-  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(ref.year, ref.month, 1));
-}
-
-/** The short weekday names, Monday first: "Mo" … "So". */
-export function weekdayNames(i18nLocale: string): string[] {
-  const fmt = new Intl.DateTimeFormat(toFormatLocale(i18nLocale), { weekday: 'short' });
+/** The short weekday names, Monday first: "Mo" … "So". `locale` is the format locale. */
+export function weekdayNames(locale: string): string[] {
   // 2024-01-01 is a Monday.
-  return Array.from({ length: 7 }, (_, i) => fmt.format(new Date(2024, 0, 1 + i)).replace('.', ''));
-}
-
-/** The short weekday of a date: "Di". */
-export function weekdayShort(iso: string, i18nLocale: string): string {
-  return new Intl.DateTimeFormat(toFormatLocale(i18nLocale), { weekday: 'short' })
-    .format(parseDay(iso))
-    .replace('.', '');
+  return Array.from({ length: 7 }, (_, i) => weekdayName(new Date(2024, 0, 1 + i), locale));
 }
 
 /** A group of rows in the list view. */
@@ -191,10 +161,7 @@ export function overviewGroups(
   past: readonly Meeting[],
   i18nLocale: string,
 ): MeetingGroup[] {
-  const fmt = new Intl.DateTimeFormat(toFormatLocale(i18nLocale), {
-    month: 'long',
-    year: 'numeric',
-  });
+  const locale = toFormatLocale(i18nLocale);
   const groups: MeetingGroup[] = [];
   const live = upcoming.filter((m) => m.status === 'live');
   if (live.length) groups.push({ key: 'now', kind: 'now', month: '', items: live });
@@ -206,7 +173,7 @@ export function overviewGroups(
       last.items.push(m);
       return;
     }
-    groups.push({ key, kind, month: m.date ? fmt.format(parseDay(m.date)) : '', items: [m] });
+    groups.push({ key, kind, month: monthYear(m.date, locale), items: [m] });
   };
   for (const m of upcoming) if (m.status !== 'live') add('upcoming', m);
   for (const m of [...past].reverse()) add('past', m);

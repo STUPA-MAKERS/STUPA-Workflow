@@ -3,7 +3,7 @@ import { IconComponent } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { formatEuro } from '../answer-format';
+import { formatMoney } from '../../format-money';
 import {
   normalizePositions,
   offerHref,
@@ -103,6 +103,6 @@ export class PositionsViewComponent {
 
   /** An amount in euro; a missing value counts as 0, as on the server. */
   protected money(value: number | null): string {
-    return formatEuro(Number(value), this.i18n.locale()) as string;
+    return formatMoney(value ?? 0, this.i18n.formatLocale());
   }
 }

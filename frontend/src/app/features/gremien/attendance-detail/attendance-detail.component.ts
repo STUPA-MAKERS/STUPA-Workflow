@@ -27,7 +27,7 @@ import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
-import { dayMonth, monthLabel } from '../gremien.util';
+import { dayMonth, monthYear } from '@shared/date-format';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 
@@ -180,7 +180,7 @@ export class AttendanceDetailComponent {
   }
 
   day(value: string | null): string {
-    return dayMonth(value, this.i18n.locale());
+    return dayMonth(value, this.i18n.formatLocale());
   }
 
   private load(request: AttendanceDetailRequest): void {
@@ -201,7 +201,7 @@ export class AttendanceDetailComponent {
         this.groups.set(
           answers.map((a) => ({
             month: a.month,
-            label: multi ? monthLabel(a.month, this.i18n.locale(), 'long') : '',
+            label: multi ? monthYear(a.month, this.i18n.formatLocale()) : '',
             meetings: a.meetings,
           })),
         );

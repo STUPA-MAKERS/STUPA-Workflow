@@ -2,14 +2,11 @@ import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Meta } from '@angular/platform-browser';
 import {
-  longDate,
-  meetingDate,
   optionKey,
   orderedCounts,
   parseSemester,
   resultKey,
   semesterLabel,
-  shortDate,
   topCounts,
   useNoindex,
 } from './public-protocols.util';
@@ -29,15 +26,6 @@ describe('public protocols util', () => {
     expect(semesterLabel('ws-2099', t)).toBe('publicProtocols.semester.ws{"year":2099,"next":"00"}');
     expect(semesterLabel('ss-2026', t)).toBe('publicProtocols.semester.ss{"year":2026}');
     expect(semesterLabel('odd', t)).toBe('odd');
-  });
-
-  it('keeps a meeting date on its day and formats it', () => {
-    expect(meetingDate('2026-09-29').getDate()).toBe(29);
-    expect(longDate('2026-09-29', 'de-DE')).toBe('Di, 29.09.2026');
-    expect(longDate('nope', 'de-DE')).toBe('');
-    expect(shortDate('2026-10-02T10:00:00Z', 'de-DE')).toBe('02.10.2026');
-    expect(shortDate(null, 'de-DE')).toBe('');
-    expect(shortDate('nope', 'de-DE')).toBe('');
   });
 
   it('counts the decisions and the skipped non-public items', () => {

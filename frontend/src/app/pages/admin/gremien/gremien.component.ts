@@ -17,7 +17,7 @@ import {
   type RowMenuSection,
 } from '@shared/ui';
 import { IconComponent, ToastService } from '@stupa-makers/ui-kit';
-import { errorCode } from '../../../features/meetings/meetings-display.util';
+import { problemCode } from '@core/api/problem';
 import { AdminApiService } from '../admin-api.service';
 import type { CdVariantOption, Gremium } from '../admin.models';
 import { GremiumRoleMatrixComponent } from '../gremium-roles/gremium-role-matrix.component';
@@ -31,7 +31,7 @@ import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog
  * refusal keeps the generic message.
  */
 function deleteErrorKey(err: unknown): TranslationKey {
-  switch (errorCode(err)) {
+  switch (problemCode(err)) {
     case 'open_vote':
       return 'admin.gremien.deleteOpenVote';
     case 'meeting_finalized':

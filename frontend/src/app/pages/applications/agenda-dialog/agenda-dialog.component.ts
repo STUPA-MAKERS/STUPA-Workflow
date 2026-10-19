@@ -27,19 +27,13 @@ import {
 } from '@stupa-makers/ui-kit';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { localToday, weekdayName } from '@shared/date-format';
 
 /** A meeting row of the dialog. */
 interface MeetingChoice {
   meeting: Meeting;
   /** "Di, 18:00 · 7 TOPs": the parts that exist, joined by a dot. */
   sub: string;
-}
-
-/** Today as a local `YYYY-MM-DD`, the shape of `Meeting.date`. */
-function localToday(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /**
@@ -180,16 +174,8 @@ export class AgendaDialogComponent {
   private subLine(m: Meeting): string {
     const parts: string[] = [];
     const head: string[] = [];
-    if (m.date) {
-      const day = new Date(`${m.date}T00:00:00`);
-      if (!Number.isNaN(day.getTime())) {
-        head.push(
-          day
-            .toLocaleDateString(this.i18n.formatLocale(), { weekday: 'short' })
-            .replace(/\.$/, ''),
-        );
-      }
-    }
+    const weekday = weekdayName(m.date, this.i18n.formatLocale());
+    if (weekday) head.push(weekday);
     if (m.startTime) head.push(m.startTime.slice(0, 5));
     if (head.length) parts.push(head.join(', '));
     const count = m.agendaItemCount ?? 0;

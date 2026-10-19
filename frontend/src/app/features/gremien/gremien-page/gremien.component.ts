@@ -40,7 +40,8 @@ import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
 import { GremienStore } from '../gremien.store';
-import { localized, weekdayDay } from '../gremien.util';
+import { localized } from '../gremien.util';
+import { weekdayDate } from '@shared/date-format';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 
@@ -237,7 +238,7 @@ export class GremienComponent implements OnDestroy {
     else if (item.nextMeeting?.date) {
       next = {
         kind: 'date',
-        text: weekdayDay(item.nextMeeting.date, locale),
+        text: weekdayDate(item.nextMeeting.date, this.i18n.formatLocale(), { year: false }),
         title: this.i18n.translate('gremien.list.nextTitle', { title: item.nextMeeting.title }),
       };
     }

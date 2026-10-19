@@ -32,7 +32,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
+import { formatBytes } from '@shared/format-bytes';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
@@ -180,7 +180,7 @@ export class BrandingEditorComponent {
   }
 
   protected size(bytes: number): string {
-    return formatBytes(bytes, this.i18n);
+    return formatBytes(bytes, this.i18n.formatLocale());
   }
 
   /** One text of the draft in the language that is edited now, for the preview. */

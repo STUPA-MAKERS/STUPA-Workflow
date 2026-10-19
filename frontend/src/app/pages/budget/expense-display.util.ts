@@ -1,25 +1,7 @@
 import type { BudgetAllocationView, BudgetTreeNode, ExpenseKind } from './budget-tree.api';
-import { toFormatLocale } from '@core/i18n/i18n.service';
+import { formatMoney } from '@shared/format-money';
 import { simplifyPathKey } from '@shared/budget-path';
 import { nodeColors } from './budget-color.util';
-
-/** Format a value as EUR. Money stays a decimal string in the API, so `Number` is UI-only. */
-export function formatEur(value: number, locale: string): string {
-  return value.toLocaleString(toFormatLocale(locale), {
-    style: 'currency',
-    currency: 'EUR',
-  });
-}
-
-/** Human-readable `detail` of a problem+json error. */
-export function problemDetail(err: unknown): string | null {
-  return (err as { error?: { detail?: string } } | null)?.error?.detail || null;
-}
-
-/** Machine `code` of a problem+json error. */
-export function problemCode(err: unknown): string | undefined {
-  return (err as { error?: { code?: string } } | null)?.error?.code;
-}
 
 /** Top-level node whose subtree contains `targetId` (fiscal years live at the top). */
 export function findTopBudgetNode(
@@ -72,9 +54,13 @@ export function costCentreLabel(
   return { name: path, path, color: null };
 }
 
-/** The amount with its sign: "−" for an expense, "+" for an income. */
+/**
+ * The amount with its sign: "−" for an expense, "+" for an income. The sign comes from the
+ * kind, not from the number, because the API keeps every amount positive. `locale` is the
+ * format locale (`de-DE` / `en-GB`).
+ */
 export function signedEur(kind: ExpenseKind, amount: string, locale: string): string {
-  return (kind === 'income' ? '+' : '−') + formatEur(Number(amount), locale);
+  return (kind === 'income' ? '+' : '−') + formatMoney(amount, locale);
 }
 
 /** A node of the forest by id, or null. */
@@ -132,64 +118,6 @@ export function costCentreFigures(
   };
 }
 
-/** A group of list rows: the rows of one month, or one group without a heading. */
-export interface MonthGroup<T> {
-  key: string;
-  /** "September 2026", or empty for the single group of a list that is not by date. */
-  label: string;
-  items: T[];
-}
-
-/**
- * Groups rows by the month of a date, in the order of the rows. A row without a date
- * goes into a group of its own at the place it comes in. `byDate` false gives one group
- * without a heading (a list sorted by amount).
- */
-export function monthGroups<T>(
-  rows: readonly T[],
-  dateOf: (row: T) => string | null,
-  locale: string,
-  byDate = true,
-): MonthGroup<T>[] {
-  if (!rows.length) return [];
-  if (!byDate) return [{ key: 'all', label: '', items: [...rows] }];
-  const fmt = new Intl.DateTimeFormat(toFormatLocale(locale), {
-    month: 'long',
-    year: 'numeric',
-    timeZone: 'UTC',
-  });
-  const groups: MonthGroup<T>[] = [];
-  for (const row of rows) {
-    const iso = dateOf(row);
-    const key = iso ? iso.slice(0, 7) : 'none';
-    const last = groups[groups.length - 1];
-    if (last && last.key === key) {
-      last.items.push(row);
-      continue;
-    }
-    let label = '';
-    if (iso) {
-      const [y, m] = iso.split('-').map(Number);
-      label = fmt.format(new Date(Date.UTC(y, m - 1, 1)));
-    }
-    groups.push({ key, label, items: [row] });
-  }
-  return groups;
-}
-
-/** A date as day and month, "28.09." in German, "28/09" in English. */
-export function shortDate(iso: string | null, locale: string): string {
-  if (!iso) return '';
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  if (!y || !m || !d) return '';
-  const text = new Date(Date.UTC(y, m - 1, d)).toLocaleDateString(toFormatLocale(locale), {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'UTC',
-  });
-  return locale === 'de' ? `${text}.`.replace('..', '.') : text;
-}
-
 /** The common VAT rates in percent. Only these show as a rate. */
 const VAT_RATES = [0, 5, 7, 16, 19];
 
@@ -204,12 +132,4 @@ export function vatRate(net: string | null, tax: string | null): number | null {
   if (!(n > 0) || !Number.isFinite(t)) return null;
   const rate = (t / n) * 100;
   return VAT_RATES.find((r) => Math.abs(r - rate) < 0.1) ?? null;
-}
-
-/** Whole calendar days from `today` to the ISO date `iso` (negative in the past). */
-export function daysUntil(iso: string, today: Date = new Date()): number {
-  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
-  const due = Date.UTC(y, m - 1, d);
-  const now = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  return Math.round((due - now) / 86_400_000);
 }

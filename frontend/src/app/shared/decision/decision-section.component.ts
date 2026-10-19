@@ -7,7 +7,8 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { FieldGroupComponent } from '@shared/ui/field-group/field-group.component';
 import { FieldRowComponent } from '@shared/ui/field-group/field-group.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
-import { formatDiff, formatMoney } from './decision.util';
+import { formatMoney } from '../format-money';
+import { formatDiff } from './decision.util';
 
 /**
  * The section "Beschluss" (F1): the decision on an application.
@@ -49,13 +50,15 @@ export class DecisionSectionComponent {
   );
 
   readonly requested = computed(() =>
-    formatMoney(this.decision().requestedAmount, this.i18n.formatLocale(), this.currency()),
+    formatMoney(this.decision().requestedAmount, this.i18n.formatLocale(), { currency: this.currency() }),
   );
 
   /** The approved amount; "as requested" shows the requested amount. */
   readonly approved = computed(() => {
     const d = this.decision();
-    return formatMoney(d.approvedAmount ?? d.requestedAmount, this.i18n.formatLocale(), this.currency());
+    return formatMoney(d.approvedAmount ?? d.requestedAmount, this.i18n.formatLocale(), {
+      currency: this.currency(),
+    });
   });
 
   readonly diff = computed(() => {

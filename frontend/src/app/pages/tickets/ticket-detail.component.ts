@@ -98,10 +98,11 @@ import {
   STATUS_LABEL,
   eventText,
   isOpen,
-  personName,
   reporterEventText,
   reporterName,
 } from './tickets.util';
+import { clock, dayMonth } from '@shared/date-format';
+import { personName } from '@shared/person-label.util';
 
 type DetailTab = 'log' | 'details';
 
@@ -820,13 +821,8 @@ export class TicketDetailComponent {
 
   /** "14.10., 21:14". */
   private when(at: string): string {
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      hourCycle: 'h23',
-    }).format(new Date(at));
+    const locale = this.i18n.formatLocale();
+    return `${dayMonth(at, locale)}, ${clock(at, locale)}`;
   }
 
   reportedAt(t: TicketDetail): string {

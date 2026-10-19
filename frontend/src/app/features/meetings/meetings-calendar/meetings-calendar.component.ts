@@ -17,7 +17,7 @@ import {
 import { Router } from '@angular/router';
 import { ApiClient } from '@core/api/api-client.service';
 import type { Meeting } from '@core/api/models';
-import { I18nService, toFormatLocale } from '@core/i18n/i18n.service';
+import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
@@ -36,7 +36,7 @@ import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
-import { meetingDay, meetingTimeText, shortTime, weekdayDate } from '../meetings-display.util';
+import { meetingDay, meetingTimeText } from '../meetings-display.util';
 import {
   type AgendaProgress,
   type CalendarDay,
@@ -45,18 +45,14 @@ import {
   OVERVIEW_NOW,
   agendaProgress,
   gridRange,
-  isoDay,
   matchesQuery,
   meetingsByDay,
   monthGrid,
-  monthLabel,
   monthOf,
   openVoteOf,
-  parseDay,
   shiftMonth,
   topsLabel,
   weekdayNames,
-  weekdayShort,
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
 import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
@@ -65,6 +61,14 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import {
+  isoDay,
+  monthYear,
+  parseDay,
+  shortTime,
+  weekdayDate,
+  weekdayName,
+} from '@shared/date-format';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -163,8 +167,8 @@ export class MeetingsCalendarComponent {
   readonly query = signal(inject(MeetingsTimelineService).searchQuery());
 
   readonly weeks = computed<CalendarDay[][]>(() => monthGrid(this.month(), this.today()));
-  readonly monthText = computed(() => monthLabel(this.month(), this.i18n.locale()));
-  readonly weekdays = computed(() => weekdayNames(this.i18n.locale()));
+  readonly monthText = computed(() => monthYear(new Date(this.month().year, this.month().month, 1), this.i18n.formatLocale()));
+  readonly weekdays = computed(() => weekdayNames(this.i18n.formatLocale()));
   private readonly range = computed(() => gridRange(this.weeks()));
 
   /** The meetings of the days of the grid. */
@@ -274,7 +278,9 @@ export class MeetingsCalendarComponent {
   /** Select a day; a day of the week before or after the month also shows its month. */
   selectDay(iso: string): void {
     this.selectedDay.set(iso);
-    const ref = monthOf(parseDay(iso));
+    const day = parseDay(iso);
+    if (!day) return;
+    const ref = monthOf(day);
     const cur = this.month();
     if (ref.year !== cur.year || ref.month !== cur.month) this.month.set(ref);
   }
@@ -296,6 +302,7 @@ export class MeetingsCalendarComponent {
       ArrowDown: 7,
     };
     const day = parseDay(this.selectedDay());
+    if (!day) return;
     let delta = steps[event.key];
     if (event.key === 'Home') delta = -((day.getDay() + 6) % 7);
     if (event.key === 'End') delta = 6 - ((day.getDay() + 6) % 7);
@@ -335,9 +342,10 @@ export class MeetingsCalendarComponent {
 
   /** The name of a day cell for a screen reader: "Dienstag, 29. September 2026, 1 Sitzung". */
   dayLabel(d: CalendarDay): string {
-    const date = new Intl.DateTimeFormat(toFormatLocale(this.i18n.locale()), {
-      dateStyle: 'full',
-    }).format(parseDay(d.iso));
+    const day = parseDay(d.iso);
+    const date = day
+      ? new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'full' }).format(day)
+      : d.iso;
     const n = this.meetingsOf(d.iso).length;
     const count =
       n === 0
@@ -371,7 +379,7 @@ export class MeetingsCalendarComponent {
   rowTime(m: Meeting): string {
     const start = shortTime(m.startTime);
     if (!m.date) return start;
-    const weekday = weekdayShort(m.date, this.i18n.locale());
+    const weekday = weekdayName(m.date, this.i18n.formatLocale());
     return start ? `${weekday}, ${start}` : weekday;
   }
 
@@ -383,9 +391,9 @@ export class MeetingsCalendarComponent {
     const next = shiftMonth(this.month(), delta);
     this.month.set(next);
     // Keep the day of the month where it exists, else the last day of the new month.
-    const cur = parseDay(this.selectedDay());
+    const cur = parseDay(this.selectedDay())?.getDate() ?? 1;
     const last = new Date(next.year, next.month + 1, 0).getDate();
-    this.selectedDay.set(isoDay(new Date(next.year, next.month, Math.min(cur.getDate(), last))));
+    this.selectedDay.set(isoDay(new Date(next.year, next.month, Math.min(cur, last))));
   }
 
   private card(m: Meeting): DayCard {

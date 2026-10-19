@@ -15,8 +15,9 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ButtonComponent, DialogComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { clockTime } from '../meetings-display.util';
 import { currentPosition, handoverPreview } from '../keepers.util';
+import { clock } from '@shared/date-format';
+import { personLabel } from '@shared/person-label.util';
 
 /** One choice of the handover time. */
 interface ModeOption {
@@ -108,7 +109,7 @@ export class HandoverDialogComponent {
   protected readonly open = computed(() => this.target() !== null);
   protected readonly targetName = computed(() => {
     const a = this.target();
-    return a ? a.displayName || a.email || '—' : '';
+    return a ? personLabel(a, this.i18n, { fallbackText: '—' }) : '';
   });
   protected readonly currentName = computed(() => this.meeting().protokollantName ?? '—');
 
@@ -126,7 +127,7 @@ export class HandoverDialogComponent {
     const t = (key: TranslationKey, params?: Record<string, string | number>) =>
       this.i18n.translate(key, params);
     const pos = this.position();
-    const time = clockTime(this.now().toISOString(), this.i18n.locale());
+    const time = clock(this.now().toISOString(), this.i18n.formatLocale());
     const top = (n: number) => t('meetings.agenda.top', { n });
     const last = this.lastTop();
     return [

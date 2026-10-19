@@ -8,6 +8,15 @@ import { type Delegation, DelegationsApiService } from '@core/api/delegations.se
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
+import {
+  calendarDaysSince,
+  clock,
+  localToday,
+  shortDay,
+  shortTime,
+  weekdayDate,
+  weekdayName,
+} from '@shared/date-format';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type {
@@ -49,7 +58,6 @@ import {
   meetingVoteStatus,
 } from '@shared/status-kind.util';
 import { closedStatus } from '../../features/voting/election.util';
-import { shortTime } from '../../features/meetings/meetings-display.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
 import { mediaQuerySignal } from '../../layout/media-query';
@@ -61,6 +69,7 @@ import {
   type FiscalYear,
 } from '../budget/budget-tree.api';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { formatMoney } from '@shared/format-money';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
 const ROWS = 25;
@@ -74,7 +83,6 @@ const PHONE_MEETINGS = 2;
 const TIMELINE_LIMIT = 8;
 /** At most this many cost-centre roots in the budget summary. */
 const BUDGET_ROOTS = 2;
-const DAY_MS = 86_400_000;
 
 /** The tabs of the work list. The URL keeps the choice as `?tab=`. */
 export type WorkTab = 'tasks' | 'mine' | 'votes';
@@ -496,16 +504,7 @@ export class DashboardComponent {
   // ---------------------------------------------------------------- today
 
   /** "Di, 29.09.2026". */
-  readonly todayLabel = computed(() =>
-    new Date(Date.now())
-      .toLocaleDateString(this.i18n.formatLocale(), {
-        weekday: 'short',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-      })
-      .replace(/\.,/, ','),
-  );
+  readonly todayLabel = computed(() => weekdayDate(new Date(Date.now()), this.i18n.formatLocale()));
 
   readonly meetingsLoading = computed(() => this.timeline() === undefined);
   /** The meetings page is open to the user: the sheet links to it. */
@@ -541,7 +540,7 @@ export class DashboardComponent {
   );
 
   private liveCard(m: Meeting): LiveCard {
-    const since = m.startedAt ? this.clock(m.startedAt) : shortTime(m.startTime);
+    const since = m.startedAt ? clock(m.startedAt, this.i18n.formatLocale()) : shortTime(m.startTime);
     const sub = [
       since ? this.i18n.translate('dashboard.sessions.since', { time: since }) : '',
       m.isProtokollant ? this.i18n.translate('dashboard.today.keeper') : '',
@@ -574,7 +573,7 @@ export class DashboardComponent {
 
   /** "Fr, 17:30": the weekday of the date and the planned start. */
   private plannedLabel(m: Meeting): string {
-    const day = this.weekday(m.date);
+    const day = weekdayName(m.date, this.i18n.formatLocale());
     return [day, shortTime(m.startTime)].filter((s) => !!s).join(', ');
   }
 
@@ -604,7 +603,7 @@ export class DashboardComponent {
   }
 
   private summary(root: BudgetTreeNode, fys: FiscalYear[], named: boolean): BudgetSummary | null {
-    const today = this.today();
+    const today = localToday(new Date(Date.now()));
     const fy =
       fys.find((f) => f.startDate <= today && today <= f.endDate) ??
       fys.find((f) => f.active) ??
@@ -637,21 +636,13 @@ export class DashboardComponent {
   /** The amount in its currency, or null without an amount. */
   private money(value: string | null | undefined, currency: string | null | undefined): string | null {
     if (value === null || value === undefined || value === '') return null;
-    const n = Number(value);
-    if (Number.isNaN(n)) return value;
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: currency || 'EUR',
-    }).format(n);
+    return formatMoney(value, this.i18n.formatLocale(), { currency }) || value;
   }
 
   /** How long a task waits, in calendar days: "heute", "1 Tag", "5 Tage". */
   private waited(at: IsoDateTime): string {
-    const then = new Date(at);
-    if (Number.isNaN(then.getTime())) return '—';
-    const day = (d: Date): number => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-    // Round, not floor: a day with a DST change has 23 or 25 hours.
-    const days = Math.max(0, Math.round((day(new Date(Date.now())) - day(then)) / DAY_MS));
+    const days = calendarDaysSince(at, new Date(Date.now()));
+    if (days === null) return '—';
     if (days === 0) return this.i18n.translate('dashboard.waiting.today');
     if (days === 1) return this.i18n.translate('dashboard.waiting.one');
     return this.i18n.translate('dashboard.waiting.other', { n: days });
@@ -659,14 +650,7 @@ export class DashboardComponent {
 
   /** "28.08." in the current year, "28.08.2025" before. */
   private shortDay(at: IsoDateTime): string {
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) return '—';
-    const sameYear = d.getFullYear() === new Date(Date.now()).getFullYear();
-    return d.toLocaleDateString(this.i18n.formatLocale(), {
-      day: '2-digit',
-      month: '2-digit',
-      ...(sameYear ? {} : { year: 'numeric' }),
-    });
+    return shortDay(at, this.i18n.formatLocale(), new Date(Date.now())) || '—';
   }
 
   /** The full date and time, for a tooltip. */
@@ -674,29 +658,6 @@ export class DashboardComponent {
     return formatMoment(at, this.i18n.formatLocale()) || null;
   }
 
-  /** The short weekday of a `YYYY-MM-DD` date in the local calendar, without a dot. */
-  private weekday(date: string | null): string {
-    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(date ?? '');
-    if (!match) return '';
-    const d = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    return d
-      .toLocaleDateString(this.i18n.formatLocale(), { weekday: 'short' })
-      .replace(/\.$/, '');
-  }
-
-  /** The local time of an instant as HH:MM. */
-  private clock(at: IsoDateTime): string {
-    const d = new Date(at);
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString(this.i18n.formatLocale(), { hour: '2-digit', minute: '2-digit' });
-  }
-
-  /** Today as `YYYY-MM-DD` in the local calendar. */
-  private today(): string {
-    const d = new Date(Date.now());
-    const pad = (n: number): string => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  }
 
   /** Send the request of the open tab again after it failed. */
   retryTab(): void {

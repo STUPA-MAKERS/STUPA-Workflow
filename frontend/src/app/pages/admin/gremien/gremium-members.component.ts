@@ -27,6 +27,7 @@ import {
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** One row of the member list. */
 interface Member {
@@ -112,7 +113,7 @@ export class GremiumMembersComponent {
       const role = this.rolesById().get(m.gremiumRoleId);
       rows.push({
         id: m.principalId,
-        name: m.displayName || m.email || this.i18n.translate('admin.gremien.unknownMember'),
+        name: personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
         email: m.email ?? null,
         role: role ? this.roleName(role) : '—',
         rank: this.rank(role),

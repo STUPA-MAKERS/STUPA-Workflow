@@ -6,6 +6,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angul
 import { render, screen, within } from '@testing-library/angular';
 import { axe } from 'jest-axe';
 import { AuthService } from '@core/auth/auth.service';
+import { ToastService } from '@stupa-makers/ui-kit';
 import { BudgetDashboardComponent, utilisation } from './budget-dashboard.component';
 import type {
   BudgetAllocationView,
@@ -505,11 +506,13 @@ describe('BudgetDashboardComponent', () => {
       const { c, http } = await setup();
       c.selectedKsId.set('');
       c.selectedFyId.set('');
+      const toast = jest.spyOn(TestBed.inject(ToastService), 'error');
       c.onExport();
       const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
       expect(req.request.params.keys()).toEqual([]);
       req.error(new ProgressEvent('err'));
       expect(c.exporting()).toBe(false);
+      expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
     });
 
     it('gives a gremium-scoped reader neither the export nor the bookings', async () => {

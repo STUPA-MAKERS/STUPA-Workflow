@@ -7,6 +7,9 @@ export const DEFAULT_LOCALE: Locale = 'de';
 
 export type TranslationKey = keyof typeof de;
 
+/** The shape of `I18nService.translate`, for pure helpers that take the translator as an argument. */
+export type Translate = (key: TranslationKey, params?: Record<string, string | number>) => string;
+
 export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
@@ -213,6 +216,7 @@ export const de = {
   'expenses.title': 'Buchungen',
   'expenses.add': 'Buchung hinzufügen',
   'expenses.export': 'Export',
+  'expenses.exportError': 'Der Export ist fehlgeschlagen.',
   'expenses.transferFrom': 'Von Kostenstelle',
   'expenses.transferTo': 'Zu Kostenstelle',
   'expenses.transferConfirm': 'Übertragen',
@@ -2844,6 +2848,7 @@ export const de = {
   'budget.dash.year': 'Haushaltsjahr',
   'budget.dash.yearShort': 'HHJ {year}',
   'budget.dash.export': 'Exportieren',
+  'budget.dash.exportError': 'Der Export ist fehlgeschlagen.',
   'budget.dash.fig.allocated': 'Zuteilung',
   'budget.dash.fig.requested': 'Beantragt',
   'budget.dash.fig.bound': 'Gebunden',

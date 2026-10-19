@@ -20,7 +20,7 @@ import { SegBarComponent, type SegTone } from '@shared/ui/seg-bar/seg-bar.compon
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import type { StatusKind } from '@shared/status-kind.util';
 import { ButtonComponent, IconComponent, ToastService } from '@stupa-makers/ui-kit';
-import { errorDetail } from '../../meetings/meetings-display.util';
+import { problemDetail } from '@core/api/problem';
 import {
   type ElectionBar,
   candidateNames,
@@ -213,7 +213,7 @@ export class ElectionResultComponent {
 
   private fail(err: unknown): void {
     this.busy.set(null);
-    const detail = errorDetail(err);
+    const detail = problemDetail(err);
     const base = this.t('meetings.toast.actionFailed');
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }
