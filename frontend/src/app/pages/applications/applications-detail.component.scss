@@ -28,9 +28,6 @@
 /* ------------------------------------------------------------------ loading shapes */
 /* The busy sheet uses the classes of the loaded one (`.ad__head`, `.ad__title`,
    `.ad__cols`, `.rowgroup`), so only the bars need a size here. */
-.ad__skelKicker {
-  width: 11rem;
-}
 .ad__skelIcon {
   display: grid;
   place-items: center;

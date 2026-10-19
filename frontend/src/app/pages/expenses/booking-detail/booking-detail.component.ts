@@ -29,7 +29,7 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../../invoices/invoice-figures';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 
@@ -48,6 +48,7 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   imports: [
     EmptyStateComponent,
     SheetBarComponent,
+    SheetBarTitleDirective,
     ButtonComponent,
     IconComponent,
     LocalizedDatePipe,

@@ -20,7 +20,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { ButtonComponent, IconComponent, MEDIA, TabsComponent, type TabItem } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
@@ -69,7 +69,7 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
     EmptyStateComponent,
     RowMenuComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
+    SheetBarTitleDirective,
     SkeletonComponent,
     CalendarSubscribeComponent,
     CreateMeetingDialogComponent,

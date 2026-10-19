@@ -440,7 +440,7 @@ describe('BudgetDashboardComponent', () => {
       expect(kicker.querySelector('nav')?.getAttribute('aria-label')).toBe(
         view.container.querySelector('nav.bd__crumbs')?.getAttribute('aria-label'),
       );
-      const actions = bar.querySelector(':scope > .bd__actions') as HTMLElement;
+      const actions = bar.querySelector(':scope > .sheet-bar__actions > .bd__actions') as HTMLElement;
       expect(within(actions).getByRole('button', { name: /Exportieren/ })).toBeTruthy();
       expect(within(actions).getByRole('button', { name: 'Buchungen ansehen' })).toBeTruthy();
       expect(bar.firstElementChild).toBe(kicker);

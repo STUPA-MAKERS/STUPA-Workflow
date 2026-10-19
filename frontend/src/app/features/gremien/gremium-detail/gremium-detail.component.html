@@ -2,6 +2,10 @@
   <article class="gd" [class.gd--split]="split()" aria-labelledby="gd-title">
     <header class="gd__head">
       <app-sheet-bar class="gd__bar" [bleed]="split()">
+        <div appSheetBarTitle class="gd__titleRow">
+          <app-gremium-logo [name]="g.name" [logoUrl]="g.logoUrl" [size]="phone() ? 'md' : 'lg'" />
+          <h2 id="gd-title" class="gd__title">{{ g.name }}</h2>
+        </div>
         @if (!phone()) {
           <app-button
             variant="text"
@@ -27,10 +31,6 @@
       </app-sheet-bar>
       <app-calendar-subscribe #abo />
 
-      <div class="gd__titleRow">
-        <app-gremium-logo [name]="g.name" [logoUrl]="g.logoUrl" [size]="phone() ? 'md' : 'lg'" />
-        <h2 id="gd-title" class="gd__title">{{ g.name }}</h2>
-      </div>
       <!-- Every part draws its dot before it; the line clips the dot of the first part on
            each line, so a dot shows only between two parts, also after a wrap. -->
       <p class="gd__line">
@@ -129,11 +129,12 @@
        after 300ms. -->
   <article class="gd gd--busy" [class.gd--split]="split()" aria-busy="true">
     <header class="gd__head skel-in" aria-hidden="true">
-      <app-sheet-bar class="gd__bar" [bleed]="split()" />
-      <div class="gd__titleRow">
-        <span class="skel-box gd__skelLogo" [class.gd__skelLogo--lg]="!phone()"></span>
-        <span class="gd__title"><span class="skel-text gd__skelTitle"></span></span>
-      </div>
+      <app-sheet-bar class="gd__bar" [bleed]="split()">
+        <div appSheetBarTitle class="gd__titleRow">
+          <span class="skel-box gd__skelLogo" [class.gd__skelLogo--lg]="!phone()"></span>
+          <span class="gd__title"><span class="skel-text gd__skelTitle"></span></span>
+        </div>
+      </app-sheet-bar>
       <p class="gd__line"><span class="skel-text skel-text--muted gd__skelLine"></span></p>
     </header>
     <div class="gd__body">

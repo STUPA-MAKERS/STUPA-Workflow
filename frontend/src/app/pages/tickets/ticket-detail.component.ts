@@ -69,7 +69,7 @@ import {
 } from '@shared/ui/row-menu/row-menu.component';
 import {
   SheetBarComponent,
-  SheetBarKickerDirective,
+  SheetBarTitleDirective,
 } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
@@ -206,7 +206,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
     NoteComponent,
     RowMenuComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
+    SheetBarTitleDirective,
     SkeletonComponent,
     StatusTextComponent,
     TabsComponent,

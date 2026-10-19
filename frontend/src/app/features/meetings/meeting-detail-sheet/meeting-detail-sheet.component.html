@@ -2,6 +2,7 @@
 <article class="ms" [class.ms--split]="split()" aria-labelledby="ms-title">
   <header class="ms__head">
     <app-sheet-bar [bleed]="split()">
+      <h2 appSheetBarTitle id="ms-title" class="ms__title">{{ m.title }}</h2>
       @if (m.canManage && !phone()) {
         <app-button
           variant="text"
@@ -20,7 +21,6 @@
       }
     </app-sheet-bar>
 
-    <h2 id="ms-title" class="ms__title">{{ m.title }}</h2>
     <!-- Every part draws its dot before it; the line clips the dot of the first part on
          each line, so a dot shows only between two parts, also after a wrap. -->
     <p class="ms__line">

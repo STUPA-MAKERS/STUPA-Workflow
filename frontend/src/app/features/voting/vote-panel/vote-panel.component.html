@@ -20,19 +20,24 @@
   <h3 class="vpn__q vpn__q--card">{{ question() }}</h3>
   <p class="vpn__rules vpn__rules--card">{{ rules() }}</p>
 } @else {
-  <p class="vpn__meta">
-    <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
-    @if (where(); as w) {
-      <!-- The meeting of the vote, as a link: on a phone the header line does this. The
-           context holds a meeting only when the reader may read it. -->
-      <a class="vpn__app vpn__where ell" [routerLink]="['/meetings', context().meeting!.id]" [title]="w">{{ w }}</a>
-      <span class="vpn__sep" aria-hidden="true">·</span>
-    } @else if (!v.meetingId && v.applicationId) {
-      <a class="vpn__app" [routerLink]="['/applications', v.applicationId]">{{ 'voting.panel.application' | t }}</a>
-      <span class="vpn__sep" aria-hidden="true">·</span>
-    }
-    <span class="vpn__rules">{{ rules() }}</span>
-  </p>
+  <!-- The actions of the page (`vpnActions`) end the meta line, so no bar stands empty
+       above the vote. -->
+  <div class="vpn__metaRow">
+    <p class="vpn__meta">
+      <app-status-text [kind]="s.kind">{{ s.key | t }}</app-status-text>
+      @if (where(); as w) {
+        <!-- The meeting of the vote, as a link: on a phone the header line does this. The
+             context holds a meeting only when the reader may read it. -->
+        <a class="vpn__app vpn__where ell" [routerLink]="['/meetings', context().meeting!.id]" [title]="w">{{ w }}</a>
+        <span class="vpn__sep" aria-hidden="true">·</span>
+      } @else if (!v.meetingId && v.applicationId) {
+        <a class="vpn__app" [routerLink]="['/applications', v.applicationId]">{{ 'voting.panel.application' | t }}</a>
+        <span class="vpn__sep" aria-hidden="true">·</span>
+      }
+      <span class="vpn__rules">{{ rules() }}</span>
+    </p>
+    <ng-content select="[vpnActions]" />
+  </div>
   <h2 class="vpn__q">{{ question() }}</h2>
 }
 

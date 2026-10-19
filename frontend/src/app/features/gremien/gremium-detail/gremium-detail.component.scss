@@ -64,6 +64,11 @@
   gap: 14px;
   min-width: 0;
 }
+/* In the bar the row centres the logo (48px, 40px on a phone) on the axis of the icon
+   buttons, in place of the padding the bar gives a one-line title. */
+.gd__head .gd__titleRow {
+  padding-block: 6px;
+}
 .gd__title {
   margin: 0;
   min-width: 0;
@@ -158,6 +163,9 @@
   .gd__title {
     font-size: 1.375rem;
     line-height: 1.75rem;
+  }
+  .gd__head .gd__titleRow {
+    padding-block: 10px;
   }
   .gd__line {
     font-size: var(--fs-sm);

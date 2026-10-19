@@ -35,7 +35,7 @@ import {
   openVoteOf,
   topsLabel,
 } from '../meetings-overview.util';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** What the sheet loaded for the meeting. `null` = the request failed. */
@@ -78,6 +78,7 @@ interface AgendaRow {
   imports: [
     EmptyStateComponent,
     SheetBarComponent,
+    SheetBarTitleDirective,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

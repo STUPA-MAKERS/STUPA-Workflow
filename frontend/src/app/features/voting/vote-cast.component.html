@@ -40,24 +40,6 @@
               <app-row-menu [sections]="menu()" (selected)="onMenu($event.id)" />
             }
           </app-vote-phone-header>
-        } @else {
-          <app-sheet-bar class="vc__bar">
-            @if (beamerLink()) {
-              <app-button variant="tonal" size="sm" (click)="goBeamer()">
-                <app-icon name="monitor" />
-                {{ 'voting.live.toBeamer' | t }}
-              </app-button>
-            }
-            @if (canDelete()) {
-              <!-- Only a draft with no ballots and no meeting can be deleted. An open
-                   vote is cancelled instead. -->
-              <app-row-menu
-                [label]="'voting.cast.menu' | t"
-                [sections]="menu()"
-                (selected)="onMenu($event.id)"
-              />
-            }
-          </app-sheet-bar>
         }
 
         <!-- Side by side only this part scrolls, under the bar, with the shared fade at
@@ -80,7 +62,27 @@
             (castDone)="onCastDone()"
             (castFailed)="onCastFailed($event)"
             (changed)="onElectionChanged()"
-          />
+          >
+            @if (!phone() && (beamerLink() || canDelete())) {
+              <span vpnActions class="vc__actions">
+                @if (beamerLink()) {
+                  <app-button variant="tonal" size="sm" (click)="goBeamer()">
+                    <app-icon name="monitor" />
+                    {{ 'voting.live.toBeamer' | t }}
+                  </app-button>
+                }
+                @if (canDelete()) {
+                  <!-- Only a draft with no ballots and no meeting can be deleted. An open
+                       vote is cancelled instead. -->
+                  <app-row-menu
+                    [label]="'voting.cast.menu' | t"
+                    [sections]="menu()"
+                    (selected)="onMenu($event.id)"
+                  />
+                }
+              </span>
+            }
+          </app-vote-panel>
           <app-todo-linked-list kind="vote" headingId="vc-todos" [targetId]="v.id" />
         </div>
       </article>

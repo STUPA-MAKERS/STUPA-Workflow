@@ -439,7 +439,7 @@ describe('VoteCastComponent', () => {
         'href',
         '/meetings/m1',
       );
-      expect(document.querySelector('.vc__bar')).toBeNull();
+      expect(document.querySelector('.vc__actions')).toBeNull();
       expect(document.querySelector('app-ballot')).toHaveClass('ballot--phone');
     });
 
@@ -596,9 +596,9 @@ describe('VoteCastComponent', () => {
       expect(document.querySelector('app-vote-panel')).not.toHaveClass('vpn--flat');
     });
 
-    it('draws no line above the title', async () => {
+    it('draws no bar above the vote', async () => {
       await setup({ page: { split: true } });
-      expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
+      expect(document.querySelector('app-sheet-bar')).toBeNull();
     });
 
     it('tells the list about a cast and stays on the vote', async () => {

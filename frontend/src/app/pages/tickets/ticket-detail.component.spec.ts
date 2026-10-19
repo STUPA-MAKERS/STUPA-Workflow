@@ -679,7 +679,9 @@ describe('TicketDetailComponent', () => {
 
   it('names the ticket number in the line under the title, with no line above it', async () => {
     await start('/tickets/t40');
-    expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelector('.td__line .mono')?.textContent?.trim()).toBe('T-0040');
   });
 

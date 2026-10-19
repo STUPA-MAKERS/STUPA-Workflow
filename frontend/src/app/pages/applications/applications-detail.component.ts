@@ -107,7 +107,7 @@ import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dial
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
 import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
-import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
@@ -163,7 +163,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     ConfirmDialogComponent,
     FabComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
+    SheetBarTitleDirective,
     NgTemplateOutlet,
     RouterLink,
     FormsModule,

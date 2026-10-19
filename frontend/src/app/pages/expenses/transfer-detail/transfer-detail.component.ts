@@ -10,7 +10,7 @@ import {
   costCentreLabel,
   formatEur,
 } from '../../budget/expense-display.util';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 
 /**
  * The detail of a transfer (board Fin-Uebertraege): "Übertrag · HHJ 2025", the
@@ -22,7 +22,7 @@ import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
   selector: 'app-transfer-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SheetBarComponent, ButtonComponent, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
+  imports: [SheetBarComponent, SheetBarTitleDirective, ButtonComponent, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
   templateUrl: './transfer-detail.component.html',
   styleUrl: './transfer-detail.component.scss',
 })

@@ -53,7 +53,7 @@ import {
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { SheetBarComponent, SheetBarKickerDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
@@ -141,7 +141,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     NoteComponent,
     RowMenuComponent,
     SheetBarComponent,
-    SheetBarKickerDirective,
+    SheetBarTitleDirective,
     SkeletonComponent,
     TabsComponent,
     TodoDueChipComponent,

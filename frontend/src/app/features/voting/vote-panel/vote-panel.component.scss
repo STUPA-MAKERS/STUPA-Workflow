@@ -9,6 +9,16 @@
   background: var(--color-surface-1);
 }
 
+/* The meta line and the actions of the page on one line; the actions keep their width. */
+.vpn__metaRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.vpn__metaRow > .vpn__meta {
+  flex: 1 1 auto;
+}
 .vpn__meta {
   display: flex;
   align-items: baseline;

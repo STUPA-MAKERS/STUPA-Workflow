@@ -98,7 +98,9 @@ describe('TodoCardDetailComponent', () => {
     expect(api.card).toHaveBeenCalledWith('k-1');
     expect(api.members).toHaveBeenCalledWith('b-1');
     expect(screen.getByRole('heading', { level: 2, name: 'Raum buchen' })).toBeInTheDocument();
-    expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     // Each part of the line wraps as a whole; the dot ends the first part.
     const created = [...document.querySelectorAll('.cd__created .cd__seg')].map((e) => e.textContent);
     expect(created).toEqual(['Angelegt von Selin Yıldız\u00a0·', expect.stringMatching(/2026$/)]);
@@ -266,7 +268,9 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.loading()).toBe(true);
     expect(screen.getByRole('status')).toHaveTextContent('Karte wird geladen');
     // No context line above the title.
-    expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelectorAll('.cd__skelIcon')).toHaveLength(2);
     expect(document.querySelector('.cd__chat .sk__composer')).not.toBeNull();
     expect(document.querySelectorAll('.cd__fields dt').length).toBe(4);

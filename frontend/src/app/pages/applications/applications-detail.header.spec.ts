@@ -190,7 +190,9 @@ describe('ApplicationsDetailComponent — header', () => {
 
   it('shows the title and status · type · gremium · amount, with no line above the title', async () => {
     await setup();
-    expect(document.querySelector('.sheet-bar__kicker')?.textContent?.trim()).toBe('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
     const line = document.querySelector('.ad__line') as HTMLElement;
     // Intl puts a non-breaking space before the currency sign. The dots are CSS: every
@@ -229,7 +231,9 @@ describe('ApplicationsDetailComponent — header', () => {
 
   it('leaves out an unknown type, a missing gremium and a missing amount', async () => {
     const { cmp, http } = await setup({ app: { gremiumId: null, amount: null, typeId: 'other' } });
-    expect(document.querySelector('.sheet-bar__kicker')?.textContent?.trim()).toBe('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelector('.ad__line')!.textContent?.trim()).toBe('Eingereicht');
     expect(cmp.gremiumName()).toBeNull();
     http.verify();

@@ -151,7 +151,9 @@ async function setup(inputs: Record<string, unknown> = {}) {
 describe('BookingDetailComponent', () => {
   it('shows the head, the payment, the details and the cost centre with its figures', async () => {
     const { view } = await setup();
-    expect(document.querySelector('.sheet-bar__kicker')).toHaveTextContent('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(screen.getByRole('heading', { name: 'Lastenrad Anzahlung' })).toBeInTheDocument();
     expect(screen.getByText('Überweisung')).toBeInTheDocument();
     expect(screen.getByText('RE-2026-118')).toBeInTheDocument();
