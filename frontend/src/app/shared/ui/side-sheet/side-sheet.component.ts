@@ -1,4 +1,5 @@
 import {
+  type AnimationCallbackEvent,
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
@@ -61,6 +62,10 @@ const NO_DRAG = 'button, a, input, select, textarea';
  * closes it too. The body scrolls inside and fades at an end only where more content is
  * hidden.
  *
+ * `shown`: true from the opening until the sheet has gone after its closing. Content
+ * that must exist only while the sheet shows (a chat marks its thread as seen) renders
+ * under `@if (sheet.shown())`, so it stays in the sheet while the sheet slides out.
+ *
  * `contentScrolls`: the content scrolls a list of its own and keeps its header in place
  * (the cost-centre picker). The body then only passes the height down and does not
  * scroll. The content must be a flex item that can shrink (`flex: 1 1 auto;
@@ -84,6 +89,9 @@ export class SideSheetComponent {
 
   readonly closed = output<void>();
 
+  /** Open, or still on its way out after the closing. */
+  readonly shown = signal(false);
+
   protected readonly id = `side-sheet-${nextId++}`;
   private readonly pane = viewChild<ElementRef<HTMLElement>>('pane');
   private readonly body = viewChild<ElementRef<HTMLElement>>('body');
@@ -100,6 +108,8 @@ export class SideSheetComponent {
   private bodyObserver: ResizeObserver | null = null;
 
   private returnFocus: HTMLElement | null = null;
+  /** The pane of the current opening, to see after a closing whether it is still there. */
+  private paneEl: HTMLElement | null = null;
   private bodyOverflow: string | null = null;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -114,6 +124,27 @@ export class SideSheetComponent {
   close(): void {
     this.open.set(false);
     this.closed.emit();
+  }
+
+  /**
+   * The leave animation of the pane: it slides back to its edge, and only then does the
+   * pane go and `shown` turn false. Without a running animation (reduced motion) it goes
+   * at once. Where Angular runs no leave animation at all (animations off, as in the
+   * specs), `deactivate` sees the pane gone and turns `shown` false.
+   */
+  protected leave(event: AnimationCallbackEvent): void {
+    const el = event.target as HTMLElement;
+    el.classList.add('ss--leaving');
+    const done = (): void => {
+      if (!this.open()) this.shown.set(false);
+      event.animationComplete();
+    };
+    const running = el.getAnimations?.() ?? [];
+    if (running.length === 0) {
+      done();
+      return;
+    }
+    void Promise.all(running.map((a) => a.finished)).then(done, done);
   }
 
   /** Read the scroll position of the body and set the fades. */
@@ -189,6 +220,7 @@ export class SideSheetComponent {
 
   /** Runs once per opening: the effect reads only `open`. */
   private activate(): void {
+    this.shown.set(true);
     this.returnFocus = document.activeElement as HTMLElement | null;
     this.bodyOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -197,6 +229,7 @@ export class SideSheetComponent {
     this.timer = setTimeout(() => {
       this.timer = null;
       const pane = this.pane()!.nativeElement;
+      this.paneEl = pane;
       (this.focusables(pane)[0] ?? pane).focus();
       this.watchBody();
     });
@@ -218,6 +251,14 @@ export class SideSheetComponent {
   private deactivate(): void {
     clearTimeout(this.timer ?? undefined);
     this.timer = null;
+    const pane = this.paneEl;
+    this.paneEl = null;
+    if (this.shown()) {
+      // The template removes or animates the pane in this change detection; look after it.
+      setTimeout(() => {
+        if (!this.open() && !pane?.isConnected) this.shown.set(false);
+      });
+    }
     this.bodyObserver?.disconnect();
     this.bodyObserver = null;
     this.drag = null;

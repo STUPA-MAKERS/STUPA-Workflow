@@ -11,7 +11,7 @@
     [class]="'ss ss--' + side()"
     [class.ss--dragging]="dragging()"
     animate.enter="ss--entering"
-    animate.leave="ss--leaving"
+    (animate.leave)="leave($event)"
     [style.transform]="dragY() ? 'translateY(' + dragY() + 'px)' : null"
     role="dialog"
     aria-modal="true"
