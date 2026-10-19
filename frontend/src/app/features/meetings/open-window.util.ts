@@ -1,7 +1,8 @@
-import { DestroyRef, type Signal, inject, signal } from '@angular/core';
+import type { Signal } from '@angular/core';
 import type { Meeting } from '@core/api/models';
+import { nowSignal } from '@stupa-makers/ui-kit';
 import { toFormatLocale } from '@core/i18n/i18n.service';
-import { clockTime } from './meetings-display.util';
+import { clock, dayMonth } from '@shared/date-format';
 
 /**
  * Where "now" is in the open window of a planned meeting.
@@ -30,10 +31,7 @@ export function openWindowState(
  * the timer stops with the caller.
  */
 export function openWindowClock(periodMs = 15_000): Signal<number> {
-  const now = signal(Date.now());
-  const id = setInterval(() => now.set(Date.now()), periodMs);
-  inject(DestroyRef).onDestroy(() => clearInterval(id));
-  return now.asReadonly();
+  return nowSignal(periodMs);
 }
 
 /**
@@ -41,12 +39,8 @@ export function openWindowClock(periodMs = 15_000): Signal<number> {
  * else `19.10., 17:00`. Local time of the browser.
  */
 export function openWindowWhen(iso: string, now: number, i18nLocale: string): string {
-  const at = new Date(iso);
-  const time = clockTime(iso, i18nLocale);
-  if (at.toDateString() === new Date(now).toDateString()) return time;
-  const day = new Intl.DateTimeFormat(toFormatLocale(i18nLocale), {
-    day: '2-digit',
-    month: '2-digit',
-  }).format(at);
-  return `${day}, ${time}`;
+  const locale = toFormatLocale(i18nLocale);
+  const time = clock(iso, locale);
+  if (new Date(iso).toDateString() === new Date(now).toDateString()) return time;
+  return `${dayMonth(iso, locale)}, ${time}`;
 }

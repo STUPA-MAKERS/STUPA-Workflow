@@ -11,6 +11,8 @@ import type {
   LocalizedText,
 } from '@core/api/gremien.service';
 import { toFormatLocale } from '@core/i18n/i18n.service';
+import { monthShort } from '@shared/date-format';
+import { resolveI18n } from '@shared/forms/i18n-text';
 
 // ------------------------------------------------------------------ roles
 
@@ -28,8 +30,7 @@ export function localized(
   locale: string,
   fallback = '',
 ): string {
-  if (!text) return fallback;
-  return text[locale] || text['de'] || Object.values(text).find(Boolean) || fallback;
+  return resolveI18n(text, locale) || fallback;
 }
 
 // ------------------------------------------------------------------ months
@@ -51,26 +52,15 @@ export function shiftMonth(key: string, n: number): string {
   return monthKey(new Date(d.getFullYear(), d.getMonth() + n, 1));
 }
 
-/**
- * The name of a month: "Okt" (short) or "Oktober 2026" (long). A short name has no
- * trailing dot, so the column heads read as in the board.
- */
-export function monthLabel(key: string, locale: string, style: 'short' | 'long' = 'short'): string {
-  const fmt =
-    style === 'long'
-      ? new Intl.DateTimeFormat(toFormatLocale(locale), { month: 'long', year: 'numeric' })
-      : new Intl.DateTimeFormat(toFormatLocale(locale), { month: 'short' });
-  return fmt.format(monthDate(key)).replace(/\.$/, '');
-}
-
 /** "Mai – Okt 2026", "Nov 2025 – Apr 2026" or "Okt 2026". */
 export function rangeLabel(from: string, to: string, locale: string): string {
   const year = (k: string) => k.slice(0, 4);
-  if (from === to) return `${monthLabel(from, locale)} ${year(from)}`;
+  const month = (k: string): string => monthShort(k, toFormatLocale(locale));
+  if (from === to) return `${month(from)} ${year(from)}`;
   if (year(from) === year(to)) {
-    return `${monthLabel(from, locale)} – ${monthLabel(to, locale)} ${year(to)}`;
+    return `${month(from)} – ${month(to)} ${year(to)}`;
   }
-  return `${monthLabel(from, locale)} ${year(from)} – ${monthLabel(to, locale)} ${year(to)}`;
+  return `${month(from)} ${year(from)} – ${month(to)} ${year(to)}`;
 }
 
 /** The choices of the chip "Zeitraum" of the attendance. */
@@ -250,61 +240,6 @@ export function oneDecimal(value: number, locale: string): string {
   }).format(value);
 }
 
-// ------------------------------------------------------------------ dates
-
-/** A local date of `YYYY-MM-DD` (or of an ISO date-time), or null. */
-export function parseDay(value: string | null | undefined): Date | null {
-  if (!value) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
-  const d = m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
-
-/** "20.10." (de) or "20/10" (en). */
-export function dayMonth(value: string | null | undefined, locale: string): string {
-  const d = parseDay(value);
-  if (!d) return '';
-  return new Intl.DateTimeFormat(toFormatLocale(locale), { day: '2-digit', month: '2-digit' }).format(d);
-}
-
-/** "Di, 20.10." (de) or "Tue, 20/10" (en); with `year` "Di, 20.10.2026". */
-export function weekdayDay(value: string | null | undefined, locale: string, year = false): string {
-  const d = parseDay(value);
-  if (!d) return '';
-  const day = new Intl.DateTimeFormat(toFormatLocale(locale), { weekday: 'short' })
-    .format(d)
-    .replace(/\.$/, '');
-  return `${day}, ${year ? fullDate(value, locale) : dayMonth(value, locale)}`;
-}
-
-/** "01.10.2025" (de) or "01/10/2025" (en). */
-export function fullDate(value: string | null | undefined, locale: string): string {
-  const d = parseDay(value);
-  if (!d) return '';
-  return new Intl.DateTimeFormat(toFormatLocale(locale), {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-  }).format(d);
-}
-
-/** "18:00" of "18:00:00", or ''. */
-export function clock(value: string | null | undefined): string {
-  return value ? value.slice(0, 5) : '';
-}
-
-/** `YYYY-MM-DD` of a local date. */
-export function isoDay(date: Date): string {
-  return `${monthKey(date)}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-/** An amount in euro in the locale ("2.890,00 €"), or ''. */
-export function euro(value: string | number | null | undefined, locale: string): string {
-  if (value === null || value === undefined || value === '') return '';
-  const n = typeof value === 'number' ? value : Number(value);
-  if (Number.isNaN(n)) return '';
-  return new Intl.NumberFormat(toFormatLocale(locale), { style: 'currency', currency: 'EUR' }).format(n);
-}
 
 // ------------------------------------------------------------------ CSV
 

@@ -4,10 +4,14 @@ import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  formatBytes,
+  IconComponent,
+  type IconName,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import type { AuditChainCheck, AuditVerification, Backup, BackupList } from '../admin.models';
-import { checkedAt, formatBytes, formatCount, formatWhen } from './admin-health.util';
+import { checkedAt, formatCount, formatWhen } from './admin-health.util';
 import { AuditLiveCheckService } from './audit-live-check.service';
 
 /** The colour of a tile: the icon, and the title for an error. */
@@ -164,7 +168,7 @@ export class AdminHealthComponent {
       this.t(`admin.backups.kind.${shown.kind}` as TranslationKey),
       this.t(`admin.backups.status.${shown.status}` as TranslationKey),
     ];
-    if (shown.sizeBytes != null) parts.push(formatBytes(shown.sizeBytes, this.i18n));
+    if (shown.sizeBytes != null) parts.push(formatBytes(shown.sizeBytes, this.i18n.formatLocale()));
     // A failed archive after the shown one: the last attempt did not give a backup.
     const failed = newestBackup(state.list.items.filter((b) => b.status === 'failed'));
     const alert =

@@ -13,6 +13,7 @@
  * The functions below map each status of the platform to a kind, and most of them also
  * to the translation key of its label. `app-status-text` draws the result.
  */
+import type { StatusKind } from '@stupa-makers/ui-kit';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { MeetingStatus, MeetingVoteStatus, ScanState, VoteResult } from '@core/api/models';
 import type { InvoiceStatus } from '../pages/budget/budget-tree.api';
@@ -22,8 +23,6 @@ import type {
   WebhookDeliveryState,
 } from '../pages/admin/admin.models';
 
-/** The five status colours of the design system. */
-export type StatusKind = 'accent' | 'warn' | 'error' | 'neutral' | 'muted';
 
 /** A status as the UI shows it: the colour and the translation key of the label. */
 export interface StatusView {

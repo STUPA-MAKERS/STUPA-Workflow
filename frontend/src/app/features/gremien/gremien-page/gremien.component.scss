@@ -1,11 +1,11 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
+@use '../../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the votes (voting.component.scss). */
 
 :host {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 /* One pane at a time the host takes at least the free height of the shell main. Side by
    side it is a pane page (`.pane-page`), which sets its own flex. */
@@ -17,16 +17,13 @@
   min-width: 0;
 }
 .grl:not(.grl--split) {
-  display: flex;
-  flex: 1 0 auto;
-  flex-direction: column;
+  @include lp.single-column;
 }
 .grl:not(.grl--split) > app-list-detail {
   flex: 1 0 auto;
 }
 .grl--split {
-  flex: 1 1 0;
-  min-height: 0;
+  @include lp.split-column;
 }
 
 /* ------------------------------------------------------------------ list pane */
@@ -34,63 +31,34 @@
   flex: 1 0 auto;
 }
 .grl__chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+  @include lp.chips;
 }
 .grl__chip {
   max-width: 100%;
 }
 
 .grl__scroll {
-  --grl-fade: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.scroll(--grl-fade);
 }
 .grl:not(.grl--split) .grl__scroll {
   flex: 1 0 auto;
 }
 /* Side by side only the rows scroll, down to the bottom edge of the pane. */
 .grl--split .grl__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--grl-fade);
+  @include lp.split-scroll(--grl-fade);
 }
 .grl--split .grl__scroll > * {
   flex: none;
 }
-.grl__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--grl-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--grl-fade));
-}
-.grl__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--grl-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--grl-fade));
-}
-.grl__scroll.is-fade-start.is-fade-end {
-  --grl-mask: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--grl-fade),
-    #000 calc(100% - var(--grl-fade)),
-    transparent
-  );
-  -webkit-mask-image: var(--grl-mask);
-  mask-image: var(--grl-mask);
+.grl__scroll {
+  @include fade.fade-y(var(--grl-fade));
 }
 
 .grl__group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 .grl__head {
-  padding: 18px var(--space-4) 6px;
+  @include lp.month;
 }
 .grl__group:first-child .grl__head,
 .grl__skel .grl__head {
@@ -106,9 +74,7 @@
   font-weight: var(--fw-medium);
 }
 .grl__rows {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 /* Side by side a row is a selectable item of its own: round on every corner. */
 .grl--split .grl__row {
@@ -142,12 +108,6 @@
   font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
-.grl__chev {
-  display: inline-flex;
-  margin-inline-end: calc(-1 * var(--space-2));
-  color: var(--color-text-muted);
-}
-
 /* The note starts at the edge of the filters and the rows. */
 .grl__loadError {
   margin: var(--space-4) 0;
@@ -155,10 +115,7 @@
 
 /* ------------------------------------------------------------------ detail pane */
 .grl__detail {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.detail;
 }
 /* Side by side the detail is as high as the pane: the gremium scrolls inside its sheet. */
 .grl--split .grl__detail {

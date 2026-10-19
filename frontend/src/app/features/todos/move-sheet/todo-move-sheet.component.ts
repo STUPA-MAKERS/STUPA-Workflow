@@ -2,8 +2,13 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, mo
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, IconComponent, SegmentedComponent, type SegmentedOption } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  IconComponent,
+  SegmentedComponent,
+  type SegmentedOption,
+  SideSheetComponent,
+} from '@stupa-makers/ui-kit';
 
 /** A column of the sheet; `count` is the number of cards when the board is known. */
 export interface MoveColumn {

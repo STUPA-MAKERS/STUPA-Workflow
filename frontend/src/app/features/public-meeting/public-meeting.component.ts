@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type OnDestroy,
   computed,
   effect,
   inject,
@@ -19,15 +18,21 @@ import { LanguageSelectComponent } from '../../layout/language-select/language-s
 import { SiteFooterComponent } from '../../layout/site-footer/site-footer.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingStatus } from '@shared/status-kind.util';
-import { ButtonComponent, IconComponent, InputComponent } from '@stupa-makers/ui-kit';
-import { clockTime } from '../meetings/meetings-display.util';
+import {
+  AvatarComponent,
+  ButtonComponent,
+  IconComponent,
+  InputComponent,
+  NoteComponent,
+  nowSignal,
+  RowMenuComponent,
+  type RowMenuSection,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { GuestSessionService } from './guest-session.service';
 import { GuestViewComponent } from './guest-view.component';
+import { clock, weekdayDate } from '@shared/date-format';
 
 /** The join code: six characters without the easily confused ones (0, O, 1, I, L). */
 const CODE_RE = /^[A-HJ-NP-Z2-9]{6}$/;
@@ -70,7 +75,7 @@ export function normalizeJoinCode(raw: string): string {
   templateUrl: './public-meeting.component.html',
   styleUrl: './public-meeting.component.scss',
 })
-export class PublicMeetingComponent implements OnDestroy {
+export class PublicMeetingComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly auth = inject(AuthService);
@@ -85,8 +90,11 @@ export class PublicMeetingComponent implements OnDestroy {
   protected readonly renaming = signal(false);
   protected readonly typedCode = signal('');
   /** A tick per second while a rejected guest waits for the next request. */
-  protected readonly now = signal(Date.now());
-  private ticker: ReturnType<typeof setInterval> | null = null;
+  /** The countdown of a rejected or removed guest runs only while it matters. */
+  protected readonly now = nowSignal(1000, () => {
+    const st = this.state();
+    return st === 'rejected' || st === 'removed';
+  });
 
   protected readonly state = this.guest.state;
   protected readonly head = computed(() => this.guest.me()?.meeting ?? this.guest.head());
@@ -101,7 +109,7 @@ export class PublicMeetingComponent implements OnDestroy {
     const parts: string[] = [];
     if (h.gremiumName) parts.push(h.gremiumName);
     if (h.status === 'live' && h.startedAt) {
-      parts.push(this.i18n.translate('guests.page.since', { time: clockTime(h.startedAt, this.i18n.locale()) }));
+      parts.push(this.i18n.translate('guests.page.since', { time: clock(h.startedAt, this.i18n.formatLocale()) }));
     } else if (h.date) {
       parts.push(this.dateText(h.date, h.startTime));
     }
@@ -147,7 +155,7 @@ export class PublicMeetingComponent implements OnDestroy {
     if (!me?.retryAfter) return '';
     const at = new Date(this.guest.fetchedAt() + me.retryAfter * 1000).toISOString();
     return this.i18n.translate('guests.page.retryAt', {
-      time: clockTime(at, this.i18n.locale()),
+      time: clock(at, this.i18n.formatLocale()),
       n: Math.max(1, Math.ceil(this.waitSeconds() / 60)),
     });
   });
@@ -168,14 +176,6 @@ export class PublicMeetingComponent implements OnDestroy {
       const code = normalizeJoinCode(pm.get('code') ?? '');
       this.renaming.set(false);
       this.guest.load(code);
-    });
-    // The countdown of a rejected or removed guest runs only while it matters.
-    effect(() => {
-      const st = this.state();
-      untracked(() => {
-        if (st === 'rejected' || st === 'removed') this.startTicker();
-        else this.stopTicker();
-      });
     });
     // The rename form starts with the current name.
     effect(() => {
@@ -219,30 +219,8 @@ export class PublicMeetingComponent implements OnDestroy {
     if (CODE_RE.test(code)) void this.router.navigate(['/j', code]);
   }
 
-  private startTicker(): void {
-    if (this.ticker !== null) return;
-    this.now.set(Date.now());
-    this.ticker = setInterval(() => this.now.set(Date.now()), 1000);
-  }
-
-  private stopTicker(): void {
-    if (this.ticker !== null) clearInterval(this.ticker);
-    this.ticker = null;
-  }
-
   private dateText(isoDate: string, time: string | null): string {
-    const d = new Date(`${isoDate}T${time ? time.slice(0, 5) : '00:00'}:00`);
-    if (Number.isNaN(d.getTime())) return isoDate;
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      ...(time ? { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' as const } : {}),
-    }).format(d);
-  }
-
-  ngOnDestroy(): void {
-    this.stopTicker();
+    const at = time ? `${isoDate}T${time.slice(0, 5)}:00` : isoDate;
+    return weekdayDate(at, this.i18n.formatLocale(), { time: !!time }) || isoDate;
   }
 }

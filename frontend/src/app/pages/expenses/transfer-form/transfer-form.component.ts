@@ -1,12 +1,5 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -16,17 +9,20 @@ import {
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  LockedFieldComponent,
+  SelectFieldComponent,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
+import { formatMoney } from '@shared/format-money';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
   costCentreFigures,
   costCentreLabel,
   findBudgetNode,
-  formatEur,
 } from '../../budget/expense-display.util';
 import type { FinanceFormLayout } from '../booking-form/booking-form.component';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -35,39 +31,46 @@ import type { ExpenseTransfersState } from '../expense-transfers.state';
 /** A new transfer, or a correction of the one in `transfers.editing`. */
 export type TransferFormMode = 'create' | 'edit';
 
-/** One leg of the preview: the cost centre, its path, the amount and what is left. */
-interface Leg {
-  cc: CostCentreLabel;
-  /** "verfügbar danach": the available amount after the transfer, null when unknown. */
-  after: string | null;
+/** "Frei danach" of one leg: the free amount now and after the transfer. */
+interface LegFree {
+  /** The free amount now, shown struck through while an amount is entered. */
+  before: string | null;
+  after: string;
 }
 
 /**
- * The transfer form (board Fin-Uebertrag-Neu): move an amount from one cost centre to
- * another in one fiscal year ("Übertrag"), or correct a transfer. It replaces the detail
- * sheet.
+ * The transfer form (boards "Übertrag buchen", "Übertrag · Handy"): move an amount from
+ * one cost centre to another in one fiscal year ("Übertrag"), or correct a transfer. It
+ * replaces the detail sheet.
  *
- * New: from, to (each the tree of the applications page), fiscal year, amount and
- * description; beside them "So wird gebucht" with the two bookings and the available
- * amount after the transfer. The dates and the note follow in the edit.
+ * New: "Von → nach" with the two legs as cards (each opens `app-cost-centre-select`) and
+ * "Frei danach" on each (the free amount now struck through, the amount after the
+ * transfer), "Richtung tauschen", then the amount beside the fiscal year and the
+ * description over the full width (one column in a narrow pane). The main action names
+ * the amount ("500,00 € übertragen"). The edit has the amount and the description beside
+ * the fiscal year, the dates and the note.
  *
- * Edit: the two cost centres of a transfer are fixed on the server, so the form shows
- * them read-only and changes the amount, the text, the dates and the note.
+ * Edit: the two cost centres of a transfer are fixed on the server, so the legs show
+ * locked and the form changes the amount, the text, the dates and the note.
  */
 @Component({
   selector: 'app-transfer-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PaneFormHeadComponent,
+    PaneFormFootComponent,
     ButtonComponent,
-    CostCentreTreeComponent,
+    CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     FormsModule,
     IconComponent,
     InputComponent,
-    ScrollFadeDirective,
+    LockedFieldComponent,
+    NgTemplateOutlet,
     SelectFieldComponent,
+    TextareaComponent,
     TranslatePipe,
   ],
   templateUrl: './transfer-form.component.html',
@@ -88,13 +91,6 @@ export class TransferFormComponent {
 
   readonly remove = output<void>();
 
-  /** The open tree: the source or the target field. */
-  protected readonly picking = signal<'from' | 'to' | null>(null);
-
-  protected label(id: string): CostCentreLabel | null {
-    return id ? costCentreLabel(this.costCentres(), id, null) : null;
-  }
-
   /** The fixed pair of the transfer under correction. */
   protected readonly pair = computed(() => {
     const t = this.transfers().editing();
@@ -105,37 +101,49 @@ export class TransferFormComponent {
     };
   });
 
-  /** "So wird gebucht": both legs, once the pair is chosen. */
-  protected readonly preview = computed<{ from: Leg; to: Leg; amount: string } | null>(() => {
-    const d = this.dialogs();
-    const fromId = d.tFromId();
-    const toId = d.tToId();
-    if (!fromId || !toId || fromId === toId) return null;
-    const amount = Number(d.tAmount()) || 0;
-    const fy = d.tFiscalYearId();
-    const leg = (id: string, sign: 1 | -1): Leg => {
-      const f = fy ? costCentreFigures(findBudgetNode(this.tree(), id), fy) : null;
-      return {
-        cc: costCentreLabel(this.costCentres(), id, null),
-        after: f ? this.money(f.available + sign * amount) : null,
-      };
-    };
-    return { from: leg(fromId, -1), to: leg(toId, 1), amount: this.money(amount) };
+  /** The amount of the new transfer, 0 while none is entered. */
+  private readonly amount = computed(() => {
+    const n = Number(this.dialogs().tAmount());
+    return Number.isFinite(n) && n > 0 ? n : 0;
   });
+
+  /** "Frei danach" of the source (minus the amount) and the target (plus the amount). */
+  protected readonly free = computed<{ from: LegFree | null; to: LegFree | null }>(() => {
+    const d = this.dialogs();
+    return {
+      from: this.legFree(d.tFromId(), -1),
+      to: this.legFree(d.tToId(), 1),
+    };
+  });
+
+  /** The main action: "500,00 € übertragen", or "Übertragen" without an amount. */
+  protected readonly submitLabel = computed(() => {
+    const amount = this.amount();
+    return amount > 0
+      ? this.i18n.translate('expenses.transfers.submit', { amount: this.money(amount) })
+      : this.i18n.translate('expenses.transferConfirm');
+  });
+
+  private legFree(id: string, sign: 1 | -1): LegFree | null {
+    const fy = this.dialogs().tFiscalYearId();
+    if (!id || !fy) return null;
+    const f = costCentreFigures(findBudgetNode(this.tree(), id), fy);
+    if (!f) return null;
+    const amount = this.amount();
+    return {
+      before: amount > 0 ? this.money(f.available) : null,
+      after: this.money(f.available + sign * amount),
+    };
+  }
 
   protected pick(which: 'from' | 'to', id: string): void {
     if (!id) return;
     if (which === 'from') this.dialogs().onTransferFrom(id);
     else this.dialogs().tToId.set(id);
-    this.picking.set(null);
-  }
-
-  protected toggle(which: 'from' | 'to'): void {
-    this.picking.set(this.picking() === which ? null : which);
   }
 
   money(value: number): string {
-    return formatEur(value, this.i18n.locale());
+    return formatMoney(value, this.i18n.formatLocale());
   }
 
   close(): void {

@@ -1,11 +1,20 @@
 import { fireEvent, render, screen } from '@testing-library/angular';
-import { of, throwError } from 'rxjs';
-import { TodosApiService, type TodoBoardSummary } from '@core/api/todos.service';
+import userEvent from '@testing-library/user-event';
+import { Subject, of, throwError, type Observable } from 'rxjs';
+import {
+  TodosApiService,
+  type TodoBoard,
+  type TodoBoardSummary,
+  type TodoCardCreate,
+  type TodoLinkTarget,
+  type TodoMember,
+} from '@core/api/todos.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { BOARDS, MEMBERS, board, detail } from '../../../../testing/todo-fixtures';
 import { TodoNewDialogComponent, type NewTodoLink } from './todo-new-dialog.component';
 import { LINK_ICON } from '../todos.util';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
+import { pickOption } from '../../../../testing/select';
 
 interface Opts {
   boards?: TodoBoardSummary[];
@@ -225,5 +234,223 @@ describe('TodoNewDialogComponent', () => {
     open();
     fireEvent.click(screen.getAllByRole('button', { name: 'Abbrechen' }).at(-1)!);
     expect(cmp.open()).toBe(false);
+  });
+});
+
+/** The dialog as the ticket page opens it ("To-Do aus Ticket anlegen"). */
+describe('TodoNewDialogComponent from a ticket', () => {
+  const TICKET = { id: 't40', number: 'T-0040', title: 'Protokoll-PDF zeigt im Kopf das falsche Datum' };
+  const TICKET_LINK: NewTodoLink = {
+    kind: 'ticket',
+    targetId: TICKET.id,
+    label: `Ticket · ${TICKET.number} ${TICKET.title}`,
+  };
+
+  function ticketBoard(
+    id: string,
+    columns = [
+      { id: `${id}-c2`, name: 'In Arbeit', position: 2, isDone: false, cardCount: 0 },
+      { id: `${id}-c1`, name: 'Offen', position: 1, isDone: false, cardCount: 0 },
+    ],
+  ): TodoBoard {
+    return board({ id, name: id, kind: 'team', gremiumId: null, columns, cards: [] });
+  }
+
+  const TICKET_MEMBERS: TodoMember[] = [
+    { principalId: 'p1', displayName: 'Mara Keller' },
+    { principalId: 'p2', displayName: null },
+  ];
+
+  const TICKET_BOARDS: TodoBoardSummary[] = [
+    { ...BOARDS[1], id: 'gb', name: 'StuPa', kind: 'gremium', gremiumId: 'g1', canWrite: true },
+    { ...BOARDS[1], id: 'pb', name: 'Persönlich', kind: 'personal', gremiumId: null, canWrite: true },
+    { ...BOARDS[1], id: 'tb', name: 'Plattform', kind: 'team', gremiumId: null, canWrite: true },
+    { ...BOARDS[1], id: 'ro', name: 'Nur lesen', kind: 'team', gremiumId: null, canWrite: false },
+  ];
+
+  interface TicketOpts {
+    boards?: Observable<TodoBoardSummary[]>;
+    board?: (id: string) => Observable<TodoBoard>;
+    members?: (id: string) => Observable<TodoMember[]>;
+    create?: jest.Mock;
+  }
+
+  async function ticketSetup(opts: TicketOpts = {}) {
+    localStorage.setItem('ap.locale', 'de');
+    const api = {
+      boards: jest.fn(() => opts.boards ?? of(TICKET_BOARDS)),
+      board: jest.fn((id: string) => (opts.board ?? ((b: string) => of(ticketBoard(b))))(id)),
+      members: jest.fn((id: string) => (opts.members ?? (() => of(TICKET_MEMBERS)))(id)),
+      createCard: opts.create ?? jest.fn((_b: TodoCardCreate) => of(detail({ id: 'card1' }))),
+      linkTargets: jest.fn(() => of([])),
+    };
+    const toast = { success: jest.fn(), error: jest.fn() };
+    const created = jest.fn();
+    const view = await render(TodoNewDialogComponent, {
+      inputs: {
+        heading: 'tickets.todo.title',
+        withDescription: false,
+        boardKinds: ['team', 'personal'],
+        initialTitle: TICKET.title,
+        initialLinks: [TICKET_LINK],
+        open: true,
+      },
+      on: { created },
+      providers: [
+        { provide: TodosApiService, useValue: api },
+        { provide: ToastService, useValue: toast },
+      ],
+    });
+    await view.fixture.whenStable();
+    view.fixture.detectChanges();
+    const c = view.fixture.componentInstance;
+    return { ...view, c, api, toast, created };
+  }
+
+  const createButton = () => screen.getByRole('button', { name: 'Anlegen' });
+
+  afterEach(() => localStorage.clear());
+
+  it('starts from the ticket, the team board and its first column, without a description', async () => {
+    const { c, api } = await ticketSetup();
+    expect(screen.getByRole('dialog', { name: 'To-Do aus Ticket anlegen' })).toBeInTheDocument();
+    expect(c.title()).toBe(TICKET.title);
+    expect(c.selectedBoard()).toBe('tb');
+    expect(api.board).toHaveBeenCalledWith('tb');
+    expect(c.column()).toBe('tb-c1');
+    // Read-only boards are no choice.
+    expect(c.boardOptions().map((o) => o.value)).toEqual(['gb', 'pb', 'tb']);
+    expect(c.columnOptions().map((o) => o.label)).toEqual(['Offen', 'In Arbeit']);
+    expect(c.memberOptions().map((o) => o.label)).toEqual(['Niemand', 'Mara Keller', 'Gelöschte Person']);
+    expect(screen.getByText('Ticket · T-0040 Protokoll-PDF zeigt im Kopf das falsche Datum')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Beschreibung (Markdown)')).toBeNull();
+  });
+
+  it('creates the card with the link to the ticket and closes', async () => {
+    const { c, api, toast, created, fixture } = await ticketSetup();
+    c.assignee.set('p1');
+    c.due.set('2026-10-17');
+    c.title.set('  PDF-Kopf: Beginn statt Ende  ');
+    fixture.detectChanges();
+    await userEvent.click(createButton());
+    expect(api.createCard).toHaveBeenCalledWith({
+      boardId: 'tb',
+      columnId: 'tb-c1',
+      title: 'PDF-Kopf: Beginn statt Ende',
+      descriptionMd: null,
+      dueDate: '2026-10-17',
+      assigneeIds: ['p1'],
+      links: [{ kind: 'ticket', targetId: 't40' }],
+    });
+    expect(toast.success).toHaveBeenCalledWith('To-Do angelegt');
+    expect(created).toHaveBeenCalled();
+    expect(c.open()).toBe(false);
+  });
+
+  it('takes the link to the ticket off and puts it back with the picker', async () => {
+    const { c, api, fixture } = await ticketSetup();
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Verknüpfung mit Ticket · T-0040 Protokoll-PDF zeigt im Kopf das falsche Datum entfernen',
+      }),
+    );
+    fixture.detectChanges();
+    expect(c.linkedKeys().has('ticket:t40')).toBe(false);
+    c.save();
+    expect(api.createCard).toHaveBeenLastCalledWith(expect.objectContaining({ links: [], assigneeIds: [], dueDate: null }));
+    c.pickLink({ kind: 'ticket', targetId: 't40', title: TICKET.title } as TodoLinkTarget);
+    expect(c.linkedKeys().has('ticket:t40')).toBe(true);
+  });
+
+  it('adds further links after the ticket', async () => {
+    const { c, api, fixture } = await ticketSetup();
+    const top = { kind: 'agenda_item', targetId: 'a2', title: 'Haushaltsplan 2027' } as TodoLinkTarget;
+    c.pickLink(top);
+    c.pickLink({ kind: 'meeting', targetId: 'm1', title: '33. Sitzung' } as TodoLinkTarget);
+    fixture.detectChanges();
+    expect(c.linkedKeys()).toEqual(new Set(['agenda_item:a2', 'meeting:m1', 'ticket:t40']));
+    c.pickLink(top);
+    c.pickLink({ kind: 'meeting', targetId: 'm1', title: '33. Sitzung' } as TodoLinkTarget);
+    c.pickLink({ kind: 'todo', targetId: 'c9', title: 'Kassenprüfung' } as TodoLinkTarget);
+    c.save();
+    expect(api.createCard).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        links: [
+          { kind: 'ticket', targetId: 't40' },
+          { kind: 'todo', targetId: 'c9' },
+        ],
+      }),
+    );
+  });
+
+  it('switches the board, drops the person and leaves a board without columns to the server', async () => {
+    const { c, api } = await ticketSetup({
+      board: (id) => of(ticketBoard(id, id === 'gb' ? [] : undefined)),
+    });
+    c.assignee.set('p1');
+    c.setBoard('gb');
+    expect(api.members).toHaveBeenLastCalledWith('gb');
+    expect(c.assignee()).toBe('');
+    expect(c.column()).toBe('');
+    c.save();
+    expect(api.createCard).toHaveBeenLastCalledWith(expect.objectContaining({ boardId: 'gb', columnId: undefined }));
+  });
+
+  it.each([
+    ['the personal board', [TICKET_BOARDS[0], TICKET_BOARDS[1]], 'pb'],
+    ['the first writable board', [TICKET_BOARDS[0]], 'gb'],
+  ])('falls back to %s', async (_label, boards, id) => {
+    const { c } = await ticketSetup({ boards: of(boards) });
+    expect(c.selectedBoard()).toBe(id);
+  });
+
+  it('says that no board takes a card', async () => {
+    const { c } = await ticketSetup({ boards: of([TICKET_BOARDS[3]]) });
+    expect(c.noBoard()).toBe(true);
+    expect(screen.getByRole('alert')).toHaveTextContent('Kein Board, in dem du To-Dos anlegen darfst.');
+    expect(createButton()).toBeDisabled();
+  });
+
+  it('drops the answers of a board the user left', async () => {
+    const slowBoard = new Subject<TodoBoard>();
+    const slowMembers = new Subject<TodoMember[]>();
+    const { c } = await ticketSetup({
+      board: (id) => (id === 'gb' ? slowBoard : of(ticketBoard(id))),
+      members: (id) => (id === 'gb' ? slowMembers : of(TICKET_MEMBERS)),
+    });
+    c.setBoard('gb');
+    c.setBoard('pb');
+    slowBoard.next(ticketBoard('gb'));
+    slowMembers.next([]);
+    expect(c.column()).toBe('pb-c1');
+    expect(c.members()).toEqual(TICKET_MEMBERS);
+  });
+
+  it('closes on Abbrechen and starts from the ticket again on the next opening', async () => {
+    const { c, api, fixture } = await ticketSetup();
+    c.title.set('Anders');
+    c.unlink(TICKET_LINK);
+    await userEvent.click(screen.getAllByRole('button', { name: 'Abbrechen' }).at(-1)!);
+    expect(c.open()).toBe(false);
+    c.open.set(true);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(c.title()).toBe(TICKET.title);
+    expect(c.links()).toEqual([TICKET_LINK]);
+    expect(api.boards).toHaveBeenCalledTimes(2);
+  });
+
+  it('sets the column, the person, the board and the title from the fields', async () => {
+    const { c, fixture } = await ticketSetup();
+    await pickOption(screen.getByLabelText('Spalte'), 'In Arbeit');
+    expect(c.column()).toBe('tb-c2');
+    await pickOption(screen.getByLabelText('Zuständig'), 'Mara Keller');
+    expect(c.assignee()).toBe('p1');
+    await pickOption(screen.getByLabelText('Board'), 'Persönlich');
+    fixture.detectChanges();
+    expect(c.selectedBoard()).toBe('pb');
+    await userEvent.clear(screen.getByLabelText(/Titel/));
+    await userEvent.type(screen.getByLabelText(/Titel/), 'Neu');
+    expect(c.title()).toBe('Neu');
   });
 });

@@ -164,8 +164,8 @@ These rules are binding for every page.
 - **Filter chips use `app-filter-select`.** A chip never opens a native `<select>`. On a
   desktop the menu is a popover, on a phone a bottom sheet. The language switch is such a
   chip too (`app-language-select`).
-- **A form select uses the app's `app-select`** (`@shared/ui/select`, `SelectFieldComponent`),
-  never the kit `SelectComponent` or a native `<select>`. The closed field is the filled
+- **A form select uses the kit `app-select`** (`SelectFieldComponent`), never a native
+  `<select>`. The closed field is the filled
   field with a chevron; the list is the same popover as `app-filter-select` on a desktop and
   the bottom sheet on a phone. A menu row has no `title` tooltip while its text shows in
   full. `no-native-select.contract.spec.ts` enforces this.
@@ -183,7 +183,7 @@ These rules are binding for every page.
   elevated surface in both themes.
 - **Balanced bars.** Bars and headers have symmetric padding and centre their items on one
   axis.
-- **Search fields search while you type** (`shared/live-search.ts`, 250 ms). There is no "Suchen"
+- **Search fields search while you type** (`liveSearch` of the ui-kit, 250 ms). There is no "Suchen"
   button. Escape or × clears the field.
 - **Separators (·) only between two visible items.** A wrapped line never starts with one.
 - **Footer only on public pages.** The site footer shows on the start page and on the public
@@ -205,8 +205,8 @@ Angular Testing Library, and `a11y.spec.ts` runs axe over them.
 - `app-segmented` — a radio group in one row (Ausgabe/Einnahme, Anwesend/Abwesend). `width="equal"` makes the segments equal (list views), `width="fill"` lets them share the width of a form or a column; an option can carry a `count` (invoice segments), and `[check]="false"` leaves out the check mark where the column is narrow.
 - `app-tabs` — a tab bar with optional counts (Antrag | Verlauf 4).
 - `app-input`, `app-datepicker`, `app-time-input`, `app-currency-input` — filled fields
-  with the label inside the box. The kit `app-select` renders a native `<select>`; the app
-  uses its own `app-select` from `@shared/ui/select` instead. `app-checkbox` — an 18px box.
+  with the label inside the box. `app-select` (`SelectFieldComponent`) opens the option
+  list of the kit, never a native `<select>`. `app-checkbox` — an 18px box.
 - `app-dialog` — a sheet (radius 24), title, actions at the right. Below 768px it is
   near-fullscreen.
 - `app-data-table`, `app-table` — the table frame (radius 16, cut line and tongue for

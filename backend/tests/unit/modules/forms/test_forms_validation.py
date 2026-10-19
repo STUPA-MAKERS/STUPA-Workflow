@@ -295,6 +295,94 @@ def test_extract_promoted_positions_feeds_amount() -> None:
     assert extract_promoted(fields, data) == {"amount": Decimal("650")}
 
 
+# Requested funding, separate from the cost total.
+def _funding_form(**kw: Any) -> list[FormFieldDef]:
+    return [_positions_field(validation={"minOffers": 1}), _field("foerderung", "funding", **kw)]
+
+
+def _costs(*values: float) -> list[dict[str, Any]]:
+    return [_position(f"P{i}", ("A", v, True)) for i, v in enumerate(values)]
+
+
+def test_validate_definition_funding_needs_positions() -> None:
+    with pytest.raises(FormDefinitionError, match="needs a positions field"):
+        validate_definition([_field("foerderung", "funding")])
+    validate_definition(_funding_form())
+
+
+def test_validate_definition_at_most_one_funding_field() -> None:
+    fields = [*_funding_form(), _field("foerderung2", "funding")]
+    with pytest.raises(FormDefinitionError, match="at most one funding field"):
+        validate_definition(fields)
+
+
+def test_validate_definition_funding_cannot_be_promoted() -> None:
+    fields = [
+        _positions_field(),
+        _field("foerderung", "funding", isPromoted=True, promoteTarget="amount"),
+    ]
+    with pytest.raises(FormDefinitionError, match="must be numeric"):
+        validate_definition(fields)
+
+
+def test_funding_within_cost_total_is_valid() -> None:
+    data = {"positions": _costs(300, 200), "foerderung": "500"}
+    validate_answers(_funding_form(), data)
+    validate_answers(_funding_form(), {**data, "foerderung": 120.5})
+
+
+def test_funding_optional_and_required() -> None:
+    validate_answers(_funding_form(), {"positions": _costs(100)})
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers(_funding_form(required=True), {"positions": _costs(100)})
+    assert _errkeys(ei.value) == {"foerderung"}
+
+
+def test_funding_above_cost_total_rejected() -> None:
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers(_funding_form(), {"positions": _costs(300, 200), "foerderung": 500.01})
+    assert [e.msg for e in ei.value.errors] == ["greater than the cost total 500"]
+
+
+def test_funding_without_positions_answer_rejected() -> None:
+    fields = [
+        _positions_field(validation={"minOffers": 1}, visibleIf={"==": [{"var": "x"}, 1]}),
+        _field("foerderung", "funding"),
+    ]
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers(fields, {"positions": _costs(100), "foerderung": 50})
+    assert [e.msg for e in ei.value.errors] == ["greater than the cost total 0"]
+
+
+@pytest.mark.parametrize(
+    ("bad", "msg"),
+    [(0, "must be greater than 0"), (-5, "must be greater than 0"), ("abc", "must be a number")],
+)
+def test_funding_bad_value_gives_one_error(bad: object, msg: str) -> None:
+    with pytest.raises(AnswerValidationError) as ei:
+        validate_answers(_funding_form(), {"positions": _costs(100), "foerderung": bad})
+    assert [e.msg for e in ei.value.errors] == [msg]
+
+
+def test_funding_before_positions_in_field_order() -> None:
+    fields = list(reversed(_funding_form()))
+    validate_answers(fields, {"positions": _costs(100), "foerderung": 100})
+    with pytest.raises(AnswerValidationError):
+        validate_answers(fields, {"positions": _costs(100), "foerderung": 101})
+
+
+def test_extract_promoted_funding_replaces_cost_total() -> None:
+    fields = [*_funding_form(), _field("x", "currency", isPromoted=True, promoteTarget="amount")]
+    data = {"positions": _costs(300, 200), "foerderung": "350.50", "x": 7}
+    assert extract_promoted(fields, data) == {"amount": Decimal("350.50")}
+
+
+@pytest.mark.parametrize("empty", [None, "", "abc", True, "NaN"])
+def test_extract_promoted_without_funding_keeps_cost_total(empty: object) -> None:
+    data = {"positions": _costs(300, 200), "foerderung": empty}
+    assert extract_promoted(_funding_form(), data) == {"amount": Decimal("500")}
+
+
 def test_required_missing_field_errors() -> None:
     with pytest.raises(AnswerValidationError) as ei:
         validate_answers([_field("title", "text", required=True)], {})

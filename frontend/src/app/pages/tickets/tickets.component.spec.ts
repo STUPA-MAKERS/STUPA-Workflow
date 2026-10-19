@@ -421,7 +421,7 @@ describe('TicketsComponent', () => {
       expect(page.split()).toBe(true);
       expect(TestBed.inject(PageFrameService).fill()).toBe(true);
       const row = screen.getByRole('link', { name: /Protokoll-PDF/ }).closest('app-list-item')!;
-      expect(row.querySelector('.tk__chev')).toBeNull();
+      expect(row.querySelector('app-row-chevron')).toBeNull();
       // Leaving the page frees the frame.
       harness.fixture.destroy();
       expect(TestBed.inject(PageFrameService).fill()).toBe(false);

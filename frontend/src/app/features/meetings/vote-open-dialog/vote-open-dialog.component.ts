@@ -25,17 +25,23 @@ import {
 import {
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
   InputComponent,
+  MoveButtonsComponent,
+  moveItem,
   SegmentedComponent,
-  SwitchComponent,
-  ToastService,
   type SegmentedOption,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  SwitchComponent,
+  TextareaComponent,
+  ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
-import { FIXED_VOTE_OPTIONS, errorDetail } from '../meetings-display.util';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { FIXED_VOTE_OPTIONS } from '../meetings-display.util';
+import { problemDetail } from '@core/api/problem';
+import { personLabel } from '@shared/person-label.util';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
 const KINDS: readonly VoteKind[] = ['motion', 'election'];
@@ -79,6 +85,8 @@ export interface CandidateDraft {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    MoveButtonsComponent,
     EmptyStateComponent,
     TruncatedDirective,
     FormsModule,
@@ -168,7 +176,7 @@ export class VoteOpenDialogComponent {
     return this.members()
       .filter((m) => !taken.has(m.principalId))
       .map((m) => {
-        const label = m.displayName || m.email || m.principalId;
+        const label = personLabel(m, this.i18n, { fallbackText: m.principalId });
         return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
       });
   });
@@ -290,7 +298,7 @@ export class VoteOpenDialogComponent {
     const member = this.members().find((m) => m.principalId === principalId);
     if (!member || this.candidates().length >= MAX_CANDIDATES) return;
     if (this.candidates().some((c) => c.principalId === principalId)) return;
-    const name = member.displayName || member.email || principalId;
+    const name = personLabel(member, this.i18n, { fallbackText: principalId });
     this.candidates.update((list) => [...list, { key: this.nextKey++, name, principalId }]);
   }
 
@@ -310,9 +318,7 @@ export class VoteOpenDialogComponent {
     const to = index + delta;
     this.candidates.update((list) => {
       if (to < 0 || to >= list.length) return list;
-      const next = [...list];
-      [next[index], next[to]] = [next[to], next[index]];
-      return next;
+      return moveItem(list, index, delta);
     });
   }
 
@@ -406,7 +412,7 @@ export class VoteOpenDialogComponent {
         },
         error: (err: unknown) => {
           this.submitting.set(false);
-          const detail = errorDetail(err);
+          const detail = problemDetail(err);
           const base = this.i18n.translate('meetings.toast.actionFailed');
           this.toast.error(detail ? `${base}: ${detail}` : base);
         },

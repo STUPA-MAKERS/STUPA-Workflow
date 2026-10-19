@@ -14,21 +14,29 @@ import { type DelegationSubstitute, DelegationsApiService } from '@core/api/dele
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent, RowMenuComponent, SkeletonComponent, type RowMenuSection } from '@shared/ui';
 import {
+  AvatarComponent,
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  ListItemComponent,
+  liveSearch,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SelectFieldComponent,
+  type SelectFieldOption,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { Subscription } from 'rxjs';
-import { liveSearch } from '@shared/live-search';
 import { AdminApiService } from '../admin-api.service';
 import { type AdminPrincipal, isActiveMembership } from '../admin.models';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -56,12 +64,15 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     EmptyStateComponent,
     ScrollFadeDirective,
     FormsModule,
     TranslatePipe,
     AvatarComponent,
+    ListItemComponent,
+    SearchPillComponent,
     ButtonComponent,
     DialogComponent,
     IconComponent,
@@ -173,7 +184,7 @@ export class SubstitutePoolComponent {
               list.push({
                 id: m.principalId,
                 name:
-                  m.displayName || m.email || this.i18n.translate('admin.gremien.unknownMember'),
+                  personLabel(m, this.i18n, { fallback: 'admin.gremien.unknownMember' }),
               });
             }
             this.loadedMembers.set(list.sort((a, b) => a.name.localeCompare(b.name)));
@@ -211,7 +222,7 @@ export class SubstitutePoolComponent {
 
   /** Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
   protected label(p: AdminPrincipal): string {
-    return p.displayName || p.email || this.i18n.translate('common.unnamed');
+    return personLabel(p, this.i18n);
   }
 
   protected pick(p: AdminPrincipal): void {

@@ -3,7 +3,7 @@
        sections, so nothing moves when the application arrives. The sheet itself and the
        fixed headings show at once, the bars after 300ms (`skel-in`). -->
   <article class="ad ad--busy" [class.ad--split]="split()" aria-busy="true">
-    <header class="ad__head" aria-hidden="true">
+    <header class="sheet-head ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle class="sheet-title ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
         <!-- The action "Kommentare" and the menu. -->
@@ -42,7 +42,7 @@
       [heading]="'applications.detail.notFound' | t"
       [body]="'applications.detail.notFoundBody' | t"
     >
-      <a [routerLink]="listPath()" class="ad__backLink">
+      <a [routerLink]="listPath()" class="sheet-back-link ad__backLink">
         {{ 'applications.detail.backToList' | t }}
       </a>
     </app-empty-state>
@@ -106,7 +106,7 @@
       @if (switching()) {
         <span class="skel-progress ad__progress" aria-hidden="true"></span>
       }
-      <header class="ad__head">
+      <header class="sheet-head ad__head">
         <app-sheet-bar [bleed]="split()">
           <h2 appSheetBarTitle id="ad-title" class="sheet-title ad__title">{{ title() }}</h2>
           <!-- The comments open in a sheet over the page; the count waits for the thread. -->
@@ -182,15 +182,8 @@
               <span class="ad__part ell" [title]="type">{{ type }}</span>
             }
             @if (application.amount !== null) {
-              @if (approvedAmount(application); as approved) {
-                <!-- F1: the approved amount, the requested one struck through next to it. -->
-                <span class="ad__part">
-                  <span class="mono ad__amount ad__amount--approved">{{ approved }}</span>
-                  <s class="mono ad__amountStruck">{{ amount(application) }}</s>
-                </span>
-              } @else {
-                <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
-              }
+              <!-- F1: the approved amount, the requested one struck through next to it. -->
+              <span class="ad__part"><app-amount [amount]="amount(application)" [approved]="approvedAmount(application)" /></span>
             }
             @if (captureParts(); as parts) {
               <!-- #11: an application that a member captured on behalf of the applicant

@@ -47,22 +47,5 @@
 
 /* The way out, in the look of a filled button. */
 .err__action {
-  display: inline-flex;
-  align-items: center;
-  height: var(--control-height);
   margin-top: 6px;
-  padding: 0 var(--space-5);
-  border-radius: var(--radius-pill);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
-  text-decoration: none;
-}
-.err__action:hover {
-  filter: brightness(1.06);
-}
-.err__action:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
 }

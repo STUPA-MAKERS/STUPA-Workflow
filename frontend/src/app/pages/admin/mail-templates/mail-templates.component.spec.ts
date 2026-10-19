@@ -292,9 +292,7 @@ describe('MailTemplatesComponent', () => {
     expect(api.previewMailPayload).toHaveBeenCalledWith(expect.objectContaining({ lang: 'en' }));
     expect(screen.getByText('Vorschau (EN)')).toBeInTheDocument();
     expect(view.container.querySelector('.mt__previewHtml')?.innerHTML).toContain('Hi');
-    c.setLang('de');
-    expect(c.lang()).toBe('de');
-    c.setLang(null);
+    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
     expect(c.lang()).toBe('de');
   });
 

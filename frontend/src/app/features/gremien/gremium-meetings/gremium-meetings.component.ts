@@ -19,21 +19,24 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { meetingStatus, type StatusView } from '@shared/status-kind.util';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  DateBlockComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+  IconComponent,
+  ListItemComponent,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+} from '@stupa-makers/ui-kit';
 import { topsLabel } from '../../meetings/meetings-overview.util';
 import { GREMIEN_NOW } from '../gremien.store';
-import { clock, isoDay, monthKey, monthLabel, shiftMonth, weekdayDay } from '../gremien.util';
-import { NoteComponent } from '@shared/ui/note/note.component';
+import { monthKey, shiftMonth } from '../gremien.util';
+import { isoDay, monthYear, shortTime, weekdayDate } from '@shared/date-format';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 export type MeetingsRange = '' | 'upcoming' | 'past6' | 'past12';
 export type MeetingsProtocol = '' | 'final' | 'draft' | 'none';
@@ -72,6 +75,7 @@ const NO_PROTOCOL: StatusView = { kind: 'muted', key: 'gremien.meetings.protocol
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     RouterLink,
     TranslatePipe,
@@ -95,7 +99,7 @@ export class GremiumMeetingsComponent {
   /** The number of meetings, for the tab bar. */
   readonly count = output<number>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   readonly error = signal(false);
@@ -151,7 +155,7 @@ export class GremiumMeetingsComponent {
   });
 
   readonly groups = computed<MeetingGroup[]>(() => {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const rows = this.filtered();
     const coming = rows
       .filter((m) => m.status !== 'closed')
@@ -174,7 +178,7 @@ export class GremiumMeetingsComponent {
       if (!group) {
         group = {
           key,
-          label: m.date ? monthLabel(key, locale, 'long') : this.i18n.translate('gremien.meetings.undated'),
+          label: m.date ? monthYear(key, locale) : this.i18n.translate('gremien.meetings.undated'),
           upcoming: false,
           rows: [],
         };
@@ -226,16 +230,16 @@ export class GremiumMeetingsComponent {
   }
 
   private toRow(m: GremiumMeeting): MeetingRow {
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const closed = m.status === 'closed';
     const status = closed ? (PROTOCOL_STATUS[m.protocolStatus ?? ''] ?? NO_PROTOCOL) : meetingStatus(m.status);
     const parts: string[] = [];
     if (this.phone()) {
-      if (m.date) parts.push(weekdayDay(m.date, locale));
+      if (m.date) parts.push(weekdayDate(m.date, locale, { year: false }));
     } else {
-      const date = weekdayDay(m.date, locale, true);
+      const date = weekdayDate(m.date, locale);
       if (date) parts.push(date);
-      const time = [clock(m.startTime), clock(m.endTime)].filter(Boolean).join('–');
+      const time = [shortTime(m.startTime), shortTime(m.endTime)].filter(Boolean).join('–');
       if (time) parts.push(time);
       parts.push(topsLabel(m.agendaItemCount, (k, p) => this.i18n.translate(k, p)));
     }

@@ -1,3 +1,5 @@
+@use 'dot-parts' as dots;
+
 :host {
   display: block;
 }
@@ -78,22 +80,10 @@
   font-size: var(--fs-small);
 }
 .ht__parts {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  margin-inline-start: calc(-1 * var(--ht-sep));
-  min-width: 0;
+  @include dots.list(var(--ht-sep));
 }
 .ht__part {
-  min-width: 0;
-}
-.ht__part::before {
-  display: inline-block;
-  width: var(--ht-sep);
-  color: var(--color-text-subtle);
-  text-align: center;
-  content: '·';
-  content: '·' / '';
+  @include dots.part(var(--ht-sep), $wrap: normal);
 }
 .ht__link {
   color: var(--color-accent-text);

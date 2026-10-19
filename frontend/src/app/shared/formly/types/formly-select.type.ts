@@ -2,10 +2,7 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import {
-  SelectFieldComponent,
-  type SelectFieldOption,
-} from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@stupa-makers/ui-kit';
 
 /**
  * Formly field type `select`: single choice (form definition `select`, `gremium_select`,

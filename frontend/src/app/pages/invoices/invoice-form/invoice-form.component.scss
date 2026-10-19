@@ -68,31 +68,9 @@
   border-radius: var(--radius-lg);
   color: var(--color-text-muted);
 }
-.if__ok {
-  color: var(--color-text);
-}
-.if__ok app-icon {
-  color: var(--color-accent-text);
-}
-/* The duplicate warning: amber, with the way to the existing invoice. */
+/* The duplicate warning keeps the small size of the form notes around it. */
 .if__dup {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-warning-subtle);
-  color: var(--color-text);
   font-size: var(--fs-small);
-}
-.if__dup > app-icon {
-  flex: none;
-  color: var(--color-warning);
-}
-.if__dupText {
-  flex: 1 1 12rem;
-  min-width: 0;
 }
 .if__legend {
   padding: 0 var(--space-1);

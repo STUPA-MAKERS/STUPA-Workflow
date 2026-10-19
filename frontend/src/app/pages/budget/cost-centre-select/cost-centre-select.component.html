@@ -1,0 +1,154 @@
+<div class="ccs__box" [class.ccs__box--open]="open()">
+  <span class="ccs__label" [id]="labelId()"
+    >{{ label() }}
+    @if (required()) {
+      <span class="ccs__req" aria-hidden="true"> *</span>
+    }
+  </span>
+  <button
+    #trigger
+    type="button"
+    class="ccs__trigger"
+    data-cc-trigger
+    aria-haspopup="listbox"
+    [id]="id()"
+    [attr.aria-expanded]="open()"
+    [attr.aria-controls]="open() ? listId() : null"
+    [attr.aria-labelledby]="labelId() + ' ' + id() + '-value'"
+    [attr.aria-required]="required() ? 'true' : null"
+    (click)="toggle()"
+    (keydown)="onTriggerKey($event)"
+  >
+    <span class="ccs__value" [id]="id() + '-value'">
+      @if (pick(); as p) {
+        @if (p.color) {
+          <span class="ccs__swatch" aria-hidden="true" [style.background]="p.color"></span>
+        }
+        <span class="ccs__name">{{ p.name }}</span>
+        <span class="ccs__code mono">{{ p.code }}</span>
+      } @else {
+        <span class="ccs__placeholder">{{ placeholder() }}</span>
+      }
+    </span>
+    @if (variant() === 'card') {
+      <ng-content />
+    } @else {
+      <app-icon class="ccs__chevron" name="down" [size]="20" />
+    }
+  </button>
+</div>
+
+<ng-template #panel let-inSheet>
+  <div class="ccs__search" [class.ccs__search--sheet]="inSheet">
+    <app-icon name="search" [size]="18" />
+    <input
+      class="ccs__input"
+      type="search"
+      autocomplete="off"
+      role="combobox"
+      data-cc-search
+      aria-autocomplete="list"
+      aria-expanded="true"
+      [attr.aria-label]="'expenses.field.costCentreSearch' | t"
+      [attr.aria-controls]="listId()"
+      [attr.aria-activedescendant]="activeId()"
+      [placeholder]="'expenses.field.costCentreSearch' | t"
+      [value]="query()"
+      (input)="onSearch($any($event.target).value)"
+      (keydown)="onListKey($event)"
+    />
+  </div>
+  @if (groups().length) {
+    <div class="ccs__list" role="listbox" [id]="listId()" [attr.aria-labelledby]="labelId()">
+      @for (g of groups(); track g.head.id) {
+        <div
+          class="ccs__group"
+          role="group"
+          [attr.aria-label]="
+            g.head.key + ' · ' + g.head.name.before + g.head.name.hit + g.head.name.after
+          "
+        >
+          <ng-container
+            [ngTemplateOutlet]="option"
+            [ngTemplateOutletContext]="{ $implicit: g.head }"
+          />
+          @for (line of g.lines; track $index) {
+            @if (line.kind === 'trail') {
+              <div class="ccs__trail" aria-hidden="true">{{ line.text }}</div>
+            } @else {
+              <ng-container
+                [ngTemplateOutlet]="option"
+                [ngTemplateOutletContext]="{ $implicit: line.choice }"
+              />
+            }
+          }
+        </div>
+      }
+    </div>
+  } @else {
+    <p class="ccs__empty">
+      {{ query().trim() ? ('expenses.field.costCentreNoHit' | t) : emptyLabel() }}
+    </p>
+  }
+</ng-template>
+
+<ng-template #option let-c>
+  <div
+    class="ccs__opt"
+    role="option"
+    [id]="optionId(c)"
+    [class.ccs__opt--head]="c.depth === 0"
+    [class.ccs__opt--active]="c.index === active()"
+    [style.--ccs-depth]="c.depth"
+    [attr.aria-selected]="c.id === value()"
+    (click)="choose(c)"
+    (pointermove)="hover(c)"
+  >
+    <span class="ccs__swatch" aria-hidden="true" [style.background]="c.color"></span>
+    <span class="ccs__key mono">{{ c.key }}</span>
+    <span class="ccs__optName"
+      >{{ c.name.before }}<mark class="ccs__hit">{{ c.name.hit }}</mark
+      >{{ c.name.after }}</span
+    >
+    @if (c.free) {
+      <span class="ccs__free mono" [class.ccs__free--neg]="c.negative">{{
+        'expenses.field.costCentreFree' | t: { amount: c.free }
+      }}</span>
+    }
+    @if (c.id === value()) {
+      <app-icon class="ccs__check" name="check" [size]="18" />
+    }
+  </div>
+</ng-template>
+
+<!-- Desktop: the popover in the top layer, so no pane or scrolling container clips it. -->
+@if (popoverOpen()) {
+  <div
+    #menu
+    class="ccs__menu"
+    animate.enter="om--entering"
+    animate.leave="om--leaving"
+    popover="manual"
+    [class.ccs__menu--placed]="placed()"
+    [style.top.px]="position().top"
+    [style.left.px]="position().left"
+    [style.width.px]="position().width"
+    [style.max-height.px]="position().maxHeight"
+  >
+    <ng-container [ngTemplateOutlet]="panel" [ngTemplateOutletContext]="{ $implicit: false }" />
+  </div>
+}
+
+<!-- Phone: the shared bottom sheet, in the top layer too. -->
+@if (sheetOpen()) {
+  <div #layer class="ccs__layer" popover="manual">
+    <app-side-sheet
+      side="bottom"
+      [heading]="label()"
+      [open]="true"
+      (openChange)="onSheetOpen($event)"
+    >
+      <ng-container [ngTemplateOutlet]="panel" [ngTemplateOutletContext]="{ $implicit: true }" />
+    </app-side-sheet>
+  </div>
+}

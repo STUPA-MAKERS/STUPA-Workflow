@@ -120,7 +120,7 @@ describe('DelegationDialogComponent', () => {
     try {
       const { dialog, group, http, fixture } = await setup(ctx({ delegationAllowExternal: true }));
       const box = within(dialog()).getByRole('searchbox', { name: 'Mitglied suchen' });
-      // RxJS debounceTime(250) uses setTimeout, so advance the jest fake timers.
+      // The search waits 250 ms with a timer, so advance the jest fake timers.
       fireEvent.input(box, { target: { value: 'ext' } });
       await jest.advanceTimersByTimeAsync(260);
       http.expectOne(`${BASE}/delegations/meetings/mt-1/recipients?q=ext`).flush([

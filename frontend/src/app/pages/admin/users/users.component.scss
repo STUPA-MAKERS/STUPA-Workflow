@@ -112,15 +112,6 @@
   flex-wrap: wrap;
   gap: var(--space-1);
 }
-.au__tag {
-  padding: 1px var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-3);
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  overflow-wrap: anywhere;
-}
-
 .au__act {
   grid-area: act;
   display: flex;

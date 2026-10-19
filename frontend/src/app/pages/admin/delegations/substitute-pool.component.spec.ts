@@ -209,7 +209,9 @@ describe('SubstitutePoolComponent', () => {
     // D7: a nameless account reads "Ohne Namen", never its sub.
     expect(within(dialog).getByRole('button', { name: 'Ohne Namen' })).toBeInTheDocument();
     expect(within(dialog).queryByText('kc|ki')).toBeNull();
-    expect(within(dialog).getByRole('button', { name: 'Ohne Namen' })).toHaveAttribute('title', 'kc|ki');
+    expect(
+      within(dialog).getByRole('button', { name: 'Ohne Namen' }).closest('app-list-item'),
+    ).toHaveAttribute('title', 'kc|ki');
     expect(within(dialog).queryByRole('button', { name: /Off/ })).toBeNull();
     await userEvent.click(within(dialog).getByRole('button', { name: /Kim/ }));
     expect(within(dialog).getByRole('status')).toHaveTextContent('Gewählt: Kim');

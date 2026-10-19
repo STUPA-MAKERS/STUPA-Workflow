@@ -29,12 +29,7 @@
 
 /* ------------------------------------------------------------------ head */
 .cd__head {
-  display: flex;
   flex: none;
-  flex-direction: column;
-  gap: var(--sheet-head-gap);
-  padding-bottom: 22px;
-  border-bottom: 1px solid var(--color-border);
 }
 .cd__back {
   display: inline-flex;
@@ -203,24 +198,18 @@
 }
 .cd__person,
 .cd__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 100%;
-  min-height: 30px;
-  padding: 1px 3px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: 0.8125rem;
-  font-weight: var(--fw-regular);
+  --chip-bg: transparent;
+  --chip-border: 1px solid var(--color-border);
+  --chip-radius: var(--radius-md);
+  --chip-min-height: 30px;
+  --chip-padding: 1px 3px;
+  --chip-gap: 6px;
+  --chip-font-size: 0.8125rem;
+  --chip-font-weight: var(--fw-regular);
 }
 .cd__label {
-  gap: 5px;
-  padding-inline-start: 10px;
-}
-.cd__chips .cd__x {
-  width: 22px;
-  height: 22px;
+  --chip-gap: 5px;
+  --chip-padding: 1px 3px 1px 10px;
 }
 .cd__dot {
   @include lbl.dot;
@@ -228,27 +217,6 @@
 .cd__muted {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
-}
-.cd__x {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-.cd__x:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
-}
-.cd__x:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
 }
 
 /* ------------------------------------------------------------------ links */
@@ -387,17 +355,8 @@ a.cd__linkTitle:hover {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-.cd__bar-track {
+.cd__checkBar {
   width: 64px;
-  height: 4px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: var(--color-surface-3);
-}
-.cd__bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--color-accent);
 }
 /* An empty list takes no gap of the section, so "Punkt hinzufügen" sits under the
    heading at the same distance as the content of the other sections. */

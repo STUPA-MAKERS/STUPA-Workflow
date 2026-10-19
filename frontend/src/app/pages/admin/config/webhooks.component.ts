@@ -14,15 +14,18 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { RowMenuComponent, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { type StatusView, webhookDeliveryStatus } from '@shared/status-kind.util';
 import {
   ButtonComponent,
   CheckboxComponent,
+  ConfirmDialogComponent,
   DialogComponent,
+  EmptyStateComponent,
   InputComponent,
+  RowMenuComponent,
+  type RowMenuSection,
+  SkeletonComponent,
+  StatusTextComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
@@ -34,8 +37,6 @@ import {
   type WebhookDeliveryState,
   type WebhookDeliveryStatus,
 } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 function emptyHook(): WebhookConfig {
   return { id: '', name: '', url: '', events: [], active: true };

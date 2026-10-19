@@ -26,13 +26,13 @@
           <app-icon name="repeat" />
           {{ 'account.calendar.rotate' | t }}
         </app-button>
-        <app-button variant="tonal" size="sm" (click)="copy()">
-          <app-icon [name]="copied() ? 'check' : 'copy'" />
-          {{ (copied() ? 'account.calendar.copied' : 'account.calendar.copy') | t }}
-        </app-button>
+        <app-copy-button
+          [text]="feedUrl"
+          [label]="'account.calendar.copy' | t"
+          [copiedLabel]="'account.calendar.copied' | t"
+        />
       </div>
     }
-    <span class="cs__live" aria-live="polite">{{ copied() ? ('account.calendar.copied' | t) : '' }}</span>
   } @else if (error()) {
     <div class="cs__actions">
       <app-button variant="tonal" size="sm" (click)="load()">{{ 'meetings.overview.selRetry' | t }}</app-button>

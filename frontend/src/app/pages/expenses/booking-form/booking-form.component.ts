@@ -1,29 +1,31 @@
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  inject,
-  input,
-  output,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  AutocompleteComponent,
   ButtonComponent,
+  ChipGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  LockedFieldComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
+import { formatMoney } from '@shared/format-money';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type {
   BudgetTreeNode,
   Expense,
@@ -34,7 +36,6 @@ import {
   type CostCentreLabel,
   costCentreLabel,
   costCentreTrail,
-  formatEur,
   signedEur,
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
@@ -60,17 +61,24 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
 ];
 
 /**
- * The booking form (boards Fin-Buchung-Neu, Fin-Buchung-Bearbeiten, Fin-Tel-Buchung-Neu):
- * add a booking or edit one. It replaces the detail sheet.
+ * The booking form (boards "Buchung hinzufügen", "Buchung · Kostenstelle wählen",
+ * "Buchung · Handy"): add a booking or edit one. It replaces the detail sheet.
  *
- * New: "Was" (kind, description, amount, category), "Wohin" (the application search, the
- * cost centre as the tree of the applications page, the fiscal year), "Beleg" (the
- * invoice, which fills payee, invoice date and reference number; the payee, the
- * reference number and the two dates), the payment method as chips and the note.
+ * Two equal columns. Start: the kind (Ausgabe | Einnahme), the amount, the description,
+ * then "Zuordnung" with the cost centre (`app-cost-centre-select`: search, grouped by
+ * top-level budget, the free amount of each), the fiscal year and the category, and the
+ * application search (`app-autocomplete`). End: "Beleg" with the invoice, the payee, the
+ * reference number and the two dates; "Zahlung" with the payment method
+ * (`app-chip-group`) and the note (`app-textarea`).
  *
- * Edit: "Fest" shows the fixed values (kind, fiscal year, application, and the cost
- * centre of a bound booking or a sub-booking); a standalone booking can move to another
- * cost centre. A parent booking shows its amount as the sum of its sub-bookings, and the
+ * A picked invoice fills the payee, the invoice date and the reference number; while it
+ * stays picked those fields are `app-locked-field filled` (the selection surface with a
+ * lock). A linked application gives the cost centre and the fiscal year, so both show
+ * filled and locked.
+ *
+ * Edit: the fiscal year, the application, and the cost centre of a bound booking or a
+ * sub-booking are fixed (`app-locked-field`); a standalone booking can move to another cost
+ * centre. A parent booking shows its amount as the sum of its sub-bookings, and the
  * sub-bookings with their actions.
  *
  * The state module holds the values and sends the requests; this component is the form.
@@ -80,18 +88,25 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    BookingRowComponent,
+    SumRowComponent,
+    PaneFormHeadComponent,
+    PaneFormFootComponent,
+    AutocompleteComponent,
     ButtonComponent,
-    CostCentreTreeComponent,
+    ChipGroupComponent,
+    CostCentreSelectComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     FormsModule,
     IconComponent,
     InputComponent,
     LocalizedDatePipe,
+    LockedFieldComponent,
     RowMenuComponent,
-    ScrollFadeDirective,
     SegmentedComponent,
     SelectFieldComponent,
+    TextareaComponent,
     TranslatePipe,
   ],
   templateUrl: './booking-form.component.html',
@@ -116,9 +131,6 @@ export class BookingFormComponent {
   readonly editSub = output<Expense>();
   readonly removeSub = output<Expense>();
 
-  /** The cost-centre tree of the field is open. */
-  protected readonly treeOpen = signal(false);
-
   protected readonly kindOptions = computed<SegmentedOption[]>(() => [
     { value: 'expense', label: this.i18n.translate('expenses.kind.expense') },
     { value: 'income', label: this.i18n.translate('expenses.kind.income') },
@@ -133,6 +145,9 @@ export class BookingFormComponent {
     })),
   );
 
+  /** The text of an application hit. */
+  protected readonly appTitle = (a: { title: string }): string => a.title;
+
   /** The application search lists its hits below the field while there are hits. */
   protected readonly suggestOpen = computed(() => this.state().appCandidates().length > 0);
 
@@ -141,7 +156,7 @@ export class BookingFormComponent {
   /** A parent booking: its amount is the sum of its sub-bookings and read-only. */
   protected readonly parentAmount = computed(() => {
     const e = this.editingRow();
-    return e && (e.childCount ?? 0) > 0 ? formatEur(Number(e.amount), this.i18n.locale()) : null;
+    return e && (e.childCount ?? 0) > 0 ? formatMoney(e.amount, this.i18n.formatLocale()) : null;
   });
 
   /** Only a standalone booking moves to another cost centre. A bound booking and a
@@ -156,10 +171,12 @@ export class BookingFormComponent {
     this.mode() === 'create' ? this.state().newBudgetId() : this.state().editBudgetId(),
   );
 
-  protected readonly ccValue = computed(() => {
-    const id = this.ccId();
-    return id ? costCentreLabel(this.costCentres(), id, null) : null;
-  });
+  /** The fiscal year the cost-centre list counts the free amounts in. */
+  protected readonly ccYear = computed(() =>
+    this.mode() === 'create'
+      ? this.state().newFiscalYearId()
+      : (this.editingRow()?.fiscalYearId ?? ''),
+  );
 
   /** "Fachschaften › Maschinenbau": the cost centre of a fixed value. */
   protected readonly ccTrail = computed(() => {
@@ -171,32 +188,25 @@ export class BookingFormComponent {
     );
   });
 
-  /** The picked invoice filled payee, invoice date and reference number. */
-  protected readonly invoiceTaken = computed(() =>
-    this.mode() === 'create' ? !!this.state().newInvoiceId() : false,
-  );
-
-  /** "Lastenrad Anzahlung · erfasst von Konrad Pfeiffer, 25.09.2026". */
-  protected readonly subtitle = computed(() => {
-    if (this.mode() === 'create') return '';
-    const e = this.editingRow();
-    if (!e) return '';
-    const date = new Date(e.createdAt).toLocaleDateString(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-    } as Intl.DateTimeFormatOptions);
-    return e.actorName
-      ? this.i18n.translate('expenses.form.editedBy', {
-          description: e.description,
-          name: e.actorName,
-          date,
-        })
-      : `${e.description} · ${date}`;
+  /**
+   * The fields the picked invoice filled: locked while the invoice stays picked. Only a
+   * new booking takes them; an edit keeps its own values.
+   */
+  protected readonly locks = computed(() => {
+    const inv = this.mode() === 'create' ? this.state().newInvoice() : null;
+    return {
+      correspondent: !!inv?.supplier,
+      referenceNumber: !!inv?.number,
+      invoiceDate: !!inv?.issueDate,
+    };
   });
 
   protected readonly subMenu = computed<RowMenuSection[]>(() => [
     { items: [{ id: 'edit', label: this.i18n.translate('action.edit'), icon: 'edit' }] },
     {
-      items: [{ id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true }],
+      items: [
+        { id: 'delete', label: this.i18n.translate('action.delete'), icon: 'trash', danger: true },
+      ],
     },
   ]);
 
@@ -210,7 +220,6 @@ export class BookingFormComponent {
     if (!id) return;
     if (this.mode() === 'create') this.state().onPickBudget(id);
     else this.state().editBudgetId.set(id);
-    this.treeOpen.set(false);
   }
 
   protected setMethod(value: string): void {
@@ -219,7 +228,9 @@ export class BookingFormComponent {
   }
 
   protected method(): string {
-    return this.mode() === 'create' ? this.state().newPaymentMethod() : this.state().editPaymentMethod();
+    return this.mode() === 'create'
+      ? this.state().newPaymentMethod()
+      : this.state().editPaymentMethod();
   }
 
   protected onSubMenu(item: RowMenuItem, s: Expense): void {
@@ -228,7 +239,7 @@ export class BookingFormComponent {
   }
 
   protected signed(e: Expense): string {
-    return signedEur(e.kind, e.amount, this.i18n.locale());
+    return signedEur(e.kind, e.amount, this.i18n.formatLocale());
   }
 
   close(): void {

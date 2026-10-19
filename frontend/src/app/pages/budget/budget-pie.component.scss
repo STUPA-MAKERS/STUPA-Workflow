@@ -1,3 +1,5 @@
+@use 'swatch';
+
 :host {
   display: block;
   min-width: 0;
@@ -109,10 +111,7 @@
   outline-offset: -2px;
 }
 .pie__swatch {
-  flex: none;
-  width: 10px;
-  height: 10px;
-  border-radius: 3px;
+  @include swatch.mark($radius: 3px);
 }
 .pie__name {
   flex: 1 1 0;

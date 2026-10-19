@@ -2,7 +2,8 @@
 // the cards of the shown group, and the form settings with the versions.
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use '../../../features/meetings/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
+@use '../../../shared/ui/surface-card' as sc;
 
 :host {
   display: flex;
@@ -356,7 +357,7 @@
   padding: var(--space-4);
   border-radius: var(--radius-lg);
   background: var(--color-surface-2);
-  --color-surface-sunken: var(--color-surface-3);
+  @include sc.raised-fields($muted-label: false);
 }
 .fe__panel > legend {
   float: left;

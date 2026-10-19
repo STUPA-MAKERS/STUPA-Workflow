@@ -121,6 +121,10 @@ FieldType = Literal[
     # comparison offers. Exactly one offer is the preferred one, and its value is the
     # position value. The sum of the positions is the amount.
     "positions",
+    # Requested funding: an amount in euro, separate from the cost total. At most one per
+    # form, only beside a `positions` field, and never above the cost total. When the
+    # applicant fills it in, it is the amount; otherwise the cost total is.
+    "funding",
     # Section marker (multi-step forms): carries only a label and splits the following
     # fields into a new step. No answer value, no validation.
     "section",

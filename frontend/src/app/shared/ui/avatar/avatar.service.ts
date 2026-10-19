@@ -1,6 +1,7 @@
 import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { API_BASE_URL } from '@core/api/api.config';
 import { BrandingService } from '@core/branding/branding.service';
+import type { UiKitAvatarSource } from '@stupa-makers/ui-kit';
 
 /** The principal of an avatar: a principal id, or `'me'` for the logged-in user. */
 export type AvatarPrincipal = string;
@@ -32,7 +33,7 @@ export const AVATAR_RETRY_MS = 10 * 60 * 1000;
  * Until the config is loaded no image loads, so the switch never comes too late.
  */
 @Injectable({ providedIn: 'root' })
-export class AvatarService {
+export class AvatarService implements UiKitAvatarSource {
   private readonly base = inject(API_BASE_URL);
   private readonly branding = inject(BrandingService);
 

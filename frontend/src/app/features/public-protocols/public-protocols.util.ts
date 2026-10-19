@@ -32,31 +32,6 @@ export function semesterLabel(
   return t('publicProtocols.semester.ws', { year: s.year, next });
 }
 
-/**
- * A meeting date (`YYYY-MM-DD`) as a local date at noon. `new Date('2026-09-29')` is
- * midnight UTC, which is the day before west of Greenwich; noon stays on the day.
- */
-export function meetingDate(date: string): Date {
-  return new Date(`${date}T12:00:00`);
-}
-
-/** "Di, 29.09.2026" in the format locale. */
-export function longDate(date: string, locale: string): string {
-  const d = meetingDate(date);
-  if (Number.isNaN(d.getTime())) return '';
-  const weekday = d.toLocaleDateString(locale, { weekday: 'short' }).replace('.', '');
-  const day = d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
-  return `${weekday}, ${day}`;
-}
-
-/** "02.10.2026" of a timestamp in the format locale, or empty. */
-export function shortDate(iso: string | null, locale: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
-}
-
 /** The i18n key of a decision result. */
 export function resultKey(result: PublicVoteResult): TranslationKey {
   return `vote.result.${result}` as TranslationKey;

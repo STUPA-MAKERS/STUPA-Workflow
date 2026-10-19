@@ -20,12 +20,27 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import {
+  AvatarComponent,
   ButtonComponent,
+  ChipComponent,
+  ConfirmDialogComponent,
+  copyText,
+  DropOverlayComponent,
+  EmptyStateComponent,
+  FileDragTracker,
+  FileViewerComponent,
+  type FileViewerItem,
   IconComponent,
+  isFileDrag,
   MEDIA,
+  mediaQuery,
+  PressSelectDirective,
   SegmentedComponent,
-  ToastService,
   type SegmentedOption,
+  SideSheetComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { PersonRef } from '@core/api/models';
@@ -33,16 +48,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { markdownToSafeHtml } from '@shared/markdown/markdown.util';
-import { FileDragTracker, isFileDrag } from '@shared/file-drop.directive';
-import { PressSelectDirective } from '@shared/press-select.directive';
-import { mediaQuerySignal } from '../../../layout/media-query';
-import { AvatarComponent } from '../avatar/avatar.component';
-import { DropOverlayComponent } from '../drop-overlay/drop-overlay.component';
 import { ImageThumbComponent, inlineUrl, isThumbImage } from '../image-thumb/image-thumb.component';
-import { SideSheetComponent } from '../side-sheet/side-sheet.component';
-import { SkeletonComponent } from '../skeleton/skeleton.component';
 import { scanStatus, type StatusView } from '../../status-kind.util';
-import { StatusTextComponent } from '../status-text/status-text.component';
 import { UPLOAD_ACCEPT, formatSize } from '../../../features/apply/apply.util';
 import {
   DRAFT_FILES_PERSIST,
@@ -67,8 +74,6 @@ import type {
   ChatVisibility,
 } from './chat.models';
 import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, linkify, newCount } from './chat.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '../confirm-dialog/confirm-dialog.component';
 
 /** The log counts as "at the newest message" this close to its end, in px. */
 const BOTTOM_SLACK = 24;
@@ -177,12 +182,14 @@ function writeStore(key: string, value: string | null): void {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ChipComponent,
     ConfirmDialogComponent,
     DropOverlayComponent,
     EmptyStateComponent,
     AvatarComponent,
     ButtonComponent,
     ChatBodyPipe,
+    FileViewerComponent,
     IconComponent,
     ImageThumbComponent,
     NgTemplateOutlet,
@@ -255,8 +262,20 @@ export class ChatComponent {
   /** Read the thread again: a file of a sent message is still in the scan. */
   readonly refresh = output<void>();
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  private readonly coarse = mediaQuerySignal('(pointer: coarse)');
+  protected readonly phone = mediaQuery(MEDIA.phone);
+  private readonly coarse = mediaQuery(MEDIA.coarse);
+  /** The full-screen viewer over the previewable files of one message. */
+  protected readonly viewerOpen = signal(false);
+  protected readonly viewerIndex = signal(0);
+  private readonly viewerFiles = signal<readonly ChatAttachment[]>([]);
+  protected readonly viewerItems = computed<FileViewerItem[]>(() =>
+    this.viewerFiles().map((f) => ({ name: f.filename, mime: f.mime, url: inlineUrl(f.url) })),
+  );
+  /** The file the viewer shows, for its download link. */
+  protected readonly viewerFile = computed<ChatAttachment | null>(() => {
+    const files = this.viewerFiles();
+    return files[Math.min(Math.max(0, this.viewerIndex()), files.length - 1)] ?? null;
+  });
   /**
    * The long press opens the actions only on a phone with a touch screen. A narrow
    * window or a zoomed page with a mouse or a keyboard keeps the hover and focus actions.
@@ -506,6 +525,27 @@ export class ChatComponent {
     return isThumbImage(file);
   }
 
+  /**
+   * A click on a clean image or PDF of a message opens the viewer over the files of that
+   * message that preview. A click with a modifier, any other file, and a PDF on a coarse
+   * pointer (a phone browser has no PDF frame) keep the link: a new tab or a download.
+   */
+  protected openViewer(event: MouseEvent, message: ChatMessage, file: ChatAttachment): void {
+    if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const files = (message.attachments ?? []).filter((f) => this.inViewer(f));
+    const index = files.findIndex((f) => f.id === file.id);
+    if (index < 0) return;
+    event.preventDefault();
+    this.viewerFiles.set(files);
+    this.viewerIndex.set(index);
+    this.viewerOpen.set(true);
+  }
+
+  private inViewer(file: ChatAttachment): boolean {
+    if (!this.isLink(file)) return false;
+    return this.isImage(file) || (file.mime === 'application/pdf' && !this.coarse());
+  }
+
   /** The inline preview URL of a message file. */
   protected inline(url: string): string {
     return inlineUrl(url);
@@ -734,7 +774,7 @@ export class ChatComponent {
     }
     afterNextRender(
       () => {
-        const buttons = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.chat__draftX'));
+        const buttons = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.chat__draft button'));
         const next = buttons[Math.min(at, buttons.length - 1)];
         (next ?? this.composerInput()?.nativeElement)?.focus();
       },
@@ -970,7 +1010,6 @@ export class ChatComponent {
 
   protected copy(msg: ChatMessage): void {
     this.menuFor.set(null);
-    const clipboard = navigator.clipboard as Clipboard | undefined;
-    if (clipboard) void clipboard.writeText(msg.body).catch(() => undefined);
+    void copyText(msg.body);
   }
 }

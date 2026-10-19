@@ -4,28 +4,33 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { NoteComponent, PageHeaderComponent, StatusTextComponent, backupStatus } from '@shared/ui';
+import {
+  PageHeaderComponent,
+  backupStatus,
+} from '@shared/ui';
 import {
   ButtonComponent,
   CellDirective,
   type ColumnDef,
+  ConfirmDialogComponent,
   DataTableComponent,
   DialogComponent,
+  downloadBlob,
+  EmptyStateComponent,
+  FilePickerComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
-  ToastService,
-} from '@stupa-makers/ui-kit';
-import {
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { downloadBlob } from '@shared/download.util';
+  StatusTextComponent,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
 import type { Backup, BackupKind } from '../admin.models';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** File name the browser saves an archive under. Mirrors the server-side name. */
 function archiveFileName(createdAt: string): string {
@@ -58,6 +63,8 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
+    SectionHeaderComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     FormsModule,
@@ -143,7 +150,7 @@ export class BackupsComponent implements OnDestroy {
 
   /** Human-readable size. Archives are megabytes to gigabytes, so bytes help nobody. */
   protected sizeLabel(bytes: number | null | undefined): string {
-    return formatBytes(bytes, this.i18n);
+    return formatBytes(bytes, this.i18n.formatLocale());
   }
 
   /** "Manuell · vor der Haushaltsabstimmung": the line under the restore title. */
@@ -272,9 +279,8 @@ export class BackupsComponent implements OnDestroy {
     });
   }
 
-  protected upload(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+  protected upload(files: File[]): void {
+    const file = files[0];
     if (!file) return;
     this.busy.set(true);
     this.api.importBackup(file).subscribe({
@@ -282,12 +288,8 @@ export class BackupsComponent implements OnDestroy {
         this.rows.update((rows) => [row, ...rows]);
         this.busy.set(false);
         this.toast.success(this.i18n.translate('admin.backups.toast.imported'));
-        input.value = '';
       },
-      error: () => {
-        this.busy.set(false);
-        input.value = '';
-      },
+      error: () => this.busy.set(false),
     });
   }
 

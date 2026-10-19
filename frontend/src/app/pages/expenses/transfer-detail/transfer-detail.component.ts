@@ -2,15 +2,23 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
+import {
+  IconComponent,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SheetBarComponent,
+  SheetBarTitleDirective,
+} from '@stupa-makers/ui-kit';
 import type { BudgetTransfer } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
   costCentreLabel,
-  formatEur,
 } from '../../budget/expense-display.util';
-import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { TransferLegComponent } from '../transfer-leg/transfer-leg.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
+import { formatMoney } from '@shared/format-money';
 
 /**
  * The detail of a transfer (board Fin-Uebertraege): "Übertrag · HHJ 2025", the
@@ -22,7 +30,7 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
   selector: 'app-transfer-detail',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SheetBarComponent, SheetBarTitleDirective, ButtonComponent, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
+  imports: [SheetActionComponent, TransferLegComponent, NoteComponent, SheetBarComponent, SheetBarTitleDirective, IconComponent, LocalizedDatePipe, RowMenuComponent, TranslatePipe],
   templateUrl: './transfer-detail.component.html',
   styleUrl: './transfer-detail.component.scss',
 })
@@ -48,14 +56,7 @@ export class TransferDetailComponent {
     return costCentreLabel(this.costCentres(), t.toBudgetId, t.toPathKey);
   });
 
-  protected readonly amount = computed(() => formatEur(Number(this.transfer().amount), this.i18n.locale()));
-
-  protected readonly createdAt = computed(() =>
-    new Date(this.transfer().createdAt).toLocaleString(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }),
-  );
+  protected readonly amount = computed(() => formatMoney(this.transfer().amount, this.i18n.formatLocale()));
 
   protected readonly menu = computed<RowMenuSection[]>(() => {
     if (!this.canManage()) return [];

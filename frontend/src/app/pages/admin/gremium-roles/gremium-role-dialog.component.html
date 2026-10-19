@@ -18,17 +18,11 @@
         [disabled]="!isNew()"
         [error]="keyError()"
       />
-      <app-input
-        [label]="'admin.common.labelDe' | t"
-        [ngModel]="draft().labelDe"
-        (ngModelChange)="patch('labelDe', $event)"
-        name="labelDe"
-      />
-      <app-input
-        [label]="'admin.common.labelEn' | t"
-        [ngModel]="draft().labelEn"
-        (ngModelChange)="patch('labelEn', $event)"
-        name="labelEn"
+      <app-i18n-input
+        [de]="draft().labelDe"
+        (deChange)="patch('labelDe', $event)"
+        [en]="draft().labelEn"
+        (enChange)="patch('labelEn', $event)"
       />
     </div>
 
@@ -75,7 +69,7 @@
     }
 
     @if (saveFailed()) {
-      <p class="rd__error" role="alert">{{ 'admin.common.saveFailed' | t }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ 'admin.common.saveFailed' | t }}</app-note>
     }
     <button type="submit" hidden></button>
   </form>

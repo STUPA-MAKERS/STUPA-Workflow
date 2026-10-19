@@ -1,0 +1,9 @@
+@if (mark() && !plain()) {
+  <span class="bkr__mark" aria-hidden="true">↳</span>
+}
+<span class="bkr__body">
+  <span class="bkr__title ell" [title]="title()">{{ mark() && plain() ? '↳ ' + title() : title() }}</span>
+  <span class="bkr__meta ell"><ng-content select="[meta]" /></span>
+</span>
+<span class="mono bkr__amount">{{ amount() }}</span>
+<ng-content />

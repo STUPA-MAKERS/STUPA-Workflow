@@ -38,11 +38,9 @@
         (ngModelChange)="title.set($event)"
       />
 
-      <label class="rd__field" [class.rd__field--error]="bodyMissing()" for="rd-body">
-        <span class="rd__label">{{ 'help.report.bodyLabel' | t }}</span>
+      <app-textarea class="rd__body" [label]="'help.report.bodyLabel' | t" [invalid]="bodyMissing()" [grow]="true">
         <textarea
           id="rd-body"
-          class="rd__textarea"
           name="body"
           rows="4"
           required
@@ -50,7 +48,7 @@
           [ngModel]="body()"
           (ngModelChange)="body.set($event)"
         ></textarea>
-      </label>
+      </app-textarea>
       @if (bodyMissing()) {
         <p class="rd__fieldError" role="alert">{{ 'help.report.required' | t }}</p>
       }
@@ -72,7 +70,14 @@
         <span id="rd-files-cap" class="rd__cap">{{ 'help.report.files' | t }}</span>
         <div class="rd__chips">
           @for (file of files(); track file.id) {
-            <span class="rd__chip" [class.rd__chip--failed]="file.failed">
+            <app-chip
+              class="rd__chip"
+              [class.rd__chip--failed]="file.failed"
+              removeSize="lg"
+              [removable]="true"
+              [removeLabel]="'apply.files.remove' | t: { name: file.filename }"
+              (remove)="removeFile(file)"
+            >
               <app-icon [name]="file.mime.startsWith('image/') ? 'image' : 'file'" [size]="18" />
               <span class="rd__chipText">
                 <span class="mono rd__chipName">{{ file.filename }}</span>
@@ -81,24 +86,16 @@
                   {{ (file.failed ? 'apply.files.lost' : scanKey(file)) | t }}
                 </span>
               </span>
-              <button
-                type="button"
-                class="rd__chipX"
-                [attr.aria-label]="'apply.files.remove' | t: { name: file.filename }"
-                (click)="removeFile(file)"
-              >
-                <app-icon name="x" [size]="16" />
-              </button>
-            </span>
+            </app-chip>
           }
           @for (p of pending(); track p.key) {
-            <span class="rd__chip rd__chip--pending" role="status">
+            <app-chip class="rd__chip rd__chip--pending" role="status">
               <span class="rd__spinner" aria-hidden="true"></span>
               <span class="rd__chipText">
                 <span class="mono rd__chipName">{{ p.filename }}</span>
                 <span class="rd__chipSub">{{ 'apply.files.uploading' | t }}</span>
               </span>
-            </span>
+            </app-chip>
           }
           @if (!full()) {
             <app-button variant="tonal" size="sm" [disabled]="drafts.busy()" (click)="pickFiles()">

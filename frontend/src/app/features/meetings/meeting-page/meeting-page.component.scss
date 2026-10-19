@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 /* The session page is a pane page that runs edge to edge: it takes the free height of
    the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls
@@ -29,45 +29,6 @@
   gap: var(--space-3);
   min-height: 84px;
   padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
-}
-.mp__back {
-  flex: none;
-}
-.mp__titles {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.mp__titleLine {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-.mp__title {
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-h1);
-  line-height: 1.75rem;
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mp__status {
-  flex: none;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
-}
-.mp__sub {
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .mp__presence {
@@ -242,6 +203,8 @@
     padding-bottom: var(--fx-dock-h, 0px);
   }
   .mp__head {
+    --mh-title-size: var(--fs-h2);
+    --mh-title-line: 1.375rem;
     gap: var(--space-1);
     min-height: 0;
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
@@ -249,10 +212,6 @@
   /* The room state is in the attendance popover of the dock. */
   .mp__presence {
     display: none;
-  }
-  .mp__title {
-    font-size: var(--fs-h2);
-    line-height: 1.375rem;
   }
   .mp__body,
   .mp__body:not(.mp__body--wide) {

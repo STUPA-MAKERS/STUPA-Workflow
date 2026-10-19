@@ -1,0 +1,15 @@
+@use '../todo-labels' as lbl;
+
+@include lbl.colors;
+
+:host {
+  display: contents;
+}
+.tlb {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tlb__dot {
+  @include lbl.dot;
+}

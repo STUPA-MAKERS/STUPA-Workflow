@@ -49,10 +49,6 @@
   max-width: 16rem;
   text-align: end;
 }
-.gdc__chev {
-  @include gremien-tab.chevron;
-}
-
 .gdc__more {
   display: flex;
   flex-wrap: wrap;

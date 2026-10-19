@@ -9,7 +9,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import {
   type Delegation,
   type DelegationRecipient,
@@ -19,18 +18,20 @@ import {
 import type { Attendance, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
+  AvatarComponent,
   ButtonComponent,
   DialogComponent,
+  EmptyStateComponent,
   IconComponent,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
+  TruncatedDirective,
 } from '@stupa-makers/ui-kit';
-import { TruncatedDirective } from '@shared/truncated.directive';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { personLabel } from '@shared/person-label.util';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -58,7 +59,7 @@ const SEARCH_ABOVE = 5;
     EmptyStateComponent,
     SkeletonComponent,
     TruncatedDirective,
-    FormsModule,
+    SearchPillComponent,
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,
@@ -94,7 +95,7 @@ export class LeadSubstituteDialogComponent {
   protected readonly open = computed(() => this.member() !== null);
   protected readonly memberName = computed(() => {
     const m = this.member();
-    return m?.displayName || m?.email || '—';
+    return personLabel(m, this.i18n, { fallbackText: '—' });
   });
   protected readonly subtitle = computed(() =>
     this.i18n.translate('meetings.leadSubstitute.for', { name: this.memberName() }),

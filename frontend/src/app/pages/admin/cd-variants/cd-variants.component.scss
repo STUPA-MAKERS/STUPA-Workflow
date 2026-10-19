@@ -69,25 +69,9 @@
 }
 /* "Logos anzeigen": a text button that discloses the logo rows. */
 .cdv__toggle {
-  min-height: 2.25rem;
   margin-inline-end: var(--space-2);
-  padding: 0 var(--space-3);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--color-accent-text);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  cursor: pointer;
-}
-.cdv__toggle:hover {
-  background: var(--color-surface-3);
-}
-.cdv__toggle:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 0;
+  --button-height: 2.25rem;
+  --button-hover-bg: var(--color-surface-3);
 }
 .cdv__count {
   font-weight: var(--fw-regular);
@@ -194,9 +178,6 @@
   border-radius: var(--radius-lg);
   background: var(--color-surface-3);
 }
-.cdv__file {
-  display: none;
-}
 .cdv__bigSquare {
   flex: none;
   width: 6rem;
@@ -254,9 +235,7 @@
   color: var(--color-text-muted);
 }
 .cdv__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  --dialog-footer-gap: var(--space-2);
 }
 
 /* A narrow sheet: the actions go below the name. */

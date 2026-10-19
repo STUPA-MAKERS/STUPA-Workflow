@@ -95,15 +95,12 @@
             <ul class="rowgroup rowgroup--bg3 pv__hits" [attr.aria-label]="'admin.privacy.personHits' | t">
               @for (c of personHits(); track c.id) {
                 <li>
-                  <button type="button" class="pv__hit" (click)="pickPerson(c)">
-                    <app-avatar size="sm" [name]="personName(c)" [principalId]="c.id" [decorative]="true" />
-                    <span class="pv__personWho">
-                      <span class="pv__personName">{{ personName(c) }}</span>
-                      @if (c.email) {
-                        <span class="pv__mail mono pv__muted">{{ c.email }}</span>
-                      }
-                    </span>
-                  </button>
+                  <app-list-item [title]="personName(c)" subWrap (activate)="pickPerson(c)">
+                    <app-avatar lead size="sm" [name]="personName(c)" [principalId]="c.id" [decorative]="true" />
+                    @if (c.email) {
+                      <span sub class="mono">{{ c.email }}</span>
+                    }
+                  </app-list-item>
                 </li>
               } @empty {
                 <li class="pv__none">{{ 'admin.users.noResults' | t }}</li>
@@ -174,7 +171,7 @@
       (ngModelChange)="rejectReason.set($event)"
     ></textarea>
   </label>
-  <div dialog-footer class="pv__dialogFoot">
+  <div dialog-footer>
     <app-button variant="text" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
   </div>

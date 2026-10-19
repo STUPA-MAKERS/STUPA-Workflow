@@ -18,20 +18,22 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, MeetingVote, Uuid } from '@core/api/models';
 import type { TodoCardDetail } from '@core/api/todos.service';
-import { BadgeComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
 import {
+  BadgeComponent,
+  ConfirmDialogComponent,
+  EmptyStateComponent,
+  IconComponent,
+  ListItemComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
+} from '@stupa-makers/ui-kit';
 import {
   TodoNewDialogComponent,
   type NewTodoLink,
 } from '../../todos/new-dialog/todo-new-dialog.component';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { TopBadgeComponent } from '../top-badge/top-badge.component';
 
 /** The ids of the row menu items of an agenda item. */
 type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
@@ -77,6 +79,7 @@ export interface AgendaMove {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TopBadgeComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
     CdkDrag,

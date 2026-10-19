@@ -249,29 +249,18 @@ describe('BackupsComponent', () => {
     expect(cmp.loading()).toBe(false);
   });
   describe('import', () => {
-    function fileEvent(file?: File): Event {
-      const input = document.createElement('input');
-      Object.defineProperty(input, 'files', {
-        value: file ? [file] : [],
-        configurable: true,
-      });
-      return { target: input } as unknown as Event;
-    }
-
-    it('uploads the chosen file and clears the picker', async () => {
+    it('uploads the chosen file', async () => {
       const { fixture, api } = await setup();
-      const cmp = fixture.componentInstance as unknown as { upload: (e: Event) => void };
+      const cmp = fixture.componentInstance as unknown as { upload: (f: File[]) => void };
       const file = new File(['x'], 'archive.tar.age');
-      const event = fileEvent(file);
-      cmp.upload(event);
+      cmp.upload([file]);
       expect(api.importBackup).toHaveBeenCalledWith(file);
-      expect((event.target as HTMLInputElement).value).toBe('');
     });
 
     it('does nothing when the picker was dismissed', async () => {
       const { fixture, api } = await setup();
-      const cmp = fixture.componentInstance as unknown as { upload: (e: Event) => void };
-      cmp.upload(fileEvent());
+      const cmp = fixture.componentInstance as unknown as { upload: (f: File[]) => void };
+      cmp.upload([]);
       expect(api.importBackup).not.toHaveBeenCalled();
     });
 
@@ -279,10 +268,10 @@ describe('BackupsComponent', () => {
       const api = makeApi({ importBackup: jest.fn(() => throwError(() => new Error('422'))) });
       const { fixture } = await setup(api);
       const cmp = fixture.componentInstance as unknown as {
-        upload: (e: Event) => void;
+        upload: (f: File[]) => void;
         busy: () => boolean;
       };
-      cmp.upload(fileEvent(new File(['x'], 'a.age')));
+      cmp.upload([new File(['x'], 'a.age')]);
       expect(cmp.busy()).toBe(false);
     });
   });

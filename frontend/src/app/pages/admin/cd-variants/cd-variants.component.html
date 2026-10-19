@@ -31,16 +31,16 @@
                 <span class="cdv__usage">{{ usage(v) }}</span>
               </span>
               <span class="cdv__actions hitrow__keep">
-                <button
-                  type="button"
+                <app-button
                   class="cdv__toggle"
-                  [attr.aria-expanded]="isExpanded(v.id)"
-                  [attr.aria-controls]="'cdv-logos-' + v.id"
+                  variant="text"
+                  [ariaExpanded]="isExpanded(v.id)"
+                  [ariaControls]="'cdv-logos-' + v.id"
                   (click)="toggle(v.id)"
                 >
                   {{ (isExpanded(v.id) ? 'admin.cdVariants.hideLogos' : 'admin.cdVariants.toggleLogos') | t }}
                   <span class="cdv__count">({{ v.logos.length }})</span>
-                </button>
+                </app-button>
                 <app-row-menu
                   [sections]="variantMenu()"
                   [label]="('ui.rowMenu.trigger' | t) + ': ' + v.name"
@@ -165,7 +165,7 @@
         />
       </div>
       <div class="cdv__fileRow" [class.cdv__fileRow--square]="draft.slot === 'square'">
-        <input id="cdv-file" #logoFile class="cdv__file" type="file" [accept]="accept()" (change)="onFileSelected(logoFile)" />
+        <app-file-picker #logoFile [accept]="accept()" (picked)="onFileSelected($event)" />
         @if (draft.previewUrl) {
           <img class="cdv__bigSquare" [src]="draft.previewUrl" alt="" width="96" height="96" />
         }
@@ -182,7 +182,7 @@
             }
           }
         </span>
-        <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.click()">
+        <app-button [variant]="draft.file ? 'tonal' : 'outlined'" size="sm" (click)="logoFile.open()">
           <app-icon name="upload" />
           {{ (draft.file ? 'admin.cdVariants.otherFile' : 'admin.cdVariants.pickFile') | t }}
         </app-button>

@@ -88,7 +88,7 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(screen.getByText('cli-agent')).toBeInTheDocument();
     // Three scopes show, the fourth is counted; the title names them all.
     expect(screen.getByText('meetings:write')).toBeInTheDocument();
-    const tags = [...container.querySelectorAll('code.og__scope')].map((c) => c.textContent);
+    const tags = [...container.querySelectorAll('code.code-tag')].map((c) => c.textContent);
     expect(tags).not.toContain('applications:write');
     expect(screen.getByText('+1 weitere')).toBeInTheDocument();
     // The owner email is the tooltip of the name, because it adds to the name.

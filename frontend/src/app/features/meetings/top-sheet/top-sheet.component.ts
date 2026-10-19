@@ -21,11 +21,18 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
+  EmptyStateComponent,
   IconComponent,
-  SegmentedComponent,
-  ToastService,
   type IconName,
+  NoteComponent,
+  RowMenuComponent,
+  type RowMenuItem,
+  type RowMenuSection,
+  SegmentedComponent,
   type SegmentedOption,
+  type StatusKind,
+  StatusTextComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import {
   MarkdownEditorComponent,
@@ -38,17 +45,12 @@ import {
   MarkdownImageUploadDirective,
   imageUploadErrorKey,
 } from '@shared/markdown/markdown-image-upload.directive';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import type { StatusKind } from '@shared/status-kind.util';
-import { resolveI18n } from '../meetings-display.util';
+import { resolveI18n } from '@shared/forms/i18n-text';
 import { meetingKeeperLine } from '../keepers.util';
 import { ProtocolBarComponent } from '../protocol-bar/protocol-bar.component';
 import { TodoLinkedListComponent } from '../../todos/linked-list/todo-linked-list.component';
 import { voteResultResolver } from '../vote-result/vote-result';
 import { applyRawFormat, insertRawTable } from './raw-format';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 
 /** The autosave state of the text of the open item. */
 export type SaveState = 'idle' | 'saving' | 'saved' | 'error';

@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 
 /* The participant view is a pane page like the session page: it takes the free height
    of the main column of the shell (`flex: 1 1 0`) and pulls the block padding and the
@@ -32,45 +33,6 @@
   min-height: 84px;
   padding: var(--space-3) var(--space-5) var(--space-3) var(--space-3);
 }
-.fv__back {
-  flex: none;
-}
-.fv__titles {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.fv__titleLine {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  min-width: 0;
-}
-.fv__title {
-  min-width: 0;
-  margin: 0;
-  font-size: var(--fs-h1);
-  line-height: 1.75rem;
-  font-weight: var(--fw-semibold);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.fv__status {
-  flex: none;
-  font-size: var(--fs-body);
-  font-weight: var(--fw-semibold);
-}
-.fv__sub {
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
 
 /* ------------------------------------------------------------------ body */
 /* Board Schmal-Teilnahme: the vote card as a strip between the header and the body. */
@@ -84,29 +46,8 @@
 .fv__fade {
   --fv-fade: var(--space-5);
 }
-.fv__fade.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fv-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--fv-fade));
-}
-.fv__fade.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--fv-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--fv-fade));
-}
-.fv__fade.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fv-fade),
-    #000 calc(100% - var(--fv-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--fv-fade),
-    #000 calc(100% - var(--fv-fade)),
-    transparent
-  );
+.fv__fade {
+  @include fade.fade-y(var(--fv-fade));
 }
 
 .fv__body {
@@ -393,15 +334,11 @@
     margin-inline: calc(-1 * var(--space-4));
   }
   .fv__head {
+    --mh-title-size: var(--fs-h3);
+    --mh-title-line: 1.375rem;
+    --mh-status-size: var(--fs-small);
     gap: var(--space-1);
     min-height: 64px;
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
-  }
-  .fv__title {
-    font-size: var(--fs-h3);
-    line-height: 1.375rem;
-  }
-  .fv__status {
-    font-size: var(--fs-small);
   }
 }

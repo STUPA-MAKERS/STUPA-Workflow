@@ -8,31 +8,33 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { Uuid } from '@core/api/models';
+import { errorStatus, problemCode } from '@core/api/problem';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
+  ButtonComponent,
+  ConfirmDialogComponent,
+  DialogComponent,
+  EmptyStateComponent,
+  FilePickerComponent,
+  formatBytes,
+  IconComponent,
+  InputComponent,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import {
-  ButtonComponent,
-  DialogComponent,
-  IconComponent,
-  InputComponent,
   SegmentedComponent,
   type SegmentedOption,
+  SelectFieldComponent,
   type SelectOption,
+  SkeletonComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
 import {
   CD_BASE_VARIANTS,
   CD_LOGO_ACCEPT,
@@ -58,8 +60,6 @@ import {
   squareVerdict,
   variantInitials,
 } from './cd-variants.util';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
-import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 
 /** Dialog state of the create/edit form. */
 interface VariantForm {
@@ -95,25 +95,6 @@ function emptyForm(): VariantForm {
   return { key: '', name: '', baseVariant: 'report' };
 }
 
-/** HTTP status of a failed request, or 0 when the error carries none. */
-function errorStatus(err: unknown): number {
-  if (typeof err === 'object' && err !== null && 'status' in err) {
-    const status = Number((err as { status: unknown }).status);
-    return Number.isFinite(status) ? status : 0;
-  }
-  return 0;
-}
-
-/** The problem+json `code` of a failed request, or '' when the error carries none. */
-function errorCode(err: unknown): string {
-  if (typeof err === 'object' && err !== null && 'error' in err) {
-    const body = (err as { error: unknown }).error;
-    if (typeof body === 'object' && body !== null && 'code' in body) {
-      return String((body as { code: unknown }).code);
-    }
-  }
-  return '';
-}
 
 /**
  * Corporate-design variants (board Admin-Dokument-Varianten): the logo sets a Gremium
@@ -134,6 +115,7 @@ function errorCode(err: unknown): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -279,7 +261,7 @@ export class AdminCdVariantsComponent {
   /** "Dateiname · 3 KB" of an upload, the name of a shipped logo. */
   logoDetail(logo: CdVariantLogo): string {
     if (logo.vendoredName) return logo.vendoredName;
-    return logo.size != null ? `${logo.fileName ?? '—'} · ${formatBytes(logo.size, this.i18n)}` : (logo.fileName ?? '—');
+    return logo.size != null ? `${logo.fileName ?? '—'} · ${formatBytes(logo.size, this.i18n.formatLocale())}` : (logo.fileName ?? '—');
   }
 
   /** The ⋮ menu of a variant. The row itself opens the edit. */
@@ -514,10 +496,10 @@ export class AdminCdVariantsComponent {
    * and for the square slot a type other than PNG, JPEG or WebP. A square file then loads
    * as an image, for the preview and the size check.
    */
-  onFileSelected(input: HTMLInputElement): void {
+  onFileSelected(files: File[]): void {
     const draft = this.logoDraft();
     if (!draft) return;
-    const file = input.files?.[0] ?? null;
+    const file = files[0] ?? null;
     this.revokePreview();
     this.logoError.set(null);
     if (file && file.size > MAX_CD_LOGO_BYTES) {
@@ -590,7 +572,7 @@ export class AdminCdVariantsComponent {
       error: (err: unknown) => {
         this.logoSaving.set(false);
         const status = errorStatus(err);
-        let key: TranslationKey = SQUARE_ERROR_KEYS[errorCode(err)] ?? 'admin.common.saveFailed';
+        let key: TranslationKey = SQUARE_ERROR_KEYS[problemCode(err)] ?? 'admin.common.saveFailed';
         if (key === 'admin.common.saveFailed' && status === 413) key = 'admin.cdVariants.logoTooLarge';
         else if (key === 'admin.common.saveFailed' && status === 415) key = 'admin.cdVariants.logoType';
         this.logoError.set(key);

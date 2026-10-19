@@ -267,13 +267,81 @@ describe('ChatComponent', () => {
     expect(screen.getByRole('link', { name: /^angebot\.pdf/ })).toHaveAttribute('href', '/api/attachments/f/download');
     const metas = [...document.querySelectorAll('.chat__fileMeta')].map((m) => m.textContent?.trim());
     expect(metas).toEqual(['PDF · 1 KB', '2 KB']);
-    // A clean image shows as a thumbnail that opens the inline preview in a new tab.
+    // A clean image shows as a thumbnail; its link is the inline preview (a click opens the viewer).
     const img = screen.getByRole('img', { name: 'kopf.png' });
     expect(img).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
     const thumb = screen.getByRole('link', { name: 'kopf.png' });
     expect(thumb).toHaveAttribute('href', '/api/attachments/g/download?inline=1');
     expect(thumb).toHaveAttribute('target', '_blank');
     expect(thumb).toHaveAttribute('rel', 'noopener');
+  });
+
+  it('opens an image or a PDF of a message in the viewer and steps through its previewable files', async () => {
+    const { view } = await setup({
+      messages: [
+        msg('a', today(9), {
+          attachments: [
+            { id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' },
+            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 10, url: '/api/attachments/g/download' },
+            { id: 'h', filename: 'README', mime: 'text/plain', size: 10, url: '/api/attachments/h/download' },
+            { id: 'k', filename: 'neu.png', mime: 'image/png', size: 10, url: '/api/attachments/k/download', scanState: 'scanning' },
+          ],
+        }),
+        msg('b', today(10), {
+          attachments: [{ id: 'z', filename: 'anderes.png', mime: 'image/png', size: 10, url: '/api/attachments/z/download' }],
+        }),
+      ],
+    });
+    // Another file keeps its link: no viewer.
+    expect(fireEvent.click(screen.getByRole('link', { name: /^README/ }))).toBe(true);
+    // A click with a modifier keeps the new tab.
+    expect(fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }), { ctrlKey: true })).toBe(true);
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    expect(fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }))).toBe(false);
+    view.fixture.detectChanges();
+    const viewer = screen.getByRole('dialog', { name: 'kopf.png' });
+    expect(within(viewer).getByRole('img', { name: 'kopf.png' })).toHaveAttribute('src', '/api/attachments/g/download?inline=1');
+    // The clean image and the PDF of this message, nothing of another message.
+    expect(viewer.querySelector('.fv__position')).toHaveTextContent('2 von 2');
+    expect(within(viewer).getByRole('link', { name: 'Herunterladen' })).toHaveAttribute('href', '/api/attachments/g/download');
+
+    await userEvent.click(within(viewer).getByRole('button', { name: 'Vorherige Datei' }));
+    view.fixture.detectChanges();
+    expect(screen.getByRole('dialog', { name: 'angebot.pdf' })).toBeInTheDocument();
+    expect(viewer.querySelector('iframe')).toHaveAttribute('src', '/api/attachments/f/download?inline=1');
+    const download = within(viewer).getByRole('link', { name: 'Herunterladen' });
+    expect(download).toHaveAttribute('href', '/api/attachments/f/download');
+    expect(download).toHaveAttribute('download');
+
+    await userEvent.click(within(viewer).getByRole('button', { name: 'Vorschau schließen' }));
+    view.fixture.detectChanges();
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    // The PDF link opens the viewer at the PDF.
+    expect(fireEvent.click(screen.getByRole('link', { name: /^angebot\.pdf/ }))).toBe(false);
+    view.fixture.detectChanges();
+    expect(screen.getByRole('dialog', { name: 'angebot.pdf' })).toBeInTheDocument();
+  });
+
+  it('keeps the PDF link on a coarse pointer and shows only the images in the viewer', async () => {
+    const { view } = await setup({
+      phone: true,
+      messages: [
+        msg('a', today(9), {
+          attachments: [
+            { id: 'f', filename: 'angebot.pdf', mime: 'application/pdf', size: 10, url: '/api/attachments/f/download' },
+            { id: 'g', filename: 'kopf.png', mime: 'image/png', size: 10, url: '/api/attachments/g/download' },
+          ],
+        }),
+      ],
+    });
+    expect(fireEvent.click(screen.getByRole('link', { name: /^angebot\.pdf/ }))).toBe(true);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    fireEvent.click(screen.getByRole('link', { name: 'kopf.png' }));
+    view.fixture.detectChanges();
+    const viewer = screen.getByRole('dialog', { name: 'kopf.png' });
+    expect(within(viewer).queryByRole('button', { name: 'Vorherige Datei' })).toBeNull();
   });
 
   it('keeps the chip for an image in the scan and renders Markdown tables and images', async () => {

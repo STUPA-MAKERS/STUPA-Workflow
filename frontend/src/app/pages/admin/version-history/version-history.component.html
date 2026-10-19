@@ -21,16 +21,17 @@
               <span class="vh__actor ell" [appTruncated]="actor(rev)" #cut="appTruncated" [attr.title]="cut.truncated() ? actor(rev) : null">{{ actor(rev) }}</span>
             </span>
             <span class="vh__actions">
-              <button
-                type="button"
+              <app-button
                 class="vh__toggle"
-                [attr.aria-expanded]="openDiffId() === rev.id"
-                [attr.aria-controls]="'vh-diff-' + rev.id"
+                variant="text"
+                size="sm"
+                [ariaExpanded]="openDiffId() === rev.id"
+                [ariaControls]="'vh-diff-' + rev.id"
                 (click)="toggleDiff(rev)"
               >
-                {{ 'admin.config.history.viewDiff' | t }}
+                <span>{{ 'admin.config.history.viewDiff' | t }}</span>
                 <app-icon [name]="openDiffId() === rev.id ? 'up' : 'down'" [size]="14" />
-              </button>
+              </app-button>
               @if (!rev.isCurrent) {
                 <app-button
                   variant="tonal"
@@ -59,17 +60,13 @@
   }
 </section>
 
-<app-dialog
-  [open]="!!confirmRestore()"
+@let restoreRev = confirmRestore();
+<app-confirm-dialog
+  [open]="!!restoreRev"
   [title]="'admin.config.restore.title' | t"
-  [closeLabel]="'action.close' | t"
-  (closed)="confirmRestore.set(null)"
->
-  @if (confirmRestore(); as rev) {
-    <p class="vh__confirm">{{ 'admin.config.restore.confirm' | t: { version: rev.version } }}</p>
-  }
-  <div dialog-footer class="vh__foot">
-    <app-button variant="text" (click)="confirmRestore.set(null)">{{ 'action.cancel' | t }}</app-button>
-    <app-button variant="fill" (click)="doRestore()">{{ 'admin.config.history.restore' | t }}</app-button>
-  </div>
-</app-dialog>
+  [body]="restoreRev ? ('admin.config.restore.confirm' | t: { version: restoreRev.version }) : ''"
+  [confirmLabel]="'admin.config.history.restore' | t"
+  [danger]="false"
+  (confirm)="doRestore()"
+  (cancel)="confirmRestore.set(null)"
+/>

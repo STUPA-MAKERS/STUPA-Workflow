@@ -27,25 +27,25 @@
           <ul class="rowgroup um__hits" [attr.aria-label]="'admin.users.merge.pickList' | t">
             @for (c of candidates(); track c.id) {
               <li>
-                <button type="button" class="um__hit" (click)="pick(c)">
-                  <app-avatar size="sm" [name]="name(c)" [principalId]="c.id" [decorative]="true" />
-                  <span class="um__hitWho">
-                    <span class="um__hitName">
-                      {{ name(c) }}
-                      @if (c.active === false) {
-                        <span class="um__tag">{{ 'admin.users.inactive' | t }}</span>
-                      }
-                    </span>
-                    @if (c.email) {
-                      <span class="um__mail mono">{{ c.email }}</span>
-                    }
-                  </span>
-                  <span class="um__hitLogin">
+                <app-list-item [title]="name(c)" subWrap (activate)="pick(c)">
+                  <app-avatar lead size="sm" [name]="name(c)" [principalId]="c.id" [decorative]="true" />
+                  @if (c.active === false) {
+                    <span status class="um__tag">{{ 'admin.users.inactive' | t }}</span>
+                  }
+                  @if (c.email) {
+                    <span sub class="mono">{{ c.email }}</span>
+                  }
+                  <!-- Wide: a column at the end. Narrow: a line below the e-mail. -->
+                  <span sub class="um__hitLogin um__hitLogin--sub">
                     {{ 'admin.users.col.lastLogin' | t }}:
                     {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
                   </span>
-                  <app-icon class="um__chev" name="right" [size]="18" />
-                </button>
+                  <span trail class="um__hitLogin um__hitLogin--trail">
+                    {{ 'admin.users.col.lastLogin' | t }}:
+                    {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
+                  </span>
+                  <app-icon trail class="um__chev" name="right" [size]="18" />
+                </app-list-item>
               </li>
             } @empty {
               <li class="um__none">{{ 'admin.users.noResults' | t }}</li>
@@ -133,7 +133,7 @@
               </app-note>
               <ul class="um__rights" [attr.aria-label]="'admin.users.merge.rightsTitle' | t">
                 @for (r of p.extraPermissions; track $index) {
-                  <li class="um__right mono">{{ permissionLabel(r) }}</li>
+                  <li class="code-tag um__right mono">{{ permissionLabel(r) }}</li>
                 }
               </ul>
             </section>
@@ -192,7 +192,7 @@
     }
   }
 
-  <div dialog-footer class="um__foot">
+  <div dialog-footer>
     @switch (step()) {
       @case ('pick') {
         <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>

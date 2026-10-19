@@ -1,20 +1,18 @@
 import type { AgendaItem, Meeting, MeetingVote } from '@core/api/models';
 import {
   voteMetaLine,
+  voteRulesParts,
+  guestComposition,
+  majorityLabel,
+  quorumLabel,
+  secrecyLabel,
   assembleProtocolMarkdown,
-  clockTime,
-  errorCode,
   meetingDay,
   meetingTimeText,
   countEntries,
-  errorDetail,
   liveOpenedVote,
-  longDate,
   meetingLine,
-  weekdayDate,
   memberAttendanceKey,
-  resolveI18n,
-  shortTime,
   voteOptionLabel,
   voteOptionsFor,
   voteResultKey,
@@ -83,24 +81,10 @@ describe('meetings-display.util', () => {
     expect(countEntries(VOTE())).toEqual([]);
   });
 
-  it('resolves i18n maps with locale → de → first-value → empty fallbacks', () => {
-    expect(resolveI18n({ en: 'Open', de: 'Offen' }, 'en')).toBe('Open');
-    expect(resolveI18n({ de: 'Offen' }, 'en')).toBe('Offen');
-    expect(resolveI18n({ fr: 'Ouvert' }, 'en')).toBe('Ouvert');
-    expect(resolveI18n({}, 'en')).toBe('');
-    expect(resolveI18n(null, 'en')).toBe('');
-  });
-
   it('labels vote options, falling back to the raw key when untranslated', () => {
     const translate = (key: string): string => (key === 'vote.option.yes' ? 'Ja' : key);
     expect(voteOptionLabel('yes', translate)).toBe('Ja');
     expect(voteOptionLabel('maybe', translate)).toBe('maybe');
-  });
-
-  it('extracts the problem+json detail from an HTTP error', () => {
-    expect(errorDetail({ error: { detail: 'nope' } })).toBe('nope');
-    expect(errorDetail({ error: {} })).toBe('');
-    expect(errorDetail(null)).toBe('');
   });
 
   it('assembles protocol markdown with heading, antrag ref and body', () => {
@@ -113,33 +97,11 @@ describe('meetings-display.util', () => {
     );
   });
 
-  it('formats a meeting date with a short weekday and names the meeting with it', () => {
-    expect(weekdayDate('2026-10-13', 'de-DE')).toBe('Di., 13.10.2026');
-    expect(weekdayDate('kein Datum', 'de-DE')).toBe('kein Datum');
+  it('names the meeting with its date and a short weekday', () => {
     const m = { title: '35. Sitzung', date: '2026-10-13' } as Parameters<typeof meetingLine>[0];
-    expect(meetingLine(m, 'de-DE')).toBe('35. Sitzung · Di., 13.10.2026');
+    expect(meetingLine(m, 'de-DE')).toBe('35. Sitzung · Di, 13.10.2026');
     expect(meetingLine({ ...m, date: null }, 'de-DE')).toBe('35. Sitzung');
-  });
-
-  it('formats long dates per locale and passes invalid input through', () => {
-    expect(longDate('2026-06-14', 'de')).toBe('14. Juni 2026');
-    // en-GB puts the day before the month name.
-    expect(longDate('2026-06-14', 'en')).toBe('14 June 2026');
-    expect(longDate('not-a-date', 'de')).toBe('not-a-date');
-  });
-
-  it('shortens a clock time to HH:MM and keeps 24 h', () => {
-    // The API sends the SQL `time` as `HH:MM:SS`. Only hours and minutes are shown.
-    expect(shortTime('18:00:00')).toBe('18:00');
-    expect(shortTime('08:05:30.5')).toBe('08:05');
-    expect(shortTime('18:00')).toBe('18:00');
-    expect(shortTime('9:05')).toBe('09:05');
-    expect(shortTime('')).toBe('');
-    expect(shortTime(null)).toBe('');
-    expect(shortTime(undefined)).toBe('');
-    // Text that is not a time stays as it is. Garbage is better than a wrong time.
-    expect(shortTime('bald')).toBe('bald');
-    expect(shortTime('25:00:00')).toBe('25:00:00');
+    expect(meetingLine({ ...m, date: 'kein Datum' }, 'de-DE')).toBe('35. Sitzung');
   });
 
   it('builds a placeholder vote from a live vote_opened message', () => {
@@ -163,20 +125,6 @@ describe('meetings-display.util', () => {
     expect(vote.secret).toBeUndefined();
     expect(vote.openedAt).toEqual(expect.any(String));
     expect(liveOpenedVote({ type: 'vote_opened', voteId: 'v-8', options: [], closesAt: null, secret: true }).secret).toBe(true);
-  });
-
-  it('reads the stable problem+json code of an HTTP error', () => {
-    expect(errorCode({ error: { code: 'open_vote' } })).toBe('open_vote');
-    expect(errorCode({ error: { code: 7 } })).toBe('');
-    expect(errorCode(null)).toBe('');
-  });
-
-  it('prints the clock time of a timestamp in local time, 24 h', () => {
-    const local = new Date(2026, 8, 29, 18, 4).toISOString();
-    expect(clockTime(local, 'de')).toBe('18:04');
-    expect(clockTime(local, 'en')).toBe('18:04');
-    expect(clockTime(null, 'de')).toBe('');
-    expect(clockTime('kaputt', 'de')).toBe('');
   });
 
   describe('meetingTimeText', () => {
@@ -247,5 +195,59 @@ describe('voteMetaLine', () => {
   it('leaves out what a live event did not bring yet', () => {
     expect(voteMetaLine(base, t as never, 'de')).toBe('');
     expect(voteMetaLine({ ...base, status: 'draft', majorityRule: 'simple' }, t as never, 'de')).toBe('vote.majority.simple');
+  });
+});
+
+describe('voteRulesParts', () => {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}(${Object.values(params).join(',')})` : key;
+
+  it('lists majority, secrecy and quorum in the one order', () => {
+    expect(
+      voteRulesParts({ majorityRule: 'simple', secret: false, quorum: { type: 'count', value: 12 } }, t as never),
+    ).toEqual(['vote.majority.simple', 'meetings.vote.publicShort', 'meetings.vote.quorumCount(12)']);
+    expect(voteRulesParts({ majorityRule: 'absolute', secret: true, quorum: { type: 'percent', value: 50 } }, t as never)).toEqual([
+      'vote.majority.absolute',
+      'meetings.vote.secretShort',
+      'meetings.vote.quorumPercent(50)',
+    ]);
+  });
+
+  it('gives the ballot form: the quorum first, only a secret vote named', () => {
+    const rules = { majorityRule: 'absolute', secret: true, quorum: { type: 'count' as const, value: 12 } };
+    expect(voteRulesParts(rules, t as never, { ballot: true })).toEqual([
+      'vote.majority.absolute',
+      'meetings.vote.quorumCount(12)',
+      'meetings.vote.secretShort',
+    ]);
+    expect(voteRulesParts({ ...rules, secret: false }, t as never, { ballot: true })).toEqual([
+      'vote.majority.absolute',
+      'meetings.vote.quorumCount(12)',
+    ]);
+  });
+
+  it('names the majority of the cast votes for a vote with guests', () => {
+    expect(voteRulesParts({ majorityRule: 'simple', guestsVote: true }, t as never)).toEqual(['vote.majorityCast.simple']);
+    expect(majorityLabel('two_thirds', false, t as never)).toBe('vote.majority.two_thirds');
+  });
+
+  it('leaves out the parts without data', () => {
+    expect(voteRulesParts({}, t as never)).toEqual([]);
+    expect(voteRulesParts({ majorityRule: null, quorum: null, secret: true }, t as never)).toEqual([
+      'meetings.vote.secretShort',
+    ]);
+    expect(secrecyLabel(false, t as never)).toBe('meetings.vote.publicShort');
+    expect(quorumLabel({ type: 'count', value: 3 }, t as never)).toBe('meetings.vote.quorumCount(3)');
+  });
+});
+
+describe('guestComposition', () => {
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}(${Object.values(params).join(',')})` : key;
+
+  it('names members and guests, or nothing while a count is unknown', () => {
+    expect(guestComposition(19, 7, t as never)).toBe('guests.vote.composition(19,7)');
+    expect(guestComposition(19, null, t as never)).toBeNull();
+    expect(guestComposition(undefined, 7, t as never)).toBeNull();
   });
 });

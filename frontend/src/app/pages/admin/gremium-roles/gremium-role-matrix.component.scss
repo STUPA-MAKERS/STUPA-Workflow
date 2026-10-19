@@ -12,16 +12,8 @@
 }
 
 .rm__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  min-height: 2.5rem;
-}
-/* Without a heading the button sits at the end. */
-.rm__add:only-child {
-  margin-inline-start: auto;
+  --sh-min-height: 2.5rem;
+  --sh-inset: 0;
 }
 
 /* The matrix: the role column, one column per right of the catalogue, the actions. All

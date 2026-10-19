@@ -11,8 +11,8 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { ApplicationListItem, Transition } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import { isRejection } from '../applications.util';
+import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@stupa-makers/ui-kit';
 
 /** What the reader chose in the row menu. The list page carries it out. */
 export type RowAction =

@@ -22,31 +22,36 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Meeting, Uuid, VoteListItem, VoteStatus } from '@core/api/models';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  ButtonComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { ListDetailLayoutComponent } from '@shared/ui/list-detail/list-detail-layout.component';
-import { ListItemComponent } from '@shared/ui/list-item/list-item.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+  IconComponent,
+  ListDetailLayoutComponent,
+  ListItemComponent,
+  liveSearch,
+  MEDIA,
+  mediaQuery,
+  NoteComponent,
+  ScrollFadeDirective,
+  SearchPillComponent,
+  SkeletonComponent,
+  StatusTextComponent,
+  StickyBarComponent,
+} from '@stupa-makers/ui-kit';
+// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
+// it uses.
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { liveSearch } from '@shared/live-search';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
-import { groupByMonth } from '../../../pages/applications/applications.util';
 import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { clock, dayMonthYear } from '@shared/date-format';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
+import { groupByMonth } from '@shared/group-by-month';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -124,6 +129,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     PageHeaderComponent,
     RouterOutlet,
@@ -153,7 +159,7 @@ export class VotingComponent implements OnDestroy {
   private readonly page = inject(VotingPageService);
   private readonly frame = inject(PageFrameService);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
@@ -262,7 +268,7 @@ export class VotingComponent implements OnDestroy {
     if (drafts.length) {
       out.push({ key: 'draft', label: this.i18n.translate('voting.list.group.draft'), rows: drafts });
     }
-    for (const g of groupByMonth(ended, this.i18n.locale())) {
+    for (const g of groupByMonth(ended, (r) => r.createdAt, this.i18n.formatLocale())) {
       out.push({ key: `m-${g.key}`, label: g.label, rows: g.items });
     }
     return out;
@@ -631,12 +637,8 @@ export class VotingComponent implements OnDestroy {
     if (Number.isNaN(date.getTime())) return [null, null];
     const locale = this.i18n.formatLocale();
     const today = new Date(Date.now()).toDateString() === date.toDateString();
-    const text = today
-      ? new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)
-      : new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
-    const exact = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(
-      date,
-    );
+    const text = today ? clock(date, locale) : dayMonthYear(date, locale);
+    const exact = formatMoment(date, locale);
     return [key ? this.i18n.translate(key, { time: text }) : text, exact];
   }
 }

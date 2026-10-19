@@ -289,10 +289,13 @@ describe('HelpTicketsComponent', () => {
       const css = readFileSync(join(__dirname, 'help-tickets.component.scss'), 'utf8');
       const rule = (sel: string) => css.match(new RegExp(`\\n${sel.replace(/[.:]/g, '\\$&')} \\{([^}]*)\\}`))?.[1] ?? '';
       expect(rule('.ht__meta')).toMatch(/overflow-x: clip;/);
-      expect(rule('.ht__parts')).toMatch(/flex-wrap: wrap;/);
-      expect(rule('.ht__parts')).toMatch(/margin-inline-start: calc\(-1 \* var\(--ht-sep\)\);/);
-      expect(rule('.ht__part::before')).toMatch(/width: var\(--ht-sep\);/);
-      expect(rule('.ht__part::before')).toMatch(/content: '·' \/ '';/);
+      expect(rule('.ht__parts')).toMatch(/@include dots\.list\(var\(--ht-sep\)\);/);
+      expect(rule('.ht__part')).toMatch(/@include dots\.part\(var\(--ht-sep\)/);
+      // The mixins of the ui-kit: a wrapping row that starts one separator early, and a
+      // dot in a box of the separator width before every part.
+      const dots = readFileSync(join(__dirname, '../../../../../vendor/ui-kit/src/styles/_dot-parts.scss'), 'utf8');
+      expect(dots).toMatch(/@mixin list\(\$sep\) \{[^}]*flex-wrap: wrap;[^}]*margin-inline-start: calc\(-1 \* #\{\$sep\}\);/);
+      expect(dots).toMatch(/&::before \{[^}]*width: \$sep;[^}]*content: '·' \/ '';/);
     });
 
     it('lists only the blocks without the site right, with no alert', async () => {

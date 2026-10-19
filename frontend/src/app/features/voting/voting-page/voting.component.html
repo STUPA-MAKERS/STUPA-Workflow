@@ -35,9 +35,7 @@
             [value]="statusFilter()"
             (valueChange)="setStatus($event)"
             [text]="statusChipLabel()"
-            [active]="statusFilter() !== ''"
-            [icon]="statusFilter() ? 'check' : null"
-            [chevron]="!statusFilter()"
+            filled
           />
           @if (showGremiumChip()) {
             <app-filter-select
@@ -47,9 +45,7 @@
               [value]="gremiumId()"
               (valueChange)="setGremium($event)"
               [text]="gremiumChipLabel()"
-              [active]="gremiumId() !== ''"
-              [icon]="gremiumId() ? 'check' : null"
-              [chevron]="!gremiumId()"
+              filled
             />
           }
           @if (activeFilterCount() > 0) {
@@ -132,7 +128,7 @@
                         }
                       </span>
                       @if (!split()) {
-                        <app-icon class="vl__chev" name="right" [size]="17" />
+                        <app-row-chevron class="vl__chev" />
                       }
                     </span>
                   </app-list-item>

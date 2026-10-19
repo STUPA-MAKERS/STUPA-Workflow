@@ -37,6 +37,7 @@ export const FIELD_TYPES: readonly FieldType[] = [
   'markdown',
   'computed',
   'positions',
+  'funding',
   'section',
 ] as const;
 
@@ -118,6 +119,22 @@ export function duplicateKeys(fields: FormFieldDef[]): string[] {
   return [...new Set(keys.filter((k) => keys.indexOf(k) !== keys.lastIndexOf(k)))].sort();
 }
 
+/**
+ * The form-level problem of the requested funding, or null. Mirrors
+ * `validate_definition`: a form has at most one `funding` field, and only beside a
+ * `positions` field, because the funding is checked against the cost total.
+ */
+export function fundingProblem(
+  fields: FormFieldDef[],
+): 'admin.form.fundingTwice' | 'admin.form.fundingNoPositions' | null {
+  const funding = fields.filter((f) => f.type === 'funding').length;
+  if (funding > 1) return 'admin.form.fundingTwice';
+  if (funding === 1 && !fields.some((f) => f.type === 'positions')) {
+    return 'admin.form.fundingNoPositions';
+  }
+  return null;
+}
+
 /** Canonical form: drop empty optionals. This is the stored definition. */
 export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   const out: FormFieldDef = { key: field.key, type: field.type, label: field.label };
@@ -131,7 +148,7 @@ export function normalizeFormField(field: FormFieldDef): FormFieldDef {
   if (field.compute) out.compute = field.compute;
   if (field.isPII) out.isPII = true;
   // Only a numeric field may carry `isPromoted`. The backend sends 422 for other types.
-  // A `positions` field promotes into `amount` automatically, without a flag.
+  // A `positions` or `funding` field promotes into `amount` automatically, without a flag.
   if (field.isPromoted && (field.type === 'number' || field.type === 'currency')) {
     out.isPromoted = true;
     if (field.promoteTarget) out.promoteTarget = field.promoteTarget;

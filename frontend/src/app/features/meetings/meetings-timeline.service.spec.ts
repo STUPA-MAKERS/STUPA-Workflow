@@ -57,6 +57,26 @@ describe('MeetingsTimelineService', () => {
     expect(svc.filterGremien()).toEqual([]);
   });
 
+  it('shows the Gremium chip only for more than one Gremium and names the chosen one', () => {
+    const one = setup().svc;
+    expect(one.showGremiumFilter()).toBe(false);
+    TestBed.resetTestingModule();
+    const { svc } = setup({
+      gremien: () =>
+        of([
+          { id: 'g1', name: 'StuPa' },
+          { id: 'g2', name: 'AStA' },
+        ]),
+    });
+    expect(svc.showGremiumFilter()).toBe(true);
+    expect(svc.gremiumFilterLabel()).toBe('Alle Gremien');
+    svc.gremiumFilter.set('g2');
+    expect(svc.gremiumFilterLabel()).toBe('AStA');
+    // A Gremium that left the list reads as "Alle Gremien".
+    svc.gremiumFilter.set('gone');
+    expect(svc.gremiumFilterLabel()).toBe('Alle Gremien');
+  });
+
   it('holds the place of the filter chip while the filter Gremien load, for a member of several', () => {
     const pending = new Subject<{ id: string; name: string }[]>();
     const { svc } = setup({ many: true, gremien: () => pending });
@@ -195,7 +215,7 @@ describe('MeetingsTimelineService', () => {
     expect(calls[7].direction).toBe('upcoming');
     expect(calls[7].q).toBeUndefined();
     svc.onSearch('z');
-    TestBed.resetTestingModule(); // ngOnDestroy clears the pending timer
+    TestBed.resetTestingModule(); // the destroy stops the pending search
     jest.advanceTimersByTime(400);
     expect(calls).toHaveLength(9);
   });

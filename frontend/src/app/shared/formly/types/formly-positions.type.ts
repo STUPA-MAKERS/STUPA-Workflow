@@ -3,6 +3,7 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
 import { ButtonComponent, IconComponent, SwitchComponent, parseMoney } from '@stupa-makers/ui-kit';
 import { I18nService } from '@core/i18n/i18n.service';
 import type { TranslationKey } from '@core/i18n/translations';
+import { formatMoney } from '@shared/format-money';
 
 /** A comparison offer within a cost position. */
 interface Offer {
@@ -215,10 +216,7 @@ export class FormlyPositionsType extends FieldType<FieldTypeConfig> implements O
   }
 
   protected fmt(value: number): string {
-    return new Intl.NumberFormat(this.i18n.formatLocale(), {
-      style: 'currency',
-      currency: 'EUR',
-    }).format(value);
+    return formatMoney(value, this.i18n.formatLocale());
   }
 
   protected positionValue(p: Position): number {

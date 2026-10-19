@@ -38,7 +38,7 @@
             <div class="og__scopes" [title]="scopes(g).join(' ')">
               <span class="sr-only">{{ 'admin.oauthGrants.col.scope' | t }}:</span>
               @for (s of visibleScopes(g); track s) {
-                <code class="og__scope">{{ s }}</code>
+                <code class="code-tag">{{ s }}</code>
               }
               @if (hiddenScopeCount(g); as extra) {
                 <span class="og__more" aria-hidden="true">{{

@@ -51,22 +51,13 @@
 
         <div class="cs__block">
           <span class="cap cs__cap" id="cs-lifetime">{{ 'account.consent.lifetime' | t }}</span>
-          <div class="cs__lifetimes" role="group" aria-labelledby="cs-lifetime">
-            @for (lt of r.lifetimes; track lt) {
-              <button
-                type="button"
-                class="chip"
-                [class.on]="lifetime() === lt"
-                [attr.aria-pressed]="lifetime() === lt"
-                (click)="setLifetime(lt)"
-              >
-                @if (lifetime() === lt) {
-                  <app-icon name="check" [size]="14" />
-                }
-                {{ lifetimeLabel(lt) }}
-              </button>
-            }
-          </div>
+          <app-chip-group
+            class="cs__lifetimes"
+            ariaLabelledby="cs-lifetime"
+            [options]="lifetimeOptions()"
+            [value]="lifetime()"
+            (valueChange)="setLifetime($event ?? '')"
+          />
         </div>
       }
 

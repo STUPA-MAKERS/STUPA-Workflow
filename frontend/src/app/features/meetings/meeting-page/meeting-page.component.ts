@@ -1,10 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
-  NgZone,
-  afterNextRender,
   computed,
   inject,
   input,
@@ -24,15 +21,18 @@ import type {
   Protocol,
   Uuid,
 } from '@core/api/models';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import {
+  ButtonComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  observeElementSize,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-} from '@shared/ui/row-menu/row-menu.component';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
+  ScrollFadeDirective,
+  SideSheetComponent,
+} from '@stupa-makers/ui-kit';
 import { meetingStatus } from '@shared/status-kind.util';
 import {
   type AgendaMove,
@@ -48,10 +48,11 @@ import { type DockPanel, SessionDockComponent } from '../session-dock/session-do
 import { type SaveState, TopSheetComponent } from '../top-sheet/top-sheet.component';
 import { VoteCardComponent } from '../vote-card/vote-card.component';
 import { voteSnippet, votesInText } from '../meetings.util';
-import { clockTime, voteOptionLabel } from '../meetings-display.util';
+import { voteOptionLabel } from '../meetings-display.util';
 import { openWindowClock, openWindowState, openWindowWhen } from '../open-window.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { JoinQrComponent } from '../public-join/join-qr.component';
+import { MeetingHeadComponent } from '../meeting-head/meeting-head.component';
+import { clock, weekdayDate } from '@shared/date-format';
 
 /** The ids of the session menu. */
 type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'delete';
@@ -80,6 +81,7 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MeetingHeadComponent,
     ScrollFadeDirective,
     NgTemplateOutlet,
     TranslatePipe,
@@ -87,7 +89,6 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
     IconComponent,
     RowMenuComponent,
     SideSheetComponent,
-    StatusTextComponent,
     AgendaPaneComponent,
     PrepChecklistComponent,
     SessionDockComponent,
@@ -108,8 +109,8 @@ export class MeetingPageComponent {
   private readonly agendaPane = viewChild(AgendaPaneComponent);
 
   /** Three columns from 1200px; below that the agenda is a sheet. */
-  protected readonly wide = mediaQuerySignal(MEDIA.wide);
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly wide = mediaQuery(MEDIA.wide);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   /**
    * Height of the dock. On a phone the dock is fixed to the viewport, so the page keeps
    * this much room below its content.
@@ -194,18 +195,12 @@ export class MeetingPageComponent {
   protected readonly revision = signal(0);
 
   constructor() {
-    const destroyRef = inject(DestroyRef);
-    const zone = inject(NgZone);
-    afterNextRender(() => {
-      const el = this.dock().nativeElement;
-      // The observer fires outside the zone, so the write runs inside it, or the page
-      // keeps the old room below its content until the next event.
-      const observer = new ResizeObserver(() =>
-        zone.run(() => this.dockHeight.set(el.offsetHeight)),
-      );
-      observer.observe(el);
-      destroyRef.onDestroy(() => observer.disconnect());
-    });
+    // The page keeps room below its content for the dock.
+    observeElementSize(
+      () => this.dock().nativeElement,
+      (size) => this.dockHeight.set(size.height),
+      'border',
+    );
   }
 
   protected readonly status = computed(() => meetingStatus(this.meeting().status));
@@ -241,15 +236,15 @@ export class MeetingPageComponent {
   /** "Studierendenparlament · Di, 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
     const m = this.meeting();
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const parts: string[] = [];
     if (m.gremiumName) parts.push(m.gremiumName);
     if (m.date) parts.push(this.dateText(m.date));
-    const started = clockTime(m.startedAt, locale);
+    const started = clock(m.startedAt, locale);
     if (m.status === 'live' && started) {
       parts.push(this.i18n.translate('meetings.page.since', { time: started }));
     } else if (m.status === 'closed' && started) {
-      const closed = clockTime(m.closedAt, locale);
+      const closed = clock(m.closedAt, locale);
       parts.push(closed ? `${started}–${closed}` : started);
     } else if (m.startTime) {
       parts.push(m.startTime.slice(0, 5));
@@ -480,13 +475,6 @@ export class MeetingPageComponent {
 
   /** "Di, 29.09.2026" in the language of the page. */
   private dateText(isoDate: string): string {
-    const date = new Date(`${isoDate}T00:00:00`);
-    if (Number.isNaN(date.getTime())) return isoDate;
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    }).format(date);
+    return weekdayDate(isoDate, this.i18n.formatLocale()) || isoDate;
   }
 }

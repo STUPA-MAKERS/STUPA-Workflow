@@ -6,6 +6,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { switchMap } from 'rxjs';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -19,20 +20,22 @@ import {
   type SubmittedKind,
 } from '@core/branding/submitted-texts';
 import { resolveI18n } from '@shared/forms/i18n-text';
-import { NoteComponent } from '@shared/ui/note/note.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
   ButtonComponent,
+  FilePickerComponent,
+  formatBytes,
   IconComponent,
   InputComponent,
-  SegmentedComponent,
-  type SegmentedOption,
+  MoveButtonsComponent,
+  moveItem,
+  NoteComponent,
+  SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { formatBytes } from '../admin-health/admin-health.util';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
@@ -44,10 +47,12 @@ import {
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
 import { renderMarkdown } from '../../../features/meetings/meetings.util';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** The language of the texts in the editor. */
-type TextLang = 'de' | 'en';
+type TextLang = ContentLang;
 
 /** The free texts in the order of the board. `applyInfo` takes Markdown. */
 const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter', 'applyInfo'] as const;
@@ -82,6 +87,11 @@ type FreetextKey = (typeof FREETEXTS)[number];
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
+    MoveButtonsComponent,
+    NgTemplateOutlet,
+    SectionHeaderComponent,
+    I18nInputComponent,
     FabComponent,
     SkeletonComponent,
     FormsModule,
@@ -90,7 +100,7 @@ type FreetextKey = (typeof FREETEXTS)[number];
     IconComponent,
     InputComponent,
     NoteComponent,
-    SegmentedComponent,
+    ContentLangSwitchComponent,
     SwitchComponent,
     VersionHistoryComponent,
     PageHeaderComponent,
@@ -124,10 +134,6 @@ export class BrandingEditorComponent {
 
   /** The language of the text fields. It starts with the language of the page. */
   protected readonly lang = signal<TextLang>(this.i18n.locale() === 'en' ? 'en' : 'de');
-  protected readonly langOptions: SegmentedOption[] = [
-    { value: 'de', label: 'DE' },
-    { value: 'en', label: 'EN' },
-  ];
 
   /** Disallowed link URLs. Their scheme is not http, https or mailto. They block a save. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
@@ -162,10 +168,6 @@ export class BrandingEditorComponent {
     this.savedRev.set(rev);
   }
 
-  protected setLang(value: string | null): void {
-    this.lang.set(value === 'en' ? 'en' : 'de');
-  }
-
   protected slotLabel(slot: LogoSlot): string {
     return this.i18n.translate(`admin.brand.logo.${slot}` as TranslationKey);
   }
@@ -180,7 +182,7 @@ export class BrandingEditorComponent {
   }
 
   protected size(bytes: number): string {
-    return formatBytes(bytes, this.i18n);
+    return formatBytes(bytes, this.i18n.formatLocale());
   }
 
   /** One text of the draft in the language that is edited now, for the preview. */
@@ -253,9 +255,8 @@ export class BrandingEditorComponent {
     return this.linkErrors().includes(url);
   }
 
-  protected onLogoSelected(slot: LogoSlot, input: HTMLInputElement): void {
-    const file = input.files?.[0];
-    input.value = '';
+  protected onLogoSelected(slot: LogoSlot, files: File[]): void {
+    const file = files[0];
     if (file) this.readLogo(slot, file);
   }
 
@@ -319,11 +320,7 @@ export class BrandingEditorComponent {
 
   protected moveColumn(i: number, dir: -1 | 1): void {
     this.patch((d) => {
-      const next = [...d.footerColumns];
-      const j = i + dir;
-      if (j < 0 || j >= next.length) return;
-      [next[i], next[j]] = [next[j], next[i]];
-      d.footerColumns = next;
+      d.footerColumns = moveItem(d.footerColumns, i, dir);
     });
   }
 

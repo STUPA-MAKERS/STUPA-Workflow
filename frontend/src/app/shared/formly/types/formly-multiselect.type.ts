@@ -1,9 +1,15 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
-import { CheckboxComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import {
+  CheckboxComponent,
+  IconComponent,
+  matchesMedia,
+  MEDIA,
+  type SheetSide,
+  SideSheetComponent,
+} from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { SideSheetComponent, type SheetSide } from '@shared/ui/side-sheet/side-sheet.component';
 
 interface MultiOption {
   value: string;
@@ -115,7 +121,7 @@ export class FormlyMultiSelectType extends FieldType<FieldTypeConfig> {
   }
 
   protected show(): void {
-    const phone = typeof window.matchMedia === 'function' && window.matchMedia(MEDIA.phone).matches;
+    const phone = matchesMedia(MEDIA.phone);
     this.side.set(phone ? 'bottom' : 'end');
     this.open.set(true);
   }

@@ -14,20 +14,25 @@ import type { AgendaItem, Attendance, Meeting, MeetingVote, Uuid } from '@core/a
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { type StatusKind, type StatusView, meetingStatus } from '@shared/status-kind.util';
-import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../layout/media-query';
+import {
+  type StatusView,
+  meetingStatus,
+} from '@shared/status-kind.util';
+import {
+  ButtonComponent,
+  EmptyStateComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ScrollFadeDirective,
+  SideSheetComponent,
+  type StatusKind,
+} from '@stupa-makers/ui-kit';
 import { AgendaPaneComponent } from './agenda-pane/agenda-pane.component';
 import { MeetingDelegationCardComponent } from './meeting-delegation-card.component';
 import {
-  clockTime,
   meetingLine,
-  shortTime,
   voteOptionLabel,
-  weekdayDate,
 } from './meetings-display.util';
 import {
   type OwnAttendanceChange,
@@ -39,7 +44,8 @@ import { ParticipantVoteService } from './participant-vote/participant-vote.serv
 import { TopSheetComponent } from './top-sheet/top-sheet.component';
 import { VoteCardComponent } from './vote-card/vote-card.component';
 import { CalendarSubscribeComponent } from './calendar-subscribe/calendar-subscribe.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { MeetingHeadComponent } from './meeting-head/meeting-head.component';
+import { clock, shortTime, weekdayDate } from '@shared/date-format';
 
 /** The length of the protocol excerpt on a phone, in characters. */
 const EXCERPT_LENGTH = 160;
@@ -74,13 +80,13 @@ const EXCERPT_LENGTH = 160;
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [ParticipantVoteService],
   imports: [
+    MeetingHeadComponent,
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
     ScrollFadeDirective,
     ButtonComponent,
     IconComponent,
-    StatusTextComponent,
     SideSheetComponent,
     AgendaPaneComponent,
     TopSheetComponent,
@@ -107,8 +113,8 @@ export class MeetingFollowViewComponent {
   /** An own attendance report (Z2, O15). */
   readonly attendanceChange = output<{ member: Attendance } & OwnAttendanceChange>();
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  protected readonly wide = mediaQuerySignal(MEDIA.wide);
+  protected readonly phone = mediaQuery(MEDIA.phone);
+  protected readonly wide = mediaQuery(MEDIA.wide);
 
   /** The item the member opened. `null`: follow the room. */
   protected readonly selectedId = signal<Uuid | null>(null);
@@ -226,15 +232,15 @@ export class MeetingFollowViewComponent {
   /** "Studierendenparlament · Di., 29.09.2026 · seit 18:04". */
   protected readonly subLine = computed(() => {
     const m = this.meeting();
-    const locale = this.i18n.locale();
+    const locale = this.i18n.formatLocale();
     const parts: string[] = [];
     if (m.gremiumName) parts.push(m.gremiumName);
     if (m.date) parts.push(this.dateText(m.date));
-    const started = clockTime(m.startedAt, locale);
+    const started = clock(m.startedAt, locale);
     if (m.status === 'live' && started) {
       parts.push(this.i18n.translate('meetings.page.since', { time: started }));
     } else if (m.status === 'closed' && started) {
-      const closed = clockTime(m.closedAt, locale);
+      const closed = clock(m.closedAt, locale);
       parts.push(closed ? `${started}–${closed}` : started);
     } else if (m.startTime) {
       parts.push(shortTime(m.startTime));
@@ -245,7 +251,7 @@ export class MeetingFollowViewComponent {
   /** The phone keeps the time alone below the title: "seit 18:04". */
   protected readonly phoneSubLine = computed(() => {
     const m = this.meeting();
-    const started = clockTime(m.startedAt, this.i18n.locale());
+    const started = clock(m.startedAt, this.i18n.formatLocale());
     if (m.status === 'live' && started) {
       return this.i18n.translate('meetings.page.since', { time: started });
     }
@@ -278,7 +284,7 @@ export class MeetingFollowViewComponent {
 
   /** "Geschlossen um 21:12". */
   protected readonly closedLine = computed(() => {
-    const time = clockTime(this.meeting().closedAt, this.i18n.locale());
+    const time = clock(this.meeting().closedAt, this.i18n.formatLocale());
     return time
       ? this.i18n.translate('meetings.dock.closedAt', { time })
       : this.i18n.translate('meetings.status.closed');

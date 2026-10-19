@@ -19,9 +19,7 @@
         [value]="result()"
         (valueChange)="setResult($event)"
         [text]="resultText()"
-        [active]="result() !== ''"
-        [icon]="result() ? 'check' : null"
-        [chevron]="!result()"
+        filled
       />
       <app-filter-select
         [label]="'gremien.decisions.kind' | t"
@@ -29,9 +27,7 @@
         [value]="kind()"
         (valueChange)="setKind($event)"
         [text]="kindText()"
-        [active]="kind() !== ''"
-        [icon]="kind() ? 'check' : null"
-        [chevron]="!kind()"
+        filled
       />
       @if (!phone()) {
         <app-filter-select
@@ -40,9 +36,7 @@
           [value]="since()"
           (valueChange)="setSince($event)"
           [text]="sinceText()"
-          [active]="since() !== ''"
-          [icon]="since() ? 'check' : null"
-          [chevron]="!since()"
+          filled
         />
       }
     </div>
@@ -93,7 +87,7 @@
                   >{{ row.status.key | t }}@if (row.elected) {: {{ row.elected }}}</app-status-text
                 >
               }
-              <app-icon class="gdc__chev" name="right" [size]="17" />
+              <app-row-chevron />
             </span>
           </app-list-item>
         }

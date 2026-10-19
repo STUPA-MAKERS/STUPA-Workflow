@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   inject,
   signal,
@@ -10,18 +9,20 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import { DateBlockComponent } from '@shared/ui/date-block/date-block.component';
-import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import {
+  ButtonComponent,
+  DateBlockComponent,
+  EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
-} from '@shared/ui/filter-select/filter-select.component';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
-import { formatSize } from '../apply/apply.util';
-import { highlight, type TextPart } from '../search/highlight';
+  formatBytes,
+  HighlightComponent,
+  IconComponent,
+  liveSearch,
+  NoteComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+} from '@stupa-makers/ui-kit';
 import type {
   PublicGremium,
   PublicProtocolSummary,
@@ -30,14 +31,12 @@ import type {
 } from './public-protocols.models';
 import { PublicProtocolsService } from './public-protocols.service';
 import {
-  longDate,
-  meetingDate,
   resultKey,
   semesterLabel,
-  shortDate,
   topCounts,
   useNoindex,
 } from './public-protocols.util';
+import { dayMonthYear, parseDay, weekdayDate } from '@shared/date-format';
 
 /** The size of one page of the list. */
 export const PAGE_SIZE = 20;
@@ -66,6 +65,7 @@ interface SemesterGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    HighlightComponent,
     RouterLink,
     TranslatePipe,
     ButtonComponent,
@@ -85,10 +85,17 @@ export class PublicProtocolsComponent {
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);
 
-  /** The text in the search field. */
-  protected readonly query = signal('');
   /** The search text of the loaded list. */
   protected readonly appliedQuery = signal('');
+  /** The search field: from the first character, Enter searches at once. */
+  protected readonly search = liveSearch<never>({
+    minLength: 1,
+    debounceMs: SEARCH_DEBOUNCE,
+    run: (q) => {
+      this.appliedQuery.set(q);
+      this.reload();
+    },
+  });
   protected readonly gremiumFilter = signal<readonly string[]>(
     this.route.snapshot.queryParamMap.getAll('gremium'),
   );
@@ -103,7 +110,6 @@ export class PublicProtocolsComponent {
   protected readonly error = signal(false);
 
   private seq = 0;
-  private timer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly hasFilters = computed(
     () =>
@@ -162,7 +168,6 @@ export class PublicProtocolsComponent {
 
   constructor() {
     useNoindex();
-    inject(DestroyRef).onDestroy(() => this.clearTimer());
     this.api.gremien().subscribe({
       next: (rows) => this.gremien.set(rows),
       error: () => this.gremien.set([]),
@@ -172,21 +177,6 @@ export class PublicProtocolsComponent {
 
   protected semesterName(key: string): string {
     return semesterLabel(key, (k, p) => this.i18n.translate(k, p));
-  }
-
-  protected onQuery(value: string): void {
-    this.query.set(value);
-    this.clearTimer();
-    this.timer = setTimeout(() => this.applyQuery(), SEARCH_DEBOUNCE);
-  }
-
-  /** Enter in the field: search now. */
-  protected applyQuery(): void {
-    this.clearTimer();
-    const q = this.query().trim();
-    if (q === this.appliedQuery()) return;
-    this.appliedQuery.set(q);
-    this.reload();
   }
 
   protected onGremien(ids: readonly string[]): void {
@@ -200,8 +190,7 @@ export class PublicProtocolsComponent {
   }
 
   protected resetFilters(): void {
-    this.clearTimer();
-    this.query.set('');
+    this.search.sync('');
     this.appliedQuery.set('');
     this.gremiumFilter.set([]);
     this.semesterFilter.set('');
@@ -270,23 +259,14 @@ export class PublicProtocolsComponent {
     };
   }
 
-  private clearTimer(): void {
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = null;
-  }
-
   // Template helpers.
 
-  protected parts(text: string): TextPart[] {
-    return highlight(text, this.appliedQuery());
-  }
-
-  protected dateOf(p: PublicProtocolSummary): Date {
-    return meetingDate(p.date);
+  protected dateOf(p: PublicProtocolSummary): Date | null {
+    return parseDay(p.date);
   }
 
   protected when(p: PublicProtocolSummary): string {
-    return longDate(p.date, this.i18n.formatLocale());
+    return weekdayDate(p.date, this.i18n.formatLocale());
   }
 
   protected resultLabel(result: PublicVoteResult): TranslationKey {
@@ -318,8 +298,8 @@ export class PublicProtocolsComponent {
   /** "PDF · 212 KB · finalisiert 02.10.2026". */
   protected pdfMeta(p: PublicProtocolSummary): string {
     const parts = ['PDF'];
-    if (p.pdfSize !== null) parts.push(formatSize(p.pdfSize, this.i18n.formatLocale()));
-    const finalized = shortDate(p.finalizedAt, this.i18n.formatLocale());
+    if (p.pdfSize !== null) parts.push(formatBytes(p.pdfSize, this.i18n.formatLocale(), 'file'));
+    const finalized = dayMonthYear(p.finalizedAt, this.i18n.formatLocale());
     if (finalized) {
       parts.push(this.i18n.translate('publicProtocols.card.finalized', { date: finalized }));
     }
