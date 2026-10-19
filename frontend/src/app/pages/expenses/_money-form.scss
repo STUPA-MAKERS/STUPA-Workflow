@@ -1,0 +1,353 @@
+// The form of a booking or a transfer (boards "Buchung hinzufügen", "Übertrag buchen"). It
+// replaces the detail sheet of the bookings page, or fills the bottom sheet of a phone.
+//
+// A head (title and a round close button), a body that scrolls in two equal columns of
+// sections, and a foot that stays at the end (delete on the left; cancel and the main
+// action on the right). In the bottom sheet the sheet brings the head and the side gutter.
+// The two form components `@use` this file.
+@use 'field' as f;
+
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mf {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.mf--pane {
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.mf--sheet {
+  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
+  --color-surface-sunken: var(--color-surface-3);
+}
+
+.mf__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+}
+.mf__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+
+.mf__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-1) var(--space-6) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container-type: inline-size;
+}
+/* In the bottom sheet the sheet body gives the side gutter. */
+.mf--sheet .mf__body {
+  padding: var(--space-1) 0 var(--space-5);
+}
+
+/* Two equal columns; one column when the body is narrower than two fields side by side. */
+.mf__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+@container (max-width: 40rem) {
+  .mf__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.mf__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.mf__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.mf__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+/* The section heading: a caption in the accent text. */
+.mf__secTitle {
+  margin: 0;
+  padding: 0;
+  color: var(--color-accent-text);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mf__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* The amount: large, in mono, at the end of the field. */
+.mf__amount ::ng-deep .cur--labelled {
+  min-height: 4.5rem;
+  padding-bottom: 10px;
+}
+.mf__amount ::ng-deep .cur__input {
+  min-height: 2.25rem;
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+  font-weight: var(--fw-medium);
+}
+.mf__amount ::ng-deep .cur__symbol {
+  font-family: var(--font-mono);
+  font-size: 1.25rem;
+  line-height: 2.25rem;
+  font-weight: var(--fw-medium);
+}
+
+/* A field this form builds itself (the application search, the note): the filled box
+   of the kit fields with the label inside. */
+.mf__box {
+  @include f.box;
+  @include f.box-labelled;
+}
+.mf__label {
+  @include f.label;
+}
+.mf__box:focus-within .mf__label {
+  @include f.label-focus;
+}
+.mf__control {
+  @include f.control;
+  @include f.control-labelled;
+}
+.mf__control::-webkit-search-cancel-button {
+  display: none;
+}
+.mf__box--area {
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 26px;
+  cursor: text;
+}
+.mf__area {
+  display: block;
+  width: 100%;
+  min-height: 4.5rem;
+  margin: 0;
+  padding: 0 var(--space-4) 10px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  resize: vertical;
+}
+@media (max-width: 768px) {
+  .mf__area {
+    font-size: 1rem;
+  }
+}
+
+/* A value the form takes from elsewhere (the invoice, the booking): the selection
+   surface with a lock before the label. */
+.mf__locked {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--field-height);
+  padding: 8px var(--space-4);
+  border-radius: var(--radius-field);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.mf__lockedLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-accent-text);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: var(--fw-medium);
+}
+.mf__lockedValue {
+  font-size: var(--fs-md);
+  line-height: 1.375rem;
+  overflow-wrap: anywhere;
+}
+
+/* The application search: a combobox in a filled box, its hits below. */
+.mf__app {
+  position: relative;
+  min-width: 0;
+}
+.mf__app .mf__control {
+  padding-inline-end: 2.75rem;
+}
+.mf__searchIcon {
+  position: absolute;
+  right: var(--space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+.mf__picked {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: 24px var(--space-2) 8px var(--space-4);
+  color: var(--color-text);
+  font-size: var(--fs-md);
+}
+.mf__picked > .ell {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.mf__suggest {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  inset-inline: 0;
+  top: calc(100% + var(--space-1));
+  max-height: 14rem;
+  margin: 0;
+  padding: 6px 0;
+  overflow-y: auto;
+  list-style: none;
+  border-radius: var(--radius-field);
+  background: var(--color-surface-3);
+  box-shadow: var(--shadow-elevated);
+}
+.mf__option {
+  display: block;
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--space-4);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.mf__option:hover,
+.mf__option:focus-visible {
+  background: var(--color-surface-4);
+  outline: 0;
+}
+.mf__option:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-focus-ring);
+}
+
+/* One choice of a few fixed values (the payment method): pill chips of control height.
+   The global `.chip` gives the edge and the selection colour. */
+.mf__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.mf__chip.chip {
+  height: var(--control-height);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  color: var(--color-text);
+  font-size: var(--fs-body);
+}
+.mf__chip.chip.on {
+  padding-inline-start: var(--space-3);
+  border-color: var(--color-accent-text);
+  color: var(--color-on-selected);
+}
+.mf__chip app-icon {
+  pointer-events: none;
+}
+
+.mf__error {
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+
+/* The foot: delete at the start, cancel and the main action at the end. */
+.mf__foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6) var(--space-5);
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.mf--sheet .mf__foot {
+  padding: var(--space-3) 0;
+  border-radius: 0;
+  background: var(--color-surface-2);
+}
+.mf__footEnd {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-inline-start: auto;
+}
+.mf__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+/* The main action: 56px high. A disabled one is grey, so it never reads as a pale
+   accent. */
+.mf__primary {
+  --control-height-lg: 3.5rem;
+  min-width: 0;
+}
+.mf__primary ::ng-deep .btn:disabled {
+  opacity: 1;
+  filter: none;
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+}
+
+/* One pane at a time the page scrolls: the foot sticks to the end of the viewport. */
+.mf--page .mf__body {
+  overflow: visible;
+}
+.mf--page .mf__foot {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+}

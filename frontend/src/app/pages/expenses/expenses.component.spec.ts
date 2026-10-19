@@ -1848,7 +1848,7 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: null, kind: null, q: null, view: null },
+        queryParams: { budget: null, kind: null, q: null, view: null, new: null, invoice: null },
         queryParamsHandling: 'merge',
         replaceUrl: true,
       }),
@@ -1860,7 +1860,14 @@ describe('ExpensesComponent (batch/bulk)', () => {
     expect(nav).toHaveBeenLastCalledWith(
       [],
       expect.objectContaining({
-        queryParams: { budget: 'b-1', kind: 'income', q: 'flyer', view: null },
+        queryParams: {
+          budget: 'b-1',
+          kind: 'income',
+          q: 'flyer',
+          view: null,
+          new: null,
+          invoice: null,
+        },
       }),
     );
     nav.mockRestore();

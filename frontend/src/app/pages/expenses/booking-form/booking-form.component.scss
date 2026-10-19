@@ -1,1 +1,31 @@
-@use '../../budget/finance-form';
+@use '../money-form';
+
+/* The sub-bookings of a parent booking: one row each, then their sum. */
+.bf__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+}
+.bf__rowBody {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.bf__rowMeta {
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+.bf__sum {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+}
+.bf__addSub {
+  align-self: flex-start;
+}

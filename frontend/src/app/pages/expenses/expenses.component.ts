@@ -509,13 +509,18 @@ export class ExpensesComponent implements OnDestroy {
       this.adoptCreateLink(qp);
     });
 
-    // Write the filters back, so the URL always states what the list shows.
+    // Write the filters back, so the URL always states what the list shows. The write
+    // also drops the create link: it runs after `adoptCreateLink` and replaces its
+    // navigation, and a merge would carry `new=booking` on to the next navigation, so the
+    // form of a new booking opened again after its save.
     effect(() => {
       const queryParams = {
         budget: this.budgetId() || null,
         kind: this.kind() || null,
         q: this.q().trim() || null,
         view: this.tab() === 'transfers' ? 'transfers' : null,
+        new: null,
+        invoice: null,
       };
       untracked(() =>
         void this.router.navigate([], {

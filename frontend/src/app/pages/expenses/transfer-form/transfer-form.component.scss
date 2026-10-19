@@ -1,37 +1,106 @@
-@use '../../budget/finance-form';
+@use '../money-form';
 
-/* "So wird gebucht": one card per booking of the transfer. */
-.tf__leg {
+.tf {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-5);
   min-width: 0;
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
 }
-.ff--sheet .tf__leg {
-  background: var(--color-surface-3);
+
+/* "Von → nach": the two legs side by side with the arrow between them. */
+.tf__legs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
+  gap: var(--space-2);
+  align-items: stretch;
 }
-.tf__kind {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
+.tf__leg {
+  min-width: 0;
 }
-.tf__name {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  overflow-wrap: anywhere;
+.tf__mid {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.tf__amount {
-  margin-top: var(--space-2);
-  font-size: var(--fs-xl);
-}
-.tf__amount--in {
+.tf__arrow {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+  background: var(--color-selected);
   color: var(--color-accent-text);
 }
-.tf__later {
-  margin: 0;
-  padding: 0 var(--space-1);
+.tf__swap {
+  align-self: flex-start;
+}
+.tf__swapInline {
+  display: none;
+}
+/* Narrow: the legs stack, the arrow points down, "Tauschen" sits beside it. */
+@container (max-width: 40rem) {
+  .tf__legs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tf__mid {
+    gap: var(--space-2);
+  }
+  .tf__arrow {
+    transform: rotate(90deg);
+  }
+  .tf__swapInline {
+    display: inline-flex;
+  }
+  .tf__swap {
+    display: none;
+  }
+}
+
+/* "Frei danach" in a leg card: the free amount now struck through, then after. */
+.tf__free {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-3);
+  margin-top: var(--space-1);
+  padding-top: 10px;
+  border-top: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  font-weight: var(--fw-regular);
+}
+.tf__before {
+  color: var(--color-text-subtle);
+}
+
+/* A leg of a transfer under correction: fixed, on the selection surface. */
+.tf__fixed {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: var(--space-4) 18px;
+  border-radius: var(--radius-xl);
+  background: var(--color-selected);
+  color: var(--color-on-selected);
+}
+.tf__fixedName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.tf__swatch {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+.tf__code {
+  padding-inline-start: 20px;
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
