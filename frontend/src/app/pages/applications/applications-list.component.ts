@@ -77,7 +77,7 @@ import {
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
-import { LIVE_SEARCH_DEBOUNCE_MS } from '@shared/live-search';
+import { debounced } from '@shared/debounced';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
 import { applicationReads } from './application-reads';
@@ -249,8 +249,8 @@ export class ApplicationsListComponent implements OnDestroy {
    * load of the next page in that time still sends the applied search only.
    */
   readonly searchText = signal('');
-  /** Debounce timer of the search (about 250 ms, like /expenses). */
-  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The search writes the URL after a pause (about 250 ms, like /expenses). */
+  private readonly applySearch = debounced(() => this.navigate({ q: this.searchText().trim() || null }));
   readonly typeId = signal('');
   /** The chosen flow states. `state` repeats in the URL and in the request (A4). */
   readonly states = signal<readonly string[]>([]);
@@ -524,7 +524,6 @@ export class ApplicationsListComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.frame.fill.set(false);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
   }
 
   /** Application title from the system title field, with the fallback "untitled". */
@@ -598,11 +597,7 @@ export class ApplicationsListComponent implements OnDestroy {
    */
   onSearch(value: string): void {
     this.searchText.set(value);
-    if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(
-      () => this.navigate({ q: this.searchText().trim() || null }),
-      LIVE_SEARCH_DEBOUNCE_MS,
-    );
+    this.applySearch();
   }
 
   /**
@@ -666,7 +661,7 @@ export class ApplicationsListComponent implements OnDestroy {
     for (const f of this.filters) f.signal.set(f.empty);
     this.states.set([]);
     this.searchText.set('');
-    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.applySearch.cancel();
     this.navigate({ ...this.filterParams(true), state: null });
   }
 

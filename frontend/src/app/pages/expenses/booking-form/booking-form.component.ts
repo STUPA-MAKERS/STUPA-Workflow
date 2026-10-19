@@ -5,7 +5,6 @@ import {
   inject,
   input,
   output,
-  signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
@@ -20,10 +19,11 @@ import {
   SegmentedComponent,
   type SegmentedOption,
 } from '@stupa-makers/ui-kit';
+import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
-import { CostCentreTreeComponent } from '../../budget/cost-centre-tree.component';
+import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
 import type {
   BudgetTreeNode,
   Expense,
@@ -38,6 +38,7 @@ import {
   signedEur,
 } from '../../budget/expense-display.util';
 import type { ExpenseDialogsState } from '../expense-dialogs.state';
+import { NoteComponent } from '@shared/ui/note/note.component';
 
 /** Which booking the form writes: a new one, or the one in `state.editing`. */
 export type BookingFormMode = 'create' | 'edit';
@@ -80,8 +81,9 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NoteComponent,
     ButtonComponent,
-    CostCentreTreeComponent,
+    CostCentrePickerComponent,
     CurrencyInputComponent,
     DatepickerComponent,
     FormsModule,
@@ -117,8 +119,6 @@ export class BookingFormComponent {
   readonly removeSub = output<Expense>();
 
   /** The cost-centre tree of the field is open. */
-  protected readonly treeOpen = signal(false);
-
   protected readonly kindOptions = computed<SegmentedOption[]>(() => [
     { value: 'expense', label: this.i18n.translate('expenses.kind.expense') },
     { value: 'income', label: this.i18n.translate('expenses.kind.income') },
@@ -156,11 +156,6 @@ export class BookingFormComponent {
     this.mode() === 'create' ? this.state().newBudgetId() : this.state().editBudgetId(),
   );
 
-  protected readonly ccValue = computed(() => {
-    const id = this.ccId();
-    return id ? costCentreLabel(this.costCentres(), id, null) : null;
-  });
-
   /** "Fachschaften › Maschinenbau": the cost centre of a fixed value. */
   protected readonly ccTrail = computed(() => {
     const e = this.editingRow();
@@ -181,9 +176,7 @@ export class BookingFormComponent {
     if (this.mode() === 'create') return '';
     const e = this.editingRow();
     if (!e) return '';
-    const date = new Date(e.createdAt).toLocaleDateString(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-    } as Intl.DateTimeFormatOptions);
+    const date = formatMoment(e.createdAt, this.i18n.formatLocale(), 'mediumDate');
     return e.actorName
       ? this.i18n.translate('expenses.form.editedBy', {
           description: e.description,
@@ -210,7 +203,6 @@ export class BookingFormComponent {
     if (!id) return;
     if (this.mode() === 'create') this.state().onPickBudget(id);
     else this.state().editBudgetId.set(id);
-    this.treeOpen.set(false);
   }
 
   protected setMethod(value: string): void {

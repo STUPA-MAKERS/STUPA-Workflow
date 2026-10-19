@@ -387,17 +387,8 @@ a.cd__linkTitle:hover {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
 }
-.cd__bar-track {
+.cd__checkBar {
   width: 64px;
-  height: 4px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: var(--color-surface-3);
-}
-.cd__bar-fill {
-  display: block;
-  height: 100%;
-  background: var(--color-accent);
 }
 /* An empty list takes no gap of the section, so "Punkt hinzufügen" sits under the
    heading at the same distance as the content of the other sections. */

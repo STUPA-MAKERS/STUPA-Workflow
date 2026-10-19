@@ -53,6 +53,7 @@ import {
 } from '@shared/ui/filter-select/filter-select.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@shared/ui/row-menu/row-menu.component';
+import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
@@ -141,6 +142,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     MarkdownViewComponent,
     NoteComponent,
     RowMenuComponent,
+    SegBarComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     SkeletonComponent,
@@ -369,10 +371,6 @@ export class TodoCardDetailComponent {
   readonly items = computed(() => [...(this.card()?.checklistItems ?? [])].sort((a, b) => a.position - b.position));
   readonly openItems = computed(() => this.items().filter((i) => !i.done));
   readonly doneItems = computed(() => this.items().filter((i) => i.done));
-  readonly progress = computed(() => {
-    const total = this.items().length;
-    return total ? Math.round((this.doneItems().length / total) * 100) : 0;
-  });
 
   readonly linkedKeys = computed(
     () => new Set((this.card()?.links ?? []).map((l) => linkKey(l.kind, l.targetId))),

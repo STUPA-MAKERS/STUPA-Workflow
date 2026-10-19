@@ -30,46 +30,28 @@
         <div class="ff__col">
           <fieldset class="ff__sec">
             <legend class="sec ff__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</legend>
-            @for (which of ['from', 'to']; track which) {
-              @let id = which === 'from' ? d.tFromId() : d.tToId();
-              @let v = label(id);
-              <div class="ff__box">
-                <span class="ff__label" [id]="'tf-' + which">{{
-                  (which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t
-                }} <span class="text-danger" aria-hidden="true">*</span></span>
-                <button
-                  type="button"
-                  class="ff__pick"
-                  [attr.aria-labelledby]="'tf-' + which + ' tf-' + which + '-v'"
-                  [attr.aria-expanded]="picking() === which"
-                  (click)="toggle($any(which))"
-                >
-                  @if (v) {
-                    @if (v.color) {
-                      <span class="ff__swatch" aria-hidden="true" [style.background]="v.color"></span>
-                    }
-                    <span class="ell" [id]="'tf-' + which + '-v'" [title]="v.name"
-                      >{{ v.name }} <span class="ff__mono">{{ v.path }}</span></span
-                    >
-                  } @else {
-                    <span class="ell ff__placeholder" [id]="'tf-' + which + '-v'">{{
-                      'expenses.field.costCentrePlaceholder' | t
-                    }}</span>
-                  }
-                  <app-icon [name]="picking() === which ? 'up' : 'down'" [size]="18" />
-                </button>
-              </div>
-              @if (picking() === which) {
-                <div class="ff__tree">
-                  <app-cost-centre-tree
-                    [nodes]="tree()"
-                    [selectedId]="id"
-                    [ariaLabel]="(which === 'from' ? 'expenses.transferFrom' : 'expenses.transferTo') | t"
-                    (picked)="pick($any(which), $event)"
-                  />
-                </div>
-              }
-            }
+            <app-cost-centre-picker
+              swatch
+              required
+              text="namePath"
+              [label]="'expenses.transferFrom' | t"
+              [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+              unknownLabel="—"
+              [nodes]="tree()"
+              [value]="d.tFromId()"
+              (picked)="pick('from', $event)"
+            />
+            <app-cost-centre-picker
+              swatch
+              required
+              text="namePath"
+              [label]="'expenses.transferTo' | t"
+              [placeholder]="'expenses.field.costCentrePlaceholder' | t"
+              unknownLabel="—"
+              [nodes]="tree()"
+              [value]="d.tToId()"
+              (picked)="pick('to', $event)"
+            />
             @if (d.tFromId() && d.tFromId() === d.tToId()) {
               <p class="ff__error" role="alert">{{ 'expenses.transfers.samePair' | t }}</p>
             }
@@ -129,10 +111,7 @@
                 <span class="tf__amount tf__amount--in mono">+{{ p.amount }}</span>
               </div>
             } @else {
-              <p class="ff__info">
-                <app-icon name="repeat" [size]="16" />
-                <span>{{ 'expenses.transfers.previewEmpty' | t }}</span>
-              </p>
+              <app-note icon="repeat" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.transfers.previewEmpty' | t }}</app-note>
             }
             <p class="tf__later">{{ 'expenses.transfers.later' | t }}</p>
           </section>
@@ -157,10 +136,7 @@
               <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
               <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
             </div>
-            <p class="ff__info">
-              <app-icon name="lock" [size]="16" />
-              <span>{{ 'expenses.transfers.pairLocked' | t }}</span>
-            </p>
+            <app-note icon="lock" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.transfers.pairLocked' | t }}</app-note>
           </fieldset>
         </div>
         <div class="ff__col">

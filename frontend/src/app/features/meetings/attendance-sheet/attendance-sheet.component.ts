@@ -12,13 +12,13 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import type { Attendance, AttendanceStatus, Meeting, Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
 import {
   RowMenuComponent,
@@ -128,7 +128,7 @@ const SELF_CHOICES: readonly { value: Choice; label: TranslationKey }[] = [
   imports: [
     EmptyStateComponent,
     TruncatedDirective,
-    FormsModule,
+    SearchPillComponent,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

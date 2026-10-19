@@ -7,6 +7,13 @@
   gap: var(--space-2);
   min-width: 0;
 }
+/* A cell of a grid: the box is the cell, the tree a row of its own below it. */
+:host(.ccp--grid) {
+  display: contents;
+}
+:host(.ccp--grid) .ccp__tree {
+  grid-column: 1 / -1;
+}
 
 .ccp__box {
   @include f.box;
@@ -54,6 +61,23 @@
 }
 .ccp__placeholder {
   color: var(--color-text-subtle);
+  /* The placeholder is a hint, not a value: one line with an ellipsis, so the empty
+     field keeps the height of the fields beside it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ccp__swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.ccp__path {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
 }
 
 .ccp__tree {
@@ -62,5 +86,5 @@
   padding: var(--space-2);
   border-radius: var(--radius-lg);
   /* One step above the surface that holds the field, like the field itself. */
-  background: var(--color-surface-sunken);
+  background: var(--ccp-tree-bg, var(--color-surface-sunken));
 }

@@ -203,58 +203,6 @@
   max-width: none;
 }
 
-/* The linked to-dos: a circle, the title over "Board · Spalte · fällig", the people. */
-.td__todos {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.td__todo {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.td__todoIcon {
-  flex: none;
-  color: var(--color-text-muted);
-}
-.td__todo--done .td__todoIcon {
-  color: var(--color-accent-text);
-}
-.td__todoText {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.td__todoTitle {
-  color: var(--color-text);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
-}
-/* The whole row opens the card. */
-.td__todoTitle::after {
-  position: absolute;
-  inset: 0;
-  content: '';
-}
-.td__todoTitle:hover {
-  text-decoration: underline;
-}
-.td__todoTitle:focus-visible {
-  outline: none;
-}
-.td__todo:focus-within {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-}
-.td__todoSub {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-
 /* ------------------------------------------------------------------ thread */
 /* Split: the columns fill the card down to its foot, and the thread fills its column.
    The log takes the height between the heading and the composer and scrolls inside. It

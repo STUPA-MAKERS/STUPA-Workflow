@@ -29,6 +29,7 @@ import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/
 import { AdminOptionsService } from '../../../pages/admin/admin-options.service';
 import { longDate } from '../meetings-display.util';
 import { PublicJoinSettingsComponent } from '../public-join/public-join-settings.component';
+import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 
 /**
  * "Sitzung anlegen" in two steps.
@@ -41,6 +42,7 @@ import { PublicJoinSettingsComponent } from '../public-join/public-join-settings
  * The Gremium list holds every Gremium for an admin and the Gremien with
  * `session.manage` for everybody else. The server refuses every other Gremium.
  */
+
 @Component({
   selector: 'app-create-meeting-dialog',
   standalone: true,
@@ -55,6 +57,7 @@ import { PublicJoinSettingsComponent } from '../public-join/public-join-settings
     DatepickerComponent,
     TimeInputComponent,
     InputComponent,
+    SegBarComponent,
   ],
   templateUrl: './create-meeting-dialog.component.html',
   styleUrl: './create-meeting-dialog.component.scss',

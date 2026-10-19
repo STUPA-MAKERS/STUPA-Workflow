@@ -6,7 +6,6 @@ import type {
   AgendaItem,
   Attendance,
   AttendanceStatus,
-  I18nMap,
   Meeting,
   MeetingVote,
   SelfAttendanceStatus,
@@ -68,12 +67,6 @@ export function countEntries(vote: MeetingVote): { key: string; value: number }[
 /** Selectable options of a vote. The fallback is the set of tally keys. */
 export function voteOptionsFor(vote: MeetingVote): string[] {
   return vote.options.length ? vote.options : Object.keys(vote.counts ?? {});
-}
-
-/** Resolve an i18n map for the given locale. The fallback is de, then the first value. */
-export function resolveI18n(map: I18nMap | null | undefined, locale: string): string {
-  if (!map) return '';
-  return map[locale] ?? map['de'] ?? Object.values(map)[0] ?? '';
 }
 
 /** Display label of a ballot option (yes→Ja …). An unknown option stays raw. */

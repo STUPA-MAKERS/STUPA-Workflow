@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { FabComponent } from '@shared/ui/fab/fab.component';
@@ -205,7 +206,7 @@ export class AdminDeadlinesComponent {
 
   protected label(p: DeadlinePolicy | null): string {
     if (!p) return '';
-    return p.label[this.i18n.locale()] ?? p.label['de'] ?? p.key;
+    return i18nLabel(p.label, this.i18n.locale(), p.key);
   }
 
   protected kindLabel(kind: DeadlineKind): string {

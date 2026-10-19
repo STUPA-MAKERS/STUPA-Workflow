@@ -28,19 +28,15 @@
           </span>
         }
       </div>
-      <label class="dd__search">
-        <app-icon name="search" [size]="17" />
-        <input
-          class="dd__searchInput"
-          type="search"
-          name="delegate-search"
-          [ngModel]="query()"
-          (ngModelChange)="search($event)"
+      <fieldset class="dd__searchBox" [disabled]="!othersOpen()">
+        <app-search-pill
+          class="dd__search"
+          size="md"
           [placeholder]="'participant.delegation.searchMember' | t"
-          [attr.aria-label]="'participant.delegation.searchMember' | t"
-          [disabled]="!othersOpen()"
+          [value]="query()"
+          (valueChange)="search($event)"
         />
-      </label>
+      </fieldset>
       @if (others().length) {
         <div class="dd__rows rowgroup rowgroup--bg3" role="radiogroup" [attr.aria-label]="'participant.delegation.others' | t">
           @for (r of others(); track r.principalId) {

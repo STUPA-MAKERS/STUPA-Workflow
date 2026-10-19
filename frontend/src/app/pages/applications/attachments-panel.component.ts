@@ -37,6 +37,7 @@ import { formatBytes } from './applications.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
 import { FileDropDirective } from '@shared/file-drop.directive';
+import { SelectionBarComponent } from '@shared/ui/selection-bar/selection-bar.component';
 
 /**
  * Attachments panel.
@@ -73,6 +74,7 @@ import { FileDropDirective } from '@shared/file-drop.directive';
     DialogComponent,
     IconComponent,
     ImageThumbComponent,
+    SelectionBarComponent,
     StatusTextComponent,
   ],
   templateUrl: './attachments-panel.component.html',
@@ -197,6 +199,10 @@ export class AttachmentsPanelComponent {
 
   isSelected(id: Uuid): boolean {
     return this.selected().has(id);
+  }
+
+  clearSelection(): void {
+    this.selected.set(new Set());
   }
 
   toggleSelect(id: Uuid, checked: boolean): void {

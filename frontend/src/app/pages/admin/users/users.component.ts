@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -238,7 +239,7 @@ export class UsersComponent {
   protected roleLabel(roleId: string): string {
     const role = this.rolesById().get(roleId);
     if (!role) return roleId;
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+    return i18nLabel(role.label, this.i18n.locale(), role.key);
   }
 
   /** The global roles of one principal as one line, for example "Administration, Mitglied". */

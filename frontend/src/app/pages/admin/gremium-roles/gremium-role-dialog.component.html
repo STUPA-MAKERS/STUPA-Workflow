@@ -75,7 +75,7 @@
     }
 
     @if (saveFailed()) {
-      <p class="rd__error" role="alert">{{ 'admin.common.saveFailed' | t }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ 'admin.common.saveFailed' | t }}</app-note>
     }
     <button type="submit" hidden></button>
   </form>

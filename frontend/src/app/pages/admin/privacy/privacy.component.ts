@@ -6,9 +6,11 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
+import { downloadBlob } from '@shared/download.util';
 import { liveSearch } from '@shared/live-search';
 import {
   AvatarComponent,
+  ListItemComponent,
   PageHeaderComponent,
   SearchPillComponent,
   StatusTextComponent,
@@ -72,6 +74,7 @@ const PERSON_HITS = 6;
     PageHeaderComponent,
     SearchPillComponent,
     AvatarComponent,
+    ListItemComponent,
     StatusTextComponent,
     RowMenuComponent,
   ],
@@ -234,12 +237,7 @@ export class PrivacyComponent {
     if (!email) return;
     this.api.downloadAuskunft(email).subscribe({
       next: (blob) => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'auskunft.xlsx';
-        a.click();
-        URL.revokeObjectURL(url);
+        downloadBlob(blob, 'auskunft.xlsx');
         this.toast.success(this.i18n.translate('admin.privacy.auskunftDone'));
       },
       error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),

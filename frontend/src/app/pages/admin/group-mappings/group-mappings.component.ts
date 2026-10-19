@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import type { Observable } from 'rxjs';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
@@ -320,11 +321,11 @@ export class GroupMappingsComponent {
   }
 
   private roleName(role: Role): string {
-    return role.label[this.i18n.locale()] ?? role.label['de'] ?? role.key;
+    return i18nLabel(role.label, this.i18n.locale(), role.key);
   }
 
   private gremiumRoleName(role: GremiumRole): string {
-    return role.name[this.i18n.locale()] ?? role.name['de'] ?? role.key;
+    return i18nLabel(role.name, this.i18n.locale(), role.key);
   }
 
   /** The i18n key of one text of one section, e.g. `admin.groupMappings.role.create`. */

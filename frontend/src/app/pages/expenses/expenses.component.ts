@@ -23,6 +23,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  CheckboxComponent,
   IconComponent,
   MEDIA,
   SegmentedComponent,
@@ -43,6 +44,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   SearchPillComponent,
+  SelectionBarComponent,
   SideSheetComponent,
   SkeletonComponent,
   StatusTextComponent,
@@ -131,6 +133,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
     BookingFormComponent,
     BulkPanelComponent,
     ButtonComponent,
+    CheckboxComponent,
     CostCentreTreeComponent,
     EmptyStateComponent,
     FabComponent,
@@ -145,6 +148,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
     ScrollFadeDirective,
     SearchPillComponent,
     SegmentedComponent,
+    SelectionBarComponent,
     SideSheetComponent,
     SkeletonComponent,
     StatusTextComponent,

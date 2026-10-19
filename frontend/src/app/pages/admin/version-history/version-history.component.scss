@@ -89,15 +89,6 @@
   border-top: 1px solid var(--color-border);
 }
 
-.vh__confirm {
-  margin: 0;
-}
-.vh__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-}
-
 /* A narrow sheet (a phone) or a narrow column (the side column of the form editor, the
    inspector of the flow editor): one column. Version and state, then time and person,
    then the actions, each on a line of its own; "Version 2" and the time never break

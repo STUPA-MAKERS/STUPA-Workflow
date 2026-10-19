@@ -195,7 +195,7 @@ describe('MeetingsTimelineService', () => {
     expect(calls[7].direction).toBe('upcoming');
     expect(calls[7].q).toBeUndefined();
     svc.onSearch('z');
-    TestBed.resetTestingModule(); // ngOnDestroy clears the pending timer
+    TestBed.resetTestingModule(); // the destroy stops the pending search
     jest.advanceTimersByTime(400);
     expect(calls).toHaveLength(9);
   });

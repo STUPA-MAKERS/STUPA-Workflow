@@ -27,9 +27,9 @@
         size="md"
         [clearable]="true"
         [placeholder]="'publicProtocols.search' | t"
-        [value]="query()"
-        (valueChange)="onQuery($event)"
-        (commit)="applyQuery()"
+        [value]="search.text()"
+        (valueChange)="search.set($event)"
+        (commit)="search.flush()"
       />
       <div class="pp__chips">
         <app-filter-select

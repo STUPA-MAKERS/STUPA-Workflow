@@ -19,8 +19,8 @@
   background: transparent;
 }
 /* The tree below the cost-centre field is on the card (or the sheet), so it steps up too. */
-.bp__card .ff__tree {
-  background: var(--color-surface-3);
+.bp__card {
+  --ccp-tree-bg: var(--color-surface-3);
 }
 .bp__hint {
   margin: 0;

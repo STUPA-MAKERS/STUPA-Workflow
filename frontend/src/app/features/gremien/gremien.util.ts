@@ -11,6 +11,7 @@ import type {
   LocalizedText,
 } from '@core/api/gremien.service';
 import { toFormatLocale } from '@core/i18n/i18n.service';
+import { resolveI18n } from '@shared/forms/i18n-text';
 
 // ------------------------------------------------------------------ roles
 
@@ -28,8 +29,7 @@ export function localized(
   locale: string,
   fallback = '',
 ): string {
-  if (!text) return fallback;
-  return text[locale] || text['de'] || Object.values(text).find(Boolean) || fallback;
+  return resolveI18n(text, locale) || fallback;
 }
 
 // ------------------------------------------------------------------ months

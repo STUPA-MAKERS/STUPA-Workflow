@@ -91,10 +91,7 @@
         </dl>
       </section>
 
-      <p class="fd__hint">
-        <app-icon name="lock" [size]="16" />
-        <span>{{ 'expenses.transfers.pairLocked' | t }}</span>
-      </p>
+      <app-note icon="lock">{{ 'expenses.transfers.pairLocked' | t }}</app-note>
     </div>
 
     <div class="fd__col">
@@ -107,7 +104,7 @@
           </div>
           <div>
             <dt>{{ 'expenses.detail.createdAt' | t }}</dt>
-            <dd class="mono">{{ createdAt() }}</dd>
+            <dd class="mono">{{ t.createdAt | ldate: 'medium' }}</dd>
           </div>
         </dl>
       </section>

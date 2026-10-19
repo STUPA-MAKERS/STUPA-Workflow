@@ -109,14 +109,6 @@ export class BookingDetailComponent {
     return m ? this.i18n.translate(`expenses.paymentMethod.${m}`) : null;
   });
 
-  /** "Konrad Pfeiffer · 25.09.2026, 10:14": who booked it and when. */
-  protected readonly createdAt = computed(() =>
-    new Date(this.expense().createdAt).toLocaleString(this.i18n.formatLocale(), {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }),
-  );
-
   /** A parent booking: its amount is the sum of its sub-bookings. */
   protected readonly isParent = computed(() => (this.expense().childCount ?? 0) > 0);
   /** The sub-booking section: a parent, or a booking that can get its first one. */

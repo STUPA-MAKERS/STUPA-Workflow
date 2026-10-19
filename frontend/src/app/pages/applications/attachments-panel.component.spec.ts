@@ -1,6 +1,6 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { fireEvent, render, screen } from '@testing-library/angular';
+import { fireEvent, render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { USE_MOCK_API } from '@core/api/api.config';
@@ -486,13 +486,22 @@ describe('AttachmentsPanelComponent', () => {
     detectChanges();
 
     expect(cmp.selectedCount()).toBe(0);
-    expect(document.querySelector('.att__bulkbar')).toBeNull();
+    expect(screen.queryByRole('toolbar', { name: 'Auswahl' })).toBeNull();
 
     cmp.toggleSelect('a', true);
     detectChanges();
     expect(cmp.isSelected('a')).toBe(true);
     expect(cmp.selectedCount()).toBe(1);
-    expect(document.querySelector('.att__bulkbar')).not.toBeNull();
+    const bar = screen.getByRole('toolbar', { name: 'Auswahl' });
+    expect(within(bar).getByRole('status')).toHaveTextContent('1 ausgewählt');
+    expect(within(bar).getByRole('button', { name: 'Auswahl löschen' })).toBeInTheDocument();
+
+    // The clear button of the bar drops the selection.
+    await userEvent.click(within(bar).getByRole('button', { name: 'Auswahl aufheben' }));
+    detectChanges();
+    expect(cmp.selectedCount()).toBe(0);
+    expect(screen.queryByRole('toolbar', { name: 'Auswahl' })).toBeNull();
+    cmp.toggleSelect('a', true);
 
     cmp.toggleSelect('a', false);
     expect(cmp.isSelected('a')).toBe(false);

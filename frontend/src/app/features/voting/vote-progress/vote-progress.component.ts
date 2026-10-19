@@ -15,12 +15,18 @@ import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
  *
  * A vote without a meeting has no attendance. Its turnout counts against the eligible
  * voters (`basis="eligible"`).
+ *
+ * `size="fat"` is the vote card of a meeting: a thicker bar, the line in body text and
+ * the percent in the accent.
  */
 @Component({
   selector: 'app-vote-progress',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [SegBarComponent, TranslatePipe],
+  host: {
+    '[class.vp--fat]': "size() === 'fat'",
+  },
   templateUrl: './vote-progress.component.html',
   styleUrl: './vote-progress.component.scss',
 })
@@ -35,6 +41,7 @@ export class VoteProgressComponent {
   readonly secret = input(false);
   /** The counts are still hidden: show the fixed line. */
   readonly hidden = input(true);
+  readonly size = input<'normal' | 'fat'>('normal');
 
   protected readonly percent = computed(() => {
     const total = this.total();

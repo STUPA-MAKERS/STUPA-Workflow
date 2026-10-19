@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
   inject,
   signal,
@@ -19,6 +18,7 @@ import {
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { liveSearch } from '@shared/live-search';
 import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { formatSize } from '../apply/apply.util';
 import { highlight, type TextPart } from '../search/highlight';
@@ -85,10 +85,17 @@ export class PublicProtocolsComponent {
   private readonly i18n = inject(I18nService);
   private readonly route = inject(ActivatedRoute);
 
-  /** The text in the search field. */
-  protected readonly query = signal('');
   /** The search text of the loaded list. */
   protected readonly appliedQuery = signal('');
+  /** The search field: from the first character, Enter searches at once. */
+  protected readonly search = liveSearch<never>({
+    minLength: 1,
+    debounceMs: SEARCH_DEBOUNCE,
+    run: (q) => {
+      this.appliedQuery.set(q);
+      this.reload();
+    },
+  });
   protected readonly gremiumFilter = signal<readonly string[]>(
     this.route.snapshot.queryParamMap.getAll('gremium'),
   );
@@ -103,7 +110,6 @@ export class PublicProtocolsComponent {
   protected readonly error = signal(false);
 
   private seq = 0;
-  private timer: ReturnType<typeof setTimeout> | null = null;
 
   protected readonly hasFilters = computed(
     () =>
@@ -162,7 +168,6 @@ export class PublicProtocolsComponent {
 
   constructor() {
     useNoindex();
-    inject(DestroyRef).onDestroy(() => this.clearTimer());
     this.api.gremien().subscribe({
       next: (rows) => this.gremien.set(rows),
       error: () => this.gremien.set([]),
@@ -172,21 +177,6 @@ export class PublicProtocolsComponent {
 
   protected semesterName(key: string): string {
     return semesterLabel(key, (k, p) => this.i18n.translate(k, p));
-  }
-
-  protected onQuery(value: string): void {
-    this.query.set(value);
-    this.clearTimer();
-    this.timer = setTimeout(() => this.applyQuery(), SEARCH_DEBOUNCE);
-  }
-
-  /** Enter in the field: search now. */
-  protected applyQuery(): void {
-    this.clearTimer();
-    const q = this.query().trim();
-    if (q === this.appliedQuery()) return;
-    this.appliedQuery.set(q);
-    this.reload();
   }
 
   protected onGremien(ids: readonly string[]): void {
@@ -200,8 +190,7 @@ export class PublicProtocolsComponent {
   }
 
   protected resetFilters(): void {
-    this.clearTimer();
-    this.query.set('');
+    this.search.sync('');
     this.appliedQuery.set('');
     this.gremiumFilter.set([]);
     this.semesterFilter.set('');
@@ -268,11 +257,6 @@ export class PublicProtocolsComponent {
       q: this.appliedQuery(),
       limit: PAGE_SIZE,
     };
-  }
-
-  private clearTimer(): void {
-    if (this.timer !== null) clearTimeout(this.timer);
-    this.timer = null;
   }
 
   // Template helpers.

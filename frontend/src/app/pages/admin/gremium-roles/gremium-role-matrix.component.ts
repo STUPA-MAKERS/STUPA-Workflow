@@ -11,6 +11,7 @@ import {
 import type { Uuid } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import { CapitalizePipe } from '@shared/pipes/capitalize.pipe';
@@ -144,7 +145,7 @@ export class GremiumRoleMatrixComponent implements OnInit {
   }
 
   protected label(r: GremiumRole): string {
-    return r.name[this.i18n.locale()] ?? r.name['de'] ?? r.key;
+    return i18nLabel(r.name, this.i18n.locale(), r.key);
   }
 
   protected permLabel(p: string): TranslationKey {

@@ -486,22 +486,14 @@
           <tr>
             <th scope="row">{{ s.label }}</th>
             <td>
-              <input
-                type="checkbox"
-                class="bt__box"
-                [checked]="isAccepted(s.value)"
-                (change)="toggleState('accepted', s.value)"
-                [attr.aria-label]="('budget.tree.accepted' | t) + ': ' + s.label"
-              />
+              <app-checkbox [ngModel]="isAccepted(s.value)" (ngModelChange)="toggleState('accepted', s.value)"
+                ><span class="sr-only">{{ ('budget.tree.accepted' | t) + ': ' + s.label }}</span></app-checkbox
+              >
             </td>
             <td>
-              <input
-                type="checkbox"
-                class="bt__box"
-                [checked]="isDenied(s.value)"
-                (change)="toggleState('denied', s.value)"
-                [attr.aria-label]="('budget.tree.denied' | t) + ': ' + s.label"
-              />
+              <app-checkbox [ngModel]="isDenied(s.value)" (ngModelChange)="toggleState('denied', s.value)"
+                ><span class="sr-only">{{ ('budget.tree.denied' | t) + ': ' + s.label }}</span></app-checkbox
+              >
             </td>
           </tr>
         }

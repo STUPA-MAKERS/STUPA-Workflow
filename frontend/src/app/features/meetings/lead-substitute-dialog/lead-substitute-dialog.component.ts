@@ -9,7 +9,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { FormsModule } from '@angular/forms';
 import {
   type Delegation,
   type DelegationRecipient,
@@ -31,6 +30,7 @@ import { TruncatedDirective } from '@shared/truncated.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 
 /** Above this many substitutes the dialog shows a search field. */
 const SEARCH_ABOVE = 5;
@@ -58,7 +58,7 @@ const SEARCH_ABOVE = 5;
     EmptyStateComponent,
     SkeletonComponent,
     TruncatedDirective,
-    FormsModule,
+    SearchPillComponent,
     TranslatePipe,
     AvatarComponent,
     ButtonComponent,

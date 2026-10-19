@@ -361,17 +361,3 @@
 .fd__neg {
   color: var(--color-danger);
 }
-
-/* A short note with an icon (the locked pair of a transfer). */
-.fd__hint {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  margin: 0;
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
-

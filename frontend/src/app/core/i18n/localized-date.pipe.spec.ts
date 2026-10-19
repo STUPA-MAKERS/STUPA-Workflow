@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { LocalizedDatePipe } from './localized-date.pipe';
+import { LocalizedDatePipe, formatMoment } from './localized-date.pipe';
 import { I18nService } from './i18n.service';
 import type { Locale } from './translations';
 
@@ -91,5 +91,17 @@ describe('LocalizedDatePipe', () => {
     const v = new Date(2026, 9, 13, 17, 0);
     expect(pipe.transform(v, 'weekdayDate')).toBe('Di., 13.10.2026');
     expect(pipe.transform(v, 'weekdayShort')).toBe('Di., 13.10.2026, 17:00');
+  });
+});
+
+describe('formatMoment', () => {
+  it('gives the text of the pipe for TS that builds a string', () => {
+    TestBed.configureTestingModule({});
+    const pipe = pipeFor('de');
+    const at = '2026-09-25T10:14:00';
+    expect(formatMoment(at, 'de-DE')).toBe(pipe.transform(at));
+    expect(formatMoment(at, 'de-DE', 'mediumDate')).toBe(pipe.transform(at, 'mediumDate'));
+    expect(formatMoment(null, 'de-DE')).toBe('');
+    expect(formatMoment('kein Datum', 'de-DE')).toBe('');
   });
 });

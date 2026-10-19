@@ -4,10 +4,11 @@
 <div
   class="inv"
   [class.inv--split]="split()"
-  (dragenter)="onDragEnter($event)"
-  (dragover)="onDragOver($event)"
-  (dragleave)="onDragLeave($event)"
-  (drop)="onDrop($event)"
+  appFileDrop
+  #drop="appFileDrop"
+  appFileDropExclude="app-file-drop-zone"
+  [appFileDropEnabled]="canManage()"
+  (appFileDrop)="onFilesDropped($event)"
 >
   <input #fileInput type="file" accept="application/pdf,.pdf" hidden (change)="onFilePicked($event)" />
   <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
@@ -243,14 +244,9 @@
     </div>
   </app-list-detail>
 
-  @if (dragActive()) {
+  @if (drop.active()) {
     <!-- Board Fin-Rechnung-Ablegen: the whole page is the drop target. -->
-    <div class="inv__dropOverlay" aria-hidden="true">
-      <div class="inv__dropInner">
-        <span class="inv__dropIcon"><app-icon name="upload" [size]="24" /></span>
-        <span class="inv__dropTitle">{{ 'invoices.drop' | t }}</span>
-      </div>
-    </div>
+    <app-drop-overlay fit="view" [label]="'invoices.drop' | t" />
   }
 </div>
 

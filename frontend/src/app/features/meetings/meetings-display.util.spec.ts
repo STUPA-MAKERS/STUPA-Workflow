@@ -13,7 +13,6 @@ import {
   meetingLine,
   weekdayDate,
   memberAttendanceKey,
-  resolveI18n,
   shortTime,
   voteOptionLabel,
   voteOptionsFor,
@@ -81,14 +80,6 @@ describe('meetings-display.util', () => {
     expect(voteOptionsFor(vote)).toEqual(['yes', 'no']);
     expect(voteOptionsFor(VOTE({ options: ['a'], counts: { b: 1 } }))).toEqual(['a']);
     expect(countEntries(VOTE())).toEqual([]);
-  });
-
-  it('resolves i18n maps with locale → de → first-value → empty fallbacks', () => {
-    expect(resolveI18n({ en: 'Open', de: 'Offen' }, 'en')).toBe('Open');
-    expect(resolveI18n({ de: 'Offen' }, 'en')).toBe('Offen');
-    expect(resolveI18n({ fr: 'Ouvert' }, 'en')).toBe('Ouvert');
-    expect(resolveI18n({}, 'en')).toBe('');
-    expect(resolveI18n(null, 'en')).toBe('');
   });
 
   it('labels vote options, falling back to the raw key when untranslated', () => {

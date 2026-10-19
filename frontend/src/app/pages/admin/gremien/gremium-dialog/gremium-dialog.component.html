@@ -142,7 +142,7 @@
     </div>
 
     @if (error()) {
-      <p class="gd__error" role="alert">{{ error() }}</p>
+      <app-note kind="error" icon="alert" role="alert">{{ error() }}</app-note>
     }
     <button type="submit" hidden></button>
   </form>

@@ -17,12 +17,15 @@ export class FileDragTracker {
   readonly active = signal(false);
   private depth = 0;
 
-  /** `accepts` is read at each event: the element takes files only while it is true. */
-  constructor(private readonly accepts: () => boolean) {}
+  /**
+   * `accepts` is read at each event: the element takes files only while it is true. It
+   * gets the event, so a host can leave a drag over one of its children alone.
+   */
+  constructor(private readonly accepts: (event: DragEvent) => boolean) {}
 
   /** The data of a file drag that this element takes, else null. */
   private take(event: DragEvent): DataTransfer | null {
-    if (!isFileDrag(event) || !this.accepts()) return null;
+    if (!isFileDrag(event) || !this.accepts(event)) return null;
     // Without `preventDefault` on dragover the browser opens the file in the tab.
     event.preventDefault();
     event.stopPropagation();
@@ -65,7 +68,9 @@ export class FileDragTracker {
  * Makes its host a drop target for files: `appFileDrop` emits the dropped files.
  *
  * `appFileDropEnabled` gates it (a permission, a state lock); while it is false, a file
- * drag passes through to the elements around the host. `active` (exported as `appFileDrop`)
+ * drag passes through to the elements around the host. `appFileDropExclude` is a CSS
+ * selector of children that take their own drops (an `app-file-drop-zone`): a drag over
+ * one of them is not counted, so the host's overlay hides there and a drop imports once. `active` (exported as `appFileDrop`)
  * is true while files hover over the host; the host shows `app-drop-overlay` then.
  * The checks of the file picker (count, size, type) stay with the host's upload: the drop
  * hands the files to the same method.
@@ -83,9 +88,12 @@ export class FileDragTracker {
 })
 export class FileDropDirective {
   readonly enabled = input(true, { alias: 'appFileDropEnabled' });
+  readonly exclude = input<string | null>(null, { alias: 'appFileDropExclude' });
   readonly dropped = output<File[]>({ alias: 'appFileDrop' });
 
-  protected readonly tracker = new FileDragTracker(() => this.enabled());
+  protected readonly tracker = new FileDragTracker(
+    (event) => this.enabled() && !this.excluded(event),
+  );
   readonly active = this.tracker.active.asReadonly();
 
   constructor() {
@@ -94,6 +102,13 @@ export class FileDropDirective {
     effect(() => {
       if (!this.enabled()) untracked(() => this.tracker.reset());
     });
+  }
+
+  /** The drag is over a child that takes its own drops. */
+  private excluded(event: DragEvent): boolean {
+    const selector = this.exclude();
+    const target = event.target;
+    return !!selector && target instanceof Element && !!target.closest(selector);
   }
 
   protected onDrop(event: DragEvent): void {

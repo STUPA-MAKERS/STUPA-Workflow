@@ -35,10 +35,13 @@
 
   @if (attachments().length) {
     @if (deleteAllowed() && selectedCount()) {
-      <div class="att__bulkbar">
-        <span class="att__bulkcount">{{ 'applications.attachments.selectedCount' | t: { count: selectedCount() } }}</span>
+      <app-selection-bar
+        inline
+        [count]="selectedCount()"
+        [countLabel]="'applications.attachments.selectedCount' | t: { count: selectedCount() }"
+        (cleared)="clearSelection()"
+      >
         <app-button
-          class="att__bulkdel"
           variant="danger"
           size="sm"
           [loading]="bulkDeleting()"
@@ -47,7 +50,7 @@
         >
           {{ 'applications.attachments.deleteSelected' | t }}
         </app-button>
-      </div>
+      </app-selection-bar>
     }
     <ul class="rowgroup att__list">
       @for (att of attachments(); track att.id) {

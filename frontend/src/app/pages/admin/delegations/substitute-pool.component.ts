@@ -14,7 +14,14 @@ import { type DelegationSubstitute, DelegationsApiService } from '@core/api/dele
 import type { Uuid } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { AvatarComponent, RowMenuComponent, SkeletonComponent, type RowMenuSection } from '@shared/ui';
+import {
+  AvatarComponent,
+  ListItemComponent,
+  RowMenuComponent,
+  SearchPillComponent,
+  SkeletonComponent,
+  type RowMenuSection,
+} from '@shared/ui';
 import {
   ButtonComponent,
   DialogComponent,
@@ -62,6 +69,8 @@ const SEARCH_LIMIT = 8;
     FormsModule,
     TranslatePipe,
     AvatarComponent,
+    ListItemComponent,
+    SearchPillComponent,
     ButtonComponent,
     DialogComponent,
     IconComponent,

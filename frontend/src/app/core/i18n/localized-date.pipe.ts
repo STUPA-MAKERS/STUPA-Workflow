@@ -31,6 +31,22 @@ const OPTIONS: Record<LocalDateFormat, Intl.DateTimeFormatOptions> = {
 };
 
 /**
+ * The localized text of a moment, as the `ldate` pipe shows it: `''` for no value or an
+ * invalid one. For TS that builds a string (a tooltip, a translated sentence); a template
+ * uses the pipe. `locale` is `I18nService.formatLocale()`.
+ */
+export function formatMoment(
+  value: string | number | Date | null | undefined,
+  locale: string,
+  format: LocalDateFormat = 'medium',
+): string {
+  if (value === null || value === undefined || value === '') return '';
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Intl.DateTimeFormat(locale, OPTIONS[format]).format(date);
+}
+
+/**
  * Localized date and time output through `Intl.DateTimeFormat`.
  *
  * The pipe follows the active UI language (`I18nService.formatLocale()`), not the
@@ -46,9 +62,6 @@ export class LocalizedDatePipe implements PipeTransform {
     value: string | number | Date | null | undefined,
     format: LocalDateFormat = 'medium',
   ): string {
-    if (value === null || value === undefined || value === '') return '';
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) return '';
-    return new Intl.DateTimeFormat(this.i18n.formatLocale(), OPTIONS[format]).format(date);
+    return formatMoment(value, this.i18n.formatLocale(), format);
   }
 }

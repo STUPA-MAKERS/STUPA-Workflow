@@ -143,35 +143,6 @@
 .al__diff {
   min-width: 0;
 }
-/* The config diff as one compact code block (board Admin-Audit-Log). */
-.al__code {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-3);
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-}
-.al__codeKey {
-  color: var(--color-text-muted);
-}
-.al__codeKey,
-.al__codeDel,
-.al__codeIns {
-  overflow-wrap: anywhere;
-}
-.al__codeDel {
-  color: var(--color-danger);
-}
-.al__codeIns {
-  color: var(--color-success);
-}
-.al__codeNone {
-  margin: 0;
-  color: var(--color-text-muted);
-}
 .al__actions {
   display: flex;
   flex-wrap: wrap;
@@ -190,15 +161,6 @@
 .al__more {
   display: flex;
   justify-content: center;
-}
-
-.al__dialogText {
-  margin: 0;
-}
-.al__dialogFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
 }
 
 /* Narrower: time and action on the first line, actor and target below. */

@@ -78,10 +78,7 @@
             </span>
           </button>
         } @else {
-          <p class="fd__hint">
-            <app-icon name="file" [size]="16" />
-            <span>{{ 'invoices.detail.noFile' | t }}</span>
-          </p>
+          <app-note icon="file">{{ 'invoices.detail.noFile' | t }}</app-note>
         }
       </section>
 

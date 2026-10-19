@@ -1,26 +1,18 @@
 <ng-template #reassignForm>
   <div class="bp__card">
-    <div class="ff__grid bp__fields">
-      <div class="ff__box">
-        <span class="ff__label" id="bp-cc">{{ 'expenses.field.costCentre' | t }}</span>
-        <button
-          type="button"
-          class="ff__pick"
-          aria-labelledby="bp-cc bp-ccv"
-          [attr.aria-expanded]="treeOpen()"
-          (click)="treeOpen.set(!treeOpen())"
-        >
-          @if (pickedCostCentre(); as v) {
-            @if (v.color) {
-              <span class="ff__swatch" aria-hidden="true" [style.background]="v.color"></span>
-            }
-            <span class="ell" id="bp-ccv" [title]="v.name">{{ v.name }}</span>
-          } @else {
-            <span class="ell ff__placeholder" id="bp-ccv">{{ 'expenses.bulk.keepValue' | t }}</span>
-          }
-          <app-icon [name]="treeOpen() ? 'up' : 'down'" [size]="18" />
-        </button>
-      </div>
+    <div class="ff__grid ff__grid--dense bp__fields">
+      <app-cost-centre-picker
+        inGrid
+        swatch
+        text="name"
+        [label]="'expenses.field.costCentre' | t"
+        [placeholder]="'expenses.bulk.keepValue' | t"
+        [allLabel]="'expenses.bulk.keepValue' | t"
+        unknownLabel="—"
+        [nodes]="tree()"
+        [value]="budgetId()"
+        (picked)="pick($event)"
+      />
       <app-input
         name="bcat"
         [label]="'expenses.field.category' | t"
@@ -29,17 +21,6 @@
         (ngModelChange)="category.set($event)"
       />
     </div>
-    @if (treeOpen()) {
-      <div class="ff__tree">
-        <app-cost-centre-tree
-          [nodes]="tree()"
-          [selectedId]="budgetId()"
-          [allLabel]="'expenses.bulk.keepValue' | t"
-          [ariaLabel]="'expenses.field.costCentre' | t"
-          (picked)="pick($event)"
-        />
-      </div>
-    }
     @if (fixedRows().length) {
       <p class="bp__hint">{{ 'expenses.bulk.reassignFixed' | t: { names: fixedNames() } }}</p>
     }

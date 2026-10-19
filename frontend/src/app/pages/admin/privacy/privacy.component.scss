@@ -71,36 +71,14 @@
   overflow-wrap: anywhere;
 }
 .pv__hits {
+  --li-hover: var(--color-selected);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.pv__hit {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: 3rem;
-  padding: var(--space-2) var(--space-3);
-  border: 0;
-  border-radius: inherit;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.pv__hit:hover {
-  background: var(--color-selected);
-  color: var(--color-on-selected);
-}
-.pv__hit:hover .pv__muted {
-  color: inherit;
-}
-.pv__hit:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
+/* The row clips the hover surface of its list item to the corners of the row group. */
+.pv__hits > li {
+  overflow: hidden;
 }
 .pv__none {
   padding: var(--space-3);

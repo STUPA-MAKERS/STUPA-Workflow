@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import type { Subscription } from 'rxjs';
 import type { I18nMap } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+import { i18nLabel } from '@shared/forms/i18n-text';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -231,7 +232,7 @@ export class UserRevokeComponent {
   }
 
   protected label(map: I18nMap, key: string): string {
-    return map[this.i18n.locale()] || map['de'] || key;
+    return i18nLabel(map, this.i18n.locale(), key);
   }
 
   protected gEntry(g: RevokeGremium): RevokeEntry {

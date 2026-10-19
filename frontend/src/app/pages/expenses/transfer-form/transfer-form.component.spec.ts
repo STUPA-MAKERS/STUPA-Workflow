@@ -160,14 +160,16 @@ describe('TransferFormComponent', () => {
   });
 
   it('opens and closes a tree with the same field, and ignores the "all" node', async () => {
-    const { form, host } = await setup('create');
+    const { form, host, user } = await setup('create');
+    const field = screen.getByRole('button', { name: /Zu Kostenstelle/ });
+    await user.click(field);
+    expect(field).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: /Hochschulsport/ })).toBeInTheDocument();
+    await user.click(field);
+    expect(field).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('button', { name: /Hochschulsport/ })).toBeNull();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const f = form as any;
-    f.toggle('to');
-    expect(f.picking()).toBe('to');
-    f.toggle('to');
-    expect(f.picking()).toBeNull();
-    f.pick('to', '');
+    (form as any).pick('to', '');
     expect(host.dialogs.tToId()).toBe('');
   });
 
