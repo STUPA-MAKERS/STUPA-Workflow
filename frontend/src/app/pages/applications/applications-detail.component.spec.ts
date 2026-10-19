@@ -252,7 +252,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(frame()).toBeNull();
     http
       .expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/attachments')
-      .flush({ id: 'd', filename: 'drop.pdf', mime: 'application/pdf', size: 1, scanned: false, is_comparison_offer: false });
+      .flush({ id: 'd', filename: 'drop.pdf', mime: 'application/pdf', size: 1, scanned: false });
     detectChanges();
     expect(screen.getByText('drop.pdf')).toBeInTheDocument();
 

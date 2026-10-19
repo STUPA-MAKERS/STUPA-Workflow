@@ -75,7 +75,6 @@ function draftOf(file: File, n: number): DraftUpload {
       mime: file.type,
       size: file.size,
       scanned: false,
-      isComparisonOffer: false,
       scanState: 'scanning',
     },
     draftToken: 'tok',

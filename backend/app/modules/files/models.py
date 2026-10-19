@@ -93,7 +93,6 @@ class Attachment(UUIDPkMixin, Base):
     storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     scanned: Mapped[bool] = mapped_column(Boolean, server_default="false")
     scan_result: Mapped[str | None] = mapped_column(Text, nullable=True)
-    is_comparison_offer: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

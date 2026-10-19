@@ -566,12 +566,10 @@ describe('mapAttachment', () => {
     mime: 'application/pdf',
     size: 2048,
     scanned: false,
-    is_comparison_offer: false,
   };
 
-  it('maps snake_case is_comparison_offer to camelCase', () => {
-    const a = mapAttachment({ ...base, is_comparison_offer: true });
-    expect(a.isComparisonOffer).toBe(true);
+  it('maps the wire attachment', () => {
+    const a = mapAttachment({ ...base });
     expect(a.filename).toBe('plan.pdf');
   });
 

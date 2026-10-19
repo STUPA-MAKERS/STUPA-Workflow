@@ -156,7 +156,6 @@ async def _add_clean_attachment(
         storage_key=storage_key,
         scanned=True,
         scan_result="clean",
-        is_comparison_offer=False,
     )
     svc.session.add(att)
     await svc.session.commit()
