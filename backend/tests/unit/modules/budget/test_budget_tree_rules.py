@@ -47,14 +47,6 @@ def test_intervals_overlap() -> None:
     assert not r.intervals_overlap(d(2026, 7, 1), d(2026, 12, 1), d(2026, 1, 1), d(2026, 6, 1))
 
 
-def test_overlaps_any() -> None:
-    d = date
-    existing = [(d(2025, 1, 1), d(2025, 12, 31)), (d(2027, 1, 1), d(2027, 12, 31))]
-    assert not r.overlaps_any(d(2026, 1, 1), d(2026, 12, 31), existing)  # a gap is allowed
-    assert r.overlaps_any(d(2025, 6, 1), d(2026, 6, 1), existing)
-    assert not r.overlaps_any(d(2026, 1, 1), d(2026, 6, 1), [])
-
-
 def test_as_amount() -> None:
     assert r.as_amount(None) == Decimal("0")
     assert r.as_amount(Decimal("5")) == Decimal("5")

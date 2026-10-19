@@ -9,7 +9,7 @@ description: Backend attachment storage for applications: multipart upload, libm
 
 **Key files:**
 - `router.py` — FastAPI routes: upload, list, signed-url, download stream, delete. The access checks mirror application read and edit. A cross-tenant request gets 404, so there is no existence oracle.
-- `service.py` — `FilesService`: `upload`, `list_for_application`, `get_attachment`, `signed_url`, `download_bytes`, `assert_editable` (state lock for an applicant or creator delete), `delete`, `delete_for_application` (GDPR), `finalize_scan` (worker callback). `max_bytes`, `_is_infected`, `_ready_attachment` (quarantine gates).
+- `service.py` — `FilesService`: `upload`, `list_for_application`, `get_attachment`, `signed_url`, `download_stream`, `assert_editable` (state lock for an applicant or creator delete), `delete`, `delete_for_application` (GDPR), `finalize_scan` (worker callback). `max_bytes`, `_is_infected`, `_ready_attachment` (quarantine gates).
 - `models.py` — `Attachment` ORM model + `MAX_ATTACHMENT_BYTES` (10 MiB) DB CHECK, the two draft CHECKs, `DRAFT_KEY_PREFIX` (`drafts/`) and `BOUND` (the `application_id IS NOT NULL` filter). `AttachmentDraftToken` holds the lifetime of a draft token.
 - `drafts.py` — draft uploads of the wizard (Z4): `DraftAttachments` (`upload`, `delete`, `token_is_valid`), `check_drafts` and `bind_drafts` (called by the application create), `hash_draft_token`, `invalid_token`, the problem codes `draft_token_invalid`, `draft_quota_exceeded`, `draft_attachments_missing`.
 - `schemas.py` — `AttachmentOut` (id/filename/mime/size/scanned/is_comparison_offer), `SignedUrlOut` (url/expiresIn).

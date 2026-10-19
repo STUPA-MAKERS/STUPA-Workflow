@@ -372,41 +372,10 @@ class FilesService:
             expiresIn=self.settings.attachment_url_ttl_seconds,
         )
 
-    async def download_bytes(
-        self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
-    ) -> tuple[bytes, str, str]:
-        """Fetch the attachment bytes from storage for the ``/download`` stream.
-
-        The method applies the same quarantine gates as ``signed_url`` (409, 410, 503). A
-        transient storage error also gives 503. The visibility gate runs BEFORE the
-        quarantine gates, so 409, 410 and 503 are no existence oracle.
-
-        A read by a principal or a member of the Gremium passes
-        ``allow_unconfirmed=False``. An unconfirmed guest submission then gives 404,
-        which mirrors the list semantics.
-
-        Returns:
-            The bytes, the filename and the MIME type for the stream response.
-        """
-        loaded = await self.get_attachment(attachment_id)
-        await self.assert_app_visible(
-            application_id_of(loaded), allow_unconfirmed=allow_unconfirmed
-        )
-        attachment = await self._ready_attachment(attachment_id)
-        # _ready_attachment guarantees both values, else it raises 410 or 503. The
-        # two asserts only help the type checker.
-        assert attachment.storage_key is not None
-        assert self.storage is not None
-        try:
-            data = await self.storage.get(attachment.storage_key)
-        except StorageError as exc:
-            raise ServiceUnavailableError("Attachment temporarily unavailable.") from exc
-        return data, attachment.filename, attachment.mime
-
     async def download_stream(
         self, attachment_id: uuid.UUID, *, allow_unconfirmed: bool = True
     ) -> tuple[AsyncIterator[bytes], str, str, int]:
-        """Return a chunk iterator instead of the full bytes of ``download_bytes``.
+        """Return a chunk iterator over the attachment bytes for the ``/download`` stream.
 
         The quarantine gates (409, 410, 503) and the visibility gate run unchanged BEFORE
         the stream starts. The method opens the storage connection eagerly, so a

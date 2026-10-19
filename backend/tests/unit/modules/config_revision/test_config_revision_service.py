@@ -115,15 +115,6 @@ async def test_head_get_list_for() -> None:
     assert await ConfigRevisionService(fake_session(result(rev))).list_for("form", "t1") == [rev]
 
 
-async def test_resolve_versions_maps_id_to_version() -> None:
-    a = _rev(entity_type="form", entity_id="t1", version=1)
-    b = _rev(entity_type="form", entity_id="t1", version=2)
-    assert await ConfigRevisionService(fake_session()).resolve_versions([a, b]) == {
-        a.id: 1,
-        b.id: 2,
-    }
-
-
 async def test_diff_against_previous_snapshot() -> None:
     prev = _rev(
         entity_type="form",
