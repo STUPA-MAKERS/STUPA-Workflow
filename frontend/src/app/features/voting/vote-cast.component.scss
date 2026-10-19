@@ -60,7 +60,7 @@
   padding: 0;
   overflow: hidden;
 }
-/* The actions at the end of the meta line of the vote: 4px between the beamer button
+/* The actions on the line of the question (the bar of the vote panel): 4px between the beamer button
    and the menu. The menu reaches into the sheet padding, so its glyph lines up with
    the end edge of the content. */
 .vc__actions {
@@ -77,7 +77,7 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: var(--space-6);
+  padding: 0 var(--space-6) var(--space-6);
   scroll-padding-block: var(--space-5);
 }
 /* The shared fade of a scroll area: an end fades only while more of the vote lies past

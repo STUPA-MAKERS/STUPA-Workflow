@@ -596,9 +596,11 @@ describe('VoteCastComponent', () => {
       expect(document.querySelector('app-vote-panel')).not.toHaveClass('vpn--flat');
     });
 
-    it('draws no bar above the vote', async () => {
+    it('opens the sheet with the question on the line of its bar, above the meta line', async () => {
       await setup({ page: { split: true } });
-      expect(document.querySelector('app-sheet-bar')).toBeNull();
+      const bar = document.querySelector('app-sheet-bar.sheet-bar--title');
+      expect(bar?.querySelector('h2')).toHaveTextContent('Soll der Antrag gefördert werden?');
+      expect(bar?.nextElementSibling).toHaveClass('vpn__meta');
     });
 
     it('tells the list about a cast and stays on the vote', async () => {

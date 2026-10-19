@@ -150,7 +150,8 @@ describe('VotePanelComponent', () => {
   it('shows no meeting line and no link for a motion without both', async () => {
     await setup({ context: { meeting: null, position: null }, vote: vote({ meetingId: null, applicationId: null }) });
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.queryByText('·')).not.toBeInTheDocument();
+    // Only the status and the rules remain, with one separator between them.
+    expect(screen.getAllByText('·')).toHaveLength(1);
   });
 
   it('shows the result of a closed vote and no ballot', async () => {
