@@ -26,8 +26,14 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import { liveSearch } from '@shared/live-search';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import {
+  ButtonComponent,
+  focusableIn,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  trapTab,
+} from '@stupa-makers/ui-kit';
 import { LINK_ICON, linkSub } from '../todos.util';
 
 type PickerKind = TodoLinkKind | 'all';
@@ -88,7 +94,7 @@ export class TodoLinkPickerComponent {
   readonly linked = input<ReadonlySet<string>>(new Set());
   readonly picked = output<TodoLinkTarget>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly chips = KIND_CHIPS;
   readonly kind = signal<PickerKind>('all');
   readonly hits = signal<TodoLinkTarget[]>([]);
@@ -223,16 +229,6 @@ export class TodoLinkPickerComponent {
     if (event.key !== 'Tab') return;
     event.stopPropagation();
     const panel = event.currentTarget as HTMLElement;
-    const focusables = [...panel.querySelectorAll<HTMLElement>('input, button:not([disabled])')];
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    const active = this.document.activeElement;
-    if (event.shiftKey && active === first) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && active === last) {
-      event.preventDefault();
-      first.focus();
-    }
+    trapTab(event, panel, { items: focusableIn(panel, 'input, button:not([disabled])') });
   }
 }

@@ -6,6 +6,8 @@ import {
   ButtonComponent,
   CurrencyInputComponent,
   IconComponent,
+  MoveButtonsComponent,
+  moveItem,
   SwitchComponent,
 } from '@stupa-makers/ui-kit';
 import {
@@ -28,7 +30,7 @@ import { formatMoney } from '../format-money';
   selector: 'app-decision-editor',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, TranslatePipe, ButtonComponent, CurrencyInputComponent, IconComponent, SwitchComponent],
+  imports: [MoveButtonsComponent, FormsModule, TranslatePipe, ButtonComponent, CurrencyInputComponent, IconComponent, SwitchComponent],
   templateUrl: './decision-editor.component.html',
   styleUrl: './decision-editor.component.scss',
 })
@@ -102,9 +104,7 @@ export class DecisionEditorComponent {
   /** Move a condition one place up (`-1`) or down (`+1`). */
   moveCondition(index: number, step: -1 | 1): void {
     const target = index + step;
-    const conditions = [...this.draft().conditions];
-    if (target < 0 || target >= conditions.length) return;
-    [conditions[index], conditions[target]] = [conditions[target], conditions[index]];
-    this.patch({ conditions });
+    if (target < 0 || target >= this.draft().conditions.length) return;
+    this.patch({ conditions: moveItem(this.draft().conditions, index, step) });
   }
 }

@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'surface';
+@use 'scroll-fade' as fade;
 
 /* One column that scrolls with the page (narrow, phone): the head, "Heute", the work
    list. Wide, the host is a pane page (`.pane-page` in styles.scss) and a grid: the list
@@ -187,32 +188,9 @@
   overscroll-behavior: contain;
   scroll-padding-block: var(--dash-fade);
 }
-.dash__panel.is-fade-start,
-.dash__todayBody.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--dash-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--dash-fade));
-}
-.dash__panel.is-fade-end,
-.dash__todayBody.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--dash-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--dash-fade));
-}
-.dash__panel.is-fade-start.is-fade-end,
-.dash__todayBody.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--dash-fade),
-    #000 calc(100% - var(--dash-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--dash-fade),
-    #000 calc(100% - var(--dash-fade)),
-    transparent
-  );
+.dash__panel,
+.dash__todayBody {
+  @include fade.fade-y(var(--dash-fade));
 }
 
 /* A title takes up to two lines in the table, then the ellipsis. */

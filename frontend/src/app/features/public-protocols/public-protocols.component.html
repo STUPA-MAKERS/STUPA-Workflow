@@ -84,9 +84,7 @@
                 <span class="pp__meta">{{ p.gremium.name }} · {{ when(p) }}</span>
                 <h3 class="pp__cardTitle">
                   <a [routerLink]="['/protokolle', p.id]">
-                    @for (part of parts(p.title); track $index) {
-                      @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} }
-                    }
+                    <app-highlight [text]="p.title" [query]="appliedQuery()" />
                   </a>
                 </h3>
               </div>
@@ -101,9 +99,7 @@
                       </span>
                     } @else {
                       <span class="pp__topTitle">
-                        @for (part of parts(top.title); track $index) {
-                          @if (part.hit) { <mark>{{ part.text }}</mark> } @else { {{ part.text }} }
-                        }
+                        <app-highlight [text]="top.title" [query]="appliedQuery()" />
                         @if (top.results.length) {
                           <span class="pp__results">
                             @for (r of top.results; track $index) {

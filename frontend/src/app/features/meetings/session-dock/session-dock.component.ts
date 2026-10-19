@@ -14,9 +14,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Attendance, Meeting, Uuid } from '@core/api/models';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { KeeperMenuComponent } from '../keeper-menu/keeper-menu.component';
 import { keeperNames } from '../keepers.util';
 import { MeetingGuestsService } from '../meeting-guests.service';
@@ -75,7 +74,7 @@ export class SessionDockComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   /** A phone opens the panels as a bottom sheet instead of a popover. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly meeting = input.required<Meeting>();
   readonly agenda = input.required<AgendaItem[]>();

@@ -1,7 +1,6 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  type ElementRef,
   type OnDestroy,
   computed,
   effect,
@@ -38,7 +37,9 @@ import {
   CurrencyInputComponent,
   DatepickerComponent,
   IconComponent,
+  InfiniteScrollDirective,
   MEDIA,
+  mediaQuery,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import {
@@ -61,7 +62,6 @@ import {
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { exportDownload } from '@shared/download.util';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
@@ -150,6 +150,7 @@ type FilterSheet = 'budget' | 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    InfiniteScrollDirective,
     AmountComponent,
     NoteComponent,
     ConfirmDialogComponent,
@@ -209,7 +210,7 @@ export class ApplicationsListComponent implements OnDestroy {
   readonly limit = 20;
 
   /** Phone width: one "more" menu in the header, filter sheets from the bottom. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);
@@ -379,8 +380,6 @@ export class ApplicationsListComponent implements OnDestroy {
   /** True while unloaded applications are left. It controls the sentinel and "load more". */
   readonly hasMore = computed(() => this.items().length < this.total());
 
-  /** Sentinel at the list end. The next load starts when it becomes visible. */
-  readonly sentinel = viewChild<ElementRef<HTMLElement>>('sentinel');
 
   /**
    * The export can carry every filter of the list except `mine`: the endpoint has no
@@ -506,23 +505,6 @@ export class ApplicationsListComponent implements OnDestroy {
     // only the panes scroll.
     effect(() => this.frame.fill.set(this.split()));
 
-    // Lazy infinite scroll: an IntersectionObserver on the sentinel loads the next page
-    // once the list end comes into view. The rootMargin acts as a prefetch. The effect
-    // re-binds whenever the sentinel appears or disappears.
-    effect((onCleanup) => {
-      const el = this.sentinel()?.nativeElement;
-      // Without a DOM API (SSR or tests) there is no observer. The "load more" button
-      // then stays as the fallback.
-      if (!el || typeof IntersectionObserver === 'undefined') return;
-      const obs = new IntersectionObserver(
-        (entries) => {
-          if (entries.some((e) => e.isIntersecting)) this.loadMore();
-        },
-        { rootMargin: '400px' },
-      );
-      obs.observe(el);
-      onCleanup(() => obs.disconnect());
-    });
   }
 
   ngOnDestroy(): void {

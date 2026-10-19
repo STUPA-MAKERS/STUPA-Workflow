@@ -22,7 +22,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Meeting, Uuid, VoteListItem, VoteStatus } from '@core/api/models';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
@@ -39,7 +39,6 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { liveSearch } from '@shared/live-search';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { VotingPageService } from './voting-page.service';
@@ -157,7 +156,7 @@ export class VotingComponent implements OnDestroy {
   private readonly page = inject(VotingPageService);
   private readonly frame = inject(PageFrameService);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   /** The list-detail layout, for its split state. */
   private readonly layout = viewChild(ListDetailLayoutComponent);

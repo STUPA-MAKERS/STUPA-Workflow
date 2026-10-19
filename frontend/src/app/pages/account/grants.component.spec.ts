@@ -231,52 +231,25 @@ describe('AccountGrantsComponent', () => {
     const { cmp, fixture } = await setup({ canMcp: true });
     await userEvent.click(screen.getByRole('button', { name: 'MCP-Konfiguration kopieren' }));
     expect(writeText).toHaveBeenCalledWith(cmp.setupJson());
-    await writeText.mock.results[0].value;
+    await fixture.whenStable();
     fixture.detectChanges();
-    expect(cmp.copied()).toBe(true);
     expect(screen.getByRole('button', { name: 'Kopiert' })).toBeInTheDocument();
+    expect(screen.getByText('Kopiert', { selector: '[aria-live]' })).toBeInTheDocument();
   });
 
-  it('keeps "Kopiert" for two seconds after the last copy, and clears the timer on destroy', async () => {
-    const writeText = jest.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    // The fake clock starts after the render: `whenStable` waits on real timers.
-    const { cmp, fixture } = await setup({ canMcp: true });
-    jest.useFakeTimers();
-    try {
-      cmp.copySetup();
-      await writeText.mock.results[0].value;
-      cmp.copySetup();
-      await writeText.mock.results[1].value;
-      expect(cmp.copied()).toBe(true);
-      jest.advanceTimersByTime(2000);
-      expect(cmp.copied()).toBe(false);
-      cmp.copySetup();
-      await writeText.mock.results[2].value;
-      fixture.destroy();
-      jest.advanceTimersByTime(2000);
-      expect(cmp.copied()).toBe(true);
-    } finally {
-      jest.useRealTimers();
-    }
-  });
-
-  it('marks a failed copy as not copied', async () => {
+  it('keeps the label when the copy is refused', async () => {
     const writeText = jest.fn(() => Promise.reject(new Error('denied')));
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
-    const { cmp } = await setup({ canMcp: true });
-    cmp.copySetup();
-    await Promise.resolve();
-    await Promise.resolve();
-    expect(cmp.copied()).toBe(false);
+    const { fixture } = await setup({ canMcp: true });
+    await userEvent.click(screen.getByRole('button', { name: 'MCP-Konfiguration kopieren' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'MCP-Konfiguration kopieren' })).toBeInTheDocument();
   });
 
-  it('copies nothing without the setup', async () => {
-    const writeText = jest.fn(() => Promise.resolve());
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+  it('shows no copy button without the setup', async () => {
     const { cmp } = await setup({ canMcp: false });
-    cmp.copySetup();
-    expect(writeText).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'MCP-Konfiguration kopieren' })).toBeNull();
     expect(cmp.installCommand()).toBe('');
   });
 
@@ -315,7 +288,10 @@ describe('AccountGrantsComponent', () => {
 
   it('tolerates a missing clipboard API', async () => {
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
-    const { cmp } = await setup({ canMcp: true });
-    expect(() => cmp.copySetup()).not.toThrow();
+    const { fixture } = await setup({ canMcp: true });
+    await userEvent.click(screen.getByRole('button', { name: 'MCP-Konfiguration kopieren' }));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'MCP-Konfiguration kopieren' })).toBeInTheDocument();
   });
 });

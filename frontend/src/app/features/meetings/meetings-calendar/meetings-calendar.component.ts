@@ -32,8 +32,7 @@ import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.componen
 import type { Seg } from '@shared/ui/seg-bar/seg-bar.component';
 import { SegBarComponent } from '@shared/ui/seg-bar/seg-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import { MeetingDialogsService } from '../meeting-dialogs.service';
 import { meetingDay, meetingTimeText } from '../meetings-display.util';
@@ -148,7 +147,7 @@ export class MeetingsCalendarComponent {
   readonly create = output<void>();
 
   /** Wide (>= 1200px): the panel beside the grid, and the page does not scroll. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
+  readonly wide = mediaQuery(MEDIA.wide);
 
   private readonly now = inject(OVERVIEW_NOW);
   /** The day of today. A timer moves it on at midnight (`scheduleMidnight`). */

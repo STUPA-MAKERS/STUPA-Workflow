@@ -24,6 +24,7 @@ import {
 import {
   ButtonComponent,
   DialogComponent,
+  FilePickerComponent,
   IconComponent,
   InputComponent,
   SegmentedComponent,
@@ -116,6 +117,7 @@ function emptyForm(): VariantForm {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -496,10 +498,10 @@ export class AdminCdVariantsComponent {
    * and for the square slot a type other than PNG, JPEG or WebP. A square file then loads
    * as an image, for the preview and the size check.
    */
-  onFileSelected(input: HTMLInputElement): void {
+  onFileSelected(files: File[]): void {
     const draft = this.logoDraft();
     if (!draft) return;
-    const file = input.files?.[0] ?? null;
+    const file = files[0] ?? null;
     this.revokePreview();
     this.logoError.set(null);
     if (file && file.size > MAX_CD_LOGO_BYTES) {

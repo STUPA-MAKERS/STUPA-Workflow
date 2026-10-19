@@ -171,7 +171,7 @@
       (ngModelChange)="rejectReason.set($event)"
     ></textarea>
   </label>
-  <div dialog-footer class="pv__dialogFoot">
+  <div dialog-footer>
     <app-button variant="text" (click)="rejecting.set(null)">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" (click)="doReject()">{{ 'admin.privacy.reject' | t }}</app-button>
   </div>

@@ -1,6 +1,6 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
-@use '../../shared/ui/scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
 :host {

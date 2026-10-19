@@ -146,17 +146,15 @@
             />
           </div>
           <!-- A note can have more than one line: a textarea keeps the line breaks. -->
-          <label class="ff__box ff__box--area" for="invoice-note">
-            <span class="ff__label">{{ 'invoices.field.note' | t }}</span>
+          <app-textarea [label]="'invoices.field.note' | t">
             <textarea
               id="invoice-note"
-              class="ff__area"
               name="note"
               rows="2"
               [ngModel]="h.newNote()"
               (ngModelChange)="h.newNote.set($event)"
             ></textarea>
-          </label>
+          </app-textarea>
         } @else {
           <div class="ff__grid">
             <app-input
@@ -217,17 +215,15 @@
               (valueChange)="setStatus($event)"
             />
           </div>
-          <label class="ff__box ff__box--area" for="invoice-enote">
-            <span class="ff__label">{{ 'invoices.field.note' | t }}</span>
+          <app-textarea [label]="'invoices.field.note' | t">
             <textarea
               id="invoice-enote"
-              class="ff__area"
               name="enote"
               rows="2"
               [ngModel]="h.editNote()"
               (ngModelChange)="h.editNote.set($event)"
             ></textarea>
-          </label>
+          </app-textarea>
         }
       </div>
     </div>

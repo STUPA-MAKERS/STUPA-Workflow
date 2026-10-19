@@ -1,4 +1,5 @@
 import { Directive, input, output } from '@angular/core';
+import { matchesMedia, MEDIA } from '@stupa-makers/ui-kit';
 
 /**
  * Press and hold select mode for a mobile card list.
@@ -38,7 +39,7 @@ export class PressSelectDirective {
 
   /** Report a touch-first device. A separate method lets a test stub the result. */
   protected coarsePointer(): boolean {
-    return window.matchMedia('(pointer: coarse)').matches;
+    return matchesMedia(MEDIA.coarse);
   }
 
   private static isInteractive(target: EventTarget | null): boolean {

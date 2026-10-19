@@ -1,7 +1,7 @@
 // The closed field: the filled field of the ui-kit (`_field.scss`), as high as a text
-// field, with a chevron. The open list: the option menu of the app (`_option-menu.scss`).
+// field, with a chevron. The open list: the option menu of the ui-kit (`_option-menu.scss`).
 @use 'field' as f;
-@use '../option-menu' as om;
+@use 'option-menu' as om;
 
 :host {
   display: block;

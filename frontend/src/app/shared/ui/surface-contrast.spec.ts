@@ -16,6 +16,9 @@ const TOKENS = readFileSync(
 );
 const scss = (file: string) => readFileSync(join(__dirname, file), 'utf8');
 const globalStyles = () => readFileSync(join(__dirname, '../../../styles.scss'), 'utf8');
+/** The global skeleton styles of the ui-kit, which `styles.scss` uses. */
+const kitSkeleton = () =>
+  readFileSync(join(__dirname, '../../../../vendor/ui-kit/src/styles/skeleton.scss'), 'utf8');
 
 function channel(c: number): number {
   const s = c / 255;
@@ -87,7 +90,8 @@ describe('text on surface 3', () => {
   it('the skeleton blocks take a fill from the text colour, so they show on every surface', () => {
     // A block in a surface colour vanished on that surface (the row menu is surface 3);
     // a share of the text colour shows on all of them, and no menu needs an override.
-    expect(globalStyles()).toMatch(
+    expect(globalStyles()).toMatch(/\n@use 'skeleton';/);
+    expect(kitSkeleton()).toMatch(
       /\n\.skel \{[^}]*--skel-fill: color-mix\(in srgb, var\(--color-text\) 9%, transparent\);/,
     );
     expect(scss('skeleton/skeleton.component.scss')).not.toMatch(/\n\.skel \{\s*background/);

@@ -61,26 +61,14 @@
 
 /* The disclosure of the diff: a text button with a chevron, as wide as its words. */
 .vh__toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-height: 2rem;
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--color-accent-text);
-  font: inherit;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semibold);
-  cursor: pointer;
+  --button-padding-inline: var(--space-2);
+  --button-font-size: var(--fs-sm);
+  --button-hover-bg: var(--color-surface-3);
 }
-.vh__toggle:hover {
-  background: var(--color-surface-3);
-}
-.vh__toggle:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 0;
+/* The chevron trails the words. The text sits in a span, because the kit button floats a
+   first-child icon to the start; the span drops the template space, so the gap is a margin. */
+.vh__toggle app-icon {
+  margin-inline-start: var(--space-1);
 }
 
 .vh__diff {

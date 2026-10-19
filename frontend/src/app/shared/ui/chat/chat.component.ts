@@ -21,13 +21,16 @@ import { NgTemplateOutlet } from '@angular/common';
 import { DomSanitizer, type SafeHtml } from '@angular/platform-browser';
 import {
   ButtonComponent,
+  ChipComponent,
+  copyText,
   FileViewerComponent,
   IconComponent,
   MEDIA,
+  mediaQuery,
   SegmentedComponent,
-  ToastService,
   type FileViewerItem,
   type SegmentedOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { API_BASE_URL } from '@core/api/api.config';
 import type { PersonRef } from '@core/api/models';
@@ -37,7 +40,6 @@ import type { TranslationKey } from '@core/i18n/translations';
 import { markdownToSafeHtml } from '@shared/markdown/markdown.util';
 import { FileDragTracker, isFileDrag } from '@shared/file-drop.directive';
 import { PressSelectDirective } from '@shared/press-select.directive';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AvatarComponent } from '../avatar/avatar.component';
 import { DropOverlayComponent } from '../drop-overlay/drop-overlay.component';
 import { ImageThumbComponent, inlineUrl, isThumbImage } from '../image-thumb/image-thumb.component';
@@ -179,6 +181,7 @@ function writeStore(key: string, value: string | null): void {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ChipComponent,
     ConfirmDialogComponent,
     DropOverlayComponent,
     EmptyStateComponent,
@@ -258,8 +261,8 @@ export class ChatComponent {
   /** Read the thread again: a file of a sent message is still in the scan. */
   readonly refresh = output<void>();
 
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
-  private readonly coarse = mediaQuerySignal('(pointer: coarse)');
+  protected readonly phone = mediaQuery(MEDIA.phone);
+  private readonly coarse = mediaQuery(MEDIA.coarse);
   /** The full-screen viewer over the previewable files of one message. */
   protected readonly viewerOpen = signal(false);
   protected readonly viewerIndex = signal(0);
@@ -770,7 +773,7 @@ export class ChatComponent {
     }
     afterNextRender(
       () => {
-        const buttons = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.chat__draftX'));
+        const buttons = Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.chat__draft button'));
         const next = buttons[Math.min(at, buttons.length - 1)];
         (next ?? this.composerInput()?.nativeElement)?.focus();
       },
@@ -1006,7 +1009,6 @@ export class ChatComponent {
 
   protected copy(msg: ChatMessage): void {
     this.menuFor.set(null);
-    const clipboard = navigator.clipboard as Clipboard | undefined;
-    if (clipboard) void clipboard.writeText(msg.body).catch(() => undefined);
+    void copyText(msg.body);
   }
 }

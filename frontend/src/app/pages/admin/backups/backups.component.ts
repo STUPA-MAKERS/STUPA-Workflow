@@ -11,6 +11,7 @@ import {
   type ColumnDef,
   DataTableComponent,
   DialogComponent,
+  FilePickerComponent,
   IconComponent,
   InputComponent,
   ToastService,
@@ -59,6 +60,7 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FilePickerComponent,
     SectionHeaderComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -274,9 +276,8 @@ export class BackupsComponent implements OnDestroy {
     });
   }
 
-  protected upload(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
+  protected upload(files: File[]): void {
+    const file = files[0];
     if (!file) return;
     this.busy.set(true);
     this.api.importBackup(file).subscribe({
@@ -284,12 +285,8 @@ export class BackupsComponent implements OnDestroy {
         this.rows.update((rows) => [row, ...rows]);
         this.busy.set(false);
         this.toast.success(this.i18n.translate('admin.backups.toast.imported'));
-        input.value = '';
       },
-      error: () => {
-        this.busy.set(false);
-        input.value = '';
-      },
+      error: () => this.busy.set(false),
     });
   }
 

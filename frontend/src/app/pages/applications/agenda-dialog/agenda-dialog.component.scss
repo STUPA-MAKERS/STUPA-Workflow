@@ -1,4 +1,4 @@
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 @use '../../../shared/ui/dialog-form' as df;
 
 /* The host adds no box; a closed dialog takes no gap in a flex column of the page. */

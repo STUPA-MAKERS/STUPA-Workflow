@@ -19,9 +19,8 @@ import { NoteComponent } from '@shared/ui/note/note.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { liveSearch } from '@shared/live-search';
-import { ButtonComponent, IconComponent } from '@stupa-makers/ui-kit';
+import { ButtonComponent, HighlightComponent, IconComponent } from '@stupa-makers/ui-kit';
 import { formatBytes } from '@shared/format-bytes';
-import { highlight, type TextPart } from '../search/highlight';
 import type {
   PublicGremium,
   PublicProtocolSummary,
@@ -64,6 +63,7 @@ interface SemesterGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    HighlightComponent,
     RouterLink,
     TranslatePipe,
     ButtonComponent,
@@ -258,10 +258,6 @@ export class PublicProtocolsComponent {
   }
 
   // Template helpers.
-
-  protected parts(text: string): TextPart[] {
-    return highlight(text, this.appliedQuery());
-  }
 
   protected dateOf(p: PublicProtocolSummary): Date | null {
     return parseDay(p.date);

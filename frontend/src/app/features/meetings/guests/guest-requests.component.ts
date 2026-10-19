@@ -3,8 +3,7 @@ import type { Meeting, MeetingGuest } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { AvatarComponent } from '@shared/ui/avatar/avatar.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { MeetingGuestsService, guestName } from '../meeting-guests.service';
 import { TruncatedDirective } from '@shared/truncated.directive';
 import { clock } from '@shared/date-format';
@@ -28,7 +27,7 @@ const JUST_NOW_MS = 60_000;
 export class GuestRequestsComponent {
   private readonly i18n = inject(I18nService);
   protected readonly guests = inject(MeetingGuestsService);
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   readonly meeting = input.required<Meeting>();
   /** The time "now" for "gerade eben"; a spec fixes it. */

@@ -1,9 +1,9 @@
 import type { ActivatedRouteSnapshot, ViewTransitionInfo } from '@angular/router';
-import { MEDIA } from '@stupa-makers/ui-kit';
+import { MEDIA, matchesMedia } from '@stupa-makers/ui-kit';
 
 /** True when the person asks the system for reduced motion. */
 export function reducedMotion(): boolean {
-  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  return matchesMedia(MEDIA.reducedMotion);
 }
 
 type TransitionDocument = Document & { startViewTransition?: (update: () => void) => unknown };
@@ -60,7 +60,7 @@ export function routeMotion(
  * not show, and names the kind on `<html data-motion>` for the styles in `styles.scss`.
  */
 export function onRouteViewTransition({ transition, from, to }: ViewTransitionInfo): void {
-  const phone = window.matchMedia?.(MEDIA.phone).matches ?? false;
+  const phone = matchesMedia(MEDIA.phone);
   const kind = reducedMotion() ? 'none' : routeMotion(routePath(from), routePath(to), phone);
   if (kind === 'none') {
     transition.skipTransition();

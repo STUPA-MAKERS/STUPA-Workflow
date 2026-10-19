@@ -11,9 +11,9 @@ import {
   IconComponent,
   InputComponent,
   MEDIA,
+  mediaQuery,
   ToastService,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import type { MailPreview, MailTemplate } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
@@ -74,7 +74,7 @@ export class MailTemplatesComponent {
   private readonly toast = inject(ToastService);
 
   /** Phone: a chip picks the template instead of the list column. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   private readonly templates_ = signal<MailTemplate[]>([]);
   readonly templates = this.templates_.asReadonly();
   // Select by key, not by ID. A builtin template has no database ID.

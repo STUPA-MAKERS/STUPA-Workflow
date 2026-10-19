@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 /* The session page is a pane page that runs edge to edge: it takes the free height of
    the main column of the shell (`flex: 1 1 0`, no height from the viewport), and pulls

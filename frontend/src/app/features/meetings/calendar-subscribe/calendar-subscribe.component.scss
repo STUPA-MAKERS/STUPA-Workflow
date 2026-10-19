@@ -1,3 +1,5 @@
+@use 'option-menu' as om;
+
 :host {
   display: contents;
 }
@@ -12,21 +14,9 @@
 
 /* Desktop: a popover in the top layer, under its anchor. */
 .cs--pop {
-  position: fixed;
-  inset: auto;
-  z-index: var(--z-dropdown);
   width: min(26rem, calc(100vw - 16px));
   max-height: min(32rem, calc(100vh - 16px));
-  margin: 0;
-  overflow-y: auto;
-  padding: var(--space-4) var(--space-5) var(--space-5);
-  border: 0;
-  border-radius: var(--radius-xl);
-  background: var(--color-surface-3);
-  box-shadow: var(--shadow-elevated);
-}
-.cs--pop:focus {
-  outline: none;
+  @include om.menu($padding: var(--space-4) var(--space-5) var(--space-5), $radius: var(--radius-xl));
 }
 /* The popover shows only once it is placed (the frame adds `cs--placed` right after it
    wrote the place), so no frame paints it at the corner of the viewport. Outside the top
@@ -42,18 +32,7 @@
 
 /* Phone: the top-layer box of the bottom sheet has no box of its own. */
 .cs__layer {
-  position: fixed;
-  inset: 0;
-  width: auto;
-  height: auto;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  overflow: visible;
-  border: 0;
-  background: transparent;
-  color: inherit;
+  @include om.layer;
 }
 .cs--sheet {
   position: relative;
@@ -106,12 +85,4 @@
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-danger-subtle);
-}
-.cs__live {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }

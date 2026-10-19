@@ -75,7 +75,7 @@
             <h3 class="section-title mt__cap">{{ 'admin.mailTemplates.placeholders' | t }}</h3>
             <ul class="mt__chips">
               @for (p of placeholderList(); track p.key) {
-                <li><code class="mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
+                <li><code class="code-tag code-tag--outlined mt__chip mono" [title]="p.desc">{{ p.token }}</code></li>
               }
             </ul>
           </div>

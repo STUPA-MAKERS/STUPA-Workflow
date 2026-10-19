@@ -1,4 +1,4 @@
-@use '../option-menu' as menu;
+@use 'option-menu' as menu;
 
 /* The host is a flex column: the log takes the space, the composer stays below it.
    A consumer bounds the log with `--chat-log-max` (a column that scrolls as a whole),
@@ -549,39 +549,22 @@
   padding: 0;
   list-style: none;
 }
+/* The item is a flex box, so the chip in it has no line box below it. */
 .chat__draft {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-3);
+  display: flex;
   max-width: 100%;
-  min-height: 48px;
-  padding: 6px var(--space-1) 6px 6px;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-3);
 }
-.chat__draft--pending {
-  padding-inline-end: var(--space-4);
+.chat__chip {
+  --chip-gap: var(--space-3);
+  --chip-min-height: 48px;
+  --chip-padding: 6px var(--space-1) 6px 6px;
+  --chip-radius: var(--radius-md);
+  --chip-bg: var(--color-surface-3);
+  --chip-font-size: 1em;
+  --chip-x-hover-bg: color-mix(in srgb, var(--color-text) 8%, transparent);
 }
-.chat__draftX {
-  display: grid;
-  flex: none;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-}
-.chat__draftX:hover {
-  background: color-mix(in srgb, var(--color-text) 8%, transparent);
-  color: var(--color-text);
-}
-.chat__draftX:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 1px;
+.chat__draft--pending .chat__chip {
+  --chip-padding: 6px var(--space-4) 6px 6px;
 }
 .chat__spinner {
   display: grid;

@@ -6,13 +6,12 @@ import { AuthService } from '@core/auth/auth.service';
 import { PrefetchService } from '@core/cache/prefetch.service';
 import { SwUpdatePromptComponent } from '@core/pwa/sw-update-prompt.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import { MEDIA, ToastComponent } from '@stupa-makers/ui-kit';
+import { MEDIA, mediaQuery, ToastComponent } from '@stupa-makers/ui-kit';
 import { HelpService } from '../features/help/help.service';
 import { ReportDialogComponent } from '../features/help/report-dialog/report-dialog.component';
 import { CommandPaletteComponent } from '../features/search/command-palette.component';
 import { BottomBarComponent } from './bottom-bar/bottom-bar.component';
 import { LoadBarComponent } from './load-bar/load-bar.component';
-import { mediaQuerySignal } from './media-query';
 import { NavRailComponent } from './nav-rail/nav-rail.component';
 import { PageFrameService } from './page-frame.service';
 import { PublicHeaderComponent } from './public-header/public-header.component';
@@ -89,7 +88,7 @@ export class ShellComponent {
   });
 
   /** The viewport is a phone (<= 768px): bottom bar instead of the rail. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   /** Full-width content from route data `wide`, for example the budget tab with two sidebars. */
   readonly wide = signal(false);

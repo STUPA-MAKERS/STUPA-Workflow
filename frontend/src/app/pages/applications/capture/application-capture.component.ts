@@ -30,14 +30,15 @@ import { liveSearch } from '@shared/live-search';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
+  AutocompleteComponent,
   ButtonComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
   SegmentedComponent,
-  ToastService,
   type SegmentedOption,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
@@ -101,6 +102,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AutocompleteComponent,
     PaneFormFootComponent,
     PaneFormHeadComponent,
     NoteComponent,

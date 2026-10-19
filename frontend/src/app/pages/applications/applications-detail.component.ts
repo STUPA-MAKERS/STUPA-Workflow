@@ -82,10 +82,11 @@ import {
   DialogComponent,
   IconComponent,
   MEDIA,
-  TabsComponent,
-  ToastService,
+  mediaQuery,
   type SelectOption,
   type TabItem,
+  TabsComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import {
@@ -107,7 +108,6 @@ import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
@@ -227,7 +227,7 @@ export class ApplicationsDetailComponent {
   /** The route of the list pane: `/applications`, or `/tasks` on the tasks page. */
   readonly listPath = computed(() => this.page?.listPath() ?? ['/applications']);
   /** Phone: every header action goes into the menu. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly loading = signal(true);
   /**

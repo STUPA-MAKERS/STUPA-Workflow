@@ -22,6 +22,8 @@ import {
   CheckboxComponent,
   FileViewerComponent,
   IconComponent,
+  matchesMedia,
+  MEDIA,
   ToastService,
   type FileViewerItem,
 } from '@stupa-makers/ui-kit';
@@ -421,6 +423,6 @@ export class AttachmentsPanelComponent {
   /** Touch-first device without an iframe PDF viewer. A separate method makes it
    *  stubbable in tests. */
   protected coarsePointer(): boolean {
-    return window.matchMedia('(pointer: coarse)').matches;
+    return matchesMedia(MEDIA.coarse);
   }
 }

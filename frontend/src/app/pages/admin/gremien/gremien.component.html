@@ -76,9 +76,9 @@
                 <h3 class="section-title" [id]="'grem-set-' + g.id">
                   {{ 'admin.gremien.settings' | t }}
                 </h3>
-                <dl class="grem__grid">
+                <dl class="kv grem__grid">
                   @for (s of settings(g); track s.label) {
-                    <div class="grem__setting" [class.grem__setting--wide]="s.copyable">
+                    <div [class.kv__wide]="s.copyable">
                       <dt>{{ s.label }}</dt>
                       <dd [class.grem__copy]="s.copyable">{{ s.value }}</dd>
                     </div>

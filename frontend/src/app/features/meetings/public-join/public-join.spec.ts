@@ -161,10 +161,9 @@ describe('JoinQrComponent', () => {
     await Promise.resolve();
     await userEvent.keyboard('{Escape}');
     expect(screen.queryByRole('dialog', { name: 'QR-Code zum Beitreten' })).toBeNull();
-    const cmp = fixture.componentInstance;
     fixture.componentRef.setInput('meeting', meeting({ publicJoin: false }));
     fixture.detectChanges();
-    cmp.copy();
+    expect(screen.queryByRole('button', { name: /Link kopieren/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /QR-Code/ })).toBeNull();
   });
 

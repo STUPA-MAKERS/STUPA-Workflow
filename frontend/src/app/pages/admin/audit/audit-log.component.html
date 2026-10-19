@@ -128,7 +128,7 @@
     </app-empty-state>
   }
 
-  <div #sentinel class="al__sentinel" aria-hidden="true"></div>
+  <div class="al__sentinel" appInfiniteScroll (scrolledToEnd)="loadMore()" aria-hidden="true"></div>
 
   @if (loading() && !entries().length) {
     <app-skeleton variant="rows" [count]="6" [label]="'admin.audit.loading' | t" />

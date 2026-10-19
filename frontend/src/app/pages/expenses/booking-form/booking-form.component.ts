@@ -11,13 +11,17 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
+  AutocompleteComponent,
   ButtonComponent,
+  ChipGroupComponent,
   CurrencyInputComponent,
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  LockedFieldComponent,
   SegmentedComponent,
   type SegmentedOption,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
@@ -85,6 +89,10 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    AutocompleteComponent,
+    LockedFieldComponent,
+    ChipGroupComponent,
     SumRowComponent,
     BookingRowComponent,
     PaneFormFootComponent,
@@ -143,6 +151,8 @@ export class BookingFormComponent {
 
   /** The application search lists its hits below the field while there are hits. */
   protected readonly suggestOpen = computed(() => this.state().appCandidates().length > 0);
+  /** The text of an application hit. */
+  protected readonly appTitle = (a: { title: string }): string => a.title;
 
   protected readonly editingRow = computed(() => this.state().editing());
 

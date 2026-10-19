@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 
 /* The participant view is a pane page like the session page: it takes the free height
    of the main column of the shell (`flex: 1 1 0`) and pulls the block padding and the

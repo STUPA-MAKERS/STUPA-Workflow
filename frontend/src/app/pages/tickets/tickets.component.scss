@@ -1,5 +1,5 @@
 @use 'breakpoints' as bp;
-@use '../../shared/ui/scroll-fade' as fade;
+@use 'scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications and the voting page. */
@@ -144,13 +144,8 @@
   .tk__chips {
     @include lp.phone-chips(--tk-chip-fade, $fade-ends: false);
   }
-  .tk__chips.is-fade-start {
-    -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--tk-chip-fade));
-    mask-image: linear-gradient(to right, transparent, #000 var(--tk-chip-fade));
-  }
-  .tk__chips.is-fade-end {
-    -webkit-mask-image: linear-gradient(to left, transparent, #000 var(--tk-chip-fade));
-    mask-image: linear-gradient(to left, transparent, #000 var(--tk-chip-fade));
+  .tk__chips {
+    @include fade.fade-x(var(--tk-chip-fade), $both: false);
   }
   .tk__groupTitle {
     padding-inline: var(--space-1);

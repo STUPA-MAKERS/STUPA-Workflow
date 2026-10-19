@@ -110,12 +110,6 @@
   color: var(--color-text-muted);
 }
 
-.cs__lifetimes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-
 .cs__actions {
   display: flex;
   justify-content: flex-end;
@@ -129,7 +123,7 @@
   .cs__card {
     padding: var(--space-5) var(--space-4) var(--space-4);
   }
-  .cs__lifetimes .chip {
-    height: 2.5rem;
+  .cs__lifetimes {
+    --chip-group-height: 2.5rem;
   }
 }

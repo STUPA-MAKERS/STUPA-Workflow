@@ -2,17 +2,6 @@
 // hinzufügen"): head, scrolling body of sections, foot.
 @use '../../budget/finance-form';
 
-.cap__pickedText {
-  flex: 1 1 auto;
-  min-width: 0;
-  // A name or an e-mail is a copyable value: it wraps, it never ends in an ellipsis.
-  overflow-wrap: anywhere;
-}
-.ff__picked app-icon {
-  flex: none;
-  color: var(--color-text-muted);
-}
-
 .cap__option {
   display: flex;
   flex-direction: column;

@@ -11,7 +11,13 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { IconComponent, type IconName } from '@stupa-makers/ui-kit';
+import {
+  anchorOutOfView,
+  IconComponent,
+  type IconName,
+  showInTopLayer,
+  watchAnchoredPopover,
+} from '@stupa-makers/ui-kit';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { SkeletonComponent } from '../skeleton/skeleton.component';
 
@@ -135,24 +141,15 @@ export class RowMenuComponent {
       if (this.open() && !this.loading()) this.schedule();
     });
 
-    const inside = (root: HTMLElement | undefined, target: EventTarget | null) =>
-      !!root && target instanceof Node && root.contains(target);
-    const onPointer = (e: Event) => {
-      if (this.open() && !inside(this.host.nativeElement, e.target)) this.close(false);
-    };
-    const onViewport = (e: Event) => {
+    watchAnchoredPopover({
+      isOpen: () => this.open(),
+      inside: () => [this.host.nativeElement],
       // A scroll inside the menu itself does not move the button.
-      if (this.open() && !inside(this.menu()?.nativeElement, e.target)) this.follow();
-    };
-    document.addEventListener('pointerdown', onPointer, true);
-    window.addEventListener('scroll', onViewport, true);
-    window.addEventListener('resize', onViewport);
-    inject(DestroyRef).onDestroy(() => {
-      document.removeEventListener('pointerdown', onPointer, true);
-      window.removeEventListener('scroll', onViewport, true);
-      window.removeEventListener('resize', onViewport);
-      this.clearTimer();
+      ownScroll: () => this.menu()?.nativeElement,
+      close: () => this.close(false),
+      follow: () => this.follow(),
     });
+    inject(DestroyRef).onDestroy(() => this.clearTimer());
   }
 
   protected toggle(): void {
@@ -238,7 +235,7 @@ export class RowMenuComponent {
       this.timer = null;
       // The timer runs only while the menu is open (close clears it), so it is rendered.
       const menu = this.menu()!.nativeElement;
-      this.showPopover(menu);
+      showInTopLayer(menu);
       this.fit(menu);
       const items = this.items(menu);
       if (this.pendingFocus && items.length > 0) {
@@ -249,13 +246,6 @@ export class RowMenuComponent {
         menu.focus();
       }
     });
-  }
-
-  private showPopover(menu: HTMLElement): void {
-    const pop = menu as HTMLElement & { showPopover?: () => void };
-    if (typeof pop.showPopover === 'function' && !menu.matches(':popover-open')) {
-      pop.showPopover();
-    }
   }
 
   /** Below the trigger, at its start or its end edge (see `align`). */
@@ -275,8 +265,7 @@ export class RowMenuComponent {
    * button leaves the viewport, the menu closes.
    */
   private follow(): void {
-    const rect = this.trigger().nativeElement.getBoundingClientRect();
-    if (rect.bottom < 0 || rect.top > window.innerHeight) {
+    if (anchorOutOfView(this.trigger().nativeElement.getBoundingClientRect())) {
       this.close(false);
       return;
     }

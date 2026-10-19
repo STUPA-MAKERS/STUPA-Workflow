@@ -68,7 +68,7 @@
     }
   </div>
 
-  <div dialog-footer class="dd__foot">
+  <div dialog-footer>
     <app-button variant="text" (click)="closed.emit()">{{ 'action.cancel' | t }}</app-button>
     <app-button variant="fill" [disabled]="!canSubmit()" [loading]="busy()" (click)="submit()">
       <app-icon name="repeat" />

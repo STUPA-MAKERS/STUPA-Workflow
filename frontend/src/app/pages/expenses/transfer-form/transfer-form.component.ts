@@ -15,6 +15,8 @@ import {
   DatepickerComponent,
   IconComponent,
   InputComponent,
+  LockedFieldComponent,
+  TextareaComponent,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
@@ -62,6 +64,8 @@ interface Leg {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    LockedFieldComponent,
     TransferLegComponent,
     PaneFormFootComponent,
     PaneFormHeadComponent,

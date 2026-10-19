@@ -229,8 +229,6 @@ describe('PublicMeetingComponent', () => {
       startTime: null,
     });
     expect(fixture.componentInstance['metaLine']()).toMatch(/^Di, 06\.10\.2026$/);
-    fixture.componentInstance['startTicker']();
-    fixture.componentInstance['startTicker']();
     fixture.destroy();
   });
 

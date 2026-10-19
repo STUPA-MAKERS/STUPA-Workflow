@@ -71,7 +71,13 @@ export const appConfig: ApplicationConfig = {
       provide: LIVE_VOTE_SOURCE,
       useFactory: () => (inject(USE_MOCK_API) ? inject(MockLiveVoteSource) : inject(WsService)),
     },
-    { provide: UI_KIT_INTL, useFactory: () => uiKitIntlFromLang(inject(I18nService).locale) },
+    {
+      provide: UI_KIT_INTL,
+      useFactory: () => {
+        const i18n = inject(I18nService);
+        return uiKitIntlFromLang(i18n.locale, undefined, i18n.formatLocale);
+      },
+    },
     { provide: UI_KIT_LOADING, useFactory: () => ({ visible: inject(LoadingService).visible }) },
     provideAppInitializer(() => {
       inject(ThemeService).init();

@@ -29,12 +29,14 @@ import { ThemeService } from '@core/theme/theme.service';
 import { scanStatus } from '@shared/status-kind.util';
 import {
   ButtonComponent,
+  ChipComponent,
   DialogComponent,
   IconComponent,
   InputComponent,
   SegmentedComponent,
-  ToastService,
   type SegmentedOption,
+  TextareaComponent,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { AltchaComponent } from '../../apply/altcha.component';
 import { formatBytes } from '@shared/format-bytes';
@@ -85,6 +87,8 @@ const KIND_LABEL: Record<TicketKind, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TextareaComponent,
+    ChipComponent,
     FormsModule,
     TranslatePipe,
     AltchaComponent,

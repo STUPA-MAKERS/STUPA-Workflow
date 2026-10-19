@@ -48,11 +48,14 @@ import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import {
   ButtonComponent,
+  focusableIn,
   IconComponent,
   MEDIA,
+  mediaQuery,
   SegmentedComponent,
-  ToastService,
   type SegmentedOption,
+  ToastService,
+  trapTab,
 } from '@stupa-makers/ui-kit';
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
@@ -76,7 +79,6 @@ import {
   sortedColumns,
   type BoardFilter,
 } from '../../features/todos/todos.util';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { TodoArchiveSheetComponent } from './archive-sheet/todo-archive-sheet.component';
 import { TodoBoardPickerComponent } from './board-picker/todo-board-picker.component';
@@ -197,7 +199,7 @@ export class TodosComponent implements OnDestroy {
   private readonly live = inject(TodoLiveService);
   private readonly cache = inject(TodoCacheService);
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   private readonly params = toSignal(this.route.paramMap.pipe(map((p) => p.get('boardId'))), {
     initialValue: this.route.snapshot.paramMap.get('boardId'),
@@ -937,28 +939,15 @@ export class TodosComponent implements OnDestroy {
       this.closeCard();
       return;
     }
-    if (event.key !== 'Tab') return;
     const root = event.currentTarget as HTMLElement;
-    const items = Array.from(
-      root.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+    // Only the shown elements. The drawer itself holds the focus after the open and is not
+    // in `items`: a Tab from there (or from any element outside the list) wraps like one
+    // from an edge.
+    const items = focusableIn(
+      root,
+      'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
     ).filter((el) => el.offsetParent !== null || el === document.activeElement);
-    if (!items.length) {
-      event.preventDefault();
-      return;
-    }
-    const first = items[0];
-    const last = items[items.length - 1];
-    // The drawer itself holds the focus after the open and is not in `items`: a Tab from
-    // there (or from any element outside the list) wraps like one from an edge.
-    const active = document.activeElement as HTMLElement | null;
-    const outside = !active || !items.includes(active);
-    if (event.shiftKey && (outside || active === first)) {
-      event.preventDefault();
-      last.focus();
-    } else if (!event.shiftKey && (outside || active === last)) {
-      event.preventDefault();
-      first.focus();
-    }
+    trapTab(event, root, { items, outsideWraps: true, focusRootWhenEmpty: false });
   }
 
   moveCard(event: BoardMove): void {

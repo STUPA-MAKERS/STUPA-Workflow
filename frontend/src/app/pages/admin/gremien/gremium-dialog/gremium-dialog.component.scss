@@ -96,12 +96,6 @@
   color: var(--color-text-muted);
 }
 
-.gd__foot {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-3);
-}
-
 @container (max-width: 34rem) {
   .gd__cols {
     grid-template-columns: 1fr;

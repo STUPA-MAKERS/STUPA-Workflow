@@ -1,10 +1,8 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   type ElementRef,
   HostListener,
-  afterNextRender,
   computed,
   effect,
   inject,
@@ -18,8 +16,10 @@ import {
   ButtonComponent,
   IconComponent,
   MEDIA,
-  ToastService,
+  mediaQuery,
+  observeElementSize,
   type SelectOption,
+  ToastService,
 } from '@stupa-makers/ui-kit';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
@@ -29,7 +29,6 @@ import {
   type RowMenuSection,
 } from '@shared/ui/row-menu/row-menu.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { AdminApiService } from '../admin-api.service';
 import {
   COMPARE_OPS,
@@ -143,9 +142,9 @@ export class FlowEditorComponent {
   private readonly canvasWrap = viewChild<ElementRef<HTMLElement>>('canvasWrap');
 
   /** Wide viewport: the canvas and the inspector fill the window side by side. */
-  protected readonly wide = mediaQuerySignal(MEDIA.wide);
+  protected readonly wide = mediaQuery(MEDIA.wide);
   /** Phone: the header moves "Versionen" into a ⋮ menu. */
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   /** The inspector shows the version history instead of the selection. */
   protected readonly showVersions = signal(false);
@@ -257,17 +256,10 @@ export class FlowEditorComponent {
 
     // Measure the canvas box, so a small flow shows at its real size instead of
     // blown up to the full box.
-    const destroyRef = inject(DestroyRef);
-    afterNextRender(() => {
-      const el = this.canvasWrap()?.nativeElement;
-      if (!el || typeof ResizeObserver === 'undefined') return;
-      const ro = new ResizeObserver(([entry]) => {
-        const { width, height } = entry.contentRect;
-        this.canvasSize.set({ w: Math.round(width), h: Math.round(height) });
-      });
-      ro.observe(el);
-      destroyRef.onDestroy(() => ro.disconnect());
-    });
+    observeElementSize(
+      () => this.canvasWrap()?.nativeElement,
+      ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
+    );
 
     // The drill-down context must never point at a deleted group. Undo, redo or a
     // dissolve from another path can delete it. Fall back to the top level.

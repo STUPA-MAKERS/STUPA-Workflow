@@ -58,13 +58,15 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import {
   ButtonComponent,
+  ChipComponent,
+  copyText,
   IconComponent,
   MEDIA,
+  mediaQuery,
+  type TabItem,
   TabsComponent,
   ToastService,
-  type TabItem,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { TodoMoveSheetComponent, type MoveChoice, type MoveColumn } from '../move-sheet/todo-move-sheet.component';
@@ -78,7 +80,6 @@ import {
   relativeDays,
   splitUrl,
 } from '../todos.util';
-import { copyToClipboard } from '@shared/clipboard';
 import { isoDay, weekdayDate } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
 
@@ -127,6 +128,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ChipComponent,
     FormsModule,
     NgTemplateOutlet,
     RouterLink,
@@ -201,7 +203,7 @@ export class TodoCardDetailComponent {
    */
   readonly transferred = output<{ card: TodoCardDetail; fromBoardId: Uuid }>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly card = signal<TodoCardDetail | null>(null);
   readonly loading = signal(true);
   readonly notFound = signal(false);
@@ -997,8 +999,10 @@ export class TodoCardDetailComponent {
     if (!c) return;
     // The card only: the link stays valid when the card moves to another board.
     const url = `${location.origin}/todos?card=${c.id}`;
-    void copyToClipboard(url).then((ok) =>
-      ok ? this.toast.success(this.t('todos.card.linkCopied')) : this.toast.error(this.t('todos.card.linkFailed')),
+    void copyText(url).then((ok) =>
+      ok
+        ? this.toast.success(this.t('todos.card.linkCopied'))
+        : this.toast.error(this.t('todos.card.linkFailed')),
     );
   }
 

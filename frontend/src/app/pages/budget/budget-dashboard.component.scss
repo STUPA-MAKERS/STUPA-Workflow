@@ -1,4 +1,5 @@
 @use 'breakpoints' as bp;
+@use 'scroll-fade' as fade;
 @use 'swatch';
 
 :host {
@@ -125,32 +126,9 @@
 .bd__sheetBody {
   --bd-fade: var(--space-6);
 }
-.bd__tree.is-fade-start,
-.bd__sheetBody.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--bd-fade));
-}
-.bd__tree.is-fade-end,
-.bd__sheetBody.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--bd-fade));
-}
-.bd__tree.is-fade-start.is-fade-end,
-.bd__sheetBody.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--bd-fade),
-    #000 calc(100% - var(--bd-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--bd-fade),
-    #000 calc(100% - var(--bd-fade)),
-    transparent
-  );
+.bd__tree,
+.bd__sheetBody {
+  @include fade.fade-y(var(--bd-fade));
 }
 
 /* ------------------------------------------------------------------ tree

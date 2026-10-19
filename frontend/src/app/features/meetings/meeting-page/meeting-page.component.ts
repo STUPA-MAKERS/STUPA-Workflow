@@ -1,10 +1,7 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   ElementRef,
-  NgZone,
-  afterNextRender,
   computed,
   inject,
   input,
@@ -24,8 +21,13 @@ import type {
   Protocol,
   Uuid,
 } from '@core/api/models';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import {
+  ButtonComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  observeElementSize,
+} from '@stupa-makers/ui-kit';
 import {
   RowMenuComponent,
   type RowMenuItem,
@@ -109,8 +111,8 @@ export class MeetingPageComponent {
   private readonly agendaPane = viewChild(AgendaPaneComponent);
 
   /** Three columns from 1200px; below that the agenda is a sheet. */
-  protected readonly wide = mediaQuerySignal(MEDIA.wide);
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly wide = mediaQuery(MEDIA.wide);
+  protected readonly phone = mediaQuery(MEDIA.phone);
   /**
    * Height of the dock. On a phone the dock is fixed to the viewport, so the page keeps
    * this much room below its content.
@@ -195,18 +197,12 @@ export class MeetingPageComponent {
   protected readonly revision = signal(0);
 
   constructor() {
-    const destroyRef = inject(DestroyRef);
-    const zone = inject(NgZone);
-    afterNextRender(() => {
-      const el = this.dock().nativeElement;
-      // The observer fires outside the zone, so the write runs inside it, or the page
-      // keeps the old room below its content until the next event.
-      const observer = new ResizeObserver(() =>
-        zone.run(() => this.dockHeight.set(el.offsetHeight)),
-      );
-      observer.observe(el);
-      destroyRef.onDestroy(() => observer.disconnect());
-    });
+    // The page keeps room below its content for the dock.
+    observeElementSize(
+      () => this.dock().nativeElement,
+      (size) => this.dockHeight.set(size.height),
+      'border',
+    );
   }
 
   protected readonly status = computed(() => meetingStatus(this.meeting().status));

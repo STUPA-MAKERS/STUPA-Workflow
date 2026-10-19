@@ -1,5 +1,6 @@
 @use 'breakpoints' as bp;
-@use '../../../shared/ui/scroll-fade' as fade;
+@use 'dot-parts' as dots;
+@use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications page (applications-list.component.scss). */
@@ -81,11 +82,7 @@
 .vl__sub {
   display: inline;
 }
-.vl__part + .vl__part::before {
-  content: '·';
-  margin-inline: 6px;
-  color: var(--color-text-subtle);
-}
+@include dots.between('.vl__part');
 
 /* The own ballot over the time, both at the end of the row. */
 .vl__trail {

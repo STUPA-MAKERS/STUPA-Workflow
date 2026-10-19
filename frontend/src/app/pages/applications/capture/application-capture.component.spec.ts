@@ -165,7 +165,7 @@ describe('ApplicationCaptureComponent', () => {
     expect(screen.getByText('anna@example.org')).toBeTruthy();
     screen.getByRole('option', { name: /Anna Antrag/ }).click();
     s.flush();
-    expect(screen.getByTestId('cap-picked').textContent).toContain('Anna Antrag · anna@example.org');
+    expect(s.container.querySelector('.ac__picked')?.textContent).toContain('Anna Antrag · anna@example.org');
     s.comp.clearPick();
     s.flush();
     expect(s.comp.picked()).toBeNull();

@@ -35,8 +35,7 @@ import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.componen
 import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { StickyBarComponent } from '@shared/ui/sticky-bar/sticky-bar.component';
-import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import { ButtonComponent, IconComponent, MEDIA, mediaQuery } from '@stupa-makers/ui-kit';
 import { CalendarSubscribeComponent } from '../calendar-subscribe/calendar-subscribe.component';
 import {
   MeetingDetailSheetComponent,
@@ -119,7 +118,7 @@ export class MeetingsListComponent {
   readonly create = output<void>();
 
   /** A phone viewport: the header holds one button and one menu. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   private readonly layout = viewChild(ListDetailLayoutComponent);
   /** The list and the detail sit side by side: the page does not scroll. */

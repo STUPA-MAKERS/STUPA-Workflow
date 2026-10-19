@@ -8,7 +8,14 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { Uuid } from '@core/api/models';
-import { ButtonComponent, DialogComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
+import {
+  ButtonComponent,
+  DialogComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { AuthService } from '@core/auth/auth.service';
 import { exportDownload } from '@shared/download.util';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
@@ -32,7 +39,6 @@ import {
   type StatusKind,
   flowColorKind,
 } from '@shared/ui';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { BUDGET_PERMISSIONS } from '../../layout/nav.service';
 import {
   BudgetTreeApi,
@@ -176,10 +182,10 @@ export class BudgetDashboardComponent {
   private readonly auth = inject(AuthService);
 
   /** The pane sits beside the sheet only on a wide viewport. */
-  readonly wide = mediaQuerySignal(MEDIA.wide);
+  readonly wide = mediaQuery(MEDIA.wide);
   /** A phone opens the tree in a sheet from the bottom, a narrow viewport in a sheet
    *  from the start. */
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
 
   readonly canExport = computed(() => this.auth.can('budget.export'));
   /** The bookings page needs a global budget permission; a gremium scope alone has none. */

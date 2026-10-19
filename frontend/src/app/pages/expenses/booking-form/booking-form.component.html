@@ -27,26 +27,14 @@
           <fieldset class="ff__sec">
             <legend class="sec ff__secTitle">{{ 'expenses.form.fixed' | t }}</legend>
             <div class="ff__grid">
-              <div class="ff__box ff__box--locked">
-                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.filter.kind' | t }}</span>
-                <span class="ff__locked">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</span>
-              </div>
-              <div class="ff__box ff__box--locked">
-                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
-                <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.filter.kind' | t">{{ (e.kind === 'income' ? 'expenses.kind.income' : 'expenses.kind.expense') | t }}</app-locked-field>
+              <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</app-locked-field>
             </div>
             @if (e.applicationId) {
-              <div class="ff__box ff__box--locked">
-                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.col.application' | t }}</span>
-                <span class="ff__locked">{{ e.applicationTitle || ('expenses.col.application' | t) }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.col.application' | t">{{ e.applicationTitle || ('expenses.col.application' | t) }}</app-locked-field>
             }
             @if (!editOwnsCostCentre()) {
-              <div class="ff__box ff__box--locked">
-                <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.costCentre' | t }}</span>
-                <span class="ff__locked">{{ ccTrail() }}</span>
-              </div>
+              <app-locked-field [label]="'expenses.field.costCentre' | t">{{ ccTrail() }}</app-locked-field>
               <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{
                   (e.applicationId ? 'expenses.field.inheritedCostCentre' : 'expenses.sub.inheritsShort') | t
                 }}</app-note>
@@ -126,60 +114,21 @@
           <fieldset class="ff__sec">
             <legend class="sec ff__secTitle">{{ 'expenses.form.where' | t }}</legend>
             @if (mode() === 'create' && s.newKind() === 'expense') {
-              <!-- The application search: a combobox in a filled field like the kit inputs. -->
-              <div class="ff__app">
-                <div class="ff__box">
-                  <label class="ff__label" for="booking-app">{{ 'expenses.field.linkApplication' | t }}</label>
-                  @if (s.newApplicationId()) {
-                    <span class="ff__picked">
-                      <span class="ell" [title]="s.appQuery()">{{ s.appQuery() }}</span>
-                      <button
-                        type="button"
-                        class="ff__iconBtn"
-                        [attr.aria-label]="'expenses.field.unlink' | t"
-                        [title]="'expenses.field.unlink' | t"
-                        (click)="s.clearApp()"
-                      >
-                        <app-icon name="x" [size]="16" />
-                      </button>
-                    </span>
-                  } @else {
-                    <input
-                      id="booking-app"
-                      class="ff__control"
-                      type="search"
-                      autocomplete="off"
-                      name="appSearch"
-                      role="combobox"
-                      aria-autocomplete="list"
-                      aria-controls="booking-app-list"
-                      [attr.aria-expanded]="suggestOpen()"
-                      [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
-                      [ngModel]="s.appQuery()"
-                      (ngModelChange)="s.onAppSearch($event)"
-                    />
-                    <app-icon class="ff__searchIcon" name="search" [size]="18" />
-                  }
-                </div>
-                @if (suggestOpen()) {
-                  <ul id="booking-app-list" class="ff__suggest" role="listbox">
-                    @for (a of s.appCandidates(); track a.id) {
-                      <li role="presentation">
-                        <button
-                          type="button"
-                          role="option"
-                          aria-selected="false"
-                          class="ff__option ell"
-                          [title]="a.title"
-                          (click)="s.pickApp(a)"
-                        >
-                          {{ a.title }}
-                        </button>
-                      </li>
-                    }
-                  </ul>
-                }
-              </div>
+              <app-autocomplete
+                inputId="booking-app"
+                name="appSearch"
+                [label]="'expenses.field.linkApplication' | t"
+                [placeholder]="'expenses.field.linkApplicationPlaceholder' | t"
+                [clearLabel]="'expenses.field.unlink' | t"
+                [query]="s.appQuery()"
+                [options]="s.appCandidates()"
+                [optionLabel]="appTitle"
+                [open]="suggestOpen()"
+                [picked]="s.newApplicationId() ? s.appQuery() : null"
+                (queryChange)="s.onAppSearch($event)"
+                (choose)="s.pickApp($event)"
+                (cleared)="s.clearApp()"
+              />
             }
             @if (mode() === 'create' && s.newApplicationId()) {
               <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.field.inheritedCostCentre' | t }}</app-note>
@@ -212,10 +161,7 @@
                     (ngModelChange)="s.newFiscalYearId.set($event)"
                   />
                 } @else {
-                  <div class="ff__box ff__box--locked">
-                    <span class="ff__label"><app-icon name="lock" [size]="12" />{{ 'expenses.field.fiscalYear' | t }}</span>
-                    <span class="ff__locked">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</span>
-                  </div>
+                  <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</app-locked-field>
                 }
               </div>
             }
@@ -335,33 +281,20 @@
 
         <fieldset class="ff__sec">
           <legend class="sec ff__secTitle" [id]="'bf-method-' + mode()">{{ 'expenses.field.paymentMethod' | t }}</legend>
-          <div class="ff__chips" role="radiogroup" [attr.aria-labelledby]="'bf-method-' + mode()">
-            @for (m of methods(); track m.value) {
-              <button
-                type="button"
-                class="chip"
-                role="radio"
-                [class.on]="method() === m.value"
-                [attr.aria-checked]="method() === m.value"
-                (click)="setMethod(m.value)"
-              >
-                @if (method() === m.value) {
-                  <app-icon name="check" [size]="14" />
-                }
-                {{ m.label }}
-              </button>
-            }
-          </div>
+          <app-chip-group
+            [ariaLabelledby]="'bf-method-' + mode()"
+            [options]="methods()"
+            [value]="method()"
+            (valueChange)="setMethod($event ?? '')"
+          />
         </fieldset>
 
         <fieldset class="ff__sec">
           <legend class="sec ff__secTitle">{{ 'expenses.field.note' | t }}</legend>
-          <label class="ff__box ff__box--area" [for]="'booking-note-' + mode()">
-            <span class="ff__label">{{ 'expenses.field.note' | t }}</span>
+          <app-textarea [label]="'expenses.field.note' | t">
             @if (mode() === 'create') {
               <textarea
                 [id]="'booking-note-' + mode()"
-                class="ff__area"
                 name="note"
                 rows="3"
                 [ngModel]="s.newNote()"
@@ -370,14 +303,13 @@
             } @else {
               <textarea
                 [id]="'booking-note-' + mode()"
-                class="ff__area"
                 name="enote"
                 rows="3"
                 [ngModel]="s.editNote()"
                 (ngModelChange)="s.editNote.set($event)"
               ></textarea>
             }
-          </label>
+          </app-textarea>
         </fieldset>
       </div>
     </div>

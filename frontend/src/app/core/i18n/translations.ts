@@ -14,11 +14,6 @@ export const de = {
   'app.title': 'STUPA Antragsplattform',
   'app.skipToContent': 'Zum Inhalt springen',
 
-  // Generic filter bar (app-filter-bar). The same strings apply everywhere.
-  'filter.button': 'Filter',
-  'filter.apply': 'Anwenden',
-  'filter.reset': 'Zurücksetzen',
-
   'shell.nav.start': 'Start',
   'shell.nav.brand': '{name}, Start',
   'shell.nav.more': 'Mehr',
@@ -2057,8 +2052,6 @@ export const de = {
   'admin.flow.cfgDeadlinePh': 'Keine Frist',
   'admin.flow.guardPriority': 'Guard-Priorität',
   'admin.flow.guardDefault': 'Kein Guard (Catch-all)',
-  'admin.flow.moveUp': 'Nach oben',
-  'admin.flow.moveDown': 'Nach unten',
   'admin.flow.branch': 'Ergebnis-Zweig',
   'admin.flow.branchNone': '— (kein Zweig)',
   'admin.flow.from': 'Von',

@@ -19,10 +19,13 @@
         </div>
       } @else {
         <div class="jl__actions">
-          <app-button size="sm" variant="text" (click)="copy()">
-            <app-icon [name]="copied() ? 'check' : 'copy'" />
-            {{ (copied() ? 'guests.link.copied' : 'guests.link.copy') | t }}
-          </app-button>
+          <app-copy-button
+            [text]="link().joinUrl"
+            variant="text"
+            [label]="'guests.link.copy' | t"
+            [copiedLabel]="'guests.link.copied' | t"
+            [resetMs]="copiedMs"
+          />
           @if (canRotate()) {
             <app-button size="sm" variant="text" [loading]="rotating()" (click)="confirming.set(true)">
               <app-icon name="repeat" />

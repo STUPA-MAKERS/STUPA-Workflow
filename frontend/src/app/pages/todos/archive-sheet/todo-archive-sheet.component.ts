@@ -7,8 +7,13 @@ import { liveSearch } from '@shared/live-search';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { SearchPillComponent } from '@shared/ui/search-pill/search-pill.component';
 import { SideSheetComponent } from '@shared/ui/side-sheet/side-sheet.component';
-import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../../layout/media-query';
+import {
+  ButtonComponent,
+  IconComponent,
+  MEDIA,
+  mediaQuery,
+  ToastService,
+} from '@stupa-makers/ui-kit';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { isoDay, shortDay } from '@shared/date-format';
 
@@ -37,7 +42,7 @@ export class TodoArchiveSheetComponent {
   readonly openCard = output<Uuid>();
   readonly restored = output<TodoCardDetail>();
 
-  readonly phone = mediaQuerySignal(MEDIA.phone);
+  readonly phone = mediaQuery(MEDIA.phone);
   readonly items = signal<TodoCardTile[]>([]);
   readonly total = signal(0);
   readonly loading = signal(false);

@@ -43,11 +43,11 @@ import {
   IconComponent,
   InputComponent,
   MEDIA,
+  mediaQuery,
+  type Step,
   StepperComponent,
   ToastService,
-  type Step,
 } from '@stupa-makers/ui-kit';
-import { mediaQuerySignal } from '../../layout/media-query';
 import { AltchaComponent } from './altcha.component';
 import { DraftAttachmentsService } from './draft-attachments.service';
 import { DraftFilesComponent } from './draft-files/draft-files.component';
@@ -158,7 +158,7 @@ export class ApplyWizardComponent {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
   protected readonly drafts = inject(DraftAttachmentsService);
-  protected readonly phone = mediaQuerySignal(MEDIA.phone);
+  protected readonly phone = mediaQuery(MEDIA.phone);
 
   /**
    * True when a principal is logged in. The account then gives the identity: no e-mail

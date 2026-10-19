@@ -6,8 +6,9 @@ import {
   ButtonComponent,
   IconComponent,
   InputComponent,
-  SwitchComponent,
+  MoveButtonsComponent,
   type SelectOption,
+  SwitchComponent,
 } from '@stupa-makers/ui-kit';
 import { SelectFieldComponent } from '@shared/ui/select/select.component';
 import type { StateDef } from '../admin.models';
@@ -31,6 +32,7 @@ export interface GuardPriorityRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MoveButtonsComponent,
     I18nInputComponent,
     TruncatedDirective,
     FormsModule,
