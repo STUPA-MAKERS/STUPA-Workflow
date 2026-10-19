@@ -942,18 +942,26 @@ export class ApplicationsDetailComponent {
       this.notFound.set(true);
       return;
     }
-    this.api.getApplication(id, { quiet: true }).subscribe({
+    // A read ahead by the list paints at once; a newer answer behind it replaces only the
+    // application, so the open view and its other reads stay.
+    let shown = false;
+    this.api.getApplication(id, { quiet: true, detail: true }).subscribe({
       next: (app) => {
         if (seq !== this.loadSeq) return;
+        if (shown) {
+          this.app.set(app);
+          return;
+        }
+        shown = true;
         this.resetShown();
         this.switching.set(false);
         this.app.set(app);
         this.loading.set(false);
-        this.loadAux();
+        this.loadAux(true);
         // Take the effective form from the pinned version of the application, not from
         // the active one. The labels and the edit fields then match the data that the
         // server validates.
-        this.api.applicationForm(app.id).subscribe({
+        this.api.applicationForm(app.id, { detail: true }).subscribe({
           next: (eff) => {
             if (seq !== this.loadSeq) return;
             this.sections.set(eff.sections);
@@ -1016,10 +1024,11 @@ export class ApplicationsDetailComponent {
 
   /** Load the versions, the comments and the available transitions.
    *  An error degrades silently to an empty result. The transitions load only with
-   *  the needed permission. The server filters them again. */
-  private loadAux(): void {
+   *  the needed permission. The server filters them again. `detail`: the first read of
+   *  an opened application, which takes what the list read ahead. */
+  private loadAux(detail = false): void {
     const seq = this.loadSeq;
-    this.api.versions(this.id).subscribe({
+    this.api.versions(this.id, { detail }).subscribe({
       next: (v) => {
         if (seq === this.loadSeq) this.versions.set(v);
       },
@@ -1028,7 +1037,7 @@ export class ApplicationsDetailComponent {
     // Only the first read of an application shows the loading state. A reload after a
     // transition keeps the thread and the count, so the header does not shift.
     if (!this.commentsLoaded) this.commentsLoading.set(true);
-    this.api.comments(this.id, { quiet: true }).subscribe({
+    this.api.comments(this.id, { quiet: true, detail }).subscribe({
       next: (c) => {
         if (seq !== this.loadSeq) return;
         this.comments.set(c);
@@ -1039,7 +1048,7 @@ export class ApplicationsDetailComponent {
         if (seq === this.loadSeq) this.commentsLoading.set(false);
       },
     });
-    this.api.timeline(this.id, { quiet: true }).subscribe({
+    this.api.timeline(this.id, { quiet: true, detail }).subscribe({
       next: (events) => {
         if (seq === this.loadSeq) this.timeline.set(events);
       },
@@ -1047,7 +1056,7 @@ export class ApplicationsDetailComponent {
     });
     if (this.canTransition()) {
       this.transitionsLoading.set(true);
-      this.api.transitions(this.id).subscribe({
+      this.api.transitions(this.id, { detail }).subscribe({
         next: (t) => {
           if (seq !== this.loadSeq) return;
           this.transitions.set(t);

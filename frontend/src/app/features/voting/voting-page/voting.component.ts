@@ -11,10 +11,13 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, NavigationEnd, Router, RouterOutlet, type ParamMap } from '@angular/router';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, type Observable, of } from 'rxjs';
 import { catchError, expand, filter, map, reduce } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { AuthService } from '@core/auth/auth.service';
+import { DelegationsApiService } from '@core/api/delegations.service';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -268,6 +271,27 @@ export class VotingComponent implements OnDestroy {
   });
 
   constructor() {
+    // The shown votes read their detail ahead, so a click shows it at once: the vote, the
+    // voting right, the linked to-dos, and once per meeting the meeting and its agenda.
+    const meetings = new Set<Uuid>();
+    prefetchDetails({
+      items: this.items,
+      key: (v) => v.id,
+      reads: (v) => {
+        const reads: Observable<unknown>[] = [
+          this.api.getVote(v.id, { detail: true }),
+          inject(DelegationsApiService).voteStatus(v.id, { detail: true }),
+          inject(TodosApiService).linked('vote', v.id),
+        ];
+        const meetingId = v.meetingId;
+        if (meetingId && !meetings.has(meetingId)) {
+          meetings.add(meetingId);
+          reads.push(this.api.getMeeting(meetingId, { quiet: true, detail: true }));
+          if (v.agendaItemId) reads.push(this.api.listAgenda(meetingId, { quiet: true, detail: true }));
+        }
+        return reads;
+      },
+    });
     this.route.queryParamMap.pipe(takeUntilDestroyed()).subscribe((pm) => {
       this.readFilters(pm);
       this.reload();

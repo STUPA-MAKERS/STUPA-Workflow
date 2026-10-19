@@ -23,7 +23,7 @@
   list-style: none;
 }
 .um__hits {
-  --li-hover: var(--color-surface-3);
+  --li-hover: var(--color-selected);
 }
 /* The row clips the hover surface of its list item to the corners of the row group. */
 .um__hits > li {
@@ -59,6 +59,9 @@
 .um__muted {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
+}
+.um__hitLogin--sub {
+  display: none;
 }
 .um__chev {
   color: var(--color-text-muted);
@@ -188,5 +191,11 @@
   .um__arrow {
     justify-self: center;
     transform: rotate(90deg);
+  }
+  .um__hitLogin--sub {
+    display: block;
+  }
+  .um__hitLogin--trail {
+    display: none;
   }
 }

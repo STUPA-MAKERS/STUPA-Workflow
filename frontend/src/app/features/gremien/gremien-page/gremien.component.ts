@@ -39,6 +39,8 @@ import { ButtonComponent, IconComponent, MEDIA } from '@stupa-makers/ui-kit';
 import { mediaQuerySignal } from '../../../layout/media-query';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
+import { GremienApiService } from '@core/api/gremien.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { GremienStore } from '../gremien.store';
 import { localized } from '../gremien.util';
 import { weekdayDate } from '@shared/date-format';
@@ -177,6 +179,12 @@ export class GremienComponent implements OnDestroy {
   ]);
 
   constructor() {
+    // The shown gremien read their first tab ahead, so a click shows it at once.
+    prefetchDetails({
+      items: computed(() => [...this.mine(), ...this.others()]),
+      key: (r) => r.item.id,
+      reads: (r) => [inject(GremienApiService).meetings(r.item.id)],
+    });
     this.store.load();
     this.readSelection();
     this.router.events

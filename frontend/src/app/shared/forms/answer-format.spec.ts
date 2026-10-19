@@ -27,6 +27,10 @@ describe('answer-format', () => {
     expect(formatAnswer(f('currency'), true, env)).toBe('true');
   });
 
+  it('formats the requested funding in euro like a currency field', () => {
+    expect(formatAnswer(f('funding'), 600, env)).toBe(formatAnswer(f('currency'), 600, env));
+  });
+
   it('gives an empty answer as an empty string, whatever the type', () => {
     expect(formatAnswer(f('currency'), '', env)).toBe('');
   });

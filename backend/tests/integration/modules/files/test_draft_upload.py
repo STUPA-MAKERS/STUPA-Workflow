@@ -95,7 +95,7 @@ def _upload(
     resp = client.post(
         "/api/apply/attachments",
         files={"file": (name, _PDF, "application/pdf")},
-        data={"field_key": "angebote", "is_comparison_offer": "true"},
+        data={"field_key": "angebote"},
         headers=headers,
     )
     assert resp.status_code == 201, resp.text
@@ -141,7 +141,7 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
         token = first["draftToken"]
         assert isinstance(token, str) and len(token) >= 32
         assert first["scanned"] is False
-        assert first["is_comparison_offer"] is True
+        assert "is_comparison_offer" not in first
         second = _upload(client, token, name="zweites.pdf")
         assert second["draftToken"] == token
 
@@ -150,7 +150,6 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
     for row in rows:
         assert row.application_id is None
         assert row.field_key == "angebote"
-        assert row.is_comparison_offer is True
         assert row.storage_key is not None
         assert row.storage_key.startswith(f"drafts/{row.id}/")
         # The database keeps the HMAC of the token, never the token.
@@ -168,7 +167,6 @@ async def test_first_upload_issues_a_token_and_later_uploads_extend_it(
     assert audits[0].data == {
         "draft": True,
         "hasFieldKey": True,
-        "isComparisonOffer": True,
         "mime": "application/pdf",
         "size": len(_PDF),
     }

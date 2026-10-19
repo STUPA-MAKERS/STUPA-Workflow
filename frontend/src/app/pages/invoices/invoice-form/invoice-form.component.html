@@ -84,7 +84,7 @@
             <app-note icon="info" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'invoices.import.manual' | t }}</app-note>
           }
           @if (h.importDuplicate() !== null) {
-            <app-note icon="alert" kind="warn" [surface]="layout() === 'sheet' ? 3 : 2" role="alert">
+            <app-note class="if__dup" icon="alert" kind="warn" [surface]="layout() === 'sheet' ? 3 : 2" role="alert">
               {{ 'invoices.import.duplicate' | t: { number: h.importDuplicate() ?? '' } }}
               <app-button noteAction variant="text" size="sm" (click)="openDuplicate.emit()">{{ 'invoices.import.openExisting' | t }}</app-button>
             </app-note>

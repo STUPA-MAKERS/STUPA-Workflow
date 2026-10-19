@@ -14,7 +14,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, type ParamMap, Router } from '@angular/router';
-import { from } from 'rxjs';
+import { type Observable, from } from 'rxjs';
 import { concatMap } from 'rxjs/operators';
 import { problemDetail } from '@core/api/problem';
 import { ApiClient } from '@core/api/api-client.service';
@@ -85,6 +85,8 @@ import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog
 import { dayMonth } from '@shared/date-format';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -486,6 +488,22 @@ export class ExpensesComponent implements OnDestroy {
   readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
 
   constructor() {
+    // The shown bookings read their linked records ahead, so a click shows them at once.
+    prefetchDetails({
+      items: this.items,
+      key: (e) => e.id,
+      reads: (e) => {
+        const reads: Observable<unknown>[] = [inject(TodosApiService).linked('expense', e.id)];
+        const invoiceId = e.invoiceId;
+        if (invoiceId && !this.invoices().some((i) => i.id === invoiceId)) {
+          reads.push(this.api.getInvoice(invoiceId, { detail: true }));
+        }
+        if (e.applicationId) reads.push(this.apps.getApplication(e.applicationId, { quiet: true, detail: true }));
+        if ((e.childCount ?? 0) > 0) reads.push(this.api.listSubBookings(e.id, { detail: true }));
+        return reads;
+      },
+      when: () => this.tab() === 'bookings',
+    });
     // Apply the URL first, then load data exactly once. The URL keeps the view shareable,
     // survives a reload, and is the target of links from the budget page, the invoices
     // page and the global search. A second, unfiltered request could resolve last and
@@ -698,7 +716,7 @@ export class ExpensesComponent implements OnDestroy {
       const cached = this.invoices().find((i) => i.id === invoiceId);
       if (cached) this.linkedInvoice.set(cached);
       else
-        this.api.getInvoice(invoiceId).subscribe({
+        this.api.getInvoice(invoiceId, { detail: true }).subscribe({
           next: (inv) => {
             if (this.selectedExpense()?.invoiceId === inv.id) this.linkedInvoice.set(inv);
           },
@@ -710,7 +728,7 @@ export class ExpensesComponent implements OnDestroy {
     if (appId && this.linkedApplication()?.id !== appId) {
       // A budget reader may lack the right to read the application: the card then shows
       // only the title the booking carries.
-      this.apps.getApplication(appId, { quiet: true }).subscribe({
+      this.apps.getApplication(appId, { quiet: true, detail: true }).subscribe({
         next: (app) => {
           if (this.selectedExpense()?.applicationId === app.id) this.linkedApplication.set(app);
         },
@@ -718,7 +736,7 @@ export class ExpensesComponent implements OnDestroy {
       });
     }
     if (e && (e.childCount ?? 0) > 0 && !this.sub.subRows().has(e.id) && !this.sub.isLoadingSub(e.id)) {
-      this.sub.loadSub(e.id);
+      this.sub.loadSub(e.id, true);
     }
   }
 

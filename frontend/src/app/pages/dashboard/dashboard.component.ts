@@ -161,9 +161,9 @@ type Loaded<T> = T | null | undefined;
  * person who may see budgets, a budget summary.
  *
  * Wide, the page is a pane page: the document does not scroll, the list and the sheet
- * scroll inside themselves. The start page keeps the footer. Narrow and on a phone the
- * page scrolls: the "Heute" band comes first, then the work list. A phone shows the rows
- * as list rows and a floating "Antrag" button.
+ * scroll inside themselves and reach down to the pane gap, because the page has no
+ * footer. Narrow and on a phone the page scrolls: the "Heute" band comes first, then the
+ * work list. A phone shows the rows as list rows and a floating "Antrag" button.
  *
  * A person without tasks and without own applications sees the empty tab next to the
  * card "Antrag stellen" with the active application types.

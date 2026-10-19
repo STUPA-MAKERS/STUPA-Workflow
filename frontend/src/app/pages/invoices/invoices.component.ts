@@ -73,6 +73,8 @@ import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog
 import { dayMonth } from '@shared/date-format';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
+import { TodosApiService } from '@core/api/todos.service';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -410,6 +412,12 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly detailOpen = computed(() => (!!this.formMode() && !this.phone()) || !!this.selectedId());
 
   constructor() {
+    // The detail shows the row at once; the shown rows read their linked to-dos ahead.
+    prefetchDetails({
+      items: this.items,
+      key: (i) => i.id,
+      reads: (i) => [inject(TodosApiService).linked('invoice', i.id)],
+    });
     this.adoptUrl(this.route.snapshot.queryParamMap);
     this.reload();
 

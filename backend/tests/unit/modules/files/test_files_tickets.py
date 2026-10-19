@@ -45,7 +45,6 @@ def _att(**kw: Any) -> Attachment:
         "storage_key": "k1",
         "scanned": True,
         "scan_result": SCAN_RESULT_CLEAN,
-        "is_comparison_offer": False,
     }
     base.update(kw)
     return Attachment(**base)

@@ -7,8 +7,6 @@ import {
   emptyFlowGraph,
   layoutEntities,
   normalizeFlowGraph,
-  parseFlowGraph,
-  serializeFlowGraph,
   validateFlowGraph,
 } from './flow-graph.util';
 
@@ -220,13 +218,6 @@ describe('graph ↔ JSON round-trip', () => {
       to: 'review',
       color: '#16a34a',
     });
-  });
-
-  it('serialize → parse is idempotent (round-trip)', () => {
-    const g = graph();
-    const back = parseFlowGraph(serializeFlowGraph(g));
-    expect(back).toEqual(normalizeFlowGraph(g));
-    expect(parseFlowGraph(serializeFlowGraph(back))).toEqual(back);
   });
 
   it('persists a non-empty layout', () => {

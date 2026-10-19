@@ -36,7 +36,8 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.getByText('Sitzung vom Di, 29.09.2026')).toBeInTheDocument();
     expect(screen.getByText('finalisiert am 02.10.2026')).toBeInTheDocument();
     const pdfs = screen.getAllByRole('link', { name: /PDF \(öffentliche Fassung\)/ });
-    expect(pdfs).toHaveLength(2);
+    // One download, in the head; the side column repeats none.
+    expect(pdfs).toHaveLength(1);
     expect(pdfs[0]).toHaveAttribute('href', '/api/public/protocols/p-1/pdf');
     expect(screen.getByText('PDF · 212 KB')).toBeInTheDocument();
     const att = screen.getByRole('heading', { name: 'Anwesenheit' }).closest('section') as HTMLElement;
@@ -85,18 +86,27 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.queryByText(/^PDF ·/)).toBeNull();
   });
 
-  it('shows no second box for a vote that is already in the TOP text', async () => {
+  it('shows a vote callout of the text as the decision box, in its place', async () => {
     const p = detailFixture();
-    p.tops[1].markdown = '> [!abstimmung] **Im Text?**';
+    p.tops[1].markdown = 'Vorher.\n\n> [!abstimmung] **Im Text?**\n> ja: 4, nein: 1\n> Gäste stimmten mit.\n\nNachher.';
     p.tops[1].decisions = [
-      { question: 'Im Text?', counts: { ja: 4 }, result: 'passed', majorityRule: 'simple', secret: false, inText: true },
+      { question: 'Im Text?', counts: { ja: 4, nein: 1 }, result: 'passed', majorityRule: 'simple', secret: false, inText: true },
       { question: 'Separat?', counts: { ja: 2 }, result: 'passed', majorityRule: 'simple', secret: false },
     ];
     await setup(of(p));
     const second = screen.getByRole('heading', { level: 3, name: /Haushalt 2027/ }).closest('li') as HTMLElement;
     const figures = within(second).getAllByRole('figure');
-    expect(figures).toHaveLength(1);
-    expect(figures[0]).toHaveTextContent('Separat?');
+    expect(figures).toHaveLength(2);
+    expect(figures[0]).toHaveTextContent('Im Text?');
+    expect(figures[0].textContent?.replace(/\s+/g, '')).toContain('Ja4Nein1');
+    expect(figures[1]).toHaveTextContent('Separat?');
+    // No raw tally line and no second callout; the note of the callout stays as text.
+    expect(second).not.toHaveTextContent('ja: 4');
+    expect(second.querySelector('.callout')).toBeNull();
+    const text = second.textContent ?? '';
+    expect(text.indexOf('Vorher.')).toBeLessThan(text.indexOf('Im Text?'));
+    expect(text.indexOf('Im Text?')).toBeLessThan(text.indexOf('Gäste stimmten mit.'));
+    expect(text.indexOf('Gäste stimmten mit.')).toBeLessThan(text.indexOf('Nachher.'));
   });
 
   it('shows the free text of a meeting without agenda items, and no PDF without one', async () => {

@@ -143,7 +143,6 @@ class DraftAttachments:
         data: bytes,
         by: str,
         field_key: str | None = None,
-        is_comparison_offer: bool = False,
     ) -> DraftAttachmentOut:
         """Store a draft upload and enqueue its scan.
 
@@ -187,7 +186,6 @@ class DraftAttachments:
             storage_key=storage_key,
             scanned=False,
             scan_result=None,
-            is_comparison_offer=is_comparison_offer,
             draft_token_hash=token_hash,
             draft_expires_at=expires_at,
         )
@@ -228,7 +226,6 @@ class DraftAttachments:
             mime=mime,
             size=len(data),
             scanned=False,
-            is_comparison_offer=is_comparison_offer,
             draftToken=plain,
             draftExpiresAt=expires_at,
         )

@@ -668,7 +668,6 @@ const MOCK_APP_ATTACHMENTS: AttachmentOutWire[] = [
     mime: 'application/pdf',
     size: 182_340,
     scanned: true,
-    is_comparison_offer: false,
   },
   {
     id: 'att00000-0000-0000-0000-000000000012',
@@ -676,7 +675,6 @@ const MOCK_APP_ATTACHMENTS: AttachmentOutWire[] = [
     mime: 'application/pdf',
     size: 96_512,
     scanned: true,
-    is_comparison_offer: true,
   },
 ];
 
@@ -1595,7 +1593,6 @@ function mockDraftUpload(body: unknown): DraftAttachmentOutWire {
     mime: file instanceof File && file.type ? file.type : 'application/pdf',
     size: file instanceof File ? file.size : 1024,
     scanned: false,
-    is_comparison_offer: form?.get('is_comparison_offer') === 'true',
     draftToken: 'mock-draft-token',
     draftExpiresAt: new Date(Date.now() + 7 * 86_400_000).toISOString(),
   };
@@ -2115,7 +2112,6 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
         mime: 'application/pdf',
         size: 12345,
         scanned: false,
-        is_comparison_offer: false,
       };
       return ok(created, 201);
     }

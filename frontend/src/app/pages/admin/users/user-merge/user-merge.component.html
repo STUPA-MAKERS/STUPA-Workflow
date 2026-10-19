@@ -35,7 +35,12 @@
                   @if (c.email) {
                     <span sub class="mono">{{ c.email }}</span>
                   }
-                  <span trail class="um__hitLogin">
+                  <!-- Wide: a column at the end. Narrow: a line below the e-mail. -->
+                  <span sub class="um__hitLogin um__hitLogin--sub">
+                    {{ 'admin.users.col.lastLogin' | t }}:
+                    {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
+                  </span>
+                  <span trail class="um__hitLogin um__hitLogin--trail">
                     {{ 'admin.users.col.lastLogin' | t }}:
                     {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
                   </span>

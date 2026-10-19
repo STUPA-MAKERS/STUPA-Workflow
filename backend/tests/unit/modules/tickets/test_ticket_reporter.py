@@ -151,7 +151,6 @@ async def test_the_detail_shows_public_notes_and_status_changes_only() -> None:
         mime="image/png",
         size=3,
         scanned=True,
-        is_comparison_offer=False,
     )
     shot = MessageAttachmentOut(
         id=uuid.uuid4(), filename="b.png", mime="image/png", size=3, scan_state="clean"

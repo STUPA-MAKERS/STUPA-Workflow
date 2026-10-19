@@ -2,9 +2,9 @@
 
 The test builds the real FastAPI app (`app.main.create_app`) and serves it in process
 through `httpx.ASGITransport`. The MCP tool goes through the real `ApiClient`. So the
-route path, the multipart field `file`, the form fields `field_key` and
-`is_comparison_offer`, the libmagic sniff with the extension check, the response shape
-and the download headers all come from the backend code and cannot drift.
+route path, the multipart field `file`, the form field `field_key`, the libmagic sniff
+with the extension check, the response shape and the download headers all come from the
+backend code and cannot drift.
 
 The principal carries the OAuth scope cap of an MCP token: the permission set of the
 default scope of this package (`config.DEFAULT_SCOPE`), resolved by the scope catalog
@@ -83,7 +83,6 @@ class _Service:
         data: bytes,
         by: str,
         field_key: str | None = None,
-        is_comparison_offer: bool = False,
     ) -> AttachmentOut:
         try:
             sniffed = backend_mime.validate_upload(filename, data)
@@ -97,7 +96,6 @@ class _Service:
                 "data": data,
                 "by": by,
                 "field_key": field_key,
-                "is_comparison_offer": is_comparison_offer,
             }
         )
         return AttachmentOut(
@@ -106,7 +104,6 @@ class _Service:
             mime=sniffed,
             size=len(data),
             scanned=False,
-            is_comparison_offer=is_comparison_offer,
         )
 
     async def owner_of(self, attachment_id: UUID) -> None:
@@ -204,7 +201,7 @@ def test_default_scope_grants_the_upload_right() -> None:
 def test_upload_through_the_real_router(backend: Any, service: _Service, pdf: Path) -> None:
     out = asyncio.run(
         meetings.upload_attachment(
-            str(APP_ID), str(pdf), field_key="offer", is_comparison_offer=True
+            str(APP_ID), str(pdf), field_key="offer"
         )
     )
     assert out == {
@@ -213,7 +210,6 @@ def test_upload_through_the_real_router(backend: Any, service: _Service, pdf: Pa
         "mime": "application/pdf",
         "size": len(PDF),
         "scanned": False,
-        "is_comparison_offer": True,
     }
     assert service.uploads == [
         {
@@ -222,7 +218,6 @@ def test_upload_through_the_real_router(backend: Any, service: _Service, pdf: Pa
             "data": PDF,
             "by": "agent-user",
             "field_key": "offer",
-            "is_comparison_offer": True,
         }
     ]
 
@@ -232,7 +227,6 @@ def test_upload_defaults_through_the_real_router(
 ) -> None:
     asyncio.run(meetings.upload_attachment(str(APP_ID), str(pdf)))
     assert service.uploads[0]["field_key"] is None
-    assert service.uploads[0]["is_comparison_offer"] is False
 
 
 def test_upload_content_mismatch_is_415(backend: Any, service: _Service, pdf: Path) -> None:

@@ -182,8 +182,10 @@ class FormFieldDef(WireModel):
     type: str = Field(
         description="text|textarea|number|currency|date|select|multiselect|gremium_select|"
         "budget_select|email|iban|daterange|checkbox|file|table|markdown|computed|positions|"
-        "section. gremium_select/budget_select options are injected by the server "
-        "(value=UUID); daterange value is {from,to} ISO dates."
+        "funding|section. gremium_select/budget_select options are injected by the server "
+        "(value=UUID); daterange value is {from,to} ISO dates. funding is the requested "
+        "funding in euro: at most one per form, needs a positions field, value <= the cost "
+        "total; when filled in it is the amount instead of the cost total."
     )
     label: I18nMap
     help: I18nMap | None = None

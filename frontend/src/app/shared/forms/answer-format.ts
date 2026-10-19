@@ -94,7 +94,7 @@ export function isEmptyAnswer(value: unknown): boolean {
  * - `select`, `gremium_select`, `budget_select`: the name of the option. The server puts
  *   the Gremien and the cost centres into the options of the effective form.
  * - `multiselect`: the names, joined by commas.
- * - `currency`: the amount in euro.
+ * - `currency` and `funding`: the amount in euro.
  * - Everything else: the value as text.
  *
  * An empty answer gives an empty string; the caller decides whether it shows a dash
@@ -118,6 +118,7 @@ export function formatAnswer(field: FormFieldDef, value: unknown, env: AnswerFor
         ? value.map((v) => optionLabel(field, v, env.lang)).join(', ')
         : optionLabel(field, value, env.lang);
     case 'currency':
+    case 'funding':
       return formatMoney(value, toFormatLocale(env.lang)) || formatFieldValue(value);
     default:
       return formatFieldValue(value);

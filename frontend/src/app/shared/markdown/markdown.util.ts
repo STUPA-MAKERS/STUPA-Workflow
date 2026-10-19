@@ -4,15 +4,16 @@
  * generator only. The generator writes fixed tags and attributes, allows a fixed list of
  * link protocols and builds an image source only from a validated uuid.
  *
- * Blocks: headings (`#` to `######`, shifted by `headingOffset`), fenced code, `>` quotes,
- * GitHub and protocol callouts (`> [!NOTE]`, `> [!abstimmung]`, …), `-`/`*` lists, `1.`
- * lists, task items (`- [ ]`, `- [x]`), GFM pipe tables with alignment, horizontal rules
- * (`---`, `***`, `___`) and paragraphs. A single line break inside a paragraph stays as a
- * `<br>`.
+ * Blocks: headings (`#` to `######`, shifted by `headingOffset`), fenced code, `>` quotes
+ * with blocks of their own, GitHub and protocol callouts (`> [!NOTE]`, `> [!abstimmung]`,
+ * …), `-`/`*` lists, `1.` lists, task items (`- [ ]`, `- [x]`), GFM pipe tables with
+ * alignment, horizontal rules (`---`, `***`, `___`) and paragraphs. A single line break
+ * inside a paragraph stays as a `<br>`.
  *
- * Inline: `**bold**`, `*italic*`, `_italic_`, `~~strike~~`, `` `code` ``, a link with the
- * http, https or mailto protocol or an app path (`/…`), and an image. An image renders
- * only when its destination is the canonical path `/api/media/images/<uuid>`. Every other
+ * Inline: backslash escapes (`\*`), a backslash at the end of a line as a line break,
+ * `**bold**`, `*italic*`, `_italic_`, `~~strike~~`, `` `code` ``, a link with the http,
+ * https or mailto protocol or an app path (`/…`), and an image. An image renders only
+ * when its destination is the canonical path `/api/media/images/<uuid>`. Every other
  * destination renders as its alt text, so no external image loads (tracking pixels).
  */
 
@@ -161,6 +162,12 @@ function inlineRenderer(imageSrc: ((id: string) => string) | null): Inline {
     let out = text.replace(/`([^`]+)`/g, (_m, code: string) =>
       stash(`<code>${code}</code>`, code),
     );
+    // A backslash at the end of a line is a hard line break, which the line join makes
+    // already. A backslash escape (`\*`, `\[`) shows the character itself, so it starts
+    // no emphasis, link or list. The text is escaped already, so `\<` arrives as `\&lt;`.
+    out = out
+      .replace(/\\$/, '')
+      .replace(/\\(&amp;|&lt;|&gt;|&quot;|&#39;|[!-/:-@[-`{-~])/g, (_m, c: string) => stash(c));
     out = replaceRefs(out, true, (alt, dest) => {
       const id = IMAGE_PATH_RE.exec(dest)?.[1];
       if (!id || !imageSrc) return alt ? stash(alt) : '';
@@ -219,8 +226,12 @@ function renderTable(head: string[], align: string[], rows: string[][], inline: 
   );
 }
 
-/** A group of consecutive `>` lines: a callout or otherwise a plain blockquote. */
-function renderQuote(lines: string[], inline: Inline): string {
+/**
+ * A group of consecutive `>` lines: a callout or otherwise a plain blockquote. A plain
+ * blockquote holds blocks of its own (paragraphs, headings, lists, a nested quote), so
+ * a quoted mail keeps its paragraphs. `blocks` renders lines that are escaped already.
+ */
+function renderQuote(lines: string[], inline: Inline, blocks: (lines: string[]) => string): string {
   const marker = /^\[!(\w+)\]\s*(.*)$/.exec(lines[0].trim());
   const kind = marker ? marker[1].toLowerCase() : '';
   if (marker && kind in CALLOUT_TITLES) {
@@ -232,7 +243,7 @@ function renderQuote(lines: string[], inline: Inline): string {
       `<p class="callout__title">${CALLOUT_TITLES[kind]}</p>${inner}</div>`
     );
   }
-  return `<blockquote>${lines.map(inline).join('<br>')}</blockquote>`;
+  return `<blockquote>${blocks(lines)}</blockquote>`;
 }
 
 /** One list item. A task item (`[ ]`, `[x]`) gets a disabled checkbox. */
@@ -252,7 +263,11 @@ export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): str
   // A control character has no meaning in Markdown. The NUL character is the placeholder
   // sentinel of the inline renderer, so a source that holds one could forge a placeholder.
   const clean = src.replace(/\r\n?/g, '\n').replace(CONTROL_RE, '');
-  const lines = escapeHtml(clean).split('\n');
+  return linkify(renderBlocks(escapeHtml(clean).split('\n'), offset, inline));
+}
+
+/** The blocks of lines that are escaped already. A blockquote renders its lines again. */
+function renderBlocks(lines: string[], offset: number, inline: Inline): string {
   const out: string[] = [];
   let para: string[] = [];
   let list: { tag: 'ul' | 'ol'; items: string[] } | null = null;
@@ -274,7 +289,7 @@ export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): str
   };
   const flushQuote = (): void => {
     if (quote.length) {
-      out.push(renderQuote(quote, inline));
+      out.push(renderQuote(quote, inline, (inner) => renderBlocks(inner, offset, inline)));
       quote = [];
     }
   };
@@ -364,5 +379,5 @@ export function markdownToSafeHtml(src: string, opts: MarkdownOptions = {}): str
   }
   if (fence) out.push(`<pre><code>${fence.join('\n')}</code></pre>`);
   flushAll();
-  return linkify(out.join('\n'));
+  return out.join('\n');
 }

@@ -26,10 +26,10 @@
   color: var(--color-accent-text);
 }
 /* A warning or an error must stand out from a neutral note beside it (board
-   Arbeit-Rechnung-Import, duplicate warning): the surface takes a tint of the tone,
-   and the text the full text colour. */
+   Arbeit-Rechnung-Import, duplicate warning): the surface takes the container colour
+   (warning) or a tint (error) of the tone, and the text the full text colour. */
 :host(.note--warn) {
-  background: color-mix(in srgb, var(--color-warning) 14%, var(--note-surface));
+  background: var(--color-warning-subtle);
   color: var(--color-text);
 }
 :host(.note--error) {

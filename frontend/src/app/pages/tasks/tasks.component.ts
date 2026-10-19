@@ -43,6 +43,8 @@ import { liveSearch } from '@shared/live-search';
 import { calendarDaysSince, isoDay } from '@shared/date-format';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
+import { prefetchDetails } from '@core/cache/detail-prefetch';
+import { applicationReads } from '../applications/application-reads';
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -244,6 +246,29 @@ export class TasksComponent implements OnDestroy {
   );
 
   constructor() {
+    // The shown rows read their detail ahead, so a click shows it at once.
+    prefetchDetails({
+      items: this.rows,
+      key: (r) => r.item.id,
+      reads: (r) => applicationReads(r.item.id),
+      when: this.showApplications,
+    });
+    // The people of a board are read once for all its cards.
+    const boards = new Set<Uuid>();
+    prefetchDetails({
+      items: this.todoRows,
+      key: (r) => r.item.id,
+      reads: (r) => {
+        const board = r.item.boardId;
+        const first = !boards.has(board);
+        boards.add(board);
+        return [
+          this.todosApi.card(r.item.id, { detail: true }),
+          ...(first ? [this.todosApi.members(board, { detail: true })] : []),
+        ];
+      },
+      when: this.showTodos,
+    });
     this.page.listPath.set(['/tasks']);
     this.api.applicationTypes({ quiet: true }).subscribe({
       next: (t) => this.types.set(t),

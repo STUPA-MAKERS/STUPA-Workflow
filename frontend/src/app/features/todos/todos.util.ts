@@ -57,19 +57,6 @@ export const LINK_KIND_LABEL: Record<TodoLinkKind, TranslationKey> = {
   todo: 'todos.linkKind.todo',
 };
 
-/** The kinds of the link picker, in the order of the server answer. */
-export const LINK_KINDS: readonly TodoLinkKind[] = [
-  'application',
-  'meeting',
-  'agenda_item',
-  'vote',
-  'gremium',
-  'invoice',
-  'expense',
-  'ticket',
-  'todo',
-];
-
 /** The state of a vote link: the result once closed, else the status. */
 const VOTE_STATUS_LABEL: Record<TodoVoteStatus, TranslationKey> = {
   draft: 'voting.list.status.draft',

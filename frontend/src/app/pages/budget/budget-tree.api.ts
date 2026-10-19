@@ -1,7 +1,7 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { skipLoading } from '@core/loading/loading.interceptor';
-import { cached, listContext } from '@core/cache/cache.interceptor';
+import { cached, detailContext, listContext } from '@core/cache/cache.interceptor';
 import type { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { API_BASE_URL } from '@core/api/api.config';
@@ -280,12 +280,6 @@ export interface InvoiceFileResult {
   fileToken: string;
   fileName: string;
   fileMime: string;
-}
-
-/** Minimal invoice choice for the booking dropdown. */
-export interface InvoiceOption {
-  id: Uuid;
-  label: string;
 }
 
 /** Filter and paging of the invoice list. The server does the fuzzy match and the filter. */
@@ -574,8 +568,11 @@ export class BudgetTreeApi {
   }
 
   /** Sub-bookings of a booking. The bookings tab expands them. */
-  listSubBookings(expenseId: Uuid): Observable<Expense[]> {
-    return this.http.get<Expense[]>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`);
+  /** `detail` keeps the answer for the read ahead of the booking list (`prefetchDetails`). */
+  listSubBookings(expenseId: Uuid, opts: { detail?: boolean } = {}): Observable<Expense[]> {
+    return this.http.get<Expense[]>(`${this.base}/budget-expenses/${expenseId}/sub-bookings`, {
+      context: opts.detail ? detailContext() : undefined,
+    });
   }
   /** Manually create a sub-booking. It inherits the cost center, the fiscal year
    *  and the kind from the parent. */
@@ -635,8 +632,11 @@ export class BudgetTreeApi {
   }
   /** Single invoice by ID for the detail dialog. The linked invoice can sit outside
    *  the list cache, which is capped at 200. */
-  getInvoice(id: Uuid): Observable<Invoice> {
-    return this.http.get<Invoice>(`${this.base}/invoices/${id}`);
+  /** `detail` keeps the answer for the read ahead of the booking list (`prefetchDetails`). */
+  getInvoice(id: Uuid, opts: { detail?: boolean } = {}): Observable<Invoice> {
+    return this.http.get<Invoice>(`${this.base}/invoices/${id}`, {
+      context: opts.detail ? detailContext() : undefined,
+    });
   }
   createInvoice(body: InvoiceCreate): Observable<Invoice> {
     return this.http.post<Invoice>(`${this.base}/invoices`, body);
@@ -736,26 +736,5 @@ export function flattenBudgetOptions(nodes: BudgetTreeNode[]): { value: Uuid; la
     }
   };
   walk(nodes);
-  return out;
-}
-
-/** An indented tree row (for a tree picker without a real tree widget). */
-export interface BudgetTreeRow {
-  id: Uuid;
-  key: string;
-  name: string;
-  depth: number;
-}
-
-/** Tree (recursive) -> indented flat list (pre-order) with depth per node. */
-export function flattenBudgetTreeRows(nodes: BudgetTreeNode[]): BudgetTreeRow[] {
-  const out: BudgetTreeRow[] = [];
-  const walk = (ns: BudgetTreeNode[], depth: number): void => {
-    for (const n of ns) {
-      out.push({ id: n.id, key: n.key, name: n.name, depth });
-      if (n.children?.length) walk(n.children, depth + 1);
-    }
-  };
-  walk(nodes, 0);
   return out;
 }

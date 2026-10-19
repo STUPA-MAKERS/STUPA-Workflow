@@ -10,7 +10,7 @@ import {
   untracked,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { forkJoin, of, type Observable } from 'rxjs';
+import { combineLatest, of, type Observable } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { ApiClient } from '@core/api/api-client.service';
 import { DelegationsApiService, type Delegation } from '@core/api/delegations.service';
@@ -257,15 +257,32 @@ export class MeetingDetailSheetComponent {
     this.data.set(null);
     const quiet = <T>(req: Observable<T>): Observable<T | null> =>
       req.pipe(catchError(() => of(null)));
-    forkJoin({
-      agenda: quiet(this.api.listAgenda(m.id, { quiet: true })),
-      attendance: quiet(this.api.listAttendance(m.id, { quiet: true })),
-      delegations: quiet(this.delegationsApi.list(m.id)),
-      protocol: m.protocolId ? quiet(this.api.getProtocol(m.id, { quiet: true })) : of(null),
+    const reads = meetingSheetReads(this.api, this.delegationsApi, m);
+    // `combineLatest`: the parts the list read ahead paint at once, a newer answer again.
+    combineLatest({
+      agenda: quiet(reads.agenda),
+      attendance: quiet(reads.attendance),
+      delegations: quiet(reads.delegations),
+      protocol: reads.protocol ? quiet(reads.protocol) : of(null),
     }).subscribe((data) => {
       if (seq !== this.seq) return;
       this.data.set(data);
       this.loading.set(false);
     });
   }
+}
+
+/**
+ * The reads of the sheet for a meeting: its agenda, attendance, delegations and, when it
+ * has one, its protocol. The meeting list reads them ahead (`prefetchDetails`), so the
+ * sheet of a clicked row shows at once.
+ */
+export function meetingSheetReads(api: ApiClient, delegations: DelegationsApiService, m: Meeting) {
+  const opts = { quiet: true, detail: true };
+  return {
+    agenda: api.listAgenda(m.id, opts),
+    attendance: api.listAttendance(m.id, opts),
+    delegations: delegations.list(m.id, { detail: true }),
+    protocol: m.protocolId ? api.getProtocol(m.id, opts) : null,
+  };
 }

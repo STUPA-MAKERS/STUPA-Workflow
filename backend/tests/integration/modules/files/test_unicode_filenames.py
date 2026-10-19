@@ -202,7 +202,7 @@ async def test_draft_upload_keeps_the_display_name(
         resp = client.post(
             "/api/apply/attachments",
             files={"file": (sent, _PDF, "application/pdf")},
-            data={"field_key": "angebote", "is_comparison_offer": "false"},
+            data={"field_key": "angebote"},
         )
     assert resp.status_code == 201, resp.text
     body = resp.json()

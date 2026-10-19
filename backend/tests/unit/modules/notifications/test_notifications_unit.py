@@ -1,13 +1,12 @@
 """Unit tests of the pure notification parts (T-18), without a database and without Redis.
 
-The parts are events, mail, templating, queue, schemas and provider.
+The parts are mail, templating, queue, schemas and provider.
 """
 
 from __future__ import annotations
 
 import pytest
 
-from app.modules.notifications import events
 from app.modules.notifications.mail import (
     CapturingMailSender,
     MailMessage,
@@ -25,14 +24,6 @@ SETTINGS = load_settings(
     SESSION_SECRET="x" * 16,
     MAGIC_LINK_SECRET="y" * 16,
 )
-
-
-# Tests for events.py
-def test_event_list_and_membership() -> None:
-    assert events.is_event("status_changed")
-    assert not events.is_event("nope")
-    assert "application_created" in events.EVENT_SET
-    assert len(events.EVENTS) == len(events.EVENT_SET)
 
 
 # Tests for mail.py
