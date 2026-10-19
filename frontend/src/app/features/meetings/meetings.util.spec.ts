@@ -137,7 +137,7 @@ describe('renderMarkdown', () => {
   });
 
   it('renders blockquotes and paragraphs with line breaks', () => {
-    expect(renderMarkdown('> Zitat')).toContain('<blockquote>Zitat</blockquote>');
+    expect(renderMarkdown('> Zitat')).toContain('<blockquote><p>Zitat</p></blockquote>');
     expect(renderMarkdown('a\nb')).toBe('<p>a<br>b</p>');
   });
 
@@ -197,7 +197,7 @@ describe('renderMarkdown', () => {
   });
 
   it('keeps a plain blockquote when there is no callout marker', () => {
-    expect(renderMarkdown('> Zitat')).toContain('<blockquote>Zitat</blockquote>');
+    expect(renderMarkdown('> Zitat')).toContain('<blockquote><p>Zitat</p></blockquote>');
   });
 
   it('treats a [!FOO] marker that is not a known callout as a plain blockquote', () => {
@@ -218,14 +218,14 @@ describe('renderMarkdown', () => {
     expect(out).toContain('callout__title');
   });
 
-  it('renders a multi-line blockquote joined by <br>', () => {
+  it('renders a multi-line blockquote as one paragraph joined by <br>', () => {
     const out = renderMarkdown('> eins\n> zwei');
-    expect(out).toBe('<blockquote>eins<br>zwei</blockquote>');
+    expect(out).toBe('<blockquote><p>eins<br>zwei</p></blockquote>');
   });
 
   it('stops collecting quote lines at the first non-quote line', () => {
     const out = renderMarkdown('> zitat\nnormaler Absatz');
-    expect(out).toContain('<blockquote>zitat</blockquote>');
+    expect(out).toContain('<blockquote><p>zitat</p></blockquote>');
     expect(out).toContain('<p>normaler Absatz</p>');
   });
 
