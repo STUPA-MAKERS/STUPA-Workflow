@@ -21,6 +21,7 @@ import { SubstitutePoolComponent } from './substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** Today as a local `YYYY-MM-DD` date, the format of `Delegation.meetingDate`. */
 export function localToday(now = new Date()): string {
@@ -45,6 +46,7 @@ export function localToday(now = new Date()): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

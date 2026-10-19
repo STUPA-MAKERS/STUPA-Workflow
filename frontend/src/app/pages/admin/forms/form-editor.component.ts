@@ -55,6 +55,7 @@ import {
 } from '../form-field.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 
 /**
  * Visible order of the question types in the "add question" menu. `section` is **not** a
@@ -98,6 +99,7 @@ type QPos = QuestionPos;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     EmptyStateComponent,
     FabComponent,
     FormsModule,

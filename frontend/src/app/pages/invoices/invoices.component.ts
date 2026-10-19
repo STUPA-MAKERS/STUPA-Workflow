@@ -69,6 +69,7 @@ import {
 } from './invoice-form/invoice-form.component';
 import { debounced } from '@shared/debounced';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -111,6 +112,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DetailNoneComponent,
     ConfirmDialogComponent,
     PageHeaderComponent,
     ButtonComponent,

@@ -52,6 +52,7 @@ import {
 } from '../gremien.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 const PRESETS: readonly RangePreset[] = ['last6', 'last12', 'last24', 'semester', 'prevSemester'];
 const SORTS: readonly AttendanceSort[] = ['quotaAsc', 'quotaDesc', 'name'];
@@ -111,6 +112,7 @@ export interface RowModel {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gat-host--fill]': 'fill()' },
   imports: [
+    RowChevronComponent,
     NoteComponent,
     EmptyStateComponent,
     TranslatePipe,

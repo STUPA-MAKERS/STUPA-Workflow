@@ -56,14 +56,10 @@
   min-width: 0;
 }
 .ur__secHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 2rem;
-}
-.ur__secTitle {
-  flex: 1 1 auto;
-  margin: 0;
+  --sh-wrap: nowrap;
+  --sh-gap: var(--space-2);
+  --sh-min-height: 2rem;
+  --sh-inset: 0;
 }
 
 .ur__items,

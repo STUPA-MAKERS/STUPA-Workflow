@@ -115,7 +115,7 @@ describe('AgendaPaneComponent', () => {
     expect(within(rows[0]).getByText('behandelt')).toBeInTheDocument();
     expect(within(rows[1]).getByText('jetzt')).toBeInTheDocument();
     expect(rows[2]).not.toHaveClass('ap__row--done');
-    expect(container.querySelector('.ap__num--now')?.closest('li')).toBe(rows[1]);
+    expect(container.querySelector('app-top-badge.tb--now')?.closest('li')).toBe(rows[1]);
   });
 
   it('marks no item as handled or now in a planned meeting, also with a stale id', async () => {
@@ -126,7 +126,7 @@ describe('AgendaPaneComponent', () => {
     rows.forEach((row) => expect(row).not.toHaveClass('ap__row--done'));
     expect(screen.queryByText('behandelt')).toBeNull();
     expect(screen.queryByText('jetzt')).toBeNull();
-    expect(container.querySelector('.ap__num--now')).toBeNull();
+    expect(container.querySelector('app-top-badge.tb--now')).toBeNull();
   });
 
   it('marks nothing as handled while no item runs', async () => {

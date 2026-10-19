@@ -1,0 +1,9 @@
+<div class="pfh__titles">
+  <h2 class="pfh__title" [id]="headingId()">{{ heading() }}</h2>
+  @if (subtitle()) {
+    <p class="pfh__subtitle">{{ subtitle() }}</p>
+  }
+</div>
+<app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="closed.emit()">
+  <app-icon name="x" />
+</app-button>

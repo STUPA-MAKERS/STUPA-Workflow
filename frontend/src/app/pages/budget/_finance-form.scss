@@ -5,6 +5,8 @@
 // out its own. The form components `@use` this file.
 @use 'field' as f;
 @use 'breakpoints' as bp;
+@use '../../shared/ui/surface-card' as sc;
+@use '../../shared/ui/scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -28,7 +30,7 @@
 }
 .ff--sheet {
   /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
-  --color-surface-sunken: var(--color-surface-3);
+  @include sc.raised-fields($muted-label: false);
 }
 
 .ff__head {
@@ -39,25 +41,6 @@
   margin: 0 var(--space-6);
   padding: var(--space-5) 0 var(--space-4);
   border-bottom: var(--border-width) solid var(--color-border);
-}
-.ff__titles {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.ff__title {
-  margin: 0;
-  font-size: var(--fs-xl);
-  line-height: 1.3;
-  font-weight: var(--fw-semibold);
-}
-.ff__subtitle {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  overflow-wrap: anywhere;
 }
 
 .ff__body {
@@ -73,29 +56,8 @@
 .ff--sheet .ff__body {
   padding: var(--space-2) 0 var(--space-5);
 }
-.ff__body.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--ff-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--ff-fade));
-}
-.ff__body.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--ff-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--ff-fade));
-}
-.ff__body.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--ff-fade),
-    #000 calc(100% - var(--ff-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--ff-fade),
-    #000 calc(100% - var(--ff-fade)),
-    transparent
-  );
+.ff__body {
+  @include fade.fade-y(var(--ff-fade));
 }
 
 .ff__cols {
@@ -335,32 +297,6 @@
   box-shadow: inset 0 0 0 2px var(--color-focus-ring);
 }
 
-/* Rows in the form (sub-bookings). */
-.ff__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: 3.5rem;
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
-}
-.ff__rowBody {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.ff__rowMeta {
-  color: var(--color-text-muted);
-  font-size: 0.8125rem;
-}
-.ff__sum {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 
 /* The foot: delete on the left, cancel and save on the right. Balanced on one axis. */
 .ff__foot {
@@ -377,12 +313,6 @@
 .ff--sheet .ff__foot {
   padding: var(--space-3) 0;
   border-radius: 0;
-}
-.ff__footEnd {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin-inline-start: auto;
 }
 .ff__btn {
   display: inline-flex;

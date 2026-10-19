@@ -32,6 +32,10 @@ import { bookedOn } from '../../invoices/invoice-figures';
 import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
+import { CostCentreLabelComponent } from '../../budget/cost-centre-label/cost-centre-label.component';
+import { BookingRowComponent } from '../../budget/booking-row/booking-row.component';
+import { SumRowComponent } from '../../budget/booking-row/sum-row.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 
 /**
  * The detail of a booking (boards Fin-Buchungen, Fin-Schmal-Buchung, Fin-Tel-Buchung):
@@ -46,6 +50,10 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetActionComponent,
+    SumRowComponent,
+    BookingRowComponent,
+    CostCentreLabelComponent,
     EmptyStateComponent,
     SheetBarComponent,
     SheetBarTitleDirective,

@@ -1,7 +1,4 @@
 @use 'breakpoints' as bp;
-@use '../../../features/todos/todo-labels' as lbl;
-
-@include lbl.colors;
 
 :host {
   display: block;
@@ -143,46 +140,20 @@
   cursor: pointer;
 }
 .lv__label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   font-size: 0.75rem;
 }
 .lv__sortIdle {
   opacity: 0.6;
 }
-.lv__dot {
-  @include lbl.dot;
-}
 .lv__due {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--color-text-muted);
+  --tdu-color: var(--color-text-muted);
   font-size: 0.8125rem;
-}
-.lv__due--overdue {
-  color: var(--color-danger);
-  font-weight: var(--fw-semibold);
-}
-.lv__due--soon {
-  color: var(--color-warning);
-  font-weight: var(--fw-semibold);
 }
 /* The people of a row are 24px circles, a little larger than the shared extra small size. */
 .lv__c--who ::ng-deep .av--xs {
   width: 1.5rem;
   height: 1.5rem;
   font-size: 0.625rem;
-}
-.lv__nobody {
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 50%;
-  color: var(--color-text-subtle);
 }
 .lv__emptyRow {
   padding: var(--space-2) var(--space-4);

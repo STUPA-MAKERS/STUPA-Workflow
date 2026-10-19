@@ -35,6 +35,7 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 let nextId = 0;
 
@@ -58,6 +59,7 @@ let nextId = 0;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,

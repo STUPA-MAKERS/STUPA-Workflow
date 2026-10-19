@@ -1,0 +1,14 @@
+<span class="tl__kind">{{ (direction() === 'out' ? 'expenses.transfers.expenseOn' : 'expenses.transfers.incomeOn') | t }}</span>
+<span class="tl__name">
+  @if (color()) {
+    <span class="tl__swatch" aria-hidden="true" [style.background]="color()"></span>
+  }
+  {{ name() }}
+</span>
+<span class="tl__path mono">
+  {{ path() }}
+  @if (after(); as a) {
+    · {{ 'expenses.transfers.availableAfter' | t: { amount: a } }}
+  }
+</span>
+<span class="tl__amount mono" [class.tl__amount--in]="direction() === 'in'">{{ direction() === 'out' ? '−' : '+' }}{{ amount() }}</span>

@@ -27,6 +27,7 @@ import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.component';
 
 /**
  * The detail of an invoice (boards Fin-Rechnungen, Fin-Schmal-Rechnung, Fin-Tel-Rechnung):
@@ -42,6 +43,7 @@ import { NoteComponent } from '@shared/ui/note/note.component';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SheetActionComponent,
     NoteComponent,
     EmptyStateComponent,
     SheetBarComponent,

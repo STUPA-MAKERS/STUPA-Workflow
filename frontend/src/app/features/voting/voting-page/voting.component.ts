@@ -44,6 +44,7 @@ import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -121,6 +122,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RowChevronComponent,
     NoteComponent,
     PageHeaderComponent,
     RouterOutlet,

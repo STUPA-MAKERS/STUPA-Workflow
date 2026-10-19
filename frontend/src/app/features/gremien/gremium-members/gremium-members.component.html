@@ -17,9 +17,7 @@
         [value]="role()"
         (valueChange)="role.set($event)"
         [text]="roleText()"
-        [active]="role() !== ''"
-        [icon]="role() ? 'check' : null"
-        [chevron]="!role()"
+        filled
       />
       <app-filter-select
         [label]="'gremien.members.former' | t"
@@ -27,9 +25,7 @@
         [value]="former() ? 'former' : ''"
         (valueChange)="setFormer($event)"
         [text]="'gremien.members.former' | t"
-        [active]="former()"
-        [icon]="former() ? 'check' : null"
-        [chevron]="!former()"
+        filled
       />
       @if (!phone()) {
         <app-button

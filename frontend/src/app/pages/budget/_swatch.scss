@@ -1,0 +1,14 @@
+// The colour mark of a cost centre: a small square in the colour of its tree.
+//
+// Use:
+//   @use '../budget/swatch';
+//   .x__swatch { @include swatch.mark; }            // 10px, radius 2px
+//   .pie__swatch { @include swatch.mark($radius: 3px); }
+
+@mixin mark($size: 10px, $radius: 2px) {
+  display: inline-block;
+  flex: none;
+  width: $size;
+  height: $size;
+  border-radius: $radius;
+}

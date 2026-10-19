@@ -997,7 +997,7 @@ describe('TodoCardDetailComponent', () => {
     const writeText = jest.fn(() => Promise.resolve());
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     fireEvent.click(screen.getByRole('button', { name: 'Link kopieren' }));
-    await Promise.resolve();
+    await new Promise((r) => setTimeout(r));
     expect(writeText).toHaveBeenCalledWith(`${location.origin}/todos/b-1?card=k-1`);
     expect(toast.success).toHaveBeenCalledWith('Link kopiert');
     writeText.mockReturnValueOnce(Promise.reject(new Error('denied')));
@@ -1006,6 +1006,7 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Der Link konnte nicht kopiert werden.');
     Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
     cmp.copyLink();
+    await new Promise((r) => setTimeout(r));
     expect(toast.error).toHaveBeenCalledTimes(2);
   });
 

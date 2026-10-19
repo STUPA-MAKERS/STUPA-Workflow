@@ -17,6 +17,8 @@ import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
 import { FilterSelectComponent, type FilterSelectOption } from '@shared/ui/filter-select/filter-select.component';
+import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
 import { ButtonComponent, InputComponent, SwitchComponent, ToastService } from '@stupa-makers/ui-kit';
 import { FabComponent } from '@shared/ui/fab/fab.component';
@@ -74,6 +76,7 @@ export function isHttpUrl(text: string): boolean {
     FilterSelectComponent,
     ButtonComponent,
     InputComponent,
+    LoadStateComponent,
     NoteComponent,
     SwitchComponent,
   ],
@@ -89,29 +92,44 @@ export class HelpTicketsComponent {
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  /** The page needs the site right. The server checks it again. */
-  protected readonly allowed = computed(() => this.auth.can('admin.site'));
-
-  protected readonly loading = signal(true);
   /** The labels of the switch rows, which the loading form shows as they are. */
   protected readonly skelSwitches = [
     'admin.helpTickets.public',
     'admin.helpTickets.notify',
     'admin.helpTickets.anonymize',
   ] as const;
-  /** The read failed: `forbidden` hides the form, `error` names the failure. */
-  protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
-  protected readonly saving = signal(false);
-  /** The stored values; the draft compares against them. */
-  protected readonly saved = signal<HelpTicketsSettings | null>(null);
-  protected readonly draft = signal<HelpTicketsSettings>({
-    wikiUrl: '',
-    publicEnabled: false,
-    notifyNew: false,
-    retentionMonths: null,
-  });
   /** The last months value, so the switch turns on with it again. */
   private lastMonths = DEFAULT_RETENTION;
+
+  /** The blocked senders need `ticket.manage`. The server checks it again. */
+  protected readonly canBlock = computed(() => this.auth.can('ticket.manage'));
+
+  /** The page needs the site right. The server checks it again. */
+  protected readonly form: SettingsForm<HelpTicketsSettings, HelpTicketsSettings> = settingsForm<HelpTicketsSettings, HelpTicketsSettings, HelpTicketsSettings>({
+    allowed: () => this.auth.can('admin.site'),
+    load: () => this.api.getHelpTickets(),
+    put: (body) => this.api.putHelpTickets(body),
+    draftOf: (s) => ({ ...s }),
+    initial: { wikiUrl: '', publicEnabled: false, notifyNew: false, retentionMonths: null },
+    body: () => {
+      const d = this.draft();
+      return this.wikiError() ? null : { ...d, wikiUrl: d.wikiUrl.trim() };
+    },
+    dirty: (s) => {
+      const d = this.draft();
+      return (
+        d.wikiUrl.trim() !== s.wikiUrl ||
+        d.publicEnabled !== s.publicEnabled ||
+        d.notifyNew !== s.notifyNew ||
+        d.retentionMonths !== s.retentionMonths
+      );
+    },
+    onApply: (s) => {
+      if (s.retentionMonths !== null) this.lastMonths = s.retentionMonths;
+    },
+  });
+  protected readonly saving = this.form.saving;
+  protected readonly draft = this.form.draft;
 
   protected readonly wikiError = computed(() =>
     isHttpUrl(this.draft().wikiUrl) ? '' : this.i18n.translate('admin.helpTickets.wikiInvalid'),
@@ -126,22 +144,8 @@ export class HelpTicketsComponent {
       .map((n) => ({ value: String(n), label: this.monthsText(n) }));
   });
 
-  protected readonly dirty = computed(() => {
-    const s = this.saved();
-    if (!s) return false;
-    const d = this.draft();
-    return (
-      d.wikiUrl.trim() !== s.wikiUrl ||
-      d.publicEnabled !== s.publicEnabled ||
-      d.notifyNew !== s.notifyNew ||
-      d.retentionMonths !== s.retentionMonths
-    );
-  });
+  protected readonly dirty = this.form.dirty;
 
-  protected readonly canSave = computed(() => this.dirty() && !this.wikiError() && !this.saving());
-
-  /** The blocked senders need `ticket.manage`. The server checks it again. */
-  protected readonly canBlock = computed(() => this.auth.can('ticket.manage'));
   /** null while loading; the read failed: `blockedError`. */
   protected readonly blocked = signal<TicketBlockedSender[] | null>(null);
   protected readonly blockedError = signal(false);
@@ -150,18 +154,6 @@ export class HelpTicketsComponent {
 
   constructor() {
     if (this.canBlock()) this.loadBlocked();
-    if (!this.allowed()) {
-      this.loading.set(false);
-      this.loadState.set('forbidden');
-      return;
-    }
-    this.api.getHelpTickets().subscribe({
-      next: (s) => this.apply(s),
-      error: (err: { status?: number }) => {
-        this.loading.set(false);
-        this.loadState.set(err?.status === 403 ? 'forbidden' : 'error');
-      },
-    });
   }
 
   private loadBlocked(): void {
@@ -234,16 +226,8 @@ export class HelpTicketsComponent {
       : this.i18n.translate('admin.helpTickets.after', { n });
   }
 
-  private apply(s: HelpTicketsSettings): void {
-    this.saved.set(s);
-    this.draft.set({ ...s });
-    if (s.retentionMonths !== null) this.lastMonths = s.retentionMonths;
-    this.loading.set(false);
-    this.loadState.set('ok');
-  }
-
   protected patch(change: Partial<HelpTicketsSettings>): void {
-    this.draft.update((d) => ({ ...d, ...change }));
+    this.form.patch(change);
   }
 
   protected setAnonymize(on: boolean): void {
@@ -257,24 +241,10 @@ export class HelpTicketsComponent {
   }
 
   protected discard(): void {
-    const s = this.saved();
-    if (s) this.apply(s);
+    this.form.reset();
   }
 
   protected save(): void {
-    if (!this.canSave()) return;
-    const d = this.draft();
-    this.saving.set(true);
-    this.api.putHelpTickets({ ...d, wikiUrl: d.wikiUrl.trim() }).subscribe({
-      next: (s) => {
-        this.saving.set(false);
-        this.apply(s);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => {
-        this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
-      },
-    });
+    this.form.save();
   }
 }

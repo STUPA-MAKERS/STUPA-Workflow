@@ -1,89 +1,90 @@
 <section class="ht admin-page">
   <app-page-header [flush]="true" [title]="'admin.helpTickets.title' | t">
-    @if (loadState() === 'ok' && !loading() && dirty()) {
+    @if (form.state() === 'ok' && dirty()) {
       <app-button actions variant="text" [disabled]="saving()" (click)="discard()">
         {{ 'admin.helpTickets.discard' | t }}
       </app-button>
     }
   </app-page-header>
 
-  @if (loading()) {
-    <!-- The loaded form with bars in place of the values: the same sections, the field
-         and the switch rows with their real labels. The bars show after 300ms. -->
-    <div class="ht__form" aria-hidden="true">
-      <section class="ht__sec">
-        <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
-        <span class="ht__skelField">
-          <span class="ht__skelFieldLabel">{{ 'admin.helpTickets.wikiUrl' | t }}</span>
-          <span class="ht__skelFieldValue skel-in"><span class="skel-text"></span></span>
-        </span>
-      </section>
-      <section class="ht__sec">
-        <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
-        <div class="ht__rows">
-          @for (key of skelSwitches; track key) {
-            <div class="ht__row ht__row--split">
-              <span class="ht__label">{{ key | t }}</span>
-              <span class="skel-box ht__skelSwitch skel-in"></span>
-            </div>
-          }
-        </div>
-      </section>
-    </div>
-    <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
-  } @else if (loadState() === 'forbidden') {
-    @if (!canBlock()) {
-      <app-note kind="warn" icon="lock" role="alert">{{ 'admin.helpTickets.forbidden' | t }}</app-note>
-    }
-  } @else if (loadState() === 'error') {
-    <app-note kind="error" icon="alert" role="alert">{{ 'admin.helpTickets.loadError' | t }}</app-note>
-  } @else {
-    <form class="ht__form" (submit)="$event.preventDefault(); save()">
-      <section class="ht__sec" aria-labelledby="ht-wiki">
-        <h2 id="ht-wiki" class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
-        <app-input
-          type="url"
-          name="wikiUrl"
-          [label]="'admin.helpTickets.wikiUrl' | t"
-          [required]="true"
-          [error]="wikiError()"
-          [ngModel]="draft().wikiUrl"
-          (ngModelChange)="patch({ wikiUrl: $event })"
-        />
-      </section>
-
-      <section class="ht__sec" aria-labelledby="ht-reports">
-        <h2 id="ht-reports" class="section-title ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
-        <div class="ht__rows">
-          <app-switch
-            class="ht__row"
-            [checked]="draft().publicEnabled"
-            (checkedChange)="patch({ publicEnabled: $event })"
-            >{{ 'admin.helpTickets.public' | t }}</app-switch
-          >
-          <app-switch class="ht__row" [checked]="draft().notifyNew" (checkedChange)="patch({ notifyNew: $event })">{{
-            'admin.helpTickets.notify' | t
-          }}</app-switch>
-          <div class="ht__row ht__row--split">
-            <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
-            @if (draft().retentionMonths; as months) {
-              <app-filter-select
-                [label]="'admin.helpTickets.retention' | t"
-                [options]="monthOptions()"
-                [value]="'' + months"
-                (valueChange)="setMonths($event)"
-              />
+  <app-load-state
+    [state]="form.state()"
+    [forbiddenText]="canBlock() ? null : ('admin.helpTickets.forbidden' | t)"
+    [errorText]="'admin.helpTickets.loadError' | t"
+  >
+    <ng-template #loading>
+      <!-- The loaded form with bars in place of the values: the same sections, the field
+           and the switch rows with their real labels. The bars show after 300ms. -->
+      <div class="ht__form" aria-hidden="true">
+        <section class="ht__sec">
+          <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+          <span class="ht__skelField">
+            <span class="ht__skelFieldLabel">{{ 'admin.helpTickets.wikiUrl' | t }}</span>
+            <span class="ht__skelFieldValue skel-in"><span class="skel-text"></span></span>
+          </span>
+        </section>
+        <section class="ht__sec">
+          <h2 class="section-title ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+          <div class="ht__rows">
+            @for (key of skelSwitches; track key) {
+              <div class="ht__row ht__row--split">
+                <span class="ht__label">{{ key | t }}</span>
+                <span class="skel-box ht__skelSwitch skel-in"></span>
+              </div>
             }
-            <app-switch
-              [ariaLabel]="'admin.helpTickets.anonymize' | t"
-              [checked]="draft().retentionMonths !== null"
-              (checkedChange)="setAnonymize($event)"
-            />
           </div>
-        </div>
-      </section>
-    </form>
-  }
+        </section>
+      </div>
+      <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
+    </ng-template>
+    <ng-template #content>
+      <form class="ht__form" (submit)="$event.preventDefault(); save()">
+        <section class="ht__sec" aria-labelledby="ht-wiki">
+          <h2 id="ht-wiki" class="section-title ht__secTitle">{{ 'admin.helpTickets.wiki' | t }}</h2>
+          <app-input
+            type="url"
+            name="wikiUrl"
+            [label]="'admin.helpTickets.wikiUrl' | t"
+            [required]="true"
+            [error]="wikiError()"
+            [ngModel]="draft().wikiUrl"
+            (ngModelChange)="patch({ wikiUrl: $event })"
+          />
+        </section>
+
+        <section class="ht__sec" aria-labelledby="ht-reports">
+          <h2 id="ht-reports" class="section-title ht__secTitle">{{ 'admin.helpTickets.reports' | t }}</h2>
+          <div class="ht__rows">
+            <app-switch
+              class="ht__row"
+              [checked]="draft().publicEnabled"
+              (checkedChange)="patch({ publicEnabled: $event })"
+              >{{ 'admin.helpTickets.public' | t }}</app-switch
+            >
+            <app-switch class="ht__row" [checked]="draft().notifyNew" (checkedChange)="patch({ notifyNew: $event })">{{
+              'admin.helpTickets.notify' | t
+            }}</app-switch>
+            <div class="ht__row ht__row--split">
+              <span id="ht-anon" class="ht__label">{{ 'admin.helpTickets.anonymize' | t }}</span>
+              @if (draft().retentionMonths; as months) {
+                <app-filter-select
+                  [label]="'admin.helpTickets.retention' | t"
+                  [options]="monthOptions()"
+                  [value]="'' + months"
+                  (valueChange)="setMonths($event)"
+                />
+              }
+              <app-switch
+                [ariaLabel]="'admin.helpTickets.anonymize' | t"
+                [checked]="draft().retentionMonths !== null"
+                (checkedChange)="setAnonymize($event)"
+              />
+            </div>
+          </div>
+        </section>
+      </form>
+    </ng-template>
+  </app-load-state>
 
   @if (canBlock()) {
     <section class="ht__sec" aria-labelledby="ht-blocked">
@@ -136,14 +137,14 @@
             <span class="skel-box ht__skelButton ht__skelButton--sm"></span>
           </li>
         </ul>
-        @if (!loading()) {
+        @if (!form.loading()) {
           <span class="sr-only" role="status">{{ 'common.loading' | t }}</span>
         }
       }
     </section>
   }
 
-  @if (loadState() === 'ok' && !loading() && dirty()) {
+  @if (form.state() === 'ok' && dirty()) {
     <app-fab icon="check" [label]="'action.save' | t" [loading]="saving()" [disabled]="!!wikiError()" (activate)="save()" />
   }
 </section>

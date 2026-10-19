@@ -1,11 +1,11 @@
 @use 'breakpoints' as bp;
+@use '../../shared/ui/scroll-fade' as fade;
+@use '../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications page (applications-list.component.scss). */
 
 :host {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 
 /* Side by side the page does not scroll: the host is a pane page (`.pane-page` in
@@ -15,8 +15,7 @@
   min-width: 0;
 }
 .tasks--split {
-  flex: 1 1 0;
-  min-height: 0;
+  @include lp.split-column;
 }
 
 /* ------------------------------------------------------------------ list pane */
@@ -25,62 +24,30 @@
 
 /* ------------------------------------------------------------------ rows */
 .tasks__scroll {
-  --tasks-fade: var(--space-6);
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.scroll(--tasks-fade);
 }
 .tasks--split .tasks__scroll {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--tasks-fade);
+  @include lp.split-scroll(--tasks-fade);
 }
 .tasks--split .tasks__scroll > * {
   flex: none;
 }
 /* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.tasks__scroll.is-fade-start {
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--tasks-fade));
-  mask-image: linear-gradient(to bottom, transparent, #000 var(--tasks-fade));
-}
-.tasks__scroll.is-fade-end {
-  -webkit-mask-image: linear-gradient(to top, transparent, #000 var(--tasks-fade));
-  mask-image: linear-gradient(to top, transparent, #000 var(--tasks-fade));
-}
-.tasks__scroll.is-fade-start.is-fade-end {
-  -webkit-mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--tasks-fade),
-    #000 calc(100% - var(--tasks-fade)),
-    transparent
-  );
-  mask-image: linear-gradient(
-    to bottom,
-    transparent,
-    #000 var(--tasks-fade),
-    #000 calc(100% - var(--tasks-fade)),
-    transparent
-  );
+.tasks__scroll {
+  @include fade.fade-y(var(--tasks-fade));
 }
 
 .tasks__group {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 .tasks__month {
-  padding: 18px var(--space-4) 6px;
+  @include lp.month;
 }
 .tasks__group:first-child .tasks__month {
   padding-top: var(--space-2);
 }
 .tasks__rows {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.stack;
 }
 
 .tasks__dot {
@@ -122,10 +89,7 @@
 
 /* ------------------------------------------------------------------ detail pane */
 .tasks__detail {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
+  @include lp.detail;
 }
 /* Side by side a to-do sheet is as tall as the pane, like the card drawer of the board:
    the thread fills its column with the composer at the foot of the pane, and the details
@@ -147,11 +111,7 @@
 
 /* ------------------------------------------------------------------ groups and To-Dos */
 .tasks__chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+  @include lp.chips;
 }
 .tasks__kind {
   margin: 0;

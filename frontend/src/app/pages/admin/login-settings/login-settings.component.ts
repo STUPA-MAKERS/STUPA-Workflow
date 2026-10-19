@@ -1,14 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { PageHeaderComponent } from '@shared/ui';
-import { NoteComponent } from '@shared/ui/note/note.component';
-import { SkeletonComponent } from '@shared/ui/skeleton/skeleton.component';
+import { type SettingsForm, settingsForm } from '@shared/forms/settings-form';
+import { LoadStateComponent } from '@shared/ui/load-state/load-state.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
-import { InputComponent, ToastService } from '@stupa-makers/ui-kit';
+import { InputComponent } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
 import { type LoginSettings, MAX_SESSION_DAYS } from '../admin.models';
 
@@ -61,8 +61,7 @@ function draftOf(s: LoginSettings): Draft {
     PageHeaderComponent,
     FabComponent,
     InputComponent,
-    NoteComponent,
-    SkeletonComponent,
+    LoadStateComponent,
   ],
   templateUrl: './login-settings.component.html',
   styleUrl: './login-settings.component.scss',
@@ -71,19 +70,20 @@ export class LoginSettingsComponent {
   private readonly api = inject(AdminApiService);
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
-  private readonly toast = inject(ToastService);
 
-
-  /** The page needs the users right. The server checks it again. */
-  protected readonly allowed = computed(() => this.auth.can('admin.users'));
-
-  protected readonly loading = signal(true);
-  /** The read failed: `forbidden` hides the form, `error` names the failure. */
-  protected readonly loadState = signal<'ok' | 'forbidden' | 'error'>('ok');
-  protected readonly saving = signal(false);
+  protected readonly form: SettingsForm<LoginSettings, Draft> = settingsForm<LoginSettings, Draft, LoginSettingsBody>({
+    allowed: () => this.auth.can('admin.users'),
+    load: () => this.api.getLoginSettings(),
+    put: (body) => this.api.putLoginSettings(body),
+    draftOf,
+    initial: { web: '', pwa: '' },
+    body: () => this.body(),
+    unchanged: (b, s) => b.webSessionDays === s.webSessionDays && b.pwaSessionDays === s.pwaSessionDays,
+  });
+  protected readonly saving = this.form.saving;
   /** The stored values; the draft compares against them. */
-  protected readonly saved = signal<LoginSettings | null>(null);
-  protected readonly draft = signal<Draft>({ web: '', pwa: '' });
+  protected readonly saved = this.form.saved;
+  protected readonly draft = this.form.draft;
 
   protected readonly web = computed(() => sessionDays(this.draft().web));
   protected readonly pwa = computed(() => sessionDays(this.draft().pwa));
@@ -98,60 +98,18 @@ export class LoginSettingsComponent {
     return { webSessionDays: web, pwaSessionDays: pwa };
   });
 
-  protected readonly dirty = computed(() => {
-    const s = this.saved();
-    const b = this.body();
-    if (!s) return false;
-    if (!b) return true;
-    return b.webSessionDays !== s.webSessionDays || b.pwaSessionDays !== s.pwaSessionDays;
-  });
-
-  protected readonly canSave = computed(() => this.dirty() && this.body() !== null && !this.saving());
-
-  constructor() {
-    if (!this.allowed()) {
-      this.loading.set(false);
-      this.loadState.set('forbidden');
-      return;
-    }
-    this.api.getLoginSettings().subscribe({
-      next: (s) => this.apply(s),
-      error: (err: { status?: number }) => {
-        this.loading.set(false);
-        this.loadState.set(err?.status === 403 ? 'forbidden' : 'error');
-      },
-    });
-  }
+  protected readonly dirty = this.form.dirty;
+  protected readonly canSave = this.form.canSave;
 
   private rangeText(): string {
     return this.i18n.translate('admin.loginSettings.range', { max: MAX_SESSION_DAYS });
   }
 
-  private apply(s: LoginSettings): void {
-    this.saved.set(s);
-    this.draft.set(draftOf(s));
-    this.loading.set(false);
-    this.loadState.set('ok');
-  }
-
   protected patch(change: Partial<Draft>): void {
-    this.draft.update((d) => ({ ...d, ...change }));
+    this.form.patch(change);
   }
 
   protected save(): void {
-    const body = this.body();
-    if (!body || !this.canSave()) return;
-    this.saving.set(true);
-    this.api.putLoginSettings(body).subscribe({
-      next: (s) => {
-        this.saving.set(false);
-        this.apply(s);
-        this.toast.success(this.i18n.translate('admin.common.saved'));
-      },
-      error: () => {
-        this.saving.set(false);
-        this.toast.error(this.i18n.translate('admin.common.saveFailed'));
-      },
-    });
+    this.form.save();
   }
 }

@@ -27,6 +27,7 @@ import {
 } from '../admin.models';
 import { SubstitutePoolComponent } from '../delegations/substitute-pool.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** One row of the member list. */
 interface Member {
@@ -57,6 +58,7 @@ export const MEMBER_PREVIEW = 7;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     EmptyStateComponent,
     RouterLink,
     TranslatePipe,

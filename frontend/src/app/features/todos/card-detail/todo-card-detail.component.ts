@@ -82,6 +82,7 @@ import {
   splitUrl,
   type Translate,
 } from '../todos.util';
+import { copyToClipboard } from '@shared/clipboard';
 
 type CardTab = 'details' | 'activity';
 
@@ -998,14 +999,8 @@ export class TodoCardDetailComponent {
     const c = this.card();
     if (!c) return;
     const url = `${location.origin}/todos/${c.boardId}?card=${c.id}`;
-    const clip = navigator.clipboard;
-    if (!clip) {
-      this.toast.error(this.t('todos.card.linkFailed'));
-      return;
-    }
-    clip.writeText(url).then(
-      () => this.toast.success(this.t('todos.card.linkCopied')),
-      () => this.toast.error(this.t('todos.card.linkFailed')),
+    void copyToClipboard(url).then((ok) =>
+      ok ? this.toast.success(this.t('todos.card.linkCopied')) : this.toast.error(this.t('todos.card.linkFailed')),
     );
   }
 

@@ -9,19 +9,14 @@
   (submit)="submit($event)"
 >
   @if (layout() !== 'sheet') {
-    <header class="ff__head">
-      <div class="ff__titles">
-        <h2 class="ff__title" [id]="'tf-title-' + mode()">{{
-          (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t
-        }}</h2>
-        @if (mode() !== 'create') {
-          <p class="ff__subtitle">{{ t.editing()?.description }}</p>
-        }
-      </div>
-      <app-button variant="text" [iconOnly]="true" [ariaLabel]="'action.close' | t" (click)="close()">
-        <app-icon name="x" />
-      </app-button>
-    </header>
+    <header
+      class="ff__head"
+      appPaneFormHead
+      [heading]="(mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t"
+      [headingId]="'tf-title-' + mode()"
+      [subtitle]="mode() !== 'create' ? t.editing()?.description : null"
+      (closed)="close()"
+    ></header>
   }
 
   <div class="ff__body" appScrollFade="y">
@@ -88,28 +83,8 @@
           <section class="ff__sec" aria-labelledby="tf-preview">
             <h3 id="tf-preview" class="sec ff__secTitle">{{ 'expenses.transfers.preview' | t }}</h3>
             @if (preview(); as p) {
-              <div class="tf__leg">
-                <span class="tf__kind">{{ 'expenses.transfers.expenseOn' | t }}</span>
-                <span class="tf__name">{{ p.from.cc.name }}</span>
-                <span class="ff__mono">
-                  {{ p.from.cc.path }}
-                  @if (p.from.after) {
-                    · {{ 'expenses.transfers.availableAfter' | t: { amount: p.from.after } }}
-                  }
-                </span>
-                <span class="tf__amount mono">−{{ p.amount }}</span>
-              </div>
-              <div class="tf__leg">
-                <span class="tf__kind">{{ 'expenses.transfers.incomeOn' | t }}</span>
-                <span class="tf__name">{{ p.to.cc.name }}</span>
-                <span class="ff__mono">
-                  {{ p.to.cc.path }}
-                  @if (p.to.after) {
-                    · {{ 'expenses.transfers.availableAfter' | t: { amount: p.to.after } }}
-                  }
-                </span>
-                <span class="tf__amount tf__amount--in mono">+{{ p.amount }}</span>
-              </div>
+              <app-transfer-leg class="tf__leg" direction="out" [name]="p.from.cc.name" [path]="p.from.cc.path" [after]="p.from.after" [amount]="p.amount" />
+              <app-transfer-leg class="tf__leg" direction="in" [name]="p.to.cc.name" [path]="p.to.cc.path" [after]="p.to.after" [amount]="p.amount" />
             } @else {
               <app-note icon="repeat" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.transfers.previewEmpty' | t }}</app-note>
             }
@@ -187,31 +162,22 @@
     </div>
   </div>
 
-  <footer class="ff__foot">
-    @if (mode() === 'edit') {
-      <!-- A phone sheet has no room for three labelled buttons: delete is an icon. -->
-      <app-button
-        variant="danger"
-        [iconOnly]="layout() === 'sheet'"
-        [ariaLabel]="'action.delete' | t"
-        (click)="remove.emit()"
-      >
-        <span class="ff__btn"
-          ><app-icon name="trash" />@if (layout() !== 'sheet') { {{ 'action.delete' | t }} }</span
-        >
+  <footer
+    class="ff__foot"
+    appPaneFormFoot
+    [deletable]="mode() === 'edit'"
+    [compact]="layout() === 'sheet'"
+    (removed)="remove.emit()"
+    (cancelled)="close()"
+  >
+    @if (mode() === 'create') {
+      <app-button variant="fill" [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
+        <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.transferConfirm' | t }}</span>
       </app-button>
+    } @else {
+      <app-button variant="fill" [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
+        'action.save' | t
+      }}</app-button>
     }
-    <div class="ff__footEnd">
-      <app-button variant="text" (click)="close()">{{ 'action.cancel' | t }}</app-button>
-      @if (mode() === 'create') {
-        <app-button variant="fill" [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
-          <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.transferConfirm' | t }}</span>
-        </app-button>
-      } @else {
-        <app-button variant="fill" [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
-          'action.save' | t
-        }}</app-button>
-      }
-    </div>
   </footer>
 </form>

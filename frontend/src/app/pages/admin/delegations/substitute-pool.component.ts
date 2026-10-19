@@ -36,6 +36,7 @@ import { type AdminPrincipal, isActiveMembership } from '../admin.models';
 import { ScrollFadeDirective } from '@shared/scroll-fade.directive';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
 /** A member of the gremium: a choice of "Vertritt". */
 export interface PoolMember {
@@ -63,6 +64,7 @@ const SEARCH_LIMIT = 8;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SectionHeaderComponent,
     NoteComponent,
     EmptyStateComponent,
     ScrollFadeDirective,

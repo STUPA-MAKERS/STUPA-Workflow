@@ -1,4 +1,4 @@
-@use '../dialog-form' as df;
+@use '../../../shared/ui/dialog-form' as df;
 @use 'field' as f;
 
 @include df.host;

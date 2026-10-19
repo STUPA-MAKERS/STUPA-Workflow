@@ -102,6 +102,7 @@ import {
   reporterEventText,
   reporterName,
 } from './tickets.util';
+import { copyToClipboard } from '@shared/clipboard';
 
 type DetailTab = 'log' | 'details';
 
@@ -643,10 +644,9 @@ export class TicketDetailComponent {
 
   /** Copy the link of the ticket. */
   async copyLink(): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(location.href.split('?')[0]);
+    if (await copyToClipboard(location.href.split('?')[0])) {
       this.toast.success(this.t('tickets.detail.linkCopied'));
-    } catch {
+    } else {
       this.toast.error(this.t('tickets.detail.linkFailed'));
     }
   }

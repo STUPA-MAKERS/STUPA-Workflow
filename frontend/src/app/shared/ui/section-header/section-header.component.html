@@ -1,0 +1,13 @@
+<header class="sh">
+  @if (heading(); as text) {
+    @if (level() === 3) {
+      <h3 class="section-title sh__title" [id]="headingId()">{{ text }}</h3>
+    } @else {
+      <h2 class="section-title sh__title" [id]="headingId()">{{ text }}</h2>
+    }
+  }
+  @if (count() !== null) {
+    <span class="sh__count">{{ count() }}</span>
+  }
+  <span class="sh__end"><ng-content /></span>
+</header>

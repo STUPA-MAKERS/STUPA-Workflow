@@ -59,12 +59,12 @@ import {
   weekdayShort,
 } from '../meetings-overview.util';
 import { MeetingsTimelineService } from '../meetings-timeline.service';
-import { MeetingsViewSwitchComponent } from '../meetings-view-switch/meetings-view-switch.component';
 import { beamerUrl } from '../../voting/beamer-link.util';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 
 /** A cell shows this many meetings; the rest is "+n" and shows in the side panel. */
 export const CELL_ENTRIES = 2;
@@ -105,6 +105,7 @@ interface DayCard {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    MeetingsViewActionsComponent,
     NoteComponent,
     EmptyStateComponent,
     FabComponent,
@@ -121,7 +122,6 @@ interface DayCard {
     SegBarComponent,
     StatusTextComponent,
     ScrollFadeDirective,
-    MeetingsViewSwitchComponent,
     CalendarSubscribeComponent,
   ],
   host: { '[class.cal--wide]': 'wide()' },
@@ -201,14 +201,6 @@ export class MeetingsCalendarComponent {
   });
 
   /** The filter offers a choice only when the user reads more than one Gremium. */
-  readonly showFilter = computed(() => this.timeline.filterGremien().length > 1);
-  readonly filterLabel = computed(() => {
-    const options = this.timeline.filterGremiumOptions();
-    const value = this.timeline.gremiumFilter();
-    // An unknown value (a Gremium that left the list) reads as "Alle Gremien".
-    return options.find((o) => o.value === value)?.label ?? options[0].label;
-  });
-
   constructor() {
     this.scheduleMidnight();
     inject(DestroyRef).onDestroy(() => {

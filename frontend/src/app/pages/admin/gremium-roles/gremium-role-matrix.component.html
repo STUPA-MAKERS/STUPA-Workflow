@@ -4,18 +4,18 @@
   [attr.aria-labelledby]="heading() ? uid + '-title' : null"
 >
   @if (heading() || (canEdit() && !fab())) {
-    <header class="rm__head">
-      @if (heading()) {
-        <h3 class="section-title" [id]="uid + '-title'">
-          {{ 'admin.gremiumRoles.matrixTitle' | t }}
-        </h3>
-      }
+    <app-section-header
+      class="rm__head"
+      [level]="3"
+      [headingId]="uid + '-title'"
+      [heading]="heading() ? ('admin.gremiumRoles.matrixTitle' | t) : null"
+    >
       @if (canEdit() && !fab()) {
-        <app-button class="rm__add" size="sm" variant="tonal" (click)="openAdd()">
+        <app-button size="sm" variant="tonal" (click)="openAdd()">
           <app-icon name="plus" /> {{ 'admin.gremiumRoles.create' | t }}
         </app-button>
       }
-    </header>
+    </app-section-header>
   }
   @if (canEdit() && fab()) {
     <app-fab [label]="'fab.gremiumRole' | t" (activate)="openAdd()" />

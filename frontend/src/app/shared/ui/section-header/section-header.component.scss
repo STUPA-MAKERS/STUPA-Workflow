@@ -1,0 +1,32 @@
+:host {
+  display: contents;
+}
+
+.sh {
+  display: flex;
+  flex-wrap: var(--sh-wrap, wrap);
+  align-items: var(--sh-align, center);
+  justify-content: space-between;
+  gap: var(--sh-gap, var(--space-2) var(--space-4));
+  min-height: var(--sh-min-height, auto);
+  padding-inline: var(--sh-inset, var(--space-1));
+}
+.sh__title {
+  min-width: var(--sh-title-min, auto);
+  padding-inline: var(--sh-title-inset, 0);
+}
+.sh__count {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: var(--sh-count-nums, tabular-nums);
+}
+.sh__end {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-inline-start: auto;
+}
+.sh__end:empty {
+  display: none;
+}

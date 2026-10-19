@@ -1,0 +1,13 @@
+@if (approved()) {
+  @if (layout() === 'stack') {
+    <span class="amt__stack">
+      <span class="mono amt__value amt__value--stack">{{ approved() }}</span>
+      <s class="mono amt__struck amt__struck--stack">{{ amount() }}</s>
+    </span>
+  } @else {
+    <span class="mono amt__value amt__value--approved">{{ approved() }}</span>
+    <s class="mono amt__struck amt__struck--inline">{{ amount() }}</s>
+  }
+} @else if (amount()) {
+  <span class="mono amt__value" [class.amt__value--stack]="layout() === 'stack'">{{ amount() }}</span>
+}

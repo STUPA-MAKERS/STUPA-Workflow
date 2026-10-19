@@ -1,14 +1,7 @@
-<div class="none">
-  @switch (state()) {
-    @case ('empty') {
-      <app-empty-state plain icon="vote"
-        fill
-        [heading]="'voting.list.empty' | t"
-        [body]="'voting.list.emptyBody' | t"
-      />
-    }
-    @case ('pick') {
-      <app-empty-state plain icon="vote" fill [heading]="'voting.list.none' | t" />
-    }
-  }
-</div>
+<app-detail-none
+  [state]="state()"
+  icon="vote"
+  [heading]="'voting.list.none' | t"
+  [emptyHeading]="'voting.list.empty' | t"
+  [emptyBody]="'voting.list.emptyBody' | t"
+/>

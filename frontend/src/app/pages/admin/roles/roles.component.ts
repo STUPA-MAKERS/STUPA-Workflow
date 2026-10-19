@@ -28,6 +28,8 @@ import { ROLE_KEY_PATTERN, type Role } from '../admin.models';
 import { permissionSections } from './permission-sections';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { ConfirmDialogComponent } from '@shared/ui/confirm-dialog/confirm-dialog.component';
+import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
+import { expandSet } from '@shared/expand-set';
 
 /** Draft for a new global role. */
 interface RoleDraft {
@@ -59,6 +61,7 @@ const FIXED_ROLES = new Set(['admin', 'member']);
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    I18nInputComponent,
     FabComponent,
     ConfirmDialogComponent,
     EmptyStateComponent,
@@ -89,7 +92,7 @@ export class AdminRolesComponent {
   private readonly savedRoles = signal<ReadonlyMap<string, Role>>(new Map());
   protected readonly savingRoles = signal(false);
   protected readonly permissions = signal<string[]>([]);
-  protected readonly expanded = signal<Set<string>>(new Set());
+  protected readonly expanded = expandSet<string>();
   protected readonly addOpen = signal(false);
   protected readonly draft = signal<RoleDraft>({ key: '', labelDe: '', labelEn: '' });
   /** The trimmed draft key matches ROLE_KEY_PATTERN. The server refuses other keys with 422. */
@@ -147,7 +150,7 @@ export class AdminRolesComponent {
   }
 
   protected isOpen(role: Role): boolean {
-    return this.expanded().has(role.id);
+    return this.expanded.has(role.id);
   }
 
   /** The ⋮ menu of a role that is not fixed: delete is its only action. */
@@ -180,12 +183,7 @@ export class AdminRolesComponent {
   }
 
   protected toggle(id: string): void {
-    this.expanded.update((set) => {
-      const next = new Set(set);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    this.expanded.toggle(id);
   }
 
   protected togglePerm(role: Role, perm: string, on: boolean): void {
@@ -307,7 +305,7 @@ export class AdminRolesComponent {
         this.creating.set(false);
         this.roles.update((list) => [...list, role]);
         this.keepSaved([role]);
-        this.expanded.update((set) => new Set(set).add(role.id));
+        this.expanded.open(role.id);
         this.addOpen.set(false);
         this.toast.success(this.i18n.translate('admin.roles.created'));
       },

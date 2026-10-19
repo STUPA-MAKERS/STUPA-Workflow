@@ -48,6 +48,8 @@ import { DraftFilesComponent } from '../../../features/apply/draft-files/draft-f
 import { FormlyDraftFilesType } from '../../../features/apply/draft-files/formly-draft-files.type';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
+import { PaneFormFootComponent } from '@shared/ui/pane-form/pane-form-foot.component';
 
 /** Who the application is for: an account, or a new person without one. */
 export type ApplicantMode = 'account' | 'guest';
@@ -98,6 +100,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PaneFormFootComponent,
+    PaneFormHeadComponent,
     NoteComponent,
     FormsModule,
     FormlyForm,

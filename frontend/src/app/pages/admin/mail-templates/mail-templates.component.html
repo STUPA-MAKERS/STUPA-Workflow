@@ -43,7 +43,7 @@
             @if (d.source === 'override') {
               <app-status-text kind="accent">{{ 'admin.mailTemplates.customized' | t }}</app-status-text>
             }
-            <app-segmented width="equal" [options]="langOptions" [value]="lang()" (valueChange)="setLang($event)" [ariaLabel]="'admin.mailTemplates.lang' | t" />
+            <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.mailTemplates.lang' | t" />
           </span>
         </header>
 
