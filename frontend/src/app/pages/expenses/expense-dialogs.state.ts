@@ -18,6 +18,18 @@ import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
 import type { ExpenseTransfersState } from './expense-transfers.state';
 import { formatMoney } from '@shared/format-money';
 
+/** The fiscal year that holds today, else the only active one, else null. */
+export function currentFiscalYear(
+  fys: readonly FiscalYear[],
+  today = new Date(),
+): FiscalYear | null {
+  const iso = today.toISOString().slice(0, 10);
+  const now = fys.find((f) => f.startDate <= iso && iso <= f.endDate);
+  if (now) return now;
+  const active = fys.filter((f) => f.active);
+  return active.length === 1 ? active[0] : null;
+}
+
 /**
  * Booking forms: create (standalone or application-bound), edit, delete, transfer
  * between cost centres, and the invoice cache behind the invoice field and the
@@ -126,6 +138,21 @@ export class ExpenseDialogsState {
   readonly tAmount = signal('');
   readonly tDescription = signal('');
   readonly transferFyOptions = signal<SelectOption[]>([]);
+
+  /**
+   * The fiscal year per top-level budget that the cost-centre list counts the free amount
+   * in, for the budgets the form has no year of: the year that holds today, else the only
+   * active one. Filled by every load of the years of a top-level budget, and for the
+   * others when the cost-centre list opens.
+   */
+  readonly topFiscalYears = signal<ReadonlyMap<string, string>>(new Map());
+  private readonly topYearsAsked = new Set<string>();
+
+  /** The invoice of the new booking, while one is picked. */
+  readonly newInvoice = computed<Invoice | null>(() => {
+    const id = this.newInvoiceId();
+    return id ? (this.invoices().find((i) => i.id === id) ?? null) : null;
+  });
   readonly canSubmitTransfer = computed(
     () =>
       !!this.tFromId() &&
@@ -279,6 +306,7 @@ export class ExpenseDialogsState {
     if (!top) return;
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
+        this.rememberTopYear(top.id, fys);
         // Offer every fiscal year. An inactive one is allowed on purpose.
         this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
         const active = fys.filter((f) => f.active);
@@ -488,6 +516,45 @@ export class ExpenseDialogsState {
     this.transferOpen.set(true);
   }
 
+  /**
+   * "Richtung tauschen": the source becomes the target and back. The fiscal year stays
+   * when both cost centres are in the same top-level budget; else the years of the new
+   * source load.
+   */
+  swapTransfer(): void {
+    const from = this.tFromId();
+    const to = this.tToId();
+    if (!from && !to) return;
+    const tree = this.list.budgetTree();
+    const sameTop =
+      !!from && !!to && findTopBudgetNode(tree, from)?.id === findTopBudgetNode(tree, to)?.id;
+    this.tToId.set(from);
+    if (sameTop) this.tFromId.set(to);
+    else this.onTransferFrom(to);
+  }
+
+  /**
+   * Load the fiscal years of every top-level budget whose year `topFiscalYears` does not
+   * hold yet, once each (the cost-centre list calls it when it opens).
+   */
+  loadTopFiscalYears(): void {
+    for (const top of this.list.budgetTree()) {
+      if (this.topYearsAsked.has(top.id) || this.topFiscalYears().has(top.id)) continue;
+      this.topYearsAsked.add(top.id);
+      this.api.listFiscalYears(top.id).subscribe({
+        next: (fys: FiscalYear[]) => this.rememberTopYear(top.id, fys),
+        error: () => this.topYearsAsked.delete(top.id),
+      });
+    }
+  }
+
+  private rememberTopYear(topId: string, fys: readonly FiscalYear[]): void {
+    const year = currentFiscalYear(fys);
+    if (year && this.topFiscalYears().get(topId) !== year.id) {
+      this.topFiscalYears.update((m) => new Map(m).set(topId, year.id));
+    }
+  }
+
   onTransferFrom(id: string): void {
     this.tFromId.set(id);
     this.tFiscalYearId.set('');
@@ -500,6 +567,7 @@ export class ExpenseDialogsState {
     if (!top) return;
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
+        this.rememberTopYear(top.id, fys);
         this.transferFyOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
         const active = fys.filter((f) => f.active);
         if (active.length === 1) this.tFiscalYearId.set(active[0].id);

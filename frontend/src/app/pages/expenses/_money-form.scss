@@ -1,0 +1,148 @@
+// The form of a booking or a transfer (boards "Buchung hinzufügen", "Übertrag buchen"). It
+// replaces the detail sheet of the bookings page, or fills the bottom sheet of a phone.
+//
+// A head (the shared pane-form head: title and close), a body that scrolls in two equal
+// columns of sections, and a foot (the shared pane-form foot: delete on the left; cancel
+// and the main action on the right). In the bottom sheet the sheet brings the head and the side gutter.
+// The two form components `@use` this file.
+:host {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.mf {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+}
+.mf--pane {
+  border-radius: var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.mf--sheet {
+  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
+  --color-surface-sunken: var(--color-surface-3);
+}
+
+.mf__head {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-6) var(--space-4);
+}
+
+.mf__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-1) var(--space-6) var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  container-type: inline-size;
+}
+/* In the bottom sheet the sheet body gives the side gutter. */
+.mf--sheet .mf__body {
+  padding: var(--space-1) 0 var(--space-5);
+}
+
+/* Two equal columns; one column when the body is narrower than two fields side by side. */
+.mf__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+@container (max-width: 40rem) {
+  .mf__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.mf__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+}
+.mf__stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+.mf__sec {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+/* The section heading: the global `.sec` caption, in capitals; a `legend` loses its
+   padding. */
+.mf__secTitle {
+  padding: 0;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mf__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+/* The payment method: the kit chip group with chips of control height. */
+.mf__chips {
+  --chip-group-height: var(--control-height);
+}
+
+.mf__error {
+  margin: 0;
+  padding: 0 var(--space-4);
+  color: var(--color-danger);
+  font-size: var(--fs-small);
+}
+
+/* The foot: delete at the start, cancel and the main action at the end. */
+.mf__foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6) var(--space-5);
+  border-top: var(--border-width) solid var(--color-border);
+  border-radius: 0 0 var(--radius-2xl) var(--radius-2xl);
+  background: var(--color-surface-1);
+}
+.mf--sheet .mf__foot {
+  padding: var(--space-3) 0;
+  border-radius: 0;
+  background: var(--color-surface-2);
+}
+.mf__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+/* The main action: 56px high. */
+.mf__primary {
+  --control-height-lg: 3.5rem;
+  min-width: 0;
+}
+
+/* One pane at a time the page scrolls: the foot sticks to the end of the viewport. */
+.mf--page .mf__body {
+  overflow: visible;
+}
+.mf--page .mf__foot {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-sticky);
+}

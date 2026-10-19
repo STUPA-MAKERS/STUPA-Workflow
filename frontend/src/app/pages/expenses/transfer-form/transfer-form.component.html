@@ -1,113 +1,166 @@
 @let d = dialogs();
 @let t = transfers();
 <form
-  class="ff"
-  [class.ff--pane]="layout() === 'pane'"
-  [class.ff--page]="layout() === 'page'"
-  [class.ff--sheet]="layout() === 'sheet'"
+  class="mf"
+  [class.mf--pane]="layout() === 'pane'"
+  [class.mf--page]="layout() === 'page'"
+  [class.mf--sheet]="layout() === 'sheet'"
   [attr.aria-labelledby]="layout() === 'sheet' ? null : 'tf-title-' + mode()"
   (submit)="submit($event)"
 >
   @if (layout() !== 'sheet') {
     <header
-      class="ff__head"
+      class="mf__head"
       appPaneFormHead
-      [heading]="(mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t"
+      [heading]="
+        (mode() === 'create' ? 'expenses.transferNew' : 'expenses.transfers.editTitle') | t
+      "
       [headingId]="'tf-title-' + mode()"
-      [subtitle]="mode() !== 'create' ? t.editing()?.description : null"
       (closed)="close()"
     ></header>
   }
 
-  <div class="ff__body" appScrollFade="y">
-    <div class="ff__cols">
-      @if (mode() === 'create') {
-        <div class="ff__col">
-          <fieldset class="ff__sec">
-            <legend class="sec ff__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</legend>
-            <app-cost-centre-picker
-              swatch
-              required
-              text="namePath"
+  <div class="mf__body">
+    <div class="tf">
+      <section class="mf__sec" aria-labelledby="tf-pair">
+        <h3 id="tf-pair" class="sec mf__secTitle">{{ 'expenses.transfers.pairTitle' | t }}</h3>
+        @if (mode() === 'create') {
+          @let legs = free();
+          <div class="tf__legs">
+            <app-cost-centre-select
+              class="tf__leg"
+              variant="card"
+              id="tf-from"
               [label]="'expenses.transferFrom' | t"
               [placeholder]="'expenses.field.costCentrePlaceholder' | t"
-              unknownLabel="—"
+              [emptyLabel]="'expenses.field.noCostCentres' | t"
+              [required]="true"
               [nodes]="tree()"
               [value]="d.tFromId()"
+              [fiscalYearId]="d.tFiscalYearId()"
+              [fiscalYears]="d.topFiscalYears()"
+              (opened)="d.loadTopFiscalYears()"
               (picked)="pick('from', $event)"
-            />
-            <app-cost-centre-picker
-              swatch
-              required
-              text="namePath"
+            >
+              <ng-container *ngTemplateOutlet="freeLine; context: { $implicit: legs.from }" />
+            </app-cost-centre-select>
+            <div class="tf__mid">
+              <span class="tf__arrow" aria-hidden="true"
+                ><app-icon name="arrow" [size]="20"
+              /></span>
+              <app-button class="tf__swapInline" variant="text" (click)="d.swapTransfer()">
+                <span class="mf__btn"
+                  ><app-icon name="swap" [size]="18" />{{
+                    'expenses.transfers.swapShort' | t
+                  }}</span
+                >
+              </app-button>
+            </div>
+            <app-cost-centre-select
+              class="tf__leg"
+              variant="card"
+              id="tf-to"
               [label]="'expenses.transferTo' | t"
               [placeholder]="'expenses.field.costCentrePlaceholder' | t"
-              unknownLabel="—"
+              [emptyLabel]="'expenses.field.noCostCentres' | t"
+              [required]="true"
               [nodes]="tree()"
               [value]="d.tToId()"
+              [fiscalYearId]="d.tFiscalYearId()"
+              [fiscalYears]="d.topFiscalYears()"
+              (opened)="d.loadTopFiscalYears()"
               (picked)="pick('to', $event)"
-            />
-            @if (d.tFromId() && d.tFromId() === d.tToId()) {
-              <p class="ff__error" role="alert">{{ 'expenses.transfers.samePair' | t }}</p>
+            >
+              <ng-container *ngTemplateOutlet="freeLine; context: { $implicit: legs.to }" />
+            </app-cost-centre-select>
+          </div>
+          @if (d.tFromId() && d.tFromId() === d.tToId()) {
+            <p class="mf__error" role="alert">{{ 'expenses.transfers.samePair' | t }}</p>
+          }
+          <app-button class="tf__swap" variant="text" (click)="d.swapTransfer()">
+            <span class="mf__btn"
+              ><app-icon name="swap" [size]="18" />{{ 'expenses.transfers.swap' | t }}</span
+            >
+          </app-button>
+        } @else if (pair(); as p) {
+          <div class="tf__legs">
+            @for (leg of [p.from, p.to]; track $index) {
+              <app-locked-field
+                class="tf__fixed"
+                [label]="($index === 0 ? 'expenses.transferFrom' : 'expenses.transferTo') | t"
+              >
+                <span class="tf__fixedName">
+                  @if (leg.color) {
+                    <span
+                      class="tf__swatch"
+                      aria-hidden="true"
+                      [style.background]="leg.color"
+                    ></span>
+                  }
+                  {{ leg.name }}
+                </span>
+                <span class="tf__code mono">{{ leg.path }}</span>
+              </app-locked-field>
+              @if ($index === 0) {
+                <div class="tf__mid">
+                  <span class="tf__arrow" aria-hidden="true"
+                    ><app-icon name="arrow" [size]="20"
+                  /></span>
+                </div>
+              }
             }
-            <div class="ff__grid">
-              <app-select
-                name="tfy"
-                [label]="'expenses.field.fiscalYear' | t"
-                [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
-                [options]="d.transferFyOptions()"
-                [required]="true"
-                [error]="d.tFromId() && !d.transferFyOptions().length ? ('expenses.field.noFiscalYear' | t) : ''"
-                [ngModel]="d.tFiscalYearId()"
-                (ngModelChange)="d.tFiscalYearId.set($event)"
-              />
-              <app-currency-input
-                name="tamount"
-                [label]="'expenses.field.amount' | t"
-                [required]="true"
-                [ngModel]="d.tAmount()"
-                (ngModelChange)="d.tAmount.set($event)"
-              />
-            </div>
-            <app-input
-              name="tdesc"
-              [label]="'expenses.field.description' | t"
-              [required]="true"
-              [placeholder]="'expenses.field.descriptionPlaceholder' | t"
-              [ngModel]="d.tDescription()"
-              (ngModelChange)="d.tDescription.set($event)"
-            />
-          </fieldset>
-        </div>
-        <div class="ff__col">
-          <section class="ff__sec" aria-labelledby="tf-preview">
-            <h3 id="tf-preview" class="sec ff__secTitle">{{ 'expenses.transfers.preview' | t }}</h3>
-            @if (preview(); as p) {
-              <app-transfer-leg class="tf__leg" direction="out" [name]="p.from.cc.name" [path]="p.from.cc.path" [after]="p.from.after" [amount]="p.amount" />
-              <app-transfer-leg class="tf__leg" direction="in" [name]="p.to.cc.name" [path]="p.to.cc.path" [after]="p.to.after" [amount]="p.amount" />
-            } @else {
-              <app-note icon="repeat" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.transfers.previewEmpty' | t }}</app-note>
-            }
-            <p class="tf__later">{{ 'expenses.transfers.later' | t }}</p>
-          </section>
+          </div>
+        }
+      </section>
+
+      @if (mode() === 'create') {
+        <!-- The amount beside the year, the description below over the full width. -->
+        <div class="tf__fields">
+          <app-currency-input
+            class="tf__amount"
+            size="lg"
+            name="tamount"
+            [label]="'expenses.field.amount' | t"
+            [required]="true"
+            [ngModel]="d.tAmount()"
+            (ngModelChange)="d.tAmount.set($event)"
+          />
+          <app-select
+            class="tf__fy"
+            name="tfy"
+            [label]="'expenses.field.fiscalYear' | t"
+            [placeholder]="'expenses.field.fiscalYearPlaceholder' | t"
+            [options]="d.transferFyOptions()"
+            [required]="true"
+            [error]="
+              d.tFromId() && !d.transferFyOptions().length
+                ? ('expenses.field.noFiscalYear' | t)
+                : ''
+            "
+            [ngModel]="d.tFiscalYearId()"
+            (ngModelChange)="d.tFiscalYearId.set($event)"
+          />
+          <app-input
+            class="tf__desc"
+            name="tdesc"
+            [label]="'expenses.field.description' | t"
+            [required]="true"
+            [placeholder]="'expenses.transfers.descriptionPlaceholder' | t"
+            [ngModel]="d.tDescription()"
+            (ngModelChange)="d.tDescription.set($event)"
+          />
         </div>
       } @else {
-        <div class="ff__col">
-          <fieldset class="ff__sec">
-            <legend class="sec ff__secTitle">{{ 'expenses.form.fixed' | t }}</legend>
-            @if (pair(); as p) {
-              <div class="ff__grid">
-                <app-locked-field [label]="'expenses.transferFrom' | t">{{ p.from.name }}</app-locked-field>
-                <app-locked-field [label]="'expenses.transferTo' | t">{{ p.to.name }}</app-locked-field>
-              </div>
-            }
-            <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{ fyLabel() ? ('expenses.detail.fy' | t: { fy: fyLabel()! }) : '—' }}</app-locked-field>
-            <app-note icon="lock" [surface]="layout() === 'sheet' ? 3 : 2">{{ 'expenses.transfers.pairLocked' | t }}</app-note>
-          </fieldset>
-        </div>
-        <div class="ff__col">
-          <fieldset class="ff__sec">
-            <legend class="sec ff__secTitle">{{ 'expenses.detail.data' | t }}</legend>
+        <div class="mf__cols">
+          <div class="mf__stack">
+            <app-currency-input
+              size="lg"
+              name="teamount"
+              [label]="'expenses.field.amount' | t"
+              [required]="true"
+              [ngModel]="t.editAmount()"
+              (ngModelChange)="t.editAmount.set($event)"
+            />
             <app-input
               name="tedesc"
               [label]="'expenses.field.description' | t"
@@ -115,14 +168,12 @@
               [ngModel]="t.editDescription()"
               (ngModelChange)="t.editDescription.set($event)"
             />
-            <app-currency-input
-              name="teamount"
-              [label]="'expenses.field.amount' | t"
-              [required]="true"
-              [ngModel]="t.editAmount()"
-              (ngModelChange)="t.editAmount.set($event)"
-            />
-            <div class="ff__grid">
+          </div>
+          <div class="mf__stack">
+            <app-locked-field [label]="'expenses.field.fiscalYear' | t">{{
+              fyLabel() ?? '—'
+            }}</app-locked-field>
+            <div class="mf__grid">
               <app-datepicker
                 name="teinv"
                 [label]="'expenses.field.invoiceDate' | t"
@@ -138,21 +189,20 @@
             </div>
             <app-textarea [label]="'expenses.field.note' | t">
               <textarea
-                id="transfer-note"
                 name="tenote"
                 rows="3"
                 [ngModel]="t.editNote()"
                 (ngModelChange)="t.editNote.set($event)"
               ></textarea>
             </app-textarea>
-          </fieldset>
+          </div>
         </div>
       }
     </div>
   </div>
 
   <footer
-    class="ff__foot"
+    class="mf__foot"
     appPaneFormFoot
     [deletable]="mode() === 'edit'"
     [compact]="layout() === 'sheet'"
@@ -160,13 +210,41 @@
     (cancelled)="close()"
   >
     @if (mode() === 'create') {
-      <app-button variant="fill" [disabled]="!d.canSubmitTransfer()" [loading]="saving()" (click)="submit($event)">
-        <span class="ff__btn"><app-icon name="repeat" />{{ 'expenses.transferConfirm' | t }}</span>
+      <app-button
+        class="mf__primary"
+        variant="fill"
+        size="lg"
+        [disabled]="!d.canSubmitTransfer()"
+        [loading]="saving()"
+        (click)="submit($event)"
+      >
+        <span class="mf__btn"><app-icon name="swap" />{{ submitLabel() }}</span>
       </app-button>
     } @else {
-      <app-button variant="fill" [disabled]="!t.canSubmitEdit()" [loading]="saving()" (click)="submit($event)">{{
-        'action.save' | t
-      }}</app-button>
+      <app-button
+        class="mf__primary"
+        variant="fill"
+        size="lg"
+        [disabled]="!t.canSubmitEdit()"
+        [loading]="saving()"
+        (click)="submit($event)"
+      >
+        <span class="mf__btn"><app-icon name="check" />{{ 'action.save' | t }}</span>
+      </app-button>
     }
   </footer>
 </form>
+
+<ng-template #freeLine let-f>
+  @if (f) {
+    <span class="tf__free">
+      <span>{{ 'expenses.transfers.freeAfter' | t }}</span>
+      <span class="mono">
+        @if (f.before) {
+          <s class="tf__before">{{ f.before }}</s>
+        }
+        {{ f.after }}
+      </span>
+    </span>
+  }
+</ng-template>
