@@ -1,6 +1,6 @@
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { SheetBarComponent, SheetBarKickerDirective } from './sheet-bar.component';
+import { SheetBarComponent, SheetBarKickerDirective, SheetBarTitleDirective } from './sheet-bar.component';
 
 @Component({
   standalone: true,
@@ -29,6 +29,18 @@ class HostComponent {
 })
 class SlotHostComponent {}
 
+@Component({
+  standalone: true,
+  imports: [SheetBarComponent, SheetBarTitleDirective],
+  template: `
+    <app-sheet-bar kicker="ignored">
+      <h2 appSheetBarTitle>Sitzung des STUPA</h2>
+      <button type="button">Menü</button>
+    </app-sheet-bar>
+  `,
+})
+class TitleHostComponent {}
+
 describe('SheetBarComponent', () => {
   function render() {
     const fixture = TestBed.createComponent(HostComponent);
@@ -49,7 +61,7 @@ describe('SheetBarComponent', () => {
 
   it('projects the actions after the kicker', () => {
     const { bar } = render();
-    expect(bar.lastElementChild?.tagName).toBe('BUTTON');
+    expect(bar.querySelector('.sheet-bar__actions')?.lastElementChild?.tagName).toBe('BUTTON');
   });
 
   it('renders the kicker as a section heading when it has an id', () => {
@@ -92,6 +104,17 @@ describe('SheetBarComponent', () => {
     expect(bar.textContent).not.toContain('ignored');
     // The kicker comes first, the actions after it.
     expect(bar.firstElementChild).toBe(k);
-    expect(bar.lastElementChild?.textContent).toBe('Export');
+    expect(bar.querySelector('.sheet-bar__actions')?.lastElementChild?.textContent).toBe('Export');
+  });
+
+  it('puts a projected title on the line of the actions instead of a kicker', () => {
+    const fixture = TestBed.createComponent(TitleHostComponent);
+    fixture.detectChanges();
+    const bar = (fixture.nativeElement as HTMLElement).querySelector('app-sheet-bar') as HTMLElement;
+    expect(bar.classList).toContain('sheet-bar--title');
+    expect(bar.querySelector('.sheet-bar__kicker')).toBeNull();
+    expect(bar.firstElementChild?.classList).toContain('sheet-bar__title');
+    expect(bar.querySelector('.sheet-bar__title h2')?.textContent).toBe('Sitzung des STUPA');
+    expect(bar.querySelector('.sheet-bar__actions button')?.textContent).toBe('Menü');
   });
 });

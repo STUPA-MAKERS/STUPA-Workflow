@@ -23,7 +23,7 @@ import {
   vatRate,
 } from '../../budget/expense-display.util';
 import { bookedOn } from '../invoice-figures';
-import { SheetBarComponent } from '@shared/ui/sheet-bar/sheet-bar.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
 import { TodoLinkedListComponent } from '../../../features/todos/linked-list/todo-linked-list.component';
 
@@ -43,6 +43,7 @@ import { TodoLinkedListComponent } from '../../../features/todos/linked-list/tod
   imports: [
     EmptyStateComponent,
     SheetBarComponent,
+    SheetBarTitleDirective,
     ButtonComponent,
     IconComponent,
     LocalizedDatePipe,
@@ -79,12 +80,6 @@ export class InvoiceDetailComponent {
   protected readonly title = computed(() => {
     const i = this.invoice();
     return i.supplier || i.number || this.i18n.translate('invoices.untitled');
-  });
-
-  protected readonly metaLine = computed(() => {
-    const i = this.invoice();
-    const kind = this.i18n.translate('invoices.detail.kind');
-    return i.number ? `${kind} · ${i.number}` : kind;
   });
 
   /** "in 9 Tagen", "heute fällig" or "seit 3 Tagen überfällig", for an open invoice. */

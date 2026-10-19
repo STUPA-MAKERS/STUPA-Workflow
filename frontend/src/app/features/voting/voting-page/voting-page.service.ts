@@ -25,8 +25,6 @@ export interface ShownVote {
  * - `split`: the list and the detail sit side by side. The detail then is a sheet.
  * - `changes$`: the detail cast a ballot or deleted a vote. The list loads again, so the
  *   row shows "Abgestimmt" or leaves.
- * - `gremiumNames`: the gremium of each loaded row, by vote id. The detail names it in
- *   its bar when the vote has no meeting to name it.
  * - `shown`: the vote in the detail with its meeting and status. When a new vote opens
  *   in the meeting of an ended vote in the detail, the list opens the new vote.
  * - `follow(meetingId)`: ONE live-vote channel per meeting for both panes. The list
@@ -39,7 +37,6 @@ export class VotingPageService {
   private readonly live = inject(LiveVoteService);
 
   readonly split = signal(false);
-  readonly gremiumNames = signal<ReadonlyMap<Uuid, string>>(new Map());
   readonly shown = signal<ShownVote | null>(null);
 
   private readonly changes = new Subject<VoteChange>();

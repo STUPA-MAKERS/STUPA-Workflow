@@ -5,13 +5,12 @@
   <article class="ad ad--busy" [class.ad--split]="split()" aria-busy="true">
     <header class="ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
-        <span appSheetBarKicker class="skel-in"><span class="skel-text skel-text--muted ad__skelKicker"></span></span>
+        <h2 appSheetBarTitle class="sheet-title ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
         <!-- The action "Kommentare" and the menu. -->
         <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
         <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
       </app-sheet-bar>
-      <h2 class="ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
-      <p class="ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
+      <p class="sheet-line ad__line skel-in"><span class="skel-text skel-text--muted ad__skelLine"></span></p>
       @if (canTransition()) {
         <ng-container *ngTemplateOutlet="transitionsSkel" />
       }
@@ -108,7 +107,8 @@
         <span class="skel-progress ad__progress" aria-hidden="true"></span>
       }
       <header class="ad__head">
-        <app-sheet-bar [bleed]="split()" [kicker]="metaLine()">
+        <app-sheet-bar [bleed]="split()">
+          <h2 appSheetBarTitle id="ad-title" class="sheet-title ad__title">{{ title() }}</h2>
           <!-- The comments open in a sheet over the page; the count waits for the thread. -->
           <app-button
             class="ad__commentsBtn"
@@ -169,18 +169,17 @@
           }
         </app-sheet-bar>
 
-        <h2 id="ad-title" class="ad__title">{{ title() }}</h2>
         <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
              part on each line, so a dot shows only between two items, also after a wrap. -->
-        <p class="ad__line ad__seps">
+        <p class="sheet-line ad__line ad__seps">
           <span class="ad__parts">
             @if (application.state) {
               <span class="ad__part">
                 <app-status-text [kind]="stateKind()">{{ application.state.label }}</app-status-text>
               </span>
             }
-            @if (gremiumName(); as gremium) {
-              <span class="ad__part ell" [title]="gremium">{{ gremium }}</span>
+            @if (typeName(); as type) {
+              <span class="ad__part ell" [title]="type">{{ type }}</span>
             }
             @if (application.amount !== null) {
               @if (approvedAmount(application); as approved) {
@@ -193,20 +192,15 @@
                 <span class="ad__part"><span class="mono ad__amount">{{ amount(application) }}</span></span>
               }
             }
+            @if (captureParts(); as parts) {
+              <!-- #11: an application that a member captured on behalf of the applicant
+                   says so at the end of the line, a part may wrap inside. -->
+              @for (part of parts; track $index) {
+                <span class="ad__part ad__capture" data-testid="ad-capture">{{ part }}</span>
+              }
+            }
           </span>
         </p>
-
-        @if (captureParts(); as parts) {
-          <!-- #11: a subtle note for an application that a member captured on behalf of
-               the applicant. The dots sit between the parts only (as in the line above). -->
-          <p class="ad__line ad__seps ad__capture" data-testid="ad-capture">
-            <span class="ad__parts">
-              @for (part of parts; track $index) {
-                <span class="ad__part">{{ part }}</span>
-              }
-            </span>
-          </p>
-        }
 
         @if (canTransition() && transitions().length) {
           <div class="ad__transitions" role="group" [attr.aria-label]="'applications.transitions.title' | t">

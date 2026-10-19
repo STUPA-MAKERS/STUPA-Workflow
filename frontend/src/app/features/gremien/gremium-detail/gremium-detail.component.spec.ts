@@ -112,8 +112,8 @@ describe('GremiumDetailComponent', () => {
     expect(d.split()).toBe(true);
     expect(screen.getByRole('heading', { level: 2, name: 'Studierendenparlament' })).toBeTruthy();
     expect(d.roleLabel()).toBe('Mitglied');
-    expect(screen.getByText('Mitglied', { selector: 'strong' })).toBeTruthy();
     expect(d.facts()).toEqual([
+      'Deine Rolle: Mitglied',
       '31 Mitglieder',
       'Beschlussfähig ab 50 %',
       'Protokolle öffentlich',

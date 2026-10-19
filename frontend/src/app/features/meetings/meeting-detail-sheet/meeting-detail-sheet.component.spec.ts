@@ -80,12 +80,15 @@ function flush(
 jest.setTimeout(15_000);
 
 describe('MeetingDetailSheetComponent', () => {
-  it('shows the head of a live meeting: Gremium, date, status, time and minute-taker', async () => {
+  it('shows the head of a live meeting: status, date, time and minute-taker, no line above the title', async () => {
     const { http, fixture } = await setup();
     expect(screen.getByRole('status')).toHaveTextContent('Sitzung wird geladen');
     flush(http);
     fixture.detectChanges();
-    expect(screen.getByText('StuPa · Do., 15.10.2026')).toBeInTheDocument();
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
+    expect(screen.getByText('Do., 15.10.2026')).toHaveClass('ms__part');
     expect(screen.getByRole('heading', { level: 2, name: 'Konstituierende Sitzung' })).toBeInTheDocument();
     expect(screen.getByText('Live')).toHaveClass('st--accent');
     expect(screen.getByText('seit 18:04')).toBeInTheDocument();
@@ -308,7 +311,9 @@ describe('MeetingDetailSheetComponent', () => {
     const { http, fixture } = await setup({ meeting: bare });
     flush(http, 'm-1', { protocol: false });
     fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.sheet-bar__kicker').textContent.trim()).toBe('');
+    // The title opens the sheet on the line of the actions; no line stands above it.
+    expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
+    expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(fixture.nativeElement.querySelectorAll('.ms__part')).toHaveLength(2);
   });
 });

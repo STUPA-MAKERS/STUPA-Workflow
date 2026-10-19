@@ -386,7 +386,7 @@ describe('VotingComponent', () => {
     });
 
     it('offers the gremien of the person and of the rows, by name', async () => {
-      const { cmp, harness } = await start('/voting', {
+      const { cmp } = await start('/voting', {
         pages: [page([item('v1', { gremiumId: 'g3', gremiumName: 'Fachschaft' }), item('v2')])],
       });
       expect(cmp.gremiumOptions().map((o) => o.label)).toEqual([
@@ -395,7 +395,6 @@ describe('VotingComponent', () => {
         'Studierendenparlament',
       ]);
       expect(cmp.showGremiumChip()).toBe(true);
-      expect(harness.routeDebugElement!.injector.get(VotingPageService).gremiumNames().get('v1')).toBe('Fachschaft');
       expect(screen.getByRole('button', { name: /Gremium/ })).toBeInTheDocument();
     });
 

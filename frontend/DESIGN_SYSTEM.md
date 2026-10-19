@@ -155,7 +155,9 @@ These rules are binding for every page.
   aligned on the right.
 - **One list/detail geometry.** Every 2-column page uses `app-list-detail` with the shared
   list width `--ld-list-width` and `app-page-header`. No page overrides them. A sheet header
-  is `app-sheet-bar` (breadcrumb or context as the kicker).
+  is `app-sheet-bar`: a detail sheet projects its title into it (`appSheetBarTitle`), so the
+  title and the header actions share the first line; the budget breadcrumb and the
+  calendar day are kickers. No context line stands above a detail title.
 - **Pane pages do not scroll.** A page without a page scroll uses the global `.pane-page`
   class (`styles.scss`). Each pane scrolls inside itself with the shared fade
   (`appScrollFade`). The header controls and the search bar (`app-sticky-bar`) stay fixed.

@@ -150,7 +150,8 @@ describe('VotePanelComponent', () => {
   it('shows no meeting line and no link for a motion without both', async () => {
     await setup({ context: { meeting: null, position: null }, vote: vote({ meetingId: null, applicationId: null }) });
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.queryByText('·')).not.toBeInTheDocument();
+    // Only the status and the rules remain, with one separator between them.
+    expect(screen.getAllByText('·')).toHaveLength(1);
   });
 
   it('shows the result of a closed vote and no ballot', async () => {
@@ -223,8 +224,12 @@ describe('VotePanelComponent', () => {
   it('uses the phone layout of board Telefon-Abstimmen', async () => {
     const { fixture } = await setup({ layout: 'phone' });
     expect(fixture.nativeElement).toHaveClass('vpn--phone');
-    expect(screen.getByText('Offen · Einfache Mehrheit')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Soll der Antrag gefördert werden?');
+    const title = screen.getByRole('heading', { level: 1 });
+    expect(title).toHaveTextContent('Soll der Antrag gefördert werden?');
+    // The meta line follows the question, as on every detail view.
+    const meta = title.nextElementSibling as HTMLElement;
+    expect(meta).toHaveClass('sheet-line');
+    expect(meta.textContent?.replace(/\s+/g, '')).toBe('Offen·EinfacheMehrheit');
     expect(screen.getByRole('heading', { name: 'Deine Stimme' })).toBeInTheDocument();
     // The turnout comes before the ballot on a phone.
     const progress = fixture.nativeElement.querySelector('app-vote-progress') as HTMLElement;

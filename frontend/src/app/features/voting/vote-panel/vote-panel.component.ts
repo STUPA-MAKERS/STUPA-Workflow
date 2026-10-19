@@ -7,6 +7,7 @@ import type { MyBallot, Vote } from '@core/api/models';
 import { ElectionResultComponent } from '../election-result/election-result.component';
 import { electionCaption, electionOf } from '../election.util';
 import { NoteComponent } from '@shared/ui/note/note.component';
+import { SheetBarComponent, SheetBarTitleDirective } from '@shared/ui/sheet-bar/sheet-bar.component';
 import { StatusTextComponent } from '@shared/ui/status-text/status-text.component';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import {
@@ -38,6 +39,8 @@ import { NO_CONTEXT, type VoteContext } from './vote-context';
     BallotComponent,
     ElectionResultComponent,
     NoteComponent,
+    SheetBarComponent,
+    SheetBarTitleDirective,
     StatusTextComponent,
     VoteBarsComponent,
     VoteProgressComponent,
