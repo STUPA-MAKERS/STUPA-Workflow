@@ -41,10 +41,13 @@
 
 /* A projected title (`appSheetBarTitle`) opens the sheet on the line of the actions. The
    actions keep the top 60px line; the title pads its first line onto the same centre
-   axis (`1lh` is the line height of the title itself) and wraps below it when long. */
+   axis (`1lh` is the line height of the title itself) and wraps below it when long. The
+   top padding keeps the title clear of the top edge of the sheet. The title only wraps and
+   never runs under the actions, also for a single long word. */
 :host(.sheet-bar--title) {
   align-items: flex-start;
   gap: var(--space-3);
+  padding-top: var(--space-2);
 }
 :host(.sheet-bar--title) .sheet-bar__actions {
   display: flex;
@@ -61,5 +64,7 @@
   min-height: 60px;
 }
 .sheet-bar__title > ::ng-deep * {
+  min-width: 0;
+  overflow-wrap: anywhere;
   padding-block: max(0px, calc((60px - 1lh) / 2));
 }
