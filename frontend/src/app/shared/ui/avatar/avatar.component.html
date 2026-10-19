@@ -1,4 +1,8 @@
-<span class="av__letters">{{ letters() }}</span>
+@if (icon(); as glyph) {
+  <app-icon [name]="glyph" [size]="iconPx()" />
+} @else {
+  <span class="av__letters">{{ letters() }}</span>
+}
 @if (src(); as url) {
   <!-- The name is the accessible name of the host; the image adds nothing to read. -->
   <img

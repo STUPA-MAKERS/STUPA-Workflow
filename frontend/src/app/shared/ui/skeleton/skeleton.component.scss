@@ -1,8 +1,7 @@
 :host {
+  /* No delay and no fade: the placeholder is there in the first frame of the page, like
+     `.skel-in`. */
   display: block;
-  /* Nothing shows for the first 300ms, so a fast answer draws no placeholder at all
-     (the delay of `.skel-in`). */
-  animation: skel-in var(--motion-fast) var(--ease-standard) var(--skeleton-delay) both;
 }
 .sk {
   display: flex;

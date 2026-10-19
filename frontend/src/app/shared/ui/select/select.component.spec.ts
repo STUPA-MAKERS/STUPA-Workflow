@@ -112,6 +112,29 @@ describe('SelectFieldComponent', () => {
       expect(document.querySelector('select')).toBeNull();
     });
 
+    it('puts the avatar of a chosen person in the field and in front of each person option', async () => {
+      const { field, tick } = await setup((h) => {
+        h.value.set('');
+        h.options.set([
+          { value: '', label: 'Niemand', person: { name: 'Niemand', icon: 'user' } },
+          { value: 'p1', label: 'Mara Keller', person: { name: 'Mara Keller', principalId: 'p1' } },
+          { value: 'x', label: 'Ohne Person' },
+        ]);
+      });
+      expect(field().querySelector('app-avatar.sel__av app-icon')).not.toBeNull();
+      await userEvent.click(field());
+      await tick();
+      const rows = screen.getAllByRole('option');
+      expect(rows[0].querySelector('app-avatar.sel__optAv app-icon')).not.toBeNull();
+      expect(rows[1].querySelector('app-avatar.sel__optAv')).toHaveTextContent('MK');
+      expect(rows[2].querySelector('app-avatar')).toBeNull();
+      expect(rows[1]).toHaveAccessibleName('Mara Keller');
+      await userEvent.click(rows[1]);
+      await tick();
+      expect(field().querySelector('app-avatar.sel__av')).toHaveTextContent('MK');
+      expect(field()).toHaveAccessibleName('Stadt');
+    });
+
     it('shows the placeholder while no option is chosen', async () => {
       const { field } = await setup((h) => {
         h.value.set('');

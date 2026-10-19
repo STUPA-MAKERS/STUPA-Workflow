@@ -315,7 +315,9 @@ export class TicketDetailComponent {
   /** The avatar before the assignee in the select; none while nobody is assigned. */
   readonly assigneePerson = computed(() => {
     const a = this.ticket()?.assignee;
-    return a ? { name: personName(a, this.t), principalId: a.principalId } : null;
+    return a
+      ? { name: personName(a, this.t), principalId: a.principalId }
+      : { name: this.t('tickets.detail.unassigned'), icon: 'user' as const };
   });
 
   readonly menuSections = computed<RowMenuSection[]>(() => {
@@ -350,13 +352,15 @@ export class TicketDetailComponent {
   ]);
 
   readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
-    const opts: FilterSelectOption[] = [{ value: '', label: this.t('tickets.detail.unassigned') }];
+    const nobody = this.t('tickets.detail.unassigned');
+    const opts: FilterSelectOption[] = [{ value: '', label: nobody, person: { name: nobody, icon: 'user' } }];
     const seen = new Set<string>();
     const current = this.ticket()?.assignee;
     for (const p of [...this.assignees(), ...(current ? [current] : [])]) {
       if (!p.principalId || seen.has(p.principalId)) continue;
       seen.add(p.principalId);
-      opts.push({ value: p.principalId, label: personName(p, this.t) });
+      const label = personName(p, this.t);
+      opts.push({ value: p.principalId, label, person: { name: label, principalId: p.principalId } });
     }
     return opts;
   });

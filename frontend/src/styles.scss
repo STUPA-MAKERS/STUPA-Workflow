@@ -321,8 +321,9 @@ td:first-child > .skel--bar {
 
    - `.skel-text`: one line of text. Give it a width; it takes the font of its parent.
    - `.skel-box`: a block of a fixed size (a button, an icon, a checkbox).
-   - `.skel-in`: on the container. It stays invisible for 300ms, so a fast answer
-     shows no placeholder at all.
+   - `.skel-in`: marks the container of a first load. It has no delay and no fade: it
+     shows in the first frame of the page, so the page never opens blank and then fills
+     in. A fast answer replaces it in place, because it has the geometry of the content.
    - `.skel-stale`: on content that is reloading. It stays as it is for 300ms, then
      dims; it never moves. Pair it with `inert` and `aria-busy`.
    - `.skel-progress`: a thin bar at the top of a reloading area, also after 300ms.
@@ -366,9 +367,6 @@ td:first-child > .skel--bar {
   100% {
     background-position: 200% 0;
   }
-}
-.skel-in {
-  animation: skel-in var(--motion-fast) var(--ease-standard) var(--skeleton-delay) both;
 }
 @keyframes skel-in {
   from {
@@ -462,47 +460,57 @@ td:first-child > .skel--bar {
 
 /* ---------------------------------------------------------------------------
    Route motion (`core/motion/motion.ts`). The router names the kind of a navigation on
-   `<html data-motion>` while its view transition runs; only then is the content a group
-   of its own, so the frame (rail, bottom bar) stays still.
-   - section: the old content fades out fast, the new one fades in and rises (fade-through).
+   `<html data-motion>` while its view transition runs.
+   - section: the old page fades out fast, the new one fades in and rises (fade-through).
    - push: on a phone, the new page slides in from the end over the old one, which recedes.
    - pop: the reverse, faster.
-   Reduced motion skips the transition in the router. */
-:root[data-motion] .main {
-  view-transition-name: main;
+   Reduced motion skips the transition in the router.
+
+   The page moves as the root snapshot, not as a snapshot of `.main`. The root snapshot
+   is always the viewport, so both images have the same size and position. `.main` is as
+   tall as its page and moves with the scroll of the document, so a group of its own
+   would morph from the old box to the new one: after a scroll, or between a page that
+   scrolls and a pane page, the new page would slide in from where the old one was and
+   the headings of both would run over each other. The frame (rail, bottom bar) gets
+   groups of its own, so it stays still above the moving page. */
+:root[data-motion] .frame__rail {
+  view-transition-name: rail;
 }
-/* The bottom bar is a group of its own, so the moving content never paints over it. */
+/* The bottom bar is a group of its own, so the moving page never paints over it. */
 :root[data-motion] .bb {
   view-transition-name: bottom-bar;
+}
+/* Shows between the old and the new page of a fade-through, and behind a receding page. */
+:root[data-motion]::view-transition {
+  background: var(--color-bg);
 }
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: var(--motion-base);
   animation-timing-function: var(--ease-standard);
 }
-::view-transition-group(main) {
-  animation-duration: var(--motion-base);
+::view-transition-group(rail),
+::view-transition-old(rail),
+::view-transition-new(rail) {
+  animation-duration: var(--motion-fast);
 }
-:root[data-motion='section']::view-transition-old(main) {
+:root[data-motion='section']::view-transition-old(root) {
   animation: vt-fade-out var(--motion-xs) var(--ease-exit) both;
 }
-:root[data-motion='section']::view-transition-new(main) {
+:root[data-motion='section']::view-transition-new(root) {
   animation: vt-rise-in var(--motion-base) var(--ease-enter) var(--motion-xs) both;
 }
-:root[data-motion='push']::view-transition-old(main) {
+:root[data-motion='push']::view-transition-old(root) {
   animation: vt-recede var(--motion-slow) var(--ease-standard) both;
 }
-:root[data-motion='push']::view-transition-new(main) {
-  /* The page on top is opaque, so the receding one never shows through its gaps. */
-  background: var(--color-bg);
+:root[data-motion='push']::view-transition-new(root) {
   animation: vt-from-end var(--motion-slow) var(--ease-standard) both;
 }
-:root[data-motion='pop']::view-transition-old(main) {
+:root[data-motion='pop']::view-transition-old(root) {
   z-index: 1;
-  background: var(--color-bg);
   animation: vt-to-end var(--motion-base) var(--ease-exit) both;
 }
-:root[data-motion='pop']::view-transition-new(main) {
+:root[data-motion='pop']::view-transition-new(root) {
   animation: vt-recede var(--motion-base) var(--ease-standard) reverse both;
 }
 @keyframes vt-fade-out {
@@ -541,6 +549,8 @@ td:first-child > .skel--bar {
      short delay; closing fades first, then the height goes.
    - `.motion-rise-in`: a new entry in a list (a chat message, a row): it fades in and
      rises by --motion-shift-sm.
+   - `.motion-fade-in`: content that takes the place of other content (the board and the
+     list of a view switch): it only fades in, it does not move.
    - `.motion-fade-out`: an entry that goes. */
 .motion-expand-in,
 .motion-expand-out {
@@ -571,6 +581,9 @@ td:first-child > .skel--bar {
 .motion-rise-in {
   animation: motion-rise-in var(--motion-base) var(--ease-enter);
 }
+.motion-fade-in {
+  animation: motion-fade-in var(--motion-base) var(--ease-standard);
+}
 .motion-fade-out {
   pointer-events: none;
   animation: motion-fade-out var(--motion-xs) var(--ease-exit) forwards;
@@ -597,6 +610,11 @@ td:first-child > .skel--bar {
   from {
     opacity: 0;
     transform: translateY(var(--motion-shift-sm));
+  }
+}
+@keyframes motion-fade-in {
+  from {
+    opacity: 0;
   }
 }
 @keyframes motion-fade-out {

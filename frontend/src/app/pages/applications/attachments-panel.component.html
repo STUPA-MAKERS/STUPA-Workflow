@@ -1,10 +1,10 @@
 <section
   class="att"
   aria-labelledby="att-title"
-  (dragenter)="onDragEnter($event)"
-  (dragover)="onDragOver($event)"
-  (dragleave)="onDragLeave($event)"
-  (drop)="onDrop($event)"
+  appFileDrop
+  #drop="appFileDrop"
+  [appFileDropEnabled]="canUpload() && dropTarget()"
+  (appFileDrop)="upload($event)"
 >
   <div class="att__head">
     <h3 id="att-title" class="sec att__title" [class.sr-only]="!titled()">{{ 'applications.attachments.title' | t }}</h3>
@@ -130,14 +130,8 @@
     <app-empty-state shape="file" rows="3" [heading]="'applications.attachments.empty' | t" />
   }
 
-  <!-- Drop overlay. It shows while a file hovers over the panel. -->
-  @if (dragActive()) {
-    <div class="att__dropOverlay" aria-hidden="true">
-      <div class="att__dropInner">
-        <app-icon name="upload" [size]="32" />
-        <span>{{ 'applications.attachments.drop' | t }}</span>
-      </div>
-    </div>
+  @if (drop.active()) {
+    <app-drop-overlay [label]="'applications.attachments.drop' | t" />
   }
 </section>
 

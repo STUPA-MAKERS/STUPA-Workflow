@@ -394,4 +394,58 @@ describe('SideSheetComponent', () => {
     view.fixture.detectChanges();
     expect(document.activeElement).not.toBe(opener);
   });
+
+  describe('shown', () => {
+    const sheetOf = (view: Awaited<ReturnType<typeof setup>>['view']) =>
+      view.fixture.debugElement.query((d) => d.name === 'app-side-sheet')
+        .componentInstance as SideSheetComponent;
+    type Leave = { leave(event: { target: Element; animationComplete: () => void }): void };
+
+    it('is true from the opening and false once the pane is gone', async () => {
+      const { view, host } = await setup();
+      const sheet = sheetOf(view);
+      expect(sheet.shown()).toBe(false);
+      host.open.set(true);
+      view.fixture.detectChanges();
+      expect(sheet.shown()).toBe(true);
+      host.open.set(false);
+      view.fixture.detectChanges();
+      await new Promise((resolve) => setTimeout(resolve));
+      expect(sheet.shown()).toBe(false);
+    });
+
+    it('stays true while the pane slides out and turns false at its end', async () => {
+      const { view, host } = await setup();
+      const sheet = sheetOf(view);
+      host.open.set(true);
+      view.fixture.detectChanges();
+      // Closed, but no change detection yet: only the leave animation can end `shown`.
+      sheet.open.set(false);
+      let finish!: () => void;
+      const pane = document.createElement('div');
+      Object.assign(pane, {
+        getAnimations: () => [{ finished: new Promise<void>((resolve) => (finish = resolve)) }],
+      });
+      const animationComplete = jest.fn();
+      (sheet as unknown as Leave).leave({ target: pane, animationComplete });
+      expect(pane).toHaveClass('ss--leaving');
+      await Promise.resolve();
+      expect(sheet.shown()).toBe(true);
+      expect(animationComplete).not.toHaveBeenCalled();
+      finish();
+      await waitFor(() => expect(animationComplete).toHaveBeenCalled());
+      expect(sheet.shown()).toBe(false);
+    });
+
+    it('stays true when the sheet opens again before the old pane has gone', async () => {
+      const { view, host } = await setup();
+      const sheet = sheetOf(view);
+      host.open.set(true);
+      view.fixture.detectChanges();
+      const animationComplete = jest.fn();
+      (sheet as unknown as Leave).leave({ target: document.createElement('div'), animationComplete });
+      expect(animationComplete).toHaveBeenCalled();
+      expect(sheet.shown()).toBe(true);
+    });
+  });
 });

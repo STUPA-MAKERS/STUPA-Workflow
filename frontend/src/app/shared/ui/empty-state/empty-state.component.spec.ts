@@ -115,7 +115,7 @@ describe('EmptyStateComponent', () => {
     expect(fixture.nativeElement).not.toHaveClass('es-host--fill');
   });
 
-  it('fills and centres in the page when fill is set', async () => {
+  it('fills the page when fill is set', async () => {
     const { fixture } = await render(EmptyStateComponent, {
       inputs: { heading: 'Leer', fill: true },
     });

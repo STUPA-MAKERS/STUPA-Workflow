@@ -292,7 +292,7 @@ describe('ApplicationsListComponent', () => {
       const { first, harness, cmp } = await start('/applications', { holdList: true });
       const el = harness.fixture.nativeElement as HTMLElement;
       // The heading of the first group and the rows in the geometry of `app-list-item`,
-      // shown after 300ms (`skel-in`), so a fast answer flashes nothing.
+      // shown at once (`skel-in`), so the page never opens blank.
       expect(el.querySelector('.apps__skel')).toHaveClass('skel-in');
       expect(el.querySelector('.apps__skel h2.apps__month .skel-text')).not.toBeNull();
       expect(el.querySelectorAll('.apps__skel .sk__item')).toHaveLength(12);

@@ -354,13 +354,13 @@ describe('TicketDetailComponent', () => {
     expect(fieldLabels()).toEqual(['Gemeldet von', 'E-Mail', 'Gemeldet', 'Zugewiesen', 'Art']);
   });
 
-  it('shows the avatar of the assignee in the select, and none without one', async () => {
+  it('shows the avatar of the assignee in the select, and the empty person without one', async () => {
     const { cmp } = await start('/tickets/t40', {
       get: () => of(detail({ assignee: { principalId: 'p9', displayName: 'Selin' } })),
     });
     expect(cmp.assigneePerson()).toEqual({ name: 'Selin', principalId: 'p9' });
     cmp.ticket.set(detail({ assignee: null }));
-    expect(cmp.assigneePerson()).toBeNull();
+    expect(cmp.assigneePerson()).toEqual({ name: 'Niemand', icon: 'user' });
   });
 
   it('links an application, and leaves out what the context lacks', async () => {

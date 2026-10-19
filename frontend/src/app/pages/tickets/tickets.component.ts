@@ -122,7 +122,8 @@ export class TicketsComponent implements OnDestroy {
   private readonly frame = inject(PageFrameService);
   private readonly rail = inject(RailStatusService);
   /** The team view; else the own tickets of the reporter. */
-  readonly manager = inject(AuthService).can('ticket.manage');
+  private readonly auth = inject(AuthService);
+  readonly manager = this.auth.can('ticket.manage');
 
   /** The clock of the row ages; a spec sets it. */
   now: () => Date = () => new Date();
@@ -187,14 +188,25 @@ export class TicketsComponent implements OnDestroy {
     return k ? this.i18n.translate(KIND_LABEL[k]) : this.i18n.translate('tickets.list.filter.kind');
   });
 
-  readonly assigneeOptions = computed<FilterSelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('tickets.list.filter.all') },
-    { value: 'me', label: this.i18n.translate('tickets.list.filter.me') },
-    { value: 'none', label: this.i18n.translate('tickets.list.filter.none') },
-    ...this.assignees()
-      .filter((p): p is PersonRef & { principalId: string } => !!p.principalId)
-      .map((p) => ({ value: p.principalId, label: p.displayName ?? p.principalId })),
-  ]);
+  readonly assigneeOptions = computed<FilterSelectOption[]>(() => {
+    const all = this.i18n.translate('tickets.list.filter.all');
+    const none = this.i18n.translate('tickets.list.filter.none');
+    return [
+      { value: '', label: all, person: { name: all, icon: 'users' } },
+      {
+        value: 'me',
+        label: this.i18n.translate('tickets.list.filter.me'),
+        person: { name: this.auth.displayName(), principalId: 'me' },
+      },
+      { value: 'none', label: none, person: { name: none, icon: 'user' } },
+      ...this.assignees()
+        .filter((p): p is PersonRef & { principalId: string } => !!p.principalId)
+        .map((p) => {
+          const label = p.displayName ?? p.principalId;
+          return { value: p.principalId, label, person: { name: label, principalId: p.principalId } };
+        }),
+    ];
+  });
   readonly assigneeChipLabel = computed(() => {
     const v = this.assigneeFilter();
     if (!v) return this.i18n.translate('tickets.list.filter.assignee');

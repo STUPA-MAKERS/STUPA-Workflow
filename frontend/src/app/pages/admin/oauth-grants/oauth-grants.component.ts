@@ -95,13 +95,16 @@ export class AdminOAuthGrantsComponent {
   readonly canRevoke = computed(() => this.auth.can('admin.users'));
 
   /** The person filter. A principal without a name or an email gets the placeholder. */
-  readonly principalOptions = computed<FilterSelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('admin.oauthGrants.filter.allPrincipals') },
-    ...this.principals().map((p) => ({
-      value: p.id,
-      label: p.displayName || p.email || this.i18n.translate('admin.oauthGrants.unknownOwner'),
-    })),
-  ]);
+  readonly principalOptions = computed<FilterSelectOption[]>(() => {
+    const all = this.i18n.translate('admin.oauthGrants.filter.allPrincipals');
+    return [
+      { value: '', label: all, person: { name: all, icon: 'users' } },
+      ...this.principals().map((p) => {
+        const label = p.displayName || p.email || this.i18n.translate('admin.oauthGrants.unknownOwner');
+        return { value: p.id, label, person: { name: label, principalId: p.id } };
+      }),
+    ];
+  });
 
   /** The text of the person chip: "Person: Alle Personen" or "Person: <name>". */
   readonly principalChipText = computed(() => {

@@ -141,8 +141,8 @@ describe('VoteOpenDialogComponent · election (F2)', () => {
       { principalId: 'p-8', displayName: null, email: null, status: 'present' } as Attendance,
     ]);
     expect(cmp.memberOptions()).toEqual([
-      { value: 'p-7', label: 'mia@x.de' },
-      { value: 'p-8', label: 'p-8' },
+      { value: 'p-7', label: 'mia@x.de', person: { name: 'mia@x.de', principalId: 'p-7' } },
+      { value: 'p-8', label: 'p-8', person: { name: 'p-8', principalId: 'p-8' } },
     ]);
     cmp.addMember('p-7');
     cmp.addMember('p-8');

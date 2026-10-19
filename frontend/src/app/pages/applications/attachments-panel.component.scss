@@ -119,27 +119,6 @@
 }
 
 /* Drop overlay over the whole panel. */
-.att__dropOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px dashed var(--color-accent);
-  border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface-1));
-  pointer-events: none;
-}
-.att__dropInner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-accent-text);
-  font-weight: var(--fw-semibold);
-}
-
 /* The file preview dialog goes wider than the lg step, almost full screen. */
 .att__previewDlg ::ng-deep .dialog {
   max-width: min(80rem, 96vw);

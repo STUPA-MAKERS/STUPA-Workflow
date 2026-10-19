@@ -119,6 +119,25 @@ describe('FilterSelectComponent', () => {
     expect(chip()).toHaveAccessibleName('Typ: Alle Typen');
   });
 
+  it('puts the avatar of a person in front of each person option, and an icon for nobody', async () => {
+    const { chip, host, user, view } = await setup();
+    host.options.set([
+      { value: '', label: 'Niemand', person: { name: 'Niemand', icon: 'user' } },
+      { value: 'p1', label: 'Mara Keller', person: { name: 'Mara Keller', principalId: 'p1' } },
+      { value: 'x', label: 'Ohne Person' },
+    ]);
+    host.person.set({ name: 'Niemand', icon: 'user' });
+    view.fixture.detectChanges();
+    expect(chip().querySelector('app-avatar.fs__av app-icon')).not.toBeNull();
+    await user.click(chip());
+    const rows = screen.getAllByRole('option');
+    expect(rows[0].querySelector('app-avatar.fs__optAv app-icon')).not.toBeNull();
+    expect(rows[1].querySelector('app-avatar.fs__optAv')).toHaveTextContent('MK');
+    expect(rows[2].querySelector('app-avatar')).toBeNull();
+    // The avatar is decorative: the name of a row is its label alone.
+    expect(rows[1]).toHaveAccessibleName('Mara Keller');
+  });
+
   it('opens the list under the chip on a click, with a check on the current value', async () => {
     const { chip, user } = await setup({ value: 'r' });
     await user.click(chip());

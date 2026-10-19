@@ -9,6 +9,7 @@ import {
   inject,
   signal,
   untracked,
+  viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
@@ -96,6 +97,8 @@ import {
 } from '../budget/budget-tree.api';
 import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
+import { FileDropDirective } from '@shared/file-drop.directive';
+import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
 import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
 import { DecisionDialogComponent } from './decision-dialog/decision-dialog.component';
@@ -160,6 +163,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DropOverlayComponent,
+    FileDropDirective,
     ConfirmDialogComponent,
     FabComponent,
     SheetBarComponent,
@@ -296,6 +301,20 @@ export class ApplicationsDetailComponent {
   private readonly injector = inject(Injector);
   /** The number of attachments, from the panel. `null` until it loaded them. */
   readonly attachmentCount = signal<number | null>(null);
+  private readonly filesPanel = viewChild(AttachmentsPanelComponent);
+  /**
+   * Files dropped anywhere on the application become its attachments. Not while another
+   * application loads, and not while the comments are open: the chat takes its own drop.
+   */
+  readonly takesDrop = computed(() => this.canManage() && !this.switching() && !this.commentsOpen());
+
+  /** A drop on the page: the panel uploads it; in tabs, its tab opens to show the upload. */
+  onFilesDropped(files: File[]): void {
+    const panel = this.filesPanel();
+    if (!panel) return;
+    if (!this.split()) this.tab.set('files');
+    panel.upload(files);
+  }
 
   /** Manual transitions that the server guard allows, plus the fire in flight. */
   readonly transitions = signal<Transition[]>([]);

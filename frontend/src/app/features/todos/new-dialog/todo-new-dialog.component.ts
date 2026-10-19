@@ -35,7 +35,7 @@ import {
   type SelectOption,
 } from '@stupa-makers/ui-kit';
 import { MarkdownImageUploadDirective } from '@shared/markdown/markdown-image-upload.directive';
-import { SelectFieldComponent } from '@shared/ui/select/select.component';
+import { SelectFieldComponent, type SelectFieldOption } from '@shared/ui/select/select.component';
 import { TodoLinkPickerComponent, linkKey } from '../link-picker/todo-link-picker.component';
 import { LINK_ICON, LINK_KIND_LABEL, sortedColumns } from '../todos.util';
 
@@ -115,13 +115,16 @@ export class TodoNewDialogComponent {
   readonly columnOptions = computed<SelectOption[]>(() =>
     sortedColumns(this.board()?.columns ?? []).map((c) => ({ value: c.id, label: c.name })),
   );
-  readonly memberOptions = computed<SelectOption[]>(() => [
-    { value: '', label: this.i18n.translate('todos.new.nobody') },
-    ...this.members().map((m) => ({
-      value: m.principalId,
-      label: m.displayName ?? this.i18n.translate('chat.deletedPerson'),
-    })),
-  ]);
+  readonly memberOptions = computed<SelectFieldOption[]>(() => {
+    const nobody = this.i18n.translate('todos.new.nobody');
+    return [
+      { value: '', label: nobody, person: { name: nobody, icon: 'user' } },
+      ...this.members().map((m) => {
+        const label = m.displayName ?? this.i18n.translate('chat.deletedPerson');
+        return { value: m.principalId, label, person: { name: label, principalId: m.principalId } };
+      }),
+    ];
+  });
   readonly linkedKeys = computed(() => new Set(this.links().map((l) => linkKey(l.kind, l.targetId))));
   readonly titleError = computed(() =>
     this.title().trim().length > MAX_TITLE ? this.i18n.translate('todos.new.titleTooLong', { max: MAX_TITLE }) : '',

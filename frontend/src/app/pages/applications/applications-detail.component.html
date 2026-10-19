@@ -88,6 +88,7 @@
   } @else {
     <!-- C: another application is on its way. This one stays, dimmed and inert after
          300ms, and the bar on top says the next one is loading. -->
+    <!-- A file dropped anywhere on the application becomes an attachment. -->
     <article
       class="ad"
       [class.ad--split]="split()"
@@ -95,7 +96,14 @@
       [attr.inert]="switching() ? '' : null"
       [attr.aria-busy]="switching() || null"
       aria-labelledby="ad-title"
+      appFileDrop
+      #drop="appFileDrop"
+      [appFileDropEnabled]="takesDrop()"
+      (appFileDrop)="onFilesDropped($event)"
     >
+      @if (drop.active()) {
+        <app-drop-overlay fit="view" [label]="'applications.attachments.drop' | t" />
+      }
       @if (switching()) {
         <span class="skel-progress ad__progress" aria-hidden="true"></span>
       }
@@ -289,15 +297,16 @@
     <!-- "Kommentare": the thread and the composer in a sheet over the page, from the end
          on a wide screen and from the bottom on a phone. The chat fills the sheet: the
          log scrolls inside and the composer stays at its foot. The chat exists only while
-         the sheet is open: projected content lives even where the sheet does not render
-         it, and a hidden chat would mark the thread as seen. -->
+         the sheet shows (open, or still sliding out): projected content lives even where
+         the sheet does not render it, and a hidden chat would mark the thread as seen. -->
     <app-side-sheet
+      #commentsSheet
       [(open)]="commentsOpen"
       [heading]="'applications.comments.title' | t"
       [side]="phone() ? 'bottom' : 'end'"
       [contentScrolls]="true"
     >
-      @if (commentsOpen()) {
+      @if (commentsSheet.shown()) {
         <app-chat
           class="ad__chat"
           [class.ad__chat--sheet]="phone()"
@@ -411,6 +420,7 @@
   <app-attachments-panel
     [applicationId]="application.id"
     [canUpload]="canManage()"
+    [dropTarget]="false"
     (countChange)="attachmentCount.set($event)"
   />
 </ng-template>

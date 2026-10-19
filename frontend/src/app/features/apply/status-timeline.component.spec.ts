@@ -386,6 +386,32 @@ describe('StatusTimelineComponent', () => {
     expect(comp.filesOpen()).toBe(false);
   });
 
+  it('opens the sheet with a file dropped anywhere on the page and uploads it', async () => {
+    const uploadAttachment = jest.fn(() =>
+      of({ id: 'f2', filename: 'Beleg.pdf', mime: 'application/pdf', size: 10, scanned: false, isComparisonOffer: false, scanState: 'scanning' as const }),
+    );
+    const { comp, fixture, container } = await setup({
+      ...fakeApi(),
+      uploadAttachment: uploadAttachment as unknown as ApiClient['uploadAttachment'],
+    });
+    await screen.findByRole('heading', { level: 1 });
+    const page = container.querySelector('article.sp') as HTMLElement;
+    fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } });
+    fixture.detectChanges();
+    expect(container.querySelector('app-drop-overlay')).toHaveTextContent('Dateien zum Hochladen ablegen');
+
+    const pdf = new File(['x'], 'Beleg.pdf', { type: 'application/pdf' });
+    fireEvent.drop(page, { dataTransfer: { types: ['Files'], files: [pdf] } });
+    expect(comp.filesOpen()).toBe(true);
+    fixture.detectChanges();
+    const dialog = await screen.findByRole('dialog', { name: 'Anhänge' });
+    expect(await within(dialog).findByText('Beleg.pdf')).toBeInTheDocument();
+    expect(uploadAttachment).toHaveBeenCalledWith(ID, pdf);
+    expect(container.querySelector('app-drop-overlay')).toBeNull();
+    // The open sheet takes its own drop.
+    expect(fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } })).toBe(true);
+  });
+
   it('hides the count when the attachments cannot be listed', async () => {
     await setup(fakeApi({ listAttachments: () => throwError(() => new Error('x')) }));
     await screen.findByRole('heading', { level: 1 });

@@ -111,7 +111,7 @@ async function start(url = '/tickets', opts: Opts = {}) {
       ]),
       { provide: TicketsApiService, useValue: api },
       { provide: RailStatusService, useValue: rail },
-      { provide: AuthService, useValue: { can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage' } },
+      { provide: AuthService, useValue: { displayName: () => 'Mia', can: (p: string) => (opts.manager ?? true) && p === 'ticket.manage' } },
     ],
   });
   const harness = await RouterTestingHarness.create();

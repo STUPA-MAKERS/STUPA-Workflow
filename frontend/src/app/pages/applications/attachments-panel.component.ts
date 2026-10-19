@@ -35,6 +35,8 @@ import {
 import { chatFileUrl } from '@shared/ui/chat/chat.util';
 import { formatBytes } from './applications.util';
 import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.component';
+import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
+import { FileDropDirective } from '@shared/file-drop.directive';
 
 /**
  * Attachments panel.
@@ -49,7 +51,9 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
  * 410 means the link expired.
  *
  * Two upload paths exist: the file picker for several files at once, and drag
- * and drop onto the panel. The overlay follows the style of the invoices page.
+ * and drop onto the panel (`appFileDrop`, with `app-drop-overlay`). A page that takes a
+ * drop on a larger area turns the panel's own target off (`dropTarget`) and hands the
+ * files to `upload`.
  * Several files upload one after the other (concatMap), so parallel requests do
  * not trip the rate limit (429). Every row carries a checkbox, next to an "all"
  * checkbox, for bulk delete.
@@ -59,7 +63,9 @@ import { EmptyStateComponent } from '@shared/ui/empty-state/empty-state.componen
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    DropOverlayComponent,
     EmptyStateComponent,
+    FileDropDirective,
     FormsModule,
     TranslatePipe,
     ButtonComponent,
@@ -90,6 +96,8 @@ export class AttachmentsPanelComponent {
    */
   readonly canDelete = input<boolean | undefined>(undefined);
   readonly deleteAllowed = computed(() => this.canDelete() ?? this.canUpload());
+  /** The panel is the drop target. False: the page around it takes the drop. */
+  readonly dropTarget = input(true);
   /** The number of attachments, after the first load and after each change. */
   readonly countChange = output<number>();
 
@@ -121,11 +129,6 @@ export class AttachmentsPanelComponent {
     const list = this.attachments();
     return list.length > 0 && list.every((a) => this.selected().has(a.id));
   });
-
-  /** Drag and drop overlay, styled like the invoices page. `dragDepth` counts the
-   *  enter and leave events of nested children, so the overlay does not flicker. */
-  readonly dragActive = signal(false);
-  private dragDepth = 0;
 
   /** The scan state as coloured text. */
   readonly scan = scanStatus;
@@ -169,9 +172,10 @@ export class AttachmentsPanelComponent {
 
   /** Upload several files one after the other (concatMap), so parallel requests do
    *  not trip the 429 rate limit. The method counts the files that succeed and
-   *  shows one summary toast at the end. */
-  private upload(files: File[]): void {
-    if (this.uploading() || !files.length) return;
+   *  shows one summary toast at the end. The picker, a drop on the panel and a drop on
+   *  the page around it end here. */
+  upload(files: File[]): void {
+    if (!this.canUpload() || this.uploading() || !files.length) return;
     this.uploading.set(true);
     let ok = 0;
     let failedStatus: number | undefined;
@@ -193,38 +197,6 @@ export class AttachmentsPanelComponent {
           if (ok > 0) this.toast.success(this.i18n.translate('applications.attachments.added'));
         },
       });
-  }
-
-  onDragEnter(event: DragEvent): void {
-    if (!this.canUpload() || !this.hasFiles(event)) return;
-    event.preventDefault();
-    this.dragDepth++;
-    this.dragActive.set(true);
-  }
-
-  onDragOver(event: DragEvent): void {
-    if (!this.canUpload() || !this.hasFiles(event)) return;
-    event.preventDefault();
-  }
-
-  onDragLeave(event: DragEvent): void {
-    if (!this.dragActive()) return;
-    event.preventDefault();
-    this.dragDepth = Math.max(0, this.dragDepth - 1);
-    if (this.dragDepth === 0) this.dragActive.set(false);
-  }
-
-  onDrop(event: DragEvent): void {
-    if (!this.canUpload()) return;
-    event.preventDefault();
-    this.dragDepth = 0;
-    this.dragActive.set(false);
-    const files = Array.from(event.dataTransfer?.files ?? []);
-    if (files.length) this.upload(files);
-  }
-
-  private hasFiles(event: DragEvent): boolean {
-    return Array.from(event.dataTransfer?.types ?? []).includes('Files');
   }
 
   isSelected(id: Uuid): boolean {

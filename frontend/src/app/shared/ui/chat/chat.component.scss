@@ -9,6 +9,8 @@
    `--chat-composer-foot` and out over the side padding of the page with
    `--chat-composer-bleed`; `--chat-composer-surface` is the fill of that bar. `--chat-bubble` is the fill of the messages of others. */
 :host {
+  /* The frame of a file drag (`app-drop-overlay`) covers the whole chat. */
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);

@@ -5,8 +5,10 @@ import {
   Injector,
   afterNextRender,
   computed,
+  effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -51,6 +53,8 @@ import { StatusTextComponent } from '@shared/ui/status-text/status-text.componen
 import { mediaQuerySignal } from '../../layout/media-query';
 import { ButtonComponent, IconComponent, MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
+import { FileDropDirective } from '@shared/file-drop.directive';
+import { DropOverlayComponent } from '@shared/ui/drop-overlay/drop-overlay.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
@@ -113,6 +117,8 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ButtonComponent,
     IconComponent,
     AttachmentsPanelComponent,
+    DropOverlayComponent,
+    FileDropDirective,
     TranslatePipe,
     DecisionSectionComponent,
   ],
@@ -152,6 +158,9 @@ export class StatusTimelineComponent {
 
   readonly filesOpen = signal(false);
   readonly commentsOpen = signal(false);
+  private readonly filesPanel = viewChild(AttachmentsPanelComponent);
+  /** Files dropped on the page, until the sheet "Anhänge" has its panel. */
+  private readonly droppedFiles = signal<File[]>([]);
 
   readonly editing = signal(false);
   readonly editFields = signal<FormlyFieldConfig[]>([]);
@@ -198,6 +207,15 @@ export class StatusTimelineComponent {
    * locked state.
    */
   readonly canUploadAttachments = computed(() => this.editScope());
+  /** A file dropped anywhere on the page becomes an attachment; an open sheet takes its own. */
+  readonly takesDrop = computed(
+    () => this.canUploadAttachments() && !this.filesOpen() && !this.commentsOpen(),
+  );
+
+  onFilesDropped(files: File[]): void {
+    this.droppedFiles.set(files);
+    this.filesOpen.set(true);
+  }
 
   /** Days a magic link works; `null`: no end. */
   protected readonly linkTtlDays = this.branding.linkTtlDays;
@@ -305,6 +323,14 @@ export class StatusTimelineComponent {
   });
 
   constructor() {
+    // A drop on the page opens the sheet "Anhänge"; its panel uploads the files.
+    effect(() => {
+      const panel = this.filesPanel();
+      const files = this.droppedFiles();
+      if (!panel || !files.length) return;
+      this.droppedFiles.set([]);
+      untracked(() => panel.upload(files));
+    });
     const snap = this.route.snapshot;
     const query = snap.queryParamMap;
     // Magic-link target is /antrag/{id}#t={token}: the token is in the fragment
