@@ -12,6 +12,7 @@ import {
   LockedFieldComponent,
   SelectFieldComponent,
   TextareaComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -58,6 +59,7 @@ interface LegFree {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     PaneFormHeadComponent,
     PaneFormFootComponent,
     ButtonComponent,

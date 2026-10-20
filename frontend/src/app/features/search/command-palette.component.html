@@ -88,7 +88,7 @@
       }
 
       @if (showEmpty()) {
-        <p class="pal__note">{{ 'search.empty' | t }}</p>
+        <app-empty-state class="pal__empty" shape="file" rows="3" [heading]="'search.empty' | t" />
       }
       <!-- Say so rather than implying that this is everything. -->
       @if (showTruncated()) {

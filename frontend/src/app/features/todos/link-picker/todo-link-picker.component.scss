@@ -76,6 +76,11 @@
 .lp--pop .lp__group {
   margin-inline: var(--space-4);
 }
+/* The hits run from edge to edge; the empty state keeps the inset of the sheet. */
+.lp--pop .lp__empty {
+  width: auto;
+  margin-inline: var(--space-3);
+}
 .lp--pop .lp__hit {
   padding-inline: var(--space-4);
   border-radius: 0;
