@@ -76,8 +76,8 @@
        clips, the body in it scrolls, so the corners clip what scrolls. -->
   <!-- One column on the home page: the navigation is the page, the empty sheet does not
        show. -->
-  <!-- One column, a phone: a swipe from the left edge leads back like the breadcrumb
-       ("Zur Liste" of an account page). -->
+  <!-- One column, a phone: a swipe from the left edge leads back like the back arrow of
+       the bar. -->
   <div
     class="af__page"
     [class.af__hidden]="navOnly()"
@@ -88,12 +88,11 @@
     (appSwipeBack)="goBack()"
     (appSwipeBackEnd)="swiping.set(false)"
   >
-    <div #page class="af__pageBody" appScrollFade="y">
-      @if (showBack()) {
-        <a class="af__back" [routerLink]="mode().home">
-          <app-icon name="back" [size]="16" />
-          {{ 'ui.listDetail.back' | t }}
-        </a>
+    <div #page class="af__pageBody" [class.ld-under-bar]="showBar()" appScrollFade="y">
+      <!-- Below wide: the bar of every one-view page (the detail of a list/detail page),
+           with the way back, the title in small type and the actions of the page header. -->
+      @if (showBar()) {
+        <app-list-detail-bar [title]="nav.title()" (back)="goBack()" />
       }
       <router-outlet />
     </div>

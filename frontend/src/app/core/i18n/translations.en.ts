@@ -59,7 +59,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'ui.rowMenu.trigger': 'More actions',
   'ui.selection.toolbar': 'Selection',
-  'ui.listDetail.back': 'Back to list',
   'ui.history.noDate': 'No date',
   'ui.history.showValues': 'Show values',
   'ui.history.hideValues': 'Hide values',

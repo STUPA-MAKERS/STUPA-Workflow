@@ -63,7 +63,6 @@ export const de = {
   // own visible text.
   'ui.rowMenu.trigger': 'Weitere Aktionen',
   'ui.selection.toolbar': 'Auswahl',
-  'ui.listDetail.back': 'Zur Liste',
   'ui.history.noDate': 'Ohne Datum',
   'ui.history.showValues': 'Werte anzeigen',
   'ui.history.hideValues': 'Werte ausblenden',

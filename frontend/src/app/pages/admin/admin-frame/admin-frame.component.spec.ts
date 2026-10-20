@@ -58,6 +58,11 @@ async function setup(perms: string[], url = '/admin/users', wide = true) {
             { path: 'cost-centres', component: StubPageComponent },
             { path: 'gremien/g1/members', component: StubPageComponent, data: { parent: ['admin', 'admin/gremien'] } },
             { path: 'users', component: StubPageComponent, data: { parent: ['admin'] } },
+            {
+              path: 'forms/:id',
+              component: StubPageComponent,
+              data: { parent: ['admin', 'admin/forms'] },
+            },
             { path: '**', component: StubPageComponent },
           ],
         },
@@ -350,6 +355,32 @@ describe('AdminFrameComponent', () => {
     expect(page.container.querySelector('.af')).not.toHaveClass('af--split');
   });
 
+  it('below wide: an admin page sits below the bar of a one-view page', async () => {
+    const view = await setup(ALL, '/admin/users', false);
+    expect(view.container.querySelector('app-list-detail-bar')).not.toBeNull();
+    expect(view.container.querySelector('.af__pageBody')).toHaveClass('ld-under-bar');
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
+    await view.fixture.whenStable();
+    expect(view.fixture.debugElement.injector.get(Router).url).toBe('/admin');
+  });
+
+  it('below wide: the back arrow leads to the parent page of the route', async () => {
+    const view = await setup(ALL, '/admin/forms/f1', false);
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
+    await view.fixture.whenStable();
+    expect(view.fixture.debugElement.injector.get(Router).url).toBe('/admin/forms');
+  });
+
+  it('has no bar on the home page below wide', async () => {
+    const home = await setup(ALL, '/admin', false);
+    expect(home.container.querySelector('app-list-detail-bar')).toBeNull();
+  });
+
+  it('has no bar beside the navigation', async () => {
+    const wide = await setup(ALL, '/admin/users');
+    expect(wide.container.querySelector('app-list-detail-bar')).toBeNull();
+  });
+
   it('keeps the navigation above the page on the home page below wide', async () => {
     const home = await setup(ALL, '/admin', false);
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
@@ -506,12 +537,11 @@ describe('AdminFrameComponent in account mode', () => {
     expect(screen.getByText('MCP-Server und Zugriffe von Agenten')).toBeInTheDocument();
   });
 
-  it('below wide: an account page fills the width and "Zur Liste" leads back', async () => {
+  it('below wide: an account page fills the width and the back arrow of the bar leads back', async () => {
     const view = await setupAccount(['mcp.use'], '/account/grants', false);
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
-    const back = screen.getByRole('link', { name: 'Zur Liste' });
-    expect(back).toHaveAttribute('href', '/account');
+    const back = screen.getByRole('button', { name: 'Zur Liste' });
     await userEvent.click(back);
     await view.fixture.whenStable();
     view.fixture.detectChanges();
