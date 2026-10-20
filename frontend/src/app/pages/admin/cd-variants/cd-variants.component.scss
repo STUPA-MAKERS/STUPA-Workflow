@@ -17,11 +17,13 @@
 /* The hover fills the whole row, not the head inside its padding: the fill of the head
    left an inset band. An open row holds the logo rows, which have the hover colour as
    their surface, so an open row keeps its surface. */
-.cdv__head.hitrow:hover {
-  background: none;
-}
-.cdv__variant:not(:has(> .cdv__body)):has(> .cdv__head:hover) {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .cdv__head.hitrow:hover {
+    background: none;
+  }
+  .cdv__variant:not(:has(> .cdv__body)):has(> .cdv__head:hover) {
+    background: var(--color-surface-3);
+  }
 }
 
 .cdv__head {
