@@ -274,11 +274,11 @@
 /* The bar of the edit mode takes the place of the header (board Anträge-Bearbeiten).
    It stays at the top while the form scrolls below it, so Abbrechen is always in reach
    ("Speichern" is the floating button) (DECISIONS: the header controls of a pane stay fixed). Side by side
-   the pane scrolls, one pane at a time the page scrolls; `top: 0` holds the bar at the
-   top of either. */
+   the pane scrolls, one pane at a time the page scrolls below the bar of the layout;
+   `--ld-sticky-top` (0 side by side) holds the bar at the top of either. */
 .ad__editBar {
   position: sticky;
-  top: 0;
+  top: var(--ld-sticky-top, 0px);
   z-index: 3;
   display: flex;
   align-items: center;
