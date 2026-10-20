@@ -1584,7 +1584,7 @@ export const de = {
   'admin.cdVariants.pickFile': 'Datei auswählen',
   'admin.cdVariants.noFile': 'Keine Datei gewählt',
   'admin.config.history.unknownActor': 'Unbekannte Person',
-  'admin.brand.textLang': 'Texte in',
+  'admin.brand.textLang': 'Sprache der Texte',
   'admin.brand.replaceLogo': 'Datei ersetzen',
   'admin.brand.removeLogo': 'Logo entfernen',
   'admin.brand.pick': 'Auswählen',
@@ -2209,7 +2209,6 @@ export const de = {
 
   'admin.brand.title': 'Branding',
   'admin.texts.title': 'Texte',
-  'admin.brand.version': 'Version {n}',
   'admin.brand.appName.group': 'App-Name',
   'admin.brand.appName.full': 'Voller Name (Browser-Tab)',
   'admin.brand.appName.short': 'Kurzname (PWA)',
@@ -2241,8 +2240,6 @@ export const de = {
   'admin.brand.submitted.group': 'Texte nach dem Einreichen',
   'admin.brand.submitted.internal': 'Intern: angemeldet mit Konto',
   'admin.brand.submitted.external': 'Extern: Gast mit E-Mail-Bestätigung',
-  'admin.brand.submitted.preview': 'Vorschau',
-  'admin.brand.submitted.default': 'Standardtext',
   'admin.brand.badUrl': 'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
 
   'admin.webhook.title': 'Webhooks',

@@ -11,10 +11,20 @@
   padding: 0;
   list-style: none;
 }
-/* The head carries the padding of the row, so its hover fill reaches the edges of the
-   row. Padding on the row itself left an inset band. */
-.cdv__head {
+.cdv__variant {
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+}
+/* The hover fills the whole row, not the head inside its padding: the fill of the head
+   left an inset band. An open row holds the logo rows, which have the hover colour as
+   their surface, so an open row keeps its surface. */
+.cdv__head.hitrow:hover {
+  background: none;
+}
+.cdv__variant:not(:has(> .cdv__body)):has(> .cdv__head:hover) {
+  background: var(--color-surface-3);
+}
+
+.cdv__head {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -81,7 +91,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: 0 var(--space-3) var(--space-3) var(--space-4);
+  margin-top: var(--space-3);
 }
 .cdv__logos {
   margin: 0;

@@ -5,7 +5,6 @@ import {
   DestroyRef,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -20,7 +19,6 @@ import type { I18nMap } from '@core/api/models';
 import {
   defaultSubmittedText,
   SUBMITTED_FREETEXT,
-  submittedMarkdown,
   type SubmittedKind,
 } from '@core/branding/submitted-texts';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
@@ -39,7 +37,6 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
   type FooterColumn,
@@ -49,8 +46,6 @@ import {
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
-import { renderMarkdown } from '../../../features/meetings/meetings.util';
-import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
@@ -74,13 +69,12 @@ export type BrandingSection = 'branding' | 'texts';
  *   accent shows at once on the whole page, before the save.
  * - "Texte": the free texts, the texts after the submission, the footer columns with
  *   their links, the copyright line and the legal links. A text field shows the language
- *   that "Texte in" picks. An empty field shows the built-in text as its placeholder.
+ *   that the switch DE | EN above them picks. An empty field shows the built-in text as its placeholder.
  *
  * The floating button "Speichern" shows only while the screen holds edits that the
- * server does not have. A save writes a new active version at once; there is no draft.
+ * server does not have. A save applies to everyone at once; there is no draft.
  * A link may carry `http:`, `https:` or `mailto:` only; another scheme blocks the save.
- * The version list below restores an older version. It works against
- * `/api/admin/site-config`.
+ * It works against `/api/admin/site-config`.
  */
 @Component({
   selector: 'app-branding-editor',
@@ -91,7 +85,6 @@ export type BrandingSection = 'branding' | 'texts';
     MoveButtonsComponent,
     NgTemplateOutlet,
     SectionHeaderComponent,
-    I18nInputComponent,
     FabComponent,
     SkeletonComponent,
     FormsModule,
@@ -102,7 +95,6 @@ export type BrandingSection = 'branding' | 'texts';
     NoteComponent,
     ContentLangSwitchComponent,
     SwitchComponent,
-    VersionHistoryComponent,
     PageHeaderComponent,
   ],
   templateUrl: './branding-editor.component.html',
@@ -124,7 +116,6 @@ export class BrandingEditorComponent {
   protected readonly freetexts = FREETEXTS;
   protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
 
-  protected readonly version = signal(0);
   /** The edited copy of the active branding. */
   protected readonly draft = signal<Branding | null>(null);
   /** The count of local edits. `patch()` increments it. */
@@ -151,19 +142,15 @@ export class BrandingEditorComponent {
   /** The edited copy carries an own accent. */
   protected readonly customAccent = computed(() => this.accent() !== DEFAULT_ACCENT);
 
-  /** Version sidebar. Reload it after a save or a restore. */
-  protected readonly history = viewChild(VersionHistoryComponent);
-
   constructor() {
     this.loadConfig();
     // An accent that was not saved leaves with the page.
     inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
 
-  /** Load the active branding, also after a version restore. */
+  /** Load the active branding. */
   protected loadConfig(): void {
     this.api.getSiteConfig().subscribe((cfg) => {
-      this.version.set(cfg.version);
       this.draft.set(cfg.branding);
       this.markSaved(this.editRev());
       this.brand.applyBranding(cfg.branding);
@@ -239,16 +226,6 @@ export class BrandingEditorComponent {
     return defaultSubmittedText(kind, this.lang());
   }
 
-  /** The field of the picked language is empty, so the page shows the built-in text. */
-  protected submittedIsDefault(d: Branding, kind: SubmittedKind): boolean {
-    return !(d.freetexts[SUBMITTED_FREETEXT[kind]]?.[this.lang()] ?? '').trim();
-  }
-
-  /** The preview as the confirmation page renders it (escaped Markdown). */
-  protected submittedPreview(d: Branding, kind: SubmittedKind): string {
-    return renderMarkdown(submittedMarkdown(d.freetexts[SUBMITTED_FREETEXT[kind]], kind, this.lang()));
-  }
-
   /** Write the text of the picked language into a map and refresh the draft. */
   protected setText(map: I18nMap, value: string): void {
     this.patch(() => {
@@ -259,13 +236,6 @@ export class BrandingEditorComponent {
   protected setUrl(link: FooterLink, value: string): void {
     this.patch(() => {
       link.url = value;
-    });
-  }
-
-  /** The column heading in one language; both stand side by side. */
-  protected setColumnLabel(col: FooterColumn, lang: TextLang, value: string): void {
-    this.patch(() => {
-      col.label[lang] = value;
     });
   }
 
@@ -402,7 +372,7 @@ export class BrandingEditorComponent {
     this.editRev.update((n) => n + 1);
   }
 
-  /** Save the branding as the new active version. */
+  /** Save the branding. It applies to everyone at once. */
   protected save(): void {
     const d = this.draft();
     if (!d || this.saving()) return;
@@ -415,12 +385,10 @@ export class BrandingEditorComponent {
     this.api.saveSiteConfig(d).subscribe({
       next: (cfg) => {
         this.saving.set(false);
-        this.version.set(cfg.version);
-        this.markSaved(rev);
+          this.markSaved(rev);
         this.brand.applyBranding(cfg.branding);
         this.brand.previewAccent(undefined);
         this.toast.success(this.i18n.translate('admin.common.saved'));
-        this.history()?.reload();
       },
       error: () => {
         this.saving.set(false);

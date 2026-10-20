@@ -1547,7 +1547,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.cdVariants.pickFile': 'Choose a file',
   'admin.cdVariants.noFile': 'No file chosen',
   'admin.config.history.unknownActor': 'Unknown person',
-  'admin.brand.textLang': 'Texts in',
+  'admin.brand.textLang': 'Language of the texts',
   'admin.brand.replaceLogo': 'Replace the file',
   'admin.brand.removeLogo': 'Remove the logo',
   'admin.brand.pick': 'Choose',
@@ -2160,7 +2160,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'admin.brand.title': 'Branding',
   'admin.texts.title': 'Texts',
-  'admin.brand.version': 'Version {n}',
   'admin.brand.appName.group': 'App name',
   'admin.brand.appName.full': 'Full name (browser tab)',
   'admin.brand.appName.short': 'Short name (PWA)',
@@ -2192,8 +2191,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.brand.submitted.group': 'Texts after the submission',
   'admin.brand.submitted.internal': 'Internal – signed in with an account',
   'admin.brand.submitted.external': 'External – guest with email confirmation',
-  'admin.brand.submitted.preview': 'Preview',
-  'admin.brand.submitted.default': 'Default text',
   'admin.brand.badUrl': 'Disallowed link URL — only http(s):// or mailto: are allowed.',
 
   'admin.webhook.title': 'Webhooks',

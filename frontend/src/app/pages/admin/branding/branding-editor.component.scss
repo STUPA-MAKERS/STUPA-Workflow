@@ -7,7 +7,7 @@
   container-type: inline-size;
 }
 
-/* The language of the texts. */
+/* The language of the texts: the switch alone, full width on a phone. */
 .br__meta {
   display: flex;
   flex-wrap: wrap;
@@ -16,13 +16,8 @@
   gap: var(--space-3);
 }
 .br__lang {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-.br__langLabel {
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
+  display: flex;
+  width: 11rem;
 }
 
 /* Two columns side by side; one below the other in a narrow sheet. */
@@ -191,43 +186,12 @@
 .br__areaInput:focus {
   outline: none;
 }
-
-/* Texts after the submission: a card per kind on the next surface, as the footer
-   columns: the field, then the Markdown preview as the page shows it. */
-.br__subm {
-  @include sc.card($pad: var(--space-3), $gap: var(--space-2), $muted-label: false);
+.br__areaInput::placeholder {
+  color: var(--color-text-subtle);
 }
-.br__submPv {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1) var(--space-4) var(--space-1);
-}
-.br__submPvHead {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-height: 1.5rem;
-}
-.br__submPvTag {
-  font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-}
-.br__submPvBody {
-  font-size: var(--fs-sm);
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-.br__submPvBody ::ng-deep :first-child {
-  margin-top: 0;
-}
-.br__submPvBody ::ng-deep :last-child {
-  margin-bottom: 0;
-}
-/* Space between Markdown blocks (paragraphs, lists). The HTML comes from
-   `innerHTML`, so it has no view-encapsulation attribute: `::ng-deep` reaches it. */
-.br__submPvBody ::ng-deep > * + * {
-  margin-top: var(--space-2);
+/* A one-line text: the same field, without the resize handle. */
+.br__areaInput--line {
+  min-height: 1.75rem;
 }
 
 /* Footer columns: a card per column on the next surface. */
@@ -244,11 +208,6 @@
 .br__columnActions {
   display: inline-flex;
   gap: 2px;
-}
-.br__pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-2);
 }
 .br__add {
   align-self: flex-start;
@@ -307,8 +266,10 @@
 }
 
 @container (max-width: 30rem) {
-  .br__nameRow,
-  .br__pair {
+  .br__lang {
+    width: 100%;
+  }
+  .br__nameRow {
     grid-template-columns: minmax(0, 1fr);
   }
   .br__link {

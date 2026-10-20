@@ -35,8 +35,8 @@ async function setup(section: BrandingSection = 'texts') {
   return { ...view, toast };
 }
 
-/** The version (the `meta` of the header). */
-function versionLine(container: Element): string {
+/** The `meta` line of the header. The page shows no version. */
+function metaLine(container: Element): string {
   return container.querySelector('.ph__meta')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
@@ -87,7 +87,7 @@ describe('BrandingEditorComponent', () => {
   it('shows the texts on the page "Texte" and nothing of the branding', async () => {
     const { container } = await setup('texts');
     expect(screen.getByRole('heading', { level: 1, name: 'Texte' })).toBeInTheDocument();
-    expect(versionLine(container)).toBe('Version 1');
+    expect(metaLine(container)).toBe('');
     expect(screen.getByRole('textbox', { name: 'Willkommenstext (DE)' })).toHaveValue('Willkommen auf der Antragsplattform.');
     expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
     expect(screen.queryByText('Vorschau', { selector: 'summary *' })).toBeNull();
@@ -138,14 +138,14 @@ describe('BrandingEditorComponent', () => {
     }
   });
 
-  it('saves at once as the new active version', async () => {
+  it('saves at once, without a version line or a version list', async () => {
     const { api, container, toast } = await setupWithStub({});
-    expect(versionLine(container)).toBe('Version 3');
+    expect(metaLine(container)).toBe('');
+    expect(container.querySelector('app-version-history')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     await userEvent.type(screen.getByRole('textbox', { name: 'Kurzname (PWA)' }), 'AP');
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
     expect(api.saveSiteConfig).toHaveBeenCalledWith(expect.objectContaining({ appShortName: 'AP' }));
-    expect(versionLine(container)).toBe('Version 4');
     expect(toast.success).toHaveBeenCalled();
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
@@ -222,9 +222,11 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(screen.getByRole('textbox', { name: 'Überschrift (DE)' })).toHaveValue('Über uns');
-    expect(screen.getByRole('textbox', { name: 'Überschrift (EN)' })).toHaveValue('About');
+    expect(screen.queryByRole('textbox', { name: 'Überschrift (EN)' })).toBeNull();
     expect(screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' })).toHaveValue('Automatische Nachricht – nicht antworten.');
+    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
     const heading = screen.getByRole('textbox', { name: 'Überschrift (EN)' });
+    expect(heading).toHaveValue('About');
     await userEvent.clear(heading);
     await userEvent.type(heading, 'Contact');
     expect(c.draft().footerColumns[0].label.en).toBe('Contact');
@@ -234,6 +236,7 @@ describe('BrandingEditorComponent', () => {
     const urls = screen.getAllByRole('textbox', { name: 'URL' });
     await userEvent.type(urls[1], 'https://k.de');
     expect(c.draft().footerColumns[0].links[1].url).toBe('https://k.de');
+    await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
     const mail = screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' });
     await userEvent.clear(mail);
     await userEvent.type(mail, 'Gruß');
@@ -375,7 +378,7 @@ describe('BrandingEditorComponent', () => {
     c.addLink(col);
     expect(col.links.length).toBeGreaterThan(0);
     c.removeLink(col, 0);
-    c.setColumnLabel(col, 'de', 'Neu');
+    c.setText(col.label, 'Neu');
     expect(col.label.de).toBe('Neu');
     c.moveColumn(cols.length - 1, -1); // a valid move up
     c.moveColumn(0, -1); // out of bounds, so a no-op
@@ -388,7 +391,7 @@ describe('BrandingEditorComponent', () => {
 
     c.removeLogo('wordmark'); // an absent slot takes the safe delete branch
     c.save();
-    expect(c.version()).toBe(2);
+    expect(c.saving()).toBe(false);
   });
 
   it('rejects an oversized logo file', async () => {
@@ -434,7 +437,7 @@ describe('BrandingEditorComponent', () => {
   });
 
   describe('texts after the submission', () => {
-    it('shows both fields with the built-in text as placeholder and preview', async () => {
+    it('shows both fields with the built-in text as placeholder, as plain fields', async () => {
       const { fixture } = await setupWithStub({}, 'texts');
       await fixture.whenStable();
       fixture.detectChanges();
@@ -445,19 +448,16 @@ describe('BrandingEditorComponent', () => {
         'placeholder',
         expect.stringMatching(/persönlichen Link/),
       );
-      expect(screen.getByTestId('submitted-preview-external').textContent).toMatch(/persönlichen Link/);
-      expect(screen.getAllByText('Standardtext')).toHaveLength(2);
+      expect(screen.queryByTestId('submitted-preview-external')).toBeNull();
+      expect(screen.getByTestId('submitted-internal').classList).toContain('br__area');
     });
 
-    it('writes the Markdown of the picked language into the draft and previews it safely', async () => {
+    it('writes the Markdown of the picked language into the draft', async () => {
       const { fixture, api } = await setupWithStub({}, 'texts');
       await fixture.whenStable();
       fixture.detectChanges();
       const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
       await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
-      expect(screen.getByTestId('submitted-preview-internal').innerHTML).toContain('<strong>sehr</strong>');
-      expect(screen.getByTestId('submitted-preview-internal').querySelector('b')).toBeNull();
-      expect(screen.getAllByText('Standardtext')).toHaveLength(1);
       await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
       const en = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (EN)' });
       expect(en).toHaveValue('');
@@ -475,9 +475,8 @@ describe('BrandingEditorComponent', () => {
       const d = c.draft();
       d.freetexts.submittedExternal = { de: 'x' };
       expect(c.submittedMap(d, 'external')).toBe(d.freetexts.submittedExternal);
-      expect(c.submittedIsDefault(d, 'external')).toBe(false);
       delete d.freetexts.submittedInternal;
-      expect(c.submittedIsDefault(d, 'internal')).toBe(true);
+      expect(c.submittedMap(d, 'internal')).toEqual({});
     });
   });
 

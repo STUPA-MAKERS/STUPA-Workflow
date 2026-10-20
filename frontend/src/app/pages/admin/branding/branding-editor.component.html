@@ -2,15 +2,13 @@
   <app-page-header
     [flush]="true"
     [title]="(section === 'texts' ? 'admin.texts.title' : 'admin.brand.title') | t"
-    [meta]="draft() ? ('admin.brand.version' | t: { n: version() }) : null"
   />
 
   @if (draft(); as d) {
     @if (section === 'texts') {
       <div class="br__meta">
         <span class="br__lang">
-          <span class="br__langLabel" id="br-lang">{{ 'admin.brand.textLang' | t }}</span>
-          <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.brand.textLang' | t" />
+          <app-content-lang-switch [(value)]="lang" width="fill" [ariaLabel]="'admin.brand.textLang' | t" />
         </span>
       </div>
 
@@ -36,33 +34,21 @@
             }
           </section>
 
-          <!-- The texts after the submission: one card per applicant kind, with the field
-               in the picked language and a Markdown preview. Empty = built-in text. -->
+          <!-- The texts after the submission, one per applicant kind. Empty = built-in text. -->
           <section class="br__sec" aria-labelledby="br-submitted">
             <h2 class="section-title br__secTitle" id="br-submitted">{{ 'admin.brand.submitted.group' | t }}</h2>
             @for (kind of submittedKinds; track kind) {
-              <article class="br__subm" [attr.aria-label]="submittedLabel(kind)" [attr.data-testid]="'submitted-' + kind">
-                <label class="br__area">
-                  <span class="br__areaLabel">{{ withLang(submittedLabel(kind)) }}</span>
-                  <textarea
-                    class="br__areaInput"
-                    rows="4"
-                    [placeholder]="submittedDefault(kind)"
-                    [ngModel]="submittedMap(d, kind)[lang()]"
-                    (ngModelChange)="setText(submittedMap(d, kind), $event)"
-                    [name]="'submitted-' + kind"
-                  ></textarea>
-                </label>
-                <div class="br__submPv">
-                  <span class="br__submPvHead">
-                    <span class="cap">{{ withLang('admin.brand.submitted.preview' | t) }}</span>
-                    @if (submittedIsDefault(d, kind)) {
-                      <span class="br__submPvTag">{{ 'admin.brand.submitted.default' | t }}</span>
-                    }
-                  </span>
-                  <div class="br__submPvBody" [attr.data-testid]="'submitted-preview-' + kind" [innerHTML]="submittedPreview(d, kind)"></div>
-                </div>
-              </article>
+              <label class="br__area" [attr.data-testid]="'submitted-' + kind">
+                <span class="br__areaLabel">{{ withLang(submittedLabel(kind)) }}</span>
+                <textarea
+                  class="br__areaInput"
+                  rows="3"
+                  [placeholder]="submittedDefault(kind)"
+                  [ngModel]="submittedMap(d, kind)[lang()]"
+                  (ngModelChange)="setText(submittedMap(d, kind), $event)"
+                  [name]="'submitted-' + kind"
+                ></textarea>
+              </label>
             }
           </section>
         </div>
@@ -87,16 +73,15 @@
                     <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeColumn' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="removeColumn(ci)"><app-icon name="trash" /></app-button>
                   </span>
                 </header>
-                <div class="br__pair">
-                  <app-i18n-input
-                    [deLabel]="'admin.brand.columnHeading' | t: { lang: 'DE' }"
-                    [enLabel]="'admin.brand.columnHeading' | t: { lang: 'EN' }"
-                    [de]="col.label['de']"
-                    (deChange)="setColumnLabel(col, 'de', $event)"
-                    [en]="col.label['en']"
-                    (enChange)="setColumnLabel(col, 'en', $event)"
+                <label class="br__area">
+                  <span class="br__areaLabel">{{ 'admin.brand.columnHeading' | t: { lang: lang().toUpperCase() } }}</span>
+                  <input
+                    class="br__areaInput br__areaInput--line"
+                    [ngModel]="col.label[lang()]"
+                    (ngModelChange)="setText(col.label, $event)"
+                    [name]="'col-' + ci + '-heading'"
                   />
-                </div>
+                </label>
                 @if (col.links.length) {
                   <ng-container
                     *ngTemplateOutlet="linkRows; context: { $implicit: col.links, col: col, labelName: 'col-' + ci + '-link-', urlName: 'col-' + ci + '-url-' }"
@@ -111,13 +96,16 @@
 
           <section class="br__sec" aria-labelledby="br-copy">
             <h2 class="sr-only" id="br-copy">{{ 'admin.brand.copyright' | t }}</h2>
-            <app-input
-              [label]="withLang('admin.brand.copyright' | t)"
-              [placeholder]="copyrightDefault()"
-              [ngModel]="d.copyright[lang()]"
-              (ngModelChange)="setText(d.copyright, $event)"
-              name="copyright"
-            />
+            <label class="br__area">
+              <span class="br__areaLabel">{{ withLang('admin.brand.copyright' | t) }}</span>
+              <input
+                class="br__areaInput br__areaInput--line"
+                [placeholder]="copyrightDefault()"
+                [ngModel]="d.copyright[lang()]"
+                (ngModelChange)="setText(d.copyright, $event)"
+                name="copyright"
+              />
+            </label>
           </section>
 
           <section class="br__sec" aria-labelledby="br-legal">
@@ -254,8 +242,6 @@
         </div>
       </div>
     }
-
-    <app-version-history entityType="site_config" entityId="global" (restored)="loadConfig()" />
   } @else {
     <div class="br__cols">
       <app-skeleton variant="lines" [count]="6" [label]="'common.loading' | t" />
