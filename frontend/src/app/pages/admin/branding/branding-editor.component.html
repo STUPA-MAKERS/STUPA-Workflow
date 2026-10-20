@@ -54,48 +54,8 @@
         </div>
 
         <div class="br__col">
-          <section class="br__sec" aria-labelledby="br-footer">
-            <app-section-header class="br__secHead" headingId="br-footer" [heading]="'admin.brand.footer' | t">
-              <app-button variant="text" size="sm" (click)="addColumn()"><app-icon name="plus" /> {{ 'admin.brand.addColumn' | t }}</app-button>
-            </app-section-header>
-            @for (col of d.footerColumns; track $index; let ci = $index; let last = $last) {
-              <article class="br__column" [attr.aria-label]="'admin.brand.column' | t: { n: ci + 1 }">
-                <header class="br__columnHead">
-                  <span class="cap">{{ 'admin.brand.column' | t: { n: ci + 1 } }}</span>
-                  <span class="br__columnActions">
-                    <app-move-buttons
-                      [upDisabled]="ci === 0"
-                      [downDisabled]="last"
-                      [upLabel]="('admin.common.moveUp' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })"
-                      [downLabel]="('admin.common.moveDown' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })"
-                      (move)="moveColumn(ci, $event)"
-                    />
-                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeColumn' | t) + ': ' + ('admin.brand.column' | t: { n: ci + 1 })" (click)="removeColumn(ci)"><app-icon name="trash" /></app-button>
-                  </span>
-                </header>
-                <label class="br__area">
-                  <span class="br__areaLabel">{{ 'admin.brand.columnHeading' | t: { lang: lang().toUpperCase() } }}</span>
-                  <input
-                    class="br__areaInput br__areaInput--line"
-                    [ngModel]="col.label[lang()]"
-                    (ngModelChange)="setText(col.label, $event)"
-                    [name]="'col-' + ci + '-heading'"
-                  />
-                </label>
-                @if (col.links.length) {
-                  <ng-container
-                    *ngTemplateOutlet="linkRows; context: { $implicit: col.links, col: col, labelName: 'col-' + ci + '-link-', urlName: 'col-' + ci + '-url-' }"
-                  />
-                }
-                <app-button class="br__add" variant="text" size="sm" (click)="addLink(col)"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
-              </article>
-            } @empty {
-              <p class="br__hint">{{ 'admin.brand.noColumns' | t }}</p>
-            }
-          </section>
-
           <section class="br__sec" aria-labelledby="br-copy">
-            <h2 class="sr-only" id="br-copy">{{ 'admin.brand.copyright' | t }}</h2>
+            <h2 class="section-title br__secTitle" id="br-copy">{{ 'admin.brand.footer' | t }}</h2>
             <label class="br__area">
               <span class="br__areaLabel">{{ withLang('admin.brand.copyright' | t) }}</span>
               <input
@@ -113,9 +73,33 @@
               <app-button variant="text" size="sm" (click)="addLegalLink()"><app-icon name="plus" /> {{ 'admin.brand.addLink' | t }}</app-button>
             </app-section-header>
             @if (d.legalLinks.length) {
-              <ng-container
-                *ngTemplateOutlet="linkRows; context: { $implicit: d.legalLinks, col: null, labelName: 'legal-', urlName: 'legal-url-' }"
-              />
+              <ul class="br__links">
+                @for (link of d.legalLinks; track $index; let li = $index) {
+                  <li class="br__link">
+                    <label class="br__area">
+                      <span class="br__areaLabel">{{ withLang('admin.brand.linkLabel' | t) }}</span>
+                      <input
+                        class="br__areaInput br__areaInput--line"
+                        [ngModel]="link.label[lang()]"
+                        (ngModelChange)="setText(link.label, $event)"
+                        [name]="'legal-' + li"
+                      />
+                    </label>
+                    <label class="br__area" [class.br__area--bad]="isBadUrl(link.url)">
+                      <span class="br__areaLabel">{{ 'admin.brand.url' | t }}</span>
+                      <input
+                        class="br__areaInput br__areaInput--line"
+                        [attr.aria-invalid]="isBadUrl(link.url) ? 'true' : null"
+                        placeholder="https://"
+                        [ngModel]="link.url"
+                        (ngModelChange)="setUrl(link, $event)"
+                        [name]="'legal-url-' + li"
+                      />
+                    </label>
+                    <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="removeLegalLink(li)"><app-icon name="trash" /></app-button>
+                  </li>
+                }
+              </ul>
             } @else {
               <p class="br__hint">{{ 'admin.brand.noLegal' | t }}</p>
             }
@@ -263,32 +247,3 @@
 <!-- The rows of a link list: the label in the edited language, the URL and "Entfernen". A
      footer column and the legal links share them. A row of a column has the column in
      `col`, a legal link has none. -->
-<ng-template #linkRows let-links let-col="col" let-labelName="labelName" let-urlName="urlName">
-  <ul class="br__links">
-    @for (link of links; track $index; let li = $index) {
-      <li class="br__link">
-        <label class="br__area">
-          <span class="br__areaLabel">{{ withLang('admin.brand.linkLabel' | t) }}</span>
-          <input
-            class="br__areaInput br__areaInput--line"
-            [ngModel]="link.label[lang()]"
-            (ngModelChange)="setText(link.label, $event)"
-            [name]="labelName + li"
-          />
-        </label>
-        <label class="br__area" [class.br__area--bad]="isBadUrl(link.url)">
-          <span class="br__areaLabel">{{ 'admin.brand.url' | t }}</span>
-          <input
-            class="br__areaInput br__areaInput--line"
-            [attr.aria-invalid]="isBadUrl(link.url) ? 'true' : null"
-            placeholder="https://"
-            [ngModel]="link.url"
-            (ngModelChange)="setUrl(link, $event)"
-            [name]="urlName + li"
-          />
-        </label>
-        <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="col ? removeLink(col, li) : removeLegalLink(li)"><app-icon name="trash" /></app-button>
-      </li>
-    }
-  </ul>
-</ng-template>

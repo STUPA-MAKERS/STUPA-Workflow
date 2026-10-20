@@ -1252,11 +1252,6 @@ export interface FooterLink {
   url: string;
 }
 
-export interface FooterColumn {
-  label: I18nMap;
-  links: FooterLink[];
-}
-
 export interface SiteFreetexts {
   /** Login hint, landing/welcome, support, email footer — each i18n. */
   loginHint: I18nMap;
@@ -1279,7 +1274,6 @@ export interface Branding {
   /** Short app name (PWA icon/home screen). Empty ⇒ the default. */
   appShortName?: string;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
-  footerColumns: FooterColumn[];
   copyright: I18nMap;
   legalLinks: FooterLink[];
   freetexts: SiteFreetexts;

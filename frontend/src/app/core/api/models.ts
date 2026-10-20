@@ -34,12 +34,6 @@ export interface PublicFooterLink {
   url: string;
 }
 
-/** A footer column of the branding: a heading and its links. */
-export interface PublicFooterColumn {
-  label: I18nMap;
-  links: PublicFooterLink[];
-}
-
 /** Public branding config of the active site version. It needs no authentication.
  *  The type stays loose on purpose. The frontend reads only what it shows: the free
  *  texts (for example `applyInfo`), the app name and the footer. */
@@ -66,8 +60,6 @@ export interface PublicSiteConfig {
     copyright?: I18nMap;
     /** Footer legal links. Empty shows no legal link. */
     legalLinks?: PublicFooterLink[];
-    /** Footer columns: a heading and its links each. Empty shows no column. */
-    footerColumns?: PublicFooterColumn[];
     freetexts?: Partial<
       Record<
         | 'loginHint'

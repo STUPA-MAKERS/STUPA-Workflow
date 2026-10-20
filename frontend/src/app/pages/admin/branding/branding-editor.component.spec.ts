@@ -43,7 +43,6 @@ function metaLine(container: Element): string {
 function emptyBranding(): Branding {
   return {
     logos: {},
-    footerColumns: [],
     copyright: { de: '', en: '' },
     legalLinks: [],
     freetexts: {
@@ -217,52 +216,46 @@ describe('BrandingEditorComponent', () => {
     });
   });
 
-  it('edits the footer columns with their links and the mail footer text (gaps N43)', async () => {
-    const { fixture } = await setup();
+  it('edits the copyright, the legal links and the mail footer text (gaps N43)', async () => {
+    const { fixture, container } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    expect(screen.getByRole('textbox', { name: 'Überschrift (DE)' })).toHaveValue('Über uns');
-    expect(screen.queryByRole('textbox', { name: 'Überschrift (EN)' })).toBeNull();
+    expect(container.querySelector('.br__column')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Spalte/ })).toBeNull();
     expect(screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' })).toHaveValue('Automatische Nachricht – nicht antworten.');
     await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-    const heading = screen.getByRole('textbox', { name: 'Überschrift (EN)' });
-    expect(heading).toHaveValue('About');
-    await userEvent.clear(heading);
-    await userEvent.type(heading, 'Contact');
-    expect(c.draft().footerColumns[0].label.en).toBe('Contact');
-    // The first "Link hinzufügen" belongs to the column, the last one to the legal links.
-    await userEvent.click(screen.getAllByRole('button', { name: 'Link hinzufügen' })[0]);
-    expect(c.draft().footerColumns[0].links).toHaveLength(2);
+    const label = screen.getAllByRole('textbox', { name: 'Bezeichnung (EN)' })[0];
+    expect(label).toHaveValue('Imprint');
+    await userEvent.clear(label);
+    await userEvent.type(label, 'Legal');
+    expect(c.draft().legalLinks[0].label.en).toBe('Legal');
+    const before = c.draft().legalLinks.length;
+    await userEvent.click(screen.getByRole('button', { name: 'Link hinzufügen' }));
+    expect(c.draft().legalLinks).toHaveLength(before + 1);
     const urls = screen.getAllByRole('textbox', { name: 'URL' });
-    await userEvent.type(urls[1], 'https://k.de');
-    expect(c.draft().footerColumns[0].links[1].url).toBe('https://k.de');
+    await userEvent.type(urls[before], 'https://k.de');
+    expect(c.draft().legalLinks[before].url).toBe('https://k.de');
     await userEvent.click(screen.getByRole('radio', { name: 'DE' }));
     const mail = screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' });
     await userEvent.clear(mail);
     await userEvent.type(mail, 'Gruß');
     expect(c.draft().freetexts.emailFooter.de).toBe('Gruß');
-    await userEvent.click(screen.getByRole('button', { name: 'Spalte entfernen: Spalte 1' }));
-    expect(c.draft().footerColumns).toHaveLength(0);
-    expect(screen.getByText('Noch keine Spalte.')).toBeInTheDocument();
     // Many typed keys: the default 5 s is short on a busy runner.
   }, 15000);
 
-  it('gives a column and the legal links the same link rows', async () => {
+  it('gives the legal links the same fields as every other text', async () => {
     const { fixture, container } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     const lists = container.querySelectorAll('ul.br__links');
-    expect(lists).toHaveLength(2);
-    for (const list of lists) {
-      const row = list.querySelector('li.br__link')!;
-      const fields = row.querySelectorAll('label.br__area input.br__areaInput');
-      expect(fields).toHaveLength(2);
-      expect(fields[1]).toHaveAttribute('placeholder', 'https://');
-    }
+    expect(lists).toHaveLength(1);
+    const row = lists[0].querySelector('li.br__link')!;
+    const fields = row.querySelectorAll('label.br__area input.br__areaInput');
+    expect(fields).toHaveLength(2);
+    expect(fields[1]).toHaveAttribute('placeholder', 'https://');
     const legal = c.draft().legalLinks.length;
-    await userEvent.click(within(lists[0] as HTMLElement).getByRole('button', { name: /^Link entfernen: / }));
-    expect(c.draft().footerColumns[0].links).toHaveLength(0);
-    expect(c.draft().legalLinks).toHaveLength(legal);
+    await userEvent.click(within(lists[0] as HTMLElement).getAllByRole('button', { name: /^Link entfernen: / })[0]);
+    expect(c.draft().legalLinks).toHaveLength(legal - 1);
   });
 
   it('switches the text fields to English', async () => {
@@ -349,14 +342,13 @@ describe('BrandingEditorComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Dateityp nicht erlaubt.');
   });
 
-  it('blocks saving when a footer link uses a disallowed scheme', async () => {
+  it('blocks saving when a legal link uses a disallowed scheme', async () => {
     const { fixture, toast } = await setup();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
-    c.addColumn();
-    const col = c.draft().footerColumns[c.draft().footerColumns.length - 1];
-    c.addLink(col);
-    c.setUrl(col.links[0], 'javascript:alert(1)');
+    c.addLegalLink();
+    const links = c.draft().legalLinks;
+    c.setUrl(links[links.length - 1], 'javascript:alert(1)');
     expect(c.linkErrors()).toContain('javascript:alert(1)');
     expect(c.isBadUrl('javascript:alert(1)')).toBe(true);
     fixture.detectChanges();
@@ -373,18 +365,8 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
 
-    c.addColumn();
-    const cols = c.draft().footerColumns;
-    const col = cols[cols.length - 1];
-    c.addLink(col);
-    expect(col.links.length).toBeGreaterThan(0);
-    c.removeLink(col, 0);
-    c.setText(col.label, 'Neu');
-    expect(col.label.de).toBe('Neu');
-    c.moveColumn(cols.length - 1, -1); // a valid move up
-    c.moveColumn(0, -1); // out of bounds, so a no-op
-    c.moveColumn(cols.length - 1, 1); // out of bounds, so a no-op
-    c.removeColumn(0);
+    c.setText(c.draft().copyright, 'Neu');
+    expect(c.draft().copyright.de).toBe('Neu');
 
     c.addLegalLink(); // adds a legal link with an empty URL
     expect(c.draft().legalLinks.length).toBeGreaterThan(0);
@@ -499,7 +481,7 @@ describe('BrandingEditorComponent', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.draft()).toBeNull();
-    expect(() => c.addColumn()).not.toThrow();
+    expect(() => c.addLegalLink()).not.toThrow();
     expect(c.draft()).toBeNull();
   });
 

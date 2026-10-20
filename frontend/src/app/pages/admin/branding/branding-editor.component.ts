@@ -6,7 +6,6 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { BrandingService, DEFAULT_LOGOS } from '@core/branding/branding.service';
@@ -29,8 +28,6 @@ import {
   formatBytes,
   IconComponent,
   InputComponent,
-  MoveButtonsComponent,
-  moveItem,
   NoteComponent,
   SkeletonComponent,
   SwitchComponent,
@@ -39,7 +36,6 @@ import {
 import { AdminApiService } from '../admin-api.service';
 import {
   type Branding,
-  type FooterColumn,
   type FooterLink,
   LOGO_ACCEPT_MIME,
   LOGO_MAX_SIZE_MB,
@@ -67,9 +63,9 @@ export type BrandingSection = 'branding' | 'texts';
  *   slots (Wortmarke, Bildmarke, Favicon; a file with a MIME and a size guard, by drop
  *   or by the file dialog). An empty slot shows the built-in logo. A change of the
  *   accent shows at once on the whole page, before the save.
- * - "Texte": the free texts, the texts after the submission, the footer columns with
- *   their links, the copyright line and the legal links. A text field shows the language
- *   that the switch DE | EN above them picks. An empty field shows the built-in text as its placeholder.
+ * - "Texte": the free texts, the texts after the submission, the copyright line of the
+ *   footer and the legal links. A text field shows the language that the switch DE | EN
+ *   above them picks. An empty field shows the built-in text as its placeholder.
  *
  * The floating button "Speichern" shows only while the screen holds edits that the
  * server does not have. A save applies to everyone at once; there is no draft.
@@ -82,8 +78,6 @@ export type BrandingSection = 'branding' | 'texts';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FilePickerComponent,
-    MoveButtonsComponent,
-    NgTemplateOutlet,
     SectionHeaderComponent,
     FabComponent,
     SkeletonComponent,
@@ -297,36 +291,6 @@ export class BrandingEditorComponent {
       const logos = { ...d.logos };
       delete logos[slot];
       d.logos = logos;
-    });
-  }
-
-  protected addColumn(): void {
-    this.patch((d) => {
-      d.footerColumns = [...d.footerColumns, { label: { de: '', en: '' }, links: [] }];
-    });
-  }
-
-  protected removeColumn(i: number): void {
-    this.patch((d) => {
-      d.footerColumns = d.footerColumns.filter((_, idx) => idx !== i);
-    });
-  }
-
-  protected moveColumn(i: number, dir: -1 | 1): void {
-    this.patch((d) => {
-      d.footerColumns = moveItem(d.footerColumns, i, dir);
-    });
-  }
-
-  protected addLink(col: FooterColumn): void {
-    this.patch(() => {
-      col.links = [...col.links, { label: { de: '', en: '' }, url: '' }];
-    });
-  }
-
-  protected removeLink(col: FooterColumn, li: number): void {
-    this.patch(() => {
-      col.links = col.links.filter((_, idx) => idx !== li);
     });
   }
 

@@ -4,7 +4,6 @@ import { ApiClient } from '@core/api/api-client.service';
 import type {
   AttachmentLimits,
   I18nMap,
-  PublicFooterColumn,
   PublicFooterLink,
   PublicSiteConfig,
 } from '@core/api/models';
@@ -73,7 +72,6 @@ export class BrandingService {
      from `/admin/site-config` would refuse that request and fall back to the defaults. */
   private readonly _copyright = signal<I18nMap | null>(null);
   private readonly _legalLinks = signal<PublicFooterLink[]>([]);
-  private readonly _footerColumns = signal<PublicFooterColumn[]>([]);
 
   /** Default confirmation window of a guest application, in hours. */
   static readonly DEFAULT_CONFIRM_TTL_HOURS = 12;
@@ -167,8 +165,6 @@ export class BrandingService {
   readonly copyright = this._copyright.asReadonly();
   /** Maintained footer links; empty means the built-in imprint/privacy pair. */
   readonly legalLinks = this._legalLinks.asReadonly();
-  /** Footer columns, each a heading and its links. */
-  readonly footerColumns = this._footerColumns.asReadonly();
 
   /**
    * Full app name: the config value, else i18n `app.title`. The value reacts to
@@ -222,7 +218,6 @@ export class BrandingService {
     this._configuredName.set(branding?.appName ?? '');
     this._copyright.set(branding?.copyright ?? null);
     this._legalLinks.set(branding?.legalLinks ?? []);
-    this._footerColumns.set(branding?.footerColumns ?? []);
     this._freetexts.set(branding?.freetexts ?? {});
     this._gravatarEnabled.set(branding?.gravatarEnabled !== false);
     const accent = normalizeHex(branding?.accentColor);

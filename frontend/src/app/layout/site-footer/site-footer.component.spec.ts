@@ -1,15 +1,14 @@
 import { signal } from '@angular/core';
-import { render, screen, within } from '@testing-library/angular';
+import { render, screen } from '@testing-library/angular';
 import { BrandingService } from '@core/branding/branding.service';
 import { SiteFooterComponent } from './site-footer.component';
 
 function branding(
-  over: Partial<Record<'copyright' | 'legalLinks' | 'footerColumns', unknown>> = {},
+  over: Partial<Record<'copyright' | 'legalLinks', unknown>> = {},
 ) {
   return {
     copyright: signal(over.copyright ?? null),
     legalLinks: signal(over.legalLinks ?? []),
-    footerColumns: signal(over.footerColumns ?? []),
   };
 }
 
@@ -105,26 +104,5 @@ describe('SiteFooterComponent', () => {
     const { container } = await setup(branding({ copyright: { de: '© AStA' } }));
     expect(container.querySelector('.ft__legal')).toBeNull();
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
-  });
-
-  it('shows the footer columns with their heading and links, and leaves out empty ones', async () => {
-    const { container } = await setup(
-      branding({
-        footerColumns: [
-          {
-            label: { de: 'Kontakt' },
-            links: [{ label: { de: 'Büro' }, url: 'https://example.org/b' }],
-          },
-          { label: {}, links: [] },
-        ],
-      }),
-    );
-    expect(container.querySelectorAll('.ft__col')).toHaveLength(1);
-    const col = container.querySelector('.ft__col') as HTMLElement;
-    expect(within(col).getByRole('heading', { name: 'Kontakt' })).toBeInTheDocument();
-    expect(within(col).getByRole('link', { name: 'Büro' })).toHaveAttribute(
-      'href',
-      'https://example.org/b',
-    );
   });
 });

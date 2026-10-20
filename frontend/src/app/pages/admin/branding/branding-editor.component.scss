@@ -194,25 +194,6 @@
   min-height: 1.75rem;
 }
 
-/* Footer columns: a card per column on the next surface. */
-.br__column {
-  @include sc.card($pad: var(--space-3), $gap: var(--space-2), $muted-label: false);
-}
-.br__columnHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding-inline-start: var(--space-1);
-}
-.br__columnActions {
-  display: inline-flex;
-  gap: 2px;
-}
-.br__add {
-  align-self: flex-start;
-}
-
 /* A link: the label and the URL as the same fields as every other text, in one row. */
 .br__links {
   display: flex;
