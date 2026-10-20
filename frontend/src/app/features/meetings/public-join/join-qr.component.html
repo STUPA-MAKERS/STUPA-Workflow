@@ -37,6 +37,8 @@
       <div class="jq__actions">
         <app-copy-button
           [text]="l.joinUrl"
+          [share]="true"
+          [shareTitle]="meeting().title"
           variant="tonal"
           [label]="'guests.qr.copy' | t"
           [copiedLabel]="'guests.link.copied' | t"
