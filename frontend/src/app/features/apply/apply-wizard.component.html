@@ -1,18 +1,12 @@
-<!-- Phone: the sticky bar of a detail, as in the list/detail pages; the arrow leaves the
-     wizard to the home page and the title slides into the bar. -->
+<!-- Phone: the sticky bar of a detail, as in the list/detail pages, with the title always
+     compact in it; the arrow leaves the wizard to the home page. -->
 <div class="wz" [appListDetailNav]="phone()">
   @if (phone()) {
-    <app-list-detail-bar [label]="'apply.leave' | t" (back)="leave()" />
+    <app-list-detail-bar [label]="'apply.leave' | t" [title]="'apply.title' | t" (back)="leave()" />
   }
   <aside class="wz__aside">
     <div class="wz__intro">
-      @if (phone()) {
-        <app-sheet-bar>
-          <h1 appSheetBarTitle class="sheet-title wz__title">{{ 'apply.title' | t }}</h1>
-        </app-sheet-bar>
-      } @else {
-        <h1 class="wz__title">{{ 'apply.title' | t }}</h1>
-      }
+      <h1 class="wz__title" [class.sr-only]="phone()">{{ 'apply.title' | t }}</h1>
     </div>
     <app-stepper
       class="wz__stepper"

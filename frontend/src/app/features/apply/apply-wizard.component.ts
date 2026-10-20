@@ -48,8 +48,6 @@ import {
   ListDetailNavDirective,
   MEDIA,
   mediaQuery,
-  SheetBarComponent,
-  SheetBarTitleDirective,
   SkeletonComponent,
   type Step,
   StepperComponent,
@@ -147,8 +145,6 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     DraftFilesComponent,
     ListDetailBarComponent,
     ListDetailNavDirective,
-    SheetBarComponent,
-    SheetBarTitleDirective,
     TranslatePipe,
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
