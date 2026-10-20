@@ -19,7 +19,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { NgTemplateOutlet } from '@angular/common';
 import type { ElectionConfig, MyBallot, ProblemDetail } from '@core/api/models';
-import { ButtonComponent, IconComponent, observeElementSize } from '@stupa-makers/ui-kit';
+import { ButtonComponent, haptic, IconComponent, observeElementSize } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
 import {
   candidateLabel,
@@ -361,6 +361,8 @@ export class BallotComponent {
       .pipe(take(1), takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
+          // The ballot is in: a short double pulse on a phone with a vibration motor.
+          haptic('success');
           this.lock(row, this.secret() ? null : choice);
           this.pending.set(null);
           this.castDone.emit({ choice, asDelegation });

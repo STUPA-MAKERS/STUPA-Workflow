@@ -66,6 +66,21 @@ describe('BallotComponent', () => {
     expect(castDone).toHaveBeenCalledWith({ choice: 'no', asDelegation: false });
   });
 
+  it('gives a double pulse once the ballot is in, not on a pick', async () => {
+    const vibrate = jest.fn(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    try {
+      await setup();
+      const user = userEvent.setup();
+      await user.click(choice('Ja'));
+      expect(vibrate).not.toHaveBeenCalled();
+      await user.click(confirmButton());
+      expect(vibrate).toHaveBeenCalledWith([12, 60, 18]);
+    } finally {
+      delete (navigator as { vibrate?: unknown }).vibrate;
+    }
+  });
+
   it('sends one ballot on a double click', async () => {
     const pending = new Subject<unknown>();
     const { caster, fixture } = await setup({ caster: () => pending });
