@@ -29,6 +29,8 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   EmptyStateComponent,
   IconComponent,
+  ListDetailBarComponent,
+  ListDetailNav,
   MEDIA,
   mediaQuery,
   ScrollFadeDirective,
@@ -111,7 +113,11 @@ const sheetScroll = new Map<number, number>();
  *   stays in view; the page sits on a sheet with round corners that scrolls inside
  *   itself, so the corners clip its content in every scroll position. The breadcrumbs
  *   then leave out "Verwaltung", because the navigation shows it.
- * - Narrower: an admin page fills the width and the breadcrumb "Verwaltung" leads back.
+ * - Narrower: an admin page fills the width below the bar of a one-view page
+ *   (`app-list-detail-bar`), the same bar as above the detail of a list/detail page: the
+ *   back arrow to the parent page (`data.parent`, else the home page), the title in small
+ *   type once the big title has scrolled under the bar, and the actions of the page
+ *   header. The page header then has no breadcrumbs.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. Every other admin page,
  *   the cost centres too, keeps the navigation at every wide size (D6).
@@ -126,15 +132,17 @@ const sheetScroll = new Map<number, number>();
  * Account mode (route data `frame: 'account'`, see `FRAME_MODES`): the navigation
  * "Konto" lists the account pages (`ACCOUNT_PAGES`), without the search and without the
  * tiles. Wide, `/account` shows an empty sheet beside the navigation. Below wide,
- * `/account` shows the navigation alone, and an account page shows "Zur Liste" above
- * it, which leads back to the navigation.
+ * `/account` shows the navigation alone, and an account page has the same bar as an
+ * admin page.
  */
 @Component({
   selector: 'app-admin-frame',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [ListDetailNav],
   imports: [
     EmptyStateComponent,
+    ListDetailBarComponent,
     PageHeaderComponent,
     RouterOutlet,
     RouterLink,
@@ -157,6 +165,8 @@ export class AdminFrameComponent {
   private readonly router = inject(Router);
   private readonly pageFrame = inject(PageFrameService);
   private readonly injector = inject(Injector);
+  /** The link to the bar: the page header reports its title and hands its actions to it. */
+  protected readonly nav = inject(ListDetailNav);
 
   /** The page sheet. Beside the navigation it is the scroll container of the page. */
   private readonly page = viewChild<ElementRef<HTMLElement>>('page');
@@ -217,8 +227,9 @@ export class AdminFrameComponent {
    */
   readonly navOnly = computed(() => this.home() && !this.split());
 
-  /** Below wide an account page shows "Zur Liste", which leads back to the navigation. */
-  readonly showBack = computed(() => this.mode().backLink && !this.home() && !this.showNav());
+  /** Below wide a page shows the bar of a one-view page, with the way back. */
+  readonly showBar = computed(() => !this.home() && !this.showNav());
+
 
   /**
    * One column, an area page (not the home page, not an editor that takes the full
@@ -236,11 +247,11 @@ export class AdminFrameComponent {
   private readonly parentPath = signal(parentOf(this.router.routerState.snapshot.root));
 
   /**
-   * The way back of a swipe: "Zur Liste" of an account page, the nearest breadcrumb of an
-   * admin page (`data.parent`, the same target as the breadcrumb link).
+   * The way back of the bar and of a swipe: the parent page (`data.parent`, the same
+   * target as the breadcrumb link), else the home page of the area.
    */
   protected goBack(): void {
-    const target = this.mode().backLink ? this.mode().home : (this.parentPath() ?? this.mode().home);
+    const target = this.parentPath() ?? this.mode().home;
     window.scrollTo(0, 0);
     void this.router.navigateByUrl(target);
   }
@@ -294,6 +305,7 @@ export class AdminFrameComponent {
       }
     });
     afterNextRender(() => this.revealActive());
+    effect(() => this.nav.active.set(this.showBar()));
 
     // Beside the navigation the frame is a pane page: it fills the window, without the
     // bottom padding of a page that scrolls.
