@@ -350,6 +350,7 @@ export const de = {
   'invoices.dropButton': 'PDF wählen',
   'action.close': 'Schließen',
   'action.retry': 'Erneut versuchen',
+  'action.undo': 'Rückgängig',
 
   'theme.toggle': 'Erscheinungsbild wechseln',
 

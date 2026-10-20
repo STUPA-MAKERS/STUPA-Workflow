@@ -202,6 +202,9 @@
                       [link]="['/applications', row.item.id]"
                       linkQueryParamsHandling="preserve"
                       [selected]="row.item.id === selectedId()"
+                      [swipeRight]="row.swipeRight"
+                      [swipeLeft]="row.swipeLeft"
+                      (swiped)="onRowSwiped(row.item, $event)"
                     >
                       <span sub>
                         @if (row.stateLabel) {

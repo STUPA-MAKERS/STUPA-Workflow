@@ -139,6 +139,9 @@
                     [linkQueryParams]="{ id: i.id }"
                     linkQueryParamsHandling="merge"
                     [selected]="i.id === selectedId()"
+                    [swipeRight]="swipeRight(menu)"
+                    [swipeLeft]="swipeLeft(menu)"
+                    (swiped)="onRowSwiped($event, i)"
                   >
                     <span sub class="inv__sub">
                       <span class="inv__parts">

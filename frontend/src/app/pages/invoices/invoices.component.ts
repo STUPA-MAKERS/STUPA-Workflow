@@ -37,6 +37,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  type RowSwipeAction,
   ScrollFadeDirective,
   SearchPillComponent,
   SegmentedComponent,
@@ -53,6 +54,7 @@ import {
   PageHeaderComponent,
   invoiceStatus,
 } from '@shared/ui';
+import { deleteAfterUndo, swipeFrom } from '@shared/row-swipe';
 import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
@@ -276,8 +278,14 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   });
 
   /** The rows by the month of their invoice date. */
+  /**
+   * The rows that a swipe took out and that wait for the answer, or for the end of the
+   * undo of a delete. The list leaves them out, so the gap closes at once.
+   */
+  readonly swipedAway = signal<ReadonlySet<string>>(new Set());
+
   readonly groups = computed(() =>
-    groupByMonth(this.items(), (i) => i.issueDate ?? i.createdAt, this.i18n.formatLocale(), {
+    groupByMonth(this.items().filter((i) => !this.swipedAway().has(i.id)), (i) => i.issueDate ?? i.createdAt, this.i18n.formatLocale(), {
       utc: true,
     }),
   );
@@ -949,6 +957,98 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     else if (item.id === 'book') this.createBooking(i);
     else if (item.id === 'file') this.openFile(i);
     else if (item.id === 'delete') this.askDelete(i);
+  }
+
+  /** The swipe to the right of a phone: "Als bezahlt markieren" of the row menu. */
+  swipeRight(menu: readonly RowMenuSection[]): RowSwipeAction | null {
+    // A paid invoice leaves the segments that show open ones only.
+    return swipeFrom(menu, 'paid', this.filterParams().status === 'open');
+  }
+
+  /** The swipe to the left: "Löschen" of the row menu. */
+  swipeLeft(menu: readonly RowMenuSection[]): RowSwipeAction | null {
+    return swipeFrom(menu, 'delete', true);
+  }
+
+  /** A swipe of a phone carried out an item of the row menu. */
+  onRowSwiped(action: RowSwipeAction, i: Invoice): void {
+    if (action.id === 'paid') this.swipePaid(i, action.leaves === true);
+    else if (action.id === 'delete') this.swipeDelete(i);
+  }
+
+  /**
+   * Mark as paid at once, with an undo in the toast. The undo is the same update with
+   * `status: open`, the way the edit form sets it back.
+   */
+  private swipePaid(i: Invoice, leaves: boolean): void {
+    if (leaves) this.setSwipedAway(i.id, true);
+    const settle = (updated: Invoice | null): void => {
+      if (updated) this.replaceRow(updated);
+      this.setSwipedAway(i.id, false);
+      this.reload();
+    };
+    this.api.updateInvoice(i.id, { status: 'paid' }).subscribe({
+      next: (updated) => {
+        this.replaceRow(updated);
+        // The invoice leaves "Eingang" and "Verbucht"; the counts change.
+        this.reload();
+        this.toast.showAction({
+          message: this.i18n.translate('invoices.toast.paid'),
+          action: this.i18n.translate('action.undo'),
+          variant: 'success',
+          closed: (how) => {
+            if (how !== 'action') {
+              this.setSwipedAway(i.id, false);
+              return;
+            }
+            this.api.updateInvoice(i.id, { status: 'open' }).subscribe({
+              next: (back) => settle(back),
+              error: (err) => {
+                settle(null);
+                this.toast.error(this.failureText(err));
+              },
+            });
+          },
+        });
+      },
+      error: (err) => {
+        this.setSwipedAway(i.id, false);
+        this.toast.error(this.failureText(err));
+      },
+    });
+  }
+
+  /** Delete without the question: the row goes now, the request when the undo is over. */
+  private swipeDelete(i: Invoice): void {
+    this.setSwipedAway(i.id, true);
+    deleteAfterUndo(this.toast, {
+      message: this.i18n.translate('invoices.toast.deleted'),
+      undo: this.i18n.translate('action.undo'),
+      restore: () => this.setSwipedAway(i.id, false),
+      send: () =>
+        this.api.deleteInvoice(i.id).subscribe({
+          next: () => {
+            this.items.update((list) => list.filter((x) => x.id !== i.id));
+            this.total.update((t) => Math.max(0, t - 1));
+            this.setSwipedAway(i.id, false);
+            if (i.id === this.selectedId()) this.closeDetail();
+            this.reload();
+          },
+          error: () => {
+            this.setSwipedAway(i.id, false);
+            this.toast.error(this.i18n.translate('invoices.toast.failed'));
+          },
+        }),
+    });
+  }
+
+  private setSwipedAway(id: string, away: boolean): void {
+    this.swipedAway.update((cur) => {
+      const next = new Set(cur);
+      if (away) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   rowMenuLabel(i: Invoice): string {

@@ -49,6 +49,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  type RowSwipeAction,
   ScrollFadeDirective,
   SearchPillComponent,
   SideSheetComponent,
@@ -75,6 +76,8 @@ import { DecisionDialogComponent } from './decision-dialog/decision-dialog.compo
 import {
   RowTransitionsMenuComponent,
   type RowAction,
+  rowArchiveItem,
+  rowShareItem,
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
@@ -127,6 +130,9 @@ interface ListRow {
   amount: string | null;
   /** F1: the approved amount when it deviates; the row then strikes `amount` through. */
   approved: string | null;
+  /** The swipe of a phone: "Öffentliche Links" to the right, archive to the left. */
+  swipeRight: RowSwipeAction | null;
+  swipeLeft: RowSwipeAction | null;
 }
 
 /** Which filter sheet is open. */
@@ -387,8 +393,14 @@ export class ApplicationsListComponent implements OnDestroy {
     () => new Map(this.types().map((t) => [t.id, t.name])),
   );
 
+  /**
+   * The rows that a swipe took out and that wait for the answer or the undo. The list
+   * leaves them out, so the gap closes at once.
+   */
+  readonly swipedAway = signal<ReadonlySet<Uuid>>(new Set());
+
   readonly rows = computed<ListRow[]>(() =>
-    this.items().map((item) => ({
+    this.items().filter((item) => !this.swipedAway().has(item.id)).map((item) => ({
       item,
       createdAt: item.createdAt,
       title: this.titleOf(item),
@@ -397,8 +409,25 @@ export class ApplicationsListComponent implements OnDestroy {
       stateKind: flowColorKind(item.state?.color),
       amount: this.money(item),
       approved: this.approvedMoney(item),
+      ...this.swipeOf(item),
     })),
   );
+
+  /**
+   * The swipe actions of a row: the same items, ids and permissions as its row menu.
+   * Archive leaves the list unless the filter shows both archived and active rows.
+   */
+  private swipeOf(item: ApplicationListItem): Pick<ListRow, 'swipeRight' | 'swipeLeft'> {
+    const t = (key: TranslationKey) => this.i18n.translate(key);
+    const share = rowShareItem(this.auth, t);
+    const archive = rowArchiveItem(this.auth, t, item);
+    return {
+      swipeRight: share ? { id: share.id, label: share.label, icon: 'link' } : null,
+      swipeLeft: archive
+        ? { id: archive.id, label: archive.label, icon: 'archive', leaves: this.archived() !== 'all' }
+        : null,
+    };
+  }
 
   /**
    * The rows by month of submission, while the list sorts by date. Sorted by amount, the
@@ -732,6 +761,61 @@ export class ApplicationsListComponent implements OnDestroy {
         this.toast.error(this.i18n.translate(actionErrorKey(err.status)));
         this.changed(item.id, 'updated');
       },
+    });
+  }
+
+  /** A swipe of a phone carried out an item of the row menu. */
+  onRowSwiped(item: ApplicationListItem, action: RowSwipeAction): void {
+    if (action.id === 'share') this.onRowAction(item, { kind: 'share' });
+    else if (action.id === 'archive') this.swipeArchive(item, action.leaves === true);
+  }
+
+  /**
+   * Archive (or bring back) at once and offer the undo in the toast. The undo sends the
+   * inverse request. A row that left the list stays out until the answer, so it does not
+   * flash back before the refresh.
+   */
+  private swipeArchive(item: ApplicationListItem, leaves: boolean): void {
+    const next = item.archivedAt === null;
+    if (leaves) this.setSwipedAway(item.id, true);
+    this.api.setApplicationArchived(item.id, next).subscribe({
+      next: () => {
+        this.changed(item.id, 'updated');
+        this.toast.showAction({
+          message: this.i18n.translate(next ? 'applications.archived' : 'applications.unarchived'),
+          action: this.i18n.translate('action.undo'),
+          variant: 'success',
+          closed: (how) => {
+            if (how !== 'action') {
+              this.setSwipedAway(item.id, false);
+              return;
+            }
+            this.api.setApplicationArchived(item.id, !next).subscribe({
+              next: () => {
+                this.setSwipedAway(item.id, false);
+                this.changed(item.id, 'updated');
+              },
+              error: () => {
+                this.setSwipedAway(item.id, false);
+                this.toast.error(this.i18n.translate('applications.actions.error'));
+              },
+            });
+          },
+        });
+      },
+      error: () => {
+        this.setSwipedAway(item.id, false);
+        this.toast.error(this.i18n.translate('applications.actions.error'));
+      },
+    });
+  }
+
+  private setSwipedAway(id: Uuid, away: boolean): void {
+    this.swipedAway.update((cur) => {
+      const next = new Set(cur);
+      if (away) next.add(id);
+      else next.delete(id);
+      return next;
     });
   }
 

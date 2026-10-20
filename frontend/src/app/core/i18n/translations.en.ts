@@ -198,6 +198,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'table.actions': 'Actions',
   'action.close': 'Close',
   'action.retry': 'Try again',
+  'action.undo': 'Undo',
 
   'expenses.title': 'Bookings',
   'expenses.add': 'Add booking',

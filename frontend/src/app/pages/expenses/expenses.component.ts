@@ -40,6 +40,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  type RowSwipeAction,
   ScrollFadeDirective,
   SearchPillComponent,
   SegmentedComponent,
@@ -85,6 +86,7 @@ import { TransferFormComponent } from './transfer-form/transfer-form.component';
 import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { CostCentreLabelComponent } from '../budget/cost-centre-label/cost-centre-label.component';
 import { dayMonth } from '@shared/date-format';
+import { deleteAfterUndo, swipeFrom } from '@shared/row-swipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
@@ -452,8 +454,16 @@ export class ExpensesComponent implements OnDestroy {
   });
 
   /** The list groups by month while it sorts by a date. */
+  /**
+   * The bookings that a swipe took out and that wait for the end of the undo. The list
+   * leaves them out, so the gap closes at once.
+   */
+  readonly swipedAway = signal<ReadonlySet<string>>(new Set());
+
   readonly groups = computed(() => {
     const field = this.sortField();
+    const away = this.swipedAway();
+    const shown = this.items().filter((e) => !away.has(e.id));
     const date = (e: Expense): string | null =>
       field === 'invoiceDate'
         ? e.invoiceDate
@@ -462,10 +472,9 @@ export class ExpensesComponent implements OnDestroy {
           : (e.paymentDate ?? e.createdAt);
     // Sorted by amount, the months would interleave: one group without a heading.
     if (field === 'amount') {
-      const items = this.items();
-      return items.length ? [{ key: 'all', label: '', items: [...items] }] : [];
+      return shown.length ? [{ key: 'all', label: '', items: shown }] : [];
     }
-    return groupByMonth(this.items(), date, this.i18n.formatLocale(), { utc: true });
+    return groupByMonth(shown, date, this.i18n.formatLocale(), { utc: true });
   });
 
   readonly transferGroups = computed(() =>
@@ -954,6 +963,47 @@ export class ExpensesComponent implements OnDestroy {
     else if (item.id === 'invoice' && e.invoiceId) {
       void this.router.navigate(['/invoices'], { queryParams: { id: e.invoiceId } });
     } else if (item.id === 'delete') this.askDelete(e);
+  }
+
+  /** The swipe to the right of a phone: "Bearbeiten" of the row menu. */
+  swipeRight(menu: readonly RowMenuSection[]): RowSwipeAction | null {
+    return swipeFrom(menu, 'edit');
+  }
+
+  /** The swipe to the left: "Löschen" of the row menu. */
+  swipeLeft(menu: readonly RowMenuSection[]): RowSwipeAction | null {
+    return swipeFrom(menu, 'delete', true);
+  }
+
+  /** A swipe of a phone carried out an item of the row menu. */
+  onRowSwiped(action: RowSwipeAction, e: Expense): void {
+    if (action.id === 'edit') {
+      this.openEdit(e);
+      return;
+    }
+    if (action.id !== 'delete') return;
+    // Delete without the question: the row goes now, the request when the undo is over.
+    this.setSwipedAway(e.id, true);
+    deleteAfterUndo(this.toast, {
+      message: this.i18n.translate('expenses.toast.deleted'),
+      undo: this.i18n.translate('action.undo'),
+      restore: () => this.setSwipedAway(e.id, false),
+      send: () =>
+        this.dialogs.remove(e, {
+          quiet: true,
+          done: () => this.setSwipedAway(e.id, false),
+          failed: () => this.setSwipedAway(e.id, false),
+        }),
+    });
+  }
+
+  private setSwipedAway(id: string, away: boolean): void {
+    this.swipedAway.update((cur) => {
+      const next = new Set(cur);
+      if (away) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   }
 
   readonly transferMenu = computed<RowMenuSection[]>(() => [

@@ -270,7 +270,10 @@
                       [linkQueryParams]="{ id: e.id, transfer: null }"
                       linkQueryParamsHandling="merge"
                       [selected]="!selecting() && e.id === selectedId()"
+                      [swipeRight]="selecting() ? null : swipeRight(rowMenu(e))"
+                      [swipeLeft]="selecting() ? null : swipeLeft(rowMenu(e))"
                       (activate)="onRowActivate(e)"
+                      (swiped)="onRowSwiped($event, e)"
                     >
                       @if (selecting()) {
                         <app-checkbox

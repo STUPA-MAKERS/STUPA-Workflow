@@ -14,6 +14,28 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { isRejection } from '../applications.util';
 import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@stupa-makers/ui-kit';
 
+type T = (key: Parameters<I18nService['translate']>[0]) => string;
+
+/**
+ * "Öffentliche Links" of a row, or null without the permission. The menu and the swipe of
+ * the row both use it, so the two show the same item with the same rule.
+ */
+export function rowShareItem(auth: AuthService, t: T): RowMenuItem | null {
+  if (!auth.can('application.share')) return null;
+  return { id: 'share', label: t('applications.row.share'), icon: 'link' };
+}
+
+/** "Archivieren" or "Aus Archiv holen" of a row, or null without the permission. */
+export function rowArchiveItem(auth: AuthService, t: T, item: ApplicationListItem): RowMenuItem | null {
+  if (!auth.can('application.archive')) return null;
+  const archived = item.archivedAt !== null;
+  return {
+    id: 'archive',
+    label: t(archived ? 'applications.row.unarchive' : 'applications.row.archive'),
+    icon: 'archive',
+  };
+}
+
 /** What the reader chose in the row menu. The list page carries it out. */
 export type RowAction =
   | { kind: 'open' }
@@ -62,7 +84,7 @@ export class RowTransitionsMenuComponent {
   );
 
   protected readonly sections = computed<RowMenuSection[]>(() => {
-    const t = (key: Parameters<I18nService['translate']>[0]) => this.i18n.translate(key);
+    const t: T = (key) => this.i18n.translate(key);
     const transitions: RowMenuItem[] = this.transitions().map((tr) => ({
       id: `t:${tr.id}`,
       label: tr.label || t('applications.transitions.fallback'),
@@ -70,17 +92,10 @@ export class RowTransitionsMenuComponent {
       danger: isRejection(tr),
     }));
     const actions: RowMenuItem[] = [{ id: 'open', label: t('applications.row.open'), icon: 'ext' }];
-    if (this.auth.can('application.share')) {
-      actions.push({ id: 'share', label: t('applications.row.share'), icon: 'link' });
-    }
-    if (this.auth.can('application.archive')) {
-      const archived = this.item().archivedAt !== null;
-      actions.push({
-        id: 'archive',
-        label: t(archived ? 'applications.row.unarchive' : 'applications.row.archive'),
-        icon: 'archive',
-      });
-    }
+    const share = rowShareItem(this.auth, t);
+    if (share) actions.push(share);
+    const archive = rowArchiveItem(this.auth, t, this.item());
+    if (archive) actions.push(archive);
     if (this.auth.can('application.force_status')) {
       actions.push({ id: 'force', label: t('applications.detail.forceStatus'), icon: 'flow' });
     }
