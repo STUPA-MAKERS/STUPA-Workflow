@@ -19,6 +19,7 @@ import {
   type SegmentedOption,
   SelectFieldComponent,
   TextareaComponent,
+  ScrollFadeDirective,
 } from '@stupa-makers/ui-kit';
 import { formatMoney } from '@shared/format-money';
 import { PaneFormHeadComponent } from '@shared/ui/pane-form/pane-form-head.component';
@@ -88,6 +89,7 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ScrollFadeDirective,
     BookingRowComponent,
     SumRowComponent,
     PaneFormHeadComponent,
