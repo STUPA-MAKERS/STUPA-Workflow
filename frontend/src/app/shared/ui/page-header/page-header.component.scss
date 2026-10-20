@@ -84,10 +84,10 @@
 }
 
 @include bp.phone {
-  .ph__bar {
+  :host(:not(.ph--display)) .ph__bar {
     --ph-title-lh: var(--lh-h1);
   }
-  .ph__title {
+  :host(:not(.ph--display)) .ph__title {
     font-size: var(--fs-h1);
     line-height: var(--lh-h1);
   }
