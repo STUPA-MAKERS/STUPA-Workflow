@@ -464,15 +464,6 @@
   border-radius: 0;
   background: none;
 }
-/* The greeting on a phone takes the page title size of the wide layout (d2), not the
-   smaller phone title of the page header. */
-:host(.dash--phone) > .dash__head ::ng-deep .ph__bar {
-  --ph-title-lh: var(--lh-d2);
-}
-:host(.dash--phone) > .dash__head ::ng-deep .ph__title {
-  font-size: var(--fs-d2);
-  line-height: var(--lh-d2);
-}
 :host(.dash--phone) .dash__todayHead {
   padding: 0 var(--space-1) var(--space-1);
 }
