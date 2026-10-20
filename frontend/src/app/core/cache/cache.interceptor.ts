@@ -78,6 +78,24 @@ export function detailContext(base: HttpContext = skipLoading()): HttpContext {
   return cached(DETAIL_TTL_MS, base);
 }
 
+/** Reads started inside {@link freshly} right now. */
+let freshReads = 0;
+
+/**
+ * Start reads that skip the stored answer and wait for the network: the reload of a pull
+ * to refresh, where the person asked for the data of now. The answer still goes into the
+ * cache, and no other entry is dropped, so the details that a list read ahead stay. Like
+ * `quietly`, the counter reaches every GET that `start` subscribes synchronously.
+ */
+export function freshly<T>(start: () => T): T {
+  freshReads++;
+  try {
+    return start();
+  } finally {
+    freshReads--;
+  }
+}
+
 /**
  * Serve-then-revalidate for reference data, and invalidate on every mutation.
  *
@@ -105,11 +123,11 @@ export const cacheInterceptor: HttpInterceptorFn = (req, next) => {
   if (ttl <= 0) return next(req);
 
   const key = req.urlWithParams;
-  const hit = cache.get(key, ttl);
+  const hit = freshReads > 0 ? undefined : cache.get(key, ttl);
   if (hit === undefined) {
     // A read ahead that is still in flight: join it rather than ask a second time, so a
     // click right after the list appeared waits for one answer, not two.
-    const flying = inflight.get(key);
+    const flying = freshReads > 0 ? undefined : inflight.get(key);
     if (flying) return flying;
     const fresh = next(req).pipe(
       tap((event) => {

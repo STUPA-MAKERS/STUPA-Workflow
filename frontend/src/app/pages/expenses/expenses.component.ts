@@ -89,6 +89,7 @@ import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** The two views of the page. Bookings are the default. */
 export type ExpensesTab = 'bookings' | 'transfers';
@@ -129,6 +130,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     InfiniteScrollDirective,
     CostCentreLabelComponent,
     DetailNoneComponent,
@@ -838,6 +840,19 @@ export class ExpensesComponent implements OnDestroy {
     this.tab.set(tab);
     this.stopSelecting();
     if (tab === 'transfers') this.transfers.reload();
+  }
+
+  /** The shown list loads: a pull to refresh waits for it. */
+  readonly listBusy = computed(() =>
+    this.tab() === 'transfers'
+      ? this.transferLoading() || this.transferReloading()
+      : this.loading() || this.reloading() || this.refreshing(),
+  );
+
+  /** Pull to refresh: the bookings or the transfers load again, with the filters. */
+  refreshList(): void {
+    if (this.tab() === 'transfers') this.transfers.reload();
+    else this.list.reload();
   }
 
   loadMoreTransfers(): void {

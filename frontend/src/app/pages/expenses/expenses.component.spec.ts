@@ -2341,6 +2341,22 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
+  it('reloads the shown list on a pull to refresh and waits while it loads', async () => {
+    const ctx = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    expect(c.listBusy()).toBe(false);
+    c.refreshList();
+    expect(c.listBusy()).toBe(true);
+    ctx.http.expectOne((r) => r.url.endsWith('/expenses') && r.method === 'GET').flush(page([]));
+    expect(c.listBusy()).toBe(false);
+    await openTransfers(ctx);
+    c.refreshList();
+    expect(c.listBusy()).toBe(true);
+    ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET').flush(transferPage());
+    expect(c.listBusy()).toBe(false);
+  });
+
   it('shows no transfers tab to a reader without budget.book', async () => {
     const ctx = await setup({ perms: ['budget.view'] });
     expect(screen.queryByRole('radio', { name: 'Überträge' })).not.toBeInTheDocument();

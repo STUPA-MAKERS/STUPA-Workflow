@@ -91,7 +91,15 @@
         />
       }
 
-      <div #scroller class="inv__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
+      <div
+        #scroller
+        class="inv__scroll"
+        appPullRefresh
+        [pullRefreshBusy]="loading() || reloading()"
+        (appPullRefresh)="reload()"
+        appScrollFade="y"
+        [attr.aria-busy]="reloading() || null"
+      >
         @if (loading()) {
           <!-- The shape of the loaded list (a month heading, rows in the geometry of
                `app-list-item`), shown after 300ms. -->

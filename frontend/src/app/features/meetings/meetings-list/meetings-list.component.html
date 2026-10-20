@@ -56,7 +56,14 @@
         }
       </app-sticky-bar>
 
-      <div class="mtl__scroll" appScrollFade="y" [attr.aria-busy]="timeline.reloadingList() || null">
+      <div
+        class="mtl__scroll"
+        appPullRefresh
+        [pullRefreshBusy]="timeline.listBusy()"
+        (appPullRefresh)="timeline.refreshList()"
+        appScrollFade="y"
+        [attr.aria-busy]="timeline.reloadingList() || null"
+      >
         @if (timeline.loadingList()) {
           <!-- The shape of the loaded list (a month heading, rows with the date block in the
                geometry of `app-list-item`), shown after 300ms. -->

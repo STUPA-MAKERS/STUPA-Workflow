@@ -184,6 +184,14 @@ describe('TicketsComponent', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Tickets werden geladen');
   });
 
+  it('loads page 0 again on a pull to refresh', async () => {
+    const { cmp, api } = await start();
+    const before = api.list.mock.calls.length;
+    (cmp as unknown as { refreshList(): void }).refreshList();
+    expect(api.list.mock.calls.length).toBeGreaterThan(before);
+    expect(api.list.mock.calls[before][0]).toMatchObject({ offset: 0 });
+  });
+
   it('asks for the closed tickets only once at a time, and stays on a failure', async () => {
     const pending = new Subject<TicketPage>();
     const { harness, cmp, api, setAnswer } = await start();

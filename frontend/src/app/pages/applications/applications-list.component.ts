@@ -83,6 +83,7 @@ import { AmountComponent } from '@shared/ui/amount/amount.component';
 import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { applicationReads } from './application-reads';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /**
  * One filter of the list.
@@ -150,6 +151,7 @@ type FilterSheet = 'more' | null;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     InfiniteScrollDirective,
     AmountComponent,
     NoteComponent,

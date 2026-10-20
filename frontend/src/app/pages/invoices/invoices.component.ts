@@ -77,6 +77,7 @@ import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** What the import found, for the note at the top of the review form. */
 export type ImportNotice = 'parsed' | 'manual' | null;
@@ -119,6 +120,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     InfiniteScrollDirective,
     DetailNoneComponent,
     ConfirmDialogComponent,
@@ -524,7 +526,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   }
 
   /** Reload page 0 after a filter change, without emptying the list first. */
-  private reload(): void {
+  protected reload(): void {
     this.fetchEpoch++;
     this.nextOffset = 0;
     this.loading.set(this.items().length === 0);

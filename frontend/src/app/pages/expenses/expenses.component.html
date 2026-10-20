@@ -152,6 +152,9 @@
       <div
         #scroller
         class="exp__scroll"
+        appPullRefresh
+        [pullRefreshBusy]="listBusy()"
+        (appPullRefresh)="refreshList()"
         appScrollFade="y"
         [attr.aria-busy]="refreshing() || reloading() || transferReloading() ? 'true' : null"
       >
