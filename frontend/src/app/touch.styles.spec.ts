@@ -98,11 +98,10 @@ describe('touch styles', () => {
     expect(scss).toContain(`${b}__item:active ${b}__ind::after {\n  background: var(--press-tint);`);
   });
 
-  it('gives the app cards and the page header actions the press and the chrome text', () => {
+  it('gives the app cards, dashboard buttons and header actions the press and chrome text', () => {
     expect(read('pages/home.component.scss')).toContain('@include press.press($scale: true);');
     const dash = read('pages/dashboard/dashboard.component.scss');
-    expect(dash).toContain('@include press.press($scale: true);');
-    expect(dash).toContain('@include press.chrome-text;');
+    expect(dash).toContain('@include press.chrome-text;\n  @include press.press;');
     expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
       /:host\(:active\) \{\s*background-image: linear-gradient\(var\(--press-tint\), var\(--press-tint\)\);/,
     );
