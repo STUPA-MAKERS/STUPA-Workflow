@@ -5,6 +5,7 @@ describe('submitted texts', () => {
   it('gives the built-in text of each kind and language', () => {
     expect(defaultSubmittedText('internal', 'de')).toBe(CATALOG.de['apply.submitted.body']);
     expect(defaultSubmittedText('external', 'en')).toBe(CATALOG.en['apply.confirm.body']);
+    expect(defaultSubmittedText('confirmed', 'de')).toBe(CATALOG.de['status.confirmed.body']);
   });
 
   it('falls back to German and then to an empty text when a catalogue lacks the key', () => {

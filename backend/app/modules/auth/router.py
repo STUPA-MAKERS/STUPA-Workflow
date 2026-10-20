@@ -493,9 +493,10 @@ async def verify_magic_link(
     in the body, so JavaScript cannot read it.
 
     The first verify of a guest application starts its flow (deadline, automatic
-    transitions, task mail) through the flow action dispatcher.
+    transitions, task mail) through the flow action dispatcher, and `confirmed` is
+    true only for that verify.
     """
-    app_id, scope, token = await service.verify_magic_link(
+    app_id, scope, token, confirmed = await service.verify_magic_link(
         db, settings, token=body.token, dispatcher=dispatcher
     )
     await db.commit()
@@ -505,4 +506,4 @@ async def verify_magic_link(
         max_age=settings.applicant_session_ttl_hours * 3600,
         **_cookie_kwargs(settings),  # type: ignore[arg-type]
     )
-    return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope)
+    return MagicLinkVerifyOut(application_id=UUID(app_id), scope=scope, confirmed=confirmed)

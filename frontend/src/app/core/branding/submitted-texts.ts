@@ -6,24 +6,28 @@ import { CATALOG, DEFAULT_LOCALE, type Locale } from '@core/i18n/translations';
  *
  * - `internal`: a signed-in applicant. The application is submitted at once.
  * - `external`: a guest. The link in the e-mail confirms the application.
+ * - `confirmed`: a guest on the first click on that link. Now the application is
+ *   submitted; the status page shows the text once.
  *
- * `/admin/branding` sets each text per language as Markdown (`freetexts.submittedInternal`
- * and `freetexts.submittedExternal` of the site config). An empty text of a language
+ * `/admin/branding` sets each text per language as Markdown (`freetexts.submittedInternal`,
+ * `freetexts.submittedExternal` and `freetexts.submittedConfirmed` of the site config). An empty text of a language
  * falls back to the built-in text of that language, so a new installation shows the
  * same words as before.
  */
-export type SubmittedKind = 'internal' | 'external';
+export type SubmittedKind = 'internal' | 'external' | 'confirmed';
 
 /** The free-text key of the site config for each kind. */
 export const SUBMITTED_FREETEXT = {
   internal: 'submittedInternal',
   external: 'submittedExternal',
+  confirmed: 'submittedConfirmed',
 } as const satisfies Record<SubmittedKind, string>;
 
-/** The built-in text of each kind: the i18n key the page used before. */
+/** The built-in text of each kind. */
 const DEFAULT_KEY = {
   internal: 'apply.submitted.body',
   external: 'apply.confirm.body',
+  confirmed: 'status.confirmed.body',
 } as const satisfies Record<SubmittedKind, string>;
 
 /** The built-in text of a kind in a language. */

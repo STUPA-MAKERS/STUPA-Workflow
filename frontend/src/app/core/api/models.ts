@@ -76,7 +76,8 @@ export interface PublicSiteConfig {
         | 'emailFooter'
         | 'applyInfo'
         | 'submittedInternal'
-        | 'submittedExternal',
+        | 'submittedExternal'
+        | 'submittedConfirmed',
         I18nMap
       >
     >;
@@ -1015,6 +1016,8 @@ export interface EffectiveForm {
 export interface MagicLinkVerifyResult {
   application_id: Uuid;
   scope: 'edit' | 'view';
+  /** True only for the verify that confirmed the e-mail of a guest application. */
+  confirmed?: boolean;
 }
 
 export type MajorityRule = 'simple' | 'absolute' | 'two_thirds';

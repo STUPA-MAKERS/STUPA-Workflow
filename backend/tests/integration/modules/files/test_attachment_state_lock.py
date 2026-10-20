@@ -75,7 +75,7 @@ async def _applicant_session(
     """Redeem a fresh magic link and return the applicant session id for the cookie."""
     token = await issue_magic_token(maker, settings, app_id)
     async with maker() as session:
-        _, scope, sid = await auth_service.verify_magic_link(session, settings, token=token)
+        _, scope, sid, _ = await auth_service.verify_magic_link(session, settings, token=token)
         await session.commit()
     assert scope == "edit"
     return sid

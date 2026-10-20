@@ -159,7 +159,7 @@ async def issue_magic_token(
 async def redeem(maker: async_sessionmaker[AsyncSession], settings: Settings, token: str) -> str:
     """Redeem a token and return the scope of the new applicant session."""
     async with maker() as session:
-        _, scope, _ = await auth_service.verify_magic_link(session, settings, token=token)
+        _, scope, *_ = await auth_service.verify_magic_link(session, settings, token=token)
         await session.commit()
     return scope
 

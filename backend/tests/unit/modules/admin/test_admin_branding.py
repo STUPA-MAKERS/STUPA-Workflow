@@ -32,6 +32,7 @@ def test_empty_branding_defaults() -> None:
     assert b.freetexts.welcome == {}
     assert b.freetexts.submitted_internal == {}
     assert b.freetexts.submitted_external == {}
+    assert b.freetexts.submitted_confirmed == {}
 
 
 def test_full_branding_roundtrip_by_alias() -> None:
@@ -49,6 +50,7 @@ def test_full_branding_roundtrip_by_alias() -> None:
             "emailFooter": {"de": "Fuß"},
             "submittedInternal": {"de": "Danke, **eingereicht**.", "en": "Thanks."},
             "submittedExternal": {"de": "Bitte bestätige die E-Mail."},
+            "submittedConfirmed": {"de": "Bestätigt, **eingereicht**."},
         },
     }
     b = Branding.model_validate(raw)
@@ -58,6 +60,7 @@ def test_full_branding_roundtrip_by_alias() -> None:
     assert dumped["freetexts"]["loginHint"] == {"de": "Hinweis"}
     assert dumped["freetexts"]["submittedInternal"]["en"] == "Thanks."
     assert dumped["freetexts"]["submittedExternal"] == {"de": "Bitte bestätige die E-Mail."}
+    assert dumped["freetexts"]["submittedConfirmed"] == {"de": "Bestätigt, **eingereicht**."}
     assert Branding.model_validate(dumped).model_dump(by_alias=True) == dumped
 
 
@@ -205,7 +208,9 @@ def test_overlong_freetext_rejected() -> None:
         )
 
 
-@pytest.mark.parametrize("key", ["submittedInternal", "submittedExternal"])
+@pytest.mark.parametrize(
+    "key", ["submittedInternal", "submittedExternal", "submittedConfirmed"]
+)
 def test_overlong_submitted_text_rejected(key: str) -> None:
     with pytest.raises(ValidationError):
         Branding.model_validate({"freetexts": {key: {"en": "x" * (MAX_FREETEXT_CHARS + 1)}}})

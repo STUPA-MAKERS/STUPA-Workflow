@@ -147,7 +147,7 @@ async def test_verify_magic_link_single_use_ok(monkeypatch: pytest.MonkeyPatch) 
     row = _link("tok", settings, scope="view", single_use=True)
     # The UPDATE wins and returns the id, so this verify redeems the token.
     db = fake_session(result(row), result("claimed-id"))
-    app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
+    app_id, scope, token, _ = await service.verify_magic_link(db, settings, token="tok")
     assert app_id == "aid-1"
     assert scope == "edit"  # O4: an old view link opens an edit session too
     assert token  # a signed applicant token
@@ -158,7 +158,7 @@ async def test_verify_magic_link_edit_not_marked_used(monkeypatch: pytest.Monkey
     monkeypatch.setattr(service, "_now", lambda: NOW)
     row = _link("tok", settings, scope="edit", single_use=False)
     db = fake_session(result(row))  # no UPDATE for a link that is not single use
-    _, scope, _ = await service.verify_magic_link(db, settings, token="tok")
+    _, scope, *_ = await service.verify_magic_link(db, settings, token="tok")
     assert scope == "edit"
 
 
@@ -186,8 +186,11 @@ async def test_verify_magic_link_first_confirmation_starts_the_flow(
     dispatcher = object()
     # The confirmation UPDATE matches the row and returns its id.
     db = fake_session(result(row), result("aid-1"))
-    await service.verify_magic_link(db, settings, token="tok", dispatcher=dispatcher)  # pyright: ignore[reportArgumentType]
+    *_, confirmed = await service.verify_magic_link(
+        db, settings, token="tok", dispatcher=dispatcher  # pyright: ignore[reportArgumentType]
+    )
     assert _FakeFlow.started == [("aid-1", dispatcher)]
+    assert confirmed is True
 
 
 async def test_verify_magic_link_second_click_starts_nothing(
@@ -200,8 +203,9 @@ async def test_verify_magic_link_second_click_starts_nothing(
     _FakeFlow.started = []
     row = _link("tok", settings, scope="edit", single_use=False)
     db = fake_session(result(row), result())  # the UPDATE matches no row
-    await service.verify_magic_link(db, settings, token="tok")
+    *_, confirmed = await service.verify_magic_link(db, settings, token="tok")
     assert _FakeFlow.started == []
+    assert confirmed is False
 
 
 class _FailingDispatcher:
@@ -243,7 +247,7 @@ async def test_verify_magic_link_survives_a_failed_flow_start(
         result(State()),  # FlowService._load_state
         result("event-1"),  # the latest status event of the task mail
     )
-    app_id, scope, token = await service.verify_magic_link(
+    app_id, scope, token, _ = await service.verify_magic_link(
         db, settings, token="tok", dispatcher=_FailingDispatcher()  # pyright: ignore[reportArgumentType]
     )
     assert (app_id, scope) == ("aid-1", "edit")

@@ -342,32 +342,34 @@ describe('BrandingEditorComponent', () => {
   });
 
   describe('texts after the submission', () => {
-    it('shows both fields with the built-in text as placeholder and preview', async () => {
+    it('shows the three fields with the built-in text as placeholder and preview', async () => {
       const { fixture } = await setupWithStub({});
       await fixture.whenStable();
       fixture.detectChanges();
       expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
-      const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Angemeldet: nach dem Absenden (DE)' });
       expect(internal).toHaveAttribute('placeholder', expect.stringMatching(/^Vielen Dank! Dein Antrag ist eingereicht/));
-      expect(screen.getByRole('textbox', { name: 'Extern: Gast mit E-Mail-Bestätigung (DE)' })).toHaveAttribute(
-        'placeholder',
-        expect.stringMatching(/persönlichen Link/),
-      );
+      expect(
+        screen.getByRole('textbox', { name: 'Gast: nach dem Absenden, vor der Bestätigung (DE)' }),
+      ).toHaveAttribute('placeholder', expect.stringMatching(/persönlichen Link/));
       expect(screen.getByTestId('submitted-preview-external').textContent).toMatch(/persönlichen Link/);
-      expect(screen.getAllByText('Standardtext')).toHaveLength(2);
+      expect(
+        screen.getByRole('textbox', { name: 'Gast: nach Klick auf den Link in der E-Mail (DE)' }),
+      ).toHaveAttribute('placeholder', expect.stringMatching(/E-Mail-Adresse ist bestätigt/));
+      expect(screen.getAllByText('Standardtext')).toHaveLength(3);
     });
 
     it('writes the Markdown of the picked language into the draft and previews it safely', async () => {
       const { fixture, api } = await setupWithStub({});
       await fixture.whenStable();
       fixture.detectChanges();
-      const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
+      const internal = screen.getByRole('textbox', { name: 'Angemeldet: nach dem Absenden (DE)' });
       await userEvent.type(internal, 'Danke **sehr** <b>x</b>');
       expect(screen.getByTestId('submitted-preview-internal').innerHTML).toContain('<strong>sehr</strong>');
       expect(screen.getByTestId('submitted-preview-internal').querySelector('b')).toBeNull();
-      expect(screen.getAllByText('Standardtext')).toHaveLength(1);
+      expect(screen.getAllByText('Standardtext')).toHaveLength(2);
       await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-      const en = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (EN)' });
+      const en = screen.getByRole('textbox', { name: 'Angemeldet: nach dem Absenden (EN)' });
       expect(en).toHaveValue('');
       expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));

@@ -19,6 +19,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import { API_BASE_URL } from '@core/api/api.config';
 import { LOCATION } from '@core/browser/location.token';
 import { BrandingService } from '@core/branding/branding.service';
+import { submittedMarkdown } from '@core/branding/submitted-texts';
 import { I18nService } from '@core/i18n/i18n.service';
 import { LocalizedDatePipe } from '@core/i18n/localized-date.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
@@ -57,6 +58,7 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
+  NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
@@ -67,6 +69,7 @@ import {
 } from '@stupa-makers/ui-kit';
 import { AttachmentsPanelComponent } from '../../pages/applications/attachments-panel.component';
 import { applicationTitle, transitionLooks } from '../../pages/applications/applications.util';
+import { renderMarkdown } from '../meetings/meetings.util';
 import { shortRef } from './apply.util';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { FabComponent } from '@shared/ui/fab/fab.component';
@@ -125,6 +128,7 @@ type Phase = 'loading' | 'expired' | 'error' | 'ready';
     ButtonComponent,
     ButtonLinkComponent,
     IconComponent,
+    NoteComponent,
     AttachmentsPanelComponent,
     DropOverlayComponent,
     FileDropDirective,
@@ -180,6 +184,22 @@ export class StatusTimelineComponent {
   readonly editDirty = signal(false);
   /** Magic-link scope: `view` locks editing regardless of status (old links only). */
   private readonly editScope = signal(true);
+
+  /**
+   * This visit confirmed the e-mail of a guest application: the first click on the
+   * magic link. Only then the page shows the text after the submission, until the
+   * applicant closes it. A reload has no token, so the text does not come back.
+   */
+  readonly justConfirmed = signal(false);
+  /**
+   * The text after the confirmation (`freetexts.submittedConfirmed` of
+   * `/admin/branding`) as HTML. `renderMarkdown` escapes all HTML first.
+   */
+  protected readonly confirmedHtml = computed(() =>
+    renderMarkdown(
+      submittedMarkdown(this.branding.freetexts().submittedConfirmed, 'confirmed', this.i18n.locale()),
+    ),
+  );
 
   /** Optimistic send: a new comment shows at once, the server answer replaces it. */
   private readonly outbox = new ChatOutbox<ApplicationComment>(
@@ -365,6 +385,7 @@ export class StatusTimelineComponent {
     this.api.verifyMagicLink(token).subscribe({
       next: (res) => {
         this.editScope.set(res.scope === 'edit');
+        this.justConfirmed.set(res.confirmed === true);
         const appId = res.application_id ?? fallbackAppId ?? '';
         // Strip the token from the URL (avoid History/Referer leak) and keep the
         // app id for a later reload.

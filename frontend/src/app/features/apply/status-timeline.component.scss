@@ -76,6 +76,24 @@
 .sp__secTitle {
   padding: 0 var(--space-1);
 }
+/* The text after the confirmation: Markdown from the site config, no outer gap. The
+   HTML comes from `innerHTML`, so it has no view-encapsulation attribute. */
+.sp__confirmedTitle {
+  display: block;
+}
+.sp__confirmedText {
+  margin-top: var(--space-1);
+  line-height: 1.55;
+}
+.sp__confirmedText ::ng-deep :first-child {
+  margin-top: 0;
+}
+.sp__confirmedText ::ng-deep :last-child {
+  margin-bottom: 0;
+}
+.sp__confirmedText ::ng-deep > * + * {
+  margin-top: var(--space-2);
+}
 .sp__link {
   margin: calc(-1 * var(--space-3)) 0 0;
   padding: 0 var(--space-1);

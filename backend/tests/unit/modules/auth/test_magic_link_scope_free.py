@@ -101,7 +101,7 @@ async def test_verify_accepts_a_link_without_expiry(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(service, "_now", lambda: NOW)
     settings = _settings()
     db = _session([result(_link(settings, expires_at=None))])
-    app_id, scope, token = await service.verify_magic_link(db, settings, token="tok")
+    app_id, scope, token, _ = await service.verify_magic_link(db, settings, token="tok")
     assert (app_id, scope) == ("aid-1", "edit")
     assert token
 

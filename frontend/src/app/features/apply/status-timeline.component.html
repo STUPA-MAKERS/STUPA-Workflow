@@ -99,6 +99,16 @@
 
           <div class="sp__grid">
             <div class="sp__main">
+              @if (justConfirmed()) {
+                <!-- The first click on the magic link submitted the application. -->
+                <app-note class="sp__confirmed" kind="ok" icon="check" role="status" data-testid="confirmed-note">
+                  <strong class="sp__confirmedTitle">{{ 'status.confirmed.heading' | t }}</strong>
+                  <div class="sp__confirmedText" [innerHTML]="confirmedHtml()"></div>
+                  <app-button noteAction variant="text" size="sm" (click)="justConfirmed.set(false)">
+                    {{ 'action.close' | t }}
+                  </app-button>
+                </app-note>
+              }
               @if (app.decision) {
                 <!-- F1: the decision, without the vote, with a note on the funded amount. -->
                 <app-decision-section

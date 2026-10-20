@@ -200,10 +200,12 @@ class SiteFreetexts(_CamelModel):
     apply_info: I18nMap = Field(default_factory=dict, alias="applyInfo")
     # The text on the page after the submission, Markdown, per language. "Internal" is
     # for a signed-in applicant (the application is submitted at once), "external" is
-    # for a guest (the e-mail link confirms the application). An empty language falls
-    # back to the built-in text of the frontend.
+    # for a guest (the e-mail link confirms the application), "confirmed" is for a
+    # guest on the first click on that link (now the application is submitted). An
+    # empty language falls back to the built-in text of the frontend.
     submitted_internal: I18nMap = Field(default_factory=dict, alias="submittedInternal")
     submitted_external: I18nMap = Field(default_factory=dict, alias="submittedExternal")
+    submitted_confirmed: I18nMap = Field(default_factory=dict, alias="submittedConfirmed")
 
     @field_validator(
         "login_hint",
@@ -213,6 +215,7 @@ class SiteFreetexts(_CamelModel):
         "apply_info",
         "submitted_internal",
         "submitted_external",
+        "submitted_confirmed",
     )
     @classmethod
     def _cap_text(cls, v: I18nMap) -> I18nMap:

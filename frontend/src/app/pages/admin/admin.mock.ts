@@ -502,6 +502,7 @@ export const MOCK_BRANDING: Branding = {
     applyInfo: {},
     submittedInternal: {},
     submittedExternal: {},
+    submittedConfirmed: {},
   },
 };
 

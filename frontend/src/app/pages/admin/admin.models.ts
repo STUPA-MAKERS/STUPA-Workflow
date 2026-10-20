@@ -1271,6 +1271,8 @@ export interface SiteFreetexts {
    */
   submittedInternal?: I18nMap;
   submittedExternal?: I18nMap;
+  /** The text for a guest on the first click on the e-mail link (status page, once). */
+  submittedConfirmed?: I18nMap;
 }
 
 export interface Branding {

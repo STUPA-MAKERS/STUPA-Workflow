@@ -34,6 +34,9 @@ class MagicLinkVerifyOut(BaseModel):
 
     application_id: UUID
     scope: Literal["edit", "view"]
+    # True only for the verify that confirmed the email of a guest application. The
+    # status page then shows the text after the submission once.
+    confirmed: bool = False
 
 
 class LogoutOut(BaseModel):

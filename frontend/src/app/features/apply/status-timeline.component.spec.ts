@@ -4,7 +4,7 @@ import { of, throwError, type Observable } from 'rxjs';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { ApiClient } from '@core/api/api-client.service';
-import { BrandingService } from '@core/branding/branding.service';
+import { BrandingService, type FreeTexts } from '@core/branding/branding.service';
 import { ToastService } from '@stupa-makers/ui-kit';
 import type {
   Application,
@@ -155,6 +155,8 @@ interface RouteOpts {
   linkTtlDays?: number | null;
   /** The public config loaded (default true). */
   loaded?: boolean;
+  /** The free texts of the branding (default none). */
+  freetexts?: FreeTexts;
 }
 
 async function setup(api: Partial<ApiClient>, params: Record<string, string> = { app: ID }, opts: RouteOpts = {}) {
@@ -170,6 +172,7 @@ async function setup(api: Partial<ApiClient>, params: Record<string, string> = {
         useValue: {
           linkTtlDays: signal(opts.linkTtlDays === undefined ? null : opts.linkTtlDays),
           loaded: signal(opts.loaded ?? true),
+          freetexts: signal(opts.freetexts ?? {}),
         },
       },
       {
@@ -206,6 +209,37 @@ describe('StatusTimelineComponent', () => {
     expect(screen.getByText('1 Datei')).toBeInTheDocument();
     expect(screen.getByText('2 Kommentare')).toBeInTheDocument();
     expect(screen.getByText('Dein Link ist unbegrenzt gültig.')).toBeInTheDocument();
+  });
+
+  it('shows the text after the submission once when the link confirmed the application', async () => {
+    const verify = jest.fn(() => of({ application_id: ID, scope: 'edit' as const, confirmed: true }));
+    const { comp } = await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok', app: ID });
+    await screen.findByRole('heading', { level: 1, name: 'Sommerfest' });
+    const note = screen.getByTestId('confirmed-note');
+    expect(note).toHaveTextContent('Antrag eingereicht');
+    expect(note).toHaveTextContent('Deine E-Mail-Adresse ist bestätigt');
+    await userEvent.click(within(note).getByRole('button', { name: 'Schließen' }));
+    expect(comp.justConfirmed()).toBe(false);
+    expect(screen.queryByTestId('confirmed-note')).toBeNull();
+  });
+
+  it('shows the configured text after the confirmation as Markdown', async () => {
+    const verify = jest.fn(() => of({ application_id: ID, scope: 'edit' as const, confirmed: true }));
+    await setup(
+      fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }),
+      { t: 'tok', app: ID },
+      { freetexts: { submittedConfirmed: { de: 'Danke, **angekommen**.' } } },
+    );
+    await screen.findByRole('heading', { level: 1, name: 'Sommerfest' });
+    const note = screen.getByTestId('confirmed-note');
+    expect(note.querySelector('strong:not(.sp__confirmedTitle)')?.textContent).toBe('angekommen');
+  });
+
+  it('shows no text after the submission for a link that was already confirmed', async () => {
+    const verify = jest.fn(() => of({ application_id: ID, scope: 'edit' as const, confirmed: false }));
+    await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok', app: ID });
+    await screen.findByRole('heading', { level: 1, name: 'Sommerfest' });
+    expect(screen.queryByTestId('confirmed-note')).toBeNull();
   });
 
   it('builds the history: status changes with the transition and versions as metadata', async () => {

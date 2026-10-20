@@ -116,7 +116,7 @@ export class BrandingEditorComponent {
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
   protected readonly freetexts = FREETEXTS;
-  protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
+  protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external', 'confirmed'];
 
   protected readonly version = signal(0);
   protected readonly hasDraftChanges = signal(false);

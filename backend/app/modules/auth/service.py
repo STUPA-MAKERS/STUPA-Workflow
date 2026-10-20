@@ -134,7 +134,7 @@ async def verify_magic_link(
     *,
     token: str,
     dispatcher: ActionDispatcher | None = None,
-) -> tuple[str, ApplicantScope, str]:
+) -> tuple[str, ApplicantScope, str, bool]:
     """Verify a magic-link token.
 
     A link without an expiry (`expires_at` NULL) stays valid until a newer link is
@@ -156,8 +156,10 @@ async def verify_magic_link(
     nothing, so a second click sends no second mail.
 
     Returns:
-        The application id, the scope (always `edit`) and the applicant session
-        token.
+        The application id, the scope (always `edit`), the applicant session token
+        and whether this verify confirmed the email. Only the first verify of a guest
+        application confirms it, so the page shows the text after the submission
+        once.
 
     Raises:
         GoneError: The token is invalid, expired or already used. The router maps this
@@ -235,7 +237,7 @@ async def verify_magic_link(
     )
     if confirmed is not None:
         await FlowService(db, dispatcher).start_confirmed(row.application_id)
-    return app_id, scope, session_token
+    return app_id, scope, session_token, confirmed is not None
 
 
 async def upsert_principal(db: AsyncSession, claims: oidc.OidcClaims) -> PrincipalRow:
