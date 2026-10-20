@@ -213,55 +213,22 @@
   align-self: flex-start;
 }
 
-/* A link: label and URL as plain fields in one row. The URL is never cut; the field
-   scrolls and keeps the whole value. */
+/* A link: the label and the URL as the same fields as every other text, in one row. */
 .br__links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.br__column .br__links > * {
-  background: var(--color-surface-3);
-}
 .br__link {
   display: grid;
-  grid-template-columns: minmax(6rem, 0.8fr) minmax(0, 1.6fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.6fr) auto;
   align-items: center;
   gap: var(--space-2);
-  min-height: 3rem;
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
 }
-.br__linkLabel,
-.br__linkUrl {
-  min-width: 0;
-  height: 2.25rem;
-  padding: 0 var(--space-2);
-  border: 0;
-  border-radius: var(--radius-md);
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-}
-.br__linkLabel {
-  font-weight: var(--fw-semibold);
-}
-.br__linkUrl {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--color-text-muted);
-}
-.br__linkLabel:hover,
-.br__linkUrl:hover {
-  background: var(--color-surface-sunken);
-}
-.br__linkLabel:focus-visible,
-.br__linkUrl:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: -2px;
-  background: var(--color-surface-sunken);
-}
-.br__linkUrl--bad {
-  color: var(--color-danger);
+.br__area--bad {
   box-shadow: inset 0 0 0 1px var(--color-danger);
 }
 
@@ -275,7 +242,11 @@
   .br__link {
     grid-template-columns: minmax(0, 1fr) auto;
   }
-  .br__linkUrl {
+  .br__link > .br__area + .br__area {
     grid-column: 1;
+  }
+  .br__link > app-button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
   }
 }

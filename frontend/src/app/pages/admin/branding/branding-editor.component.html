@@ -264,27 +264,29 @@
      footer column and the legal links share them. A row of a column has the column in
      `col`, a legal link has none. -->
 <ng-template #linkRows let-links let-col="col" let-labelName="labelName" let-urlName="urlName">
-  <ul class="rowgroup br__links">
+  <ul class="br__links">
     @for (link of links; track $index; let li = $index) {
       <li class="br__link">
-        <input
-          class="br__linkLabel"
-          [attr.aria-label]="withLang('admin.brand.linkLabel' | t)"
-          [placeholder]="'admin.brand.linkLabel' | t"
-          [ngModel]="link.label[lang()]"
-          (ngModelChange)="setText(link.label, $event)"
-          [name]="labelName + li"
-        />
-        <input
-          class="br__linkUrl mono"
-          [class.br__linkUrl--bad]="isBadUrl(link.url)"
-          [attr.aria-invalid]="isBadUrl(link.url) ? 'true' : null"
-          [attr.aria-label]="'admin.brand.url' | t"
-          placeholder="https://"
-          [ngModel]="link.url"
-          (ngModelChange)="setUrl(link, $event)"
-          [name]="urlName + li"
-        />
+        <label class="br__area">
+          <span class="br__areaLabel">{{ withLang('admin.brand.linkLabel' | t) }}</span>
+          <input
+            class="br__areaInput br__areaInput--line"
+            [ngModel]="link.label[lang()]"
+            (ngModelChange)="setText(link.label, $event)"
+            [name]="labelName + li"
+          />
+        </label>
+        <label class="br__area" [class.br__area--bad]="isBadUrl(link.url)">
+          <span class="br__areaLabel">{{ 'admin.brand.url' | t }}</span>
+          <input
+            class="br__areaInput br__areaInput--line"
+            [attr.aria-invalid]="isBadUrl(link.url) ? 'true' : null"
+            placeholder="https://"
+            [ngModel]="link.url"
+            (ngModelChange)="setUrl(link, $event)"
+            [name]="urlName + li"
+          />
+        </label>
         <app-button variant="text" size="sm" [iconOnly]="true" [ariaLabel]="('admin.brand.removeLink' | t) + ': ' + (link.label[lang()] || link.url)" (click)="col ? removeLink(col, li) : removeLegalLink(li)"><app-icon name="trash" /></app-button>
       </li>
     }

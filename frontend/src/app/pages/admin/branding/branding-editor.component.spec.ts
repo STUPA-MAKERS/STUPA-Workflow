@@ -255,8 +255,9 @@ describe('BrandingEditorComponent', () => {
     expect(lists).toHaveLength(2);
     for (const list of lists) {
       const row = list.querySelector('li.br__link')!;
-      expect(row.querySelector('input.br__linkLabel')).not.toBeNull();
-      expect(row.querySelector('input.br__linkUrl.mono')).toHaveAttribute('placeholder', 'https://');
+      const fields = row.querySelectorAll('label.br__area input.br__areaInput');
+      expect(fields).toHaveLength(2);
+      expect(fields[1]).toHaveAttribute('placeholder', 'https://');
     }
     const legal = c.draft().legalLinks.length;
     await userEvent.click(within(lists[0] as HTMLElement).getByRole('button', { name: /^Link entfernen: / }));
