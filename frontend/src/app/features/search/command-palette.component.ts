@@ -19,6 +19,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 // By path, not through the `@shared/ui` barrel: the shell is in the initial bundle, and
 // the barrel would pull every shared block a lazy page uses into it.
 import {
+  EmptyStateComponent,
   HighlightComponent,
   IconComponent,
   type IconName,
@@ -106,7 +107,7 @@ const EMPTY: SearchResults = { hits: [], truncated: false, failed: [] };
   selector: 'app-command-palette',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HighlightComponent, TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
+  imports: [EmptyStateComponent, HighlightComponent, TruncatedDirective, FormsModule, TranslatePipe, IconComponent, StatusTextComponent],
   templateUrl: './command-palette.component.html',
   styleUrl: './command-palette.component.scss',
 })

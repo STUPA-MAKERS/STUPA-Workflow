@@ -171,12 +171,12 @@ describe('TodoLinkPickerComponent', () => {
     expect(linkTargets).toHaveBeenLastCalledWith('Haushalt', 'agenda_item', 'k-1');
   });
 
-  it('says when nothing matches', async () => {
+  it('shows the shared empty state when nothing matches', async () => {
     const empty = await setup();
     empty.linkTargets.mockReturnValue(of([]));
     await empty.open();
     empty.type('zz');
-    expect(screen.getByText('Keine Treffer.')).toBeInTheDocument();
+    expect(screen.getByText('Keine Treffer.').closest('app-empty-state')).not.toBeNull();
   });
 
   it('says when the search fails', async () => {

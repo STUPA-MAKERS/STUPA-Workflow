@@ -26,6 +26,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
 import {
   ButtonComponent,
+  EmptyStateComponent,
   focusableIn,
   IconComponent,
   liveSearch,
@@ -78,7 +79,7 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
   selector: 'app-todo-link-picker',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, IconComponent, SideSheetComponent],
+  imports: [NgTemplateOutlet, TranslatePipe, ButtonComponent, EmptyStateComponent, IconComponent, SideSheetComponent],
   templateUrl: './todo-link-picker.component.html',
   styleUrl: './todo-link-picker.component.scss',
 })

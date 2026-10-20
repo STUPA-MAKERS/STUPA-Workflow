@@ -176,6 +176,10 @@ app-status-text.pal__rowSub {
   flex: none;
 }
 
+.pal__empty {
+  margin-top: var(--space-2);
+}
+
 .pal__note {
   margin: 0;
   padding: var(--space-4) 14px;
