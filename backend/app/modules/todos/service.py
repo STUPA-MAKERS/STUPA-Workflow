@@ -853,13 +853,17 @@ class TodoService:
         ids = list(dict.fromkeys(card_ids))
         found = {
             card.id: card
-            for card in (await self.session.scalars(select(TodoCard).where(TodoCard.id.in_(ids))))
+            for card in (
+                await self.session.scalars(select(TodoCard).where(TodoCard.id.in_(ids)))
+            ).all()
         }
         boards = {
             board.id: board
-            for board in await self.session.scalars(
-                select(TodoBoard).where(TodoBoard.id.in_({c.board_id for c in found.values()}))
-            )
+            for board in (
+                await self.session.scalars(
+                    select(TodoBoard).where(TodoBoard.id.in_({c.board_id for c in found.values()}))
+                )
+            ).all()
         }
         pairs: list[tuple[TodoCard, TodoBoard]] = []
         for card_id in ids:
@@ -904,25 +908,31 @@ class TodoService:
             for board_id, board in boards.items()
         }
         items = _by_card(
-            await self.session.scalars(
-                select(TodoCheckItem)
-                .where(TodoCheckItem.card_id.in_(ids))
-                .order_by(TodoCheckItem.position, TodoCheckItem.id)
-            )
+            (
+                await self.session.scalars(
+                    select(TodoCheckItem)
+                    .where(TodoCheckItem.card_id.in_(ids))
+                    .order_by(TodoCheckItem.position, TodoCheckItem.id)
+                )
+            ).all()
         )
         events = _by_card(
-            await self.session.scalars(
-                select(TodoEvent)
-                .where(TodoEvent.card_id.in_(ids))
-                .order_by(TodoEvent.created_at, TodoEvent.id)
-            )
+            (
+                await self.session.scalars(
+                    select(TodoEvent)
+                    .where(TodoEvent.card_id.in_(ids))
+                    .order_by(TodoEvent.created_at, TodoEvent.id)
+                )
+            ).all()
         )
         comments = _by_card(
-            await self.session.scalars(
-                select(TodoComment)
-                .where(TodoComment.card_id.in_(ids), TodoComment.deleted_at.is_(None))
-                .order_by(TodoComment.created_at, TodoComment.id)
-            )
+            (
+                await self.session.scalars(
+                    select(TodoComment)
+                    .where(TodoComment.card_id.in_(ids), TodoComment.deleted_at.is_(None))
+                    .order_by(TodoComment.created_at, TodoComment.id)
+                )
+            ).all()
         )
         refs: set[tuple[str, uuid.UUID]] = set()
         people: set[uuid.UUID | None] = set()
