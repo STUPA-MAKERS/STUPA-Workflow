@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '@core/auth/auth.service';
 import { BrandingService } from '@core/branding/branding.service';
@@ -37,10 +37,10 @@ export class PublicHeaderComponent {
   readonly theme = inject(ThemeService);
   readonly i18n = inject(I18nService);
 
-  /** Black type on light, white type on dark: both are official CD variants. */
-  readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
+  /** The wordmark of the branding, or the built-in one in the colours of the theme. */
+  readonly logoSrc = this.branding.wordmarkSrc;
   /** The mark alone, for a phone, where the wordmark does not fit beside the controls. */
-  readonly markSrc = 'assets/logos/stupa-mark.svg';
+  readonly markSrc = this.branding.markSrc;
 
   login(): void {
     this.auth.login();

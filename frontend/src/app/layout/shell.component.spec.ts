@@ -55,6 +55,8 @@ function brandingStub(
   return {
     appName: signal('STUPA'),
     homeHeading: signal('Willkommen'),
+    wordmarkSrc: signal('assets/logos/stupa-wordmark-light.svg'),
+    markSrc: signal('assets/logos/stupa-mark.svg'),
     copyright: signal(over.copyright ?? null),
     legalLinks: signal(over.legalLinks ?? []),
     footerColumns: signal(over.footerColumns ?? []),

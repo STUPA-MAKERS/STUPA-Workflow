@@ -9,9 +9,35 @@ import type {
   PublicSiteConfig,
 } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
+import { applyAccent, normalizeHex } from '@core/theme/accent';
+import { ThemeService } from '@core/theme/theme.service';
 
 /** The free texts of the branding, keyed by their slot. */
 export type FreeTexts = NonNullable<NonNullable<PublicSiteConfig['branding']>['freetexts']>;
+
+/** The branding part of the public config. */
+type PublicBranding = NonNullable<PublicSiteConfig['branding']>;
+
+/** A logo slot of the branding. */
+export type BrandLogoSlot = 'wordmark' | 'imagemark' | 'favicon';
+
+/**
+ * The built-in logos, which show while a slot holds no upload. The wordmark comes in a
+ * light and a dark variant (black or white type); the mark and the favicon serve both
+ * themes.
+ */
+export const DEFAULT_LOGOS = {
+  wordmark: { light: 'assets/logos/stupa-wordmark-light.svg', dark: 'assets/logos/stupa-wordmark-dark.svg' },
+  imagemark: 'assets/logos/stupa-mark.svg',
+  favicon: 'favicon.ico',
+} as const;
+
+/**
+ * The accent of the last loaded config, kept in the browser. The service applies it at
+ * once on the next start, so the page does not show the built-in green until the config
+ * has loaded.
+ */
+const ACCENT_KEY = 'ap.accent';
 
 /**
  * App name from the active site config, which needs no authentication.
@@ -20,6 +46,9 @@ export type FreeTexts = NonNullable<NonNullable<PublicSiteConfig['branding']>['f
  * the public config once at app start and exposes the app name, the footer copyright
  * and the footer legal links as signals. The header (aria-label), the home page (H1)
  * and the footer read them, and it also sets `document.title`.
+ *
+ * It also applies the accent colour of the config to the theme tokens (`core/theme/accent`)
+ * and gives the logos of the config, with the built-in logos for an empty slot.
  *
  * Fallback: when the config name is empty or not yet loaded, the existing i18n
  * texts apply. `app.title` gives the full name and `home.heading` gives the H1.
@@ -34,6 +63,7 @@ export class BrandingService {
   private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
   private readonly title = inject(Title);
+  private readonly theme = inject(ThemeService);
 
   /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
@@ -66,6 +96,28 @@ export class BrandingService {
   private readonly _loaded = signal(false);
 
   private readonly _gravatarEnabled = signal(true);
+
+  /** The accent colour of the active config (`#rrggbb`), or null for the built-in one. */
+  private readonly _accent = signal<string | null>(readStoredAccent());
+  /** An accent that the branding editor shows before the save, or undefined for none. */
+  private readonly _accentPreview = signal<string | null | undefined>(undefined);
+  private readonly _logos = signal<Partial<Record<BrandLogoSlot, string>>>({});
+
+  /** The accent colour of the active config, or null for the built-in one. */
+  readonly accentColor = this._accent.asReadonly();
+
+  /** The wordmark in the colours of the theme: the upload, else the built-in variant. */
+  readonly wordmarkSrc = computed(
+    () => this._logos().wordmark ?? DEFAULT_LOGOS.wordmark[this.theme.resolved()],
+  );
+  /** The mark without the wordmark: the upload, else the built-in mark. */
+  readonly markSrc = computed(() => this._logos().imagemark ?? DEFAULT_LOGOS.imagemark);
+  /** The icon of the browser tab: the upload, else the built-in favicon. */
+  readonly faviconSrc = computed(() => this._logos().favicon ?? DEFAULT_LOGOS.favicon);
+  /** The uploaded logo of a slot, or null while the built-in one shows. */
+  logoUpload(slot: BrandLogoSlot): string | null {
+    return this._logos()[slot] ?? null;
+  }
 
   /** The handbook of the platform: the default of the backend until the config loads. */
   static readonly DEFAULT_WIKI_URL = 'https://wiki.reutlingen.university/books/antragsplattform';
@@ -136,16 +188,59 @@ export class BrandingService {
 
   constructor() {
     effect(() => this.title.setTitle(this.appName()));
+    effect(() => {
+      const preview = this._accentPreview();
+      applyAccent(preview === undefined ? this._accent() : preview);
+    });
+    // index.html links the built-in icons; an upload replaces each of them, and an
+    // empty slot puts the built-in href back.
+    const builtIn = new Map<HTMLLinkElement, string>();
+    effect(() => {
+      const upload = this._logos().favicon;
+      document.querySelectorAll<HTMLLinkElement>('link[rel="icon"]').forEach((link) => {
+        let original = builtIn.get(link);
+        if (original === undefined) {
+          original = link.getAttribute('href') ?? '';
+          builtIn.set(link, original);
+        }
+        link.setAttribute('href', upload ?? original);
+        if (upload) link.removeAttribute('type');
+      });
+    });
+  }
+
+  /**
+   * Show an accent before it is saved, app-wide, so the editor shows its effect on the
+   * real page. `undefined` ends the preview and the saved accent applies again.
+   */
+  previewAccent(accent: string | null | undefined): void {
+    this._accentPreview.set(accent === undefined ? undefined : normalizeHex(accent));
+  }
+
+  /** Take the branding parts that the whole app shows: after the load and after a save. */
+  applyBranding(branding: PublicBranding | null | undefined): void {
+    this._configuredName.set(branding?.appName ?? '');
+    this._copyright.set(branding?.copyright ?? null);
+    this._legalLinks.set(branding?.legalLinks ?? []);
+    this._footerColumns.set(branding?.footerColumns ?? []);
+    this._freetexts.set(branding?.freetexts ?? {});
+    this._gravatarEnabled.set(branding?.gravatarEnabled !== false);
+    const accent = normalizeHex(branding?.accentColor);
+    this._accent.set(accent);
+    storeAccent(accent);
+    const logos: Partial<Record<BrandLogoSlot, string>> = {};
+    for (const slot of ['wordmark', 'imagemark', 'favicon'] as const) {
+      const url = branding?.logos?.[slot]?.url;
+      if (url) logos[slot] = url;
+    }
+    this._logos.set(logos);
   }
 
   /** Call once at app start. Loads the active branding config and ignores failures. */
   init(): void {
     this.injector.get(ApiClient).publicSiteConfig().subscribe({
       next: (cfg) => {
-        this._configuredName.set(cfg.branding?.appName ?? '');
-        this._copyright.set(cfg.branding?.copyright ?? null);
-        this._legalLinks.set(cfg.branding?.legalLinks ?? []);
-        this._footerColumns.set(cfg.branding?.footerColumns ?? []);
+        this.applyBranding(cfg.branding);
         if (typeof cfg.confirmTtlHours === 'number' && cfg.confirmTtlHours > 0) {
           this._confirmTtlHours.set(cfg.confirmTtlHours);
         }
@@ -153,8 +248,6 @@ export class BrandingService {
           this._linkTtlDays.set(cfg.linkTtlDays);
         }
         if (cfg.attachmentLimits) this._attachmentLimits.set(cfg.attachmentLimits);
-        this._freetexts.set(cfg.branding?.freetexts ?? {});
-        this._gravatarEnabled.set(cfg.branding?.gravatarEnabled !== false);
         if (cfg.help?.wikiUrl) this._wikiUrl.set(cfg.help.wikiUrl);
         this._ticketsPublic.set(cfg.tickets?.publicEnabled === true);
         this._loaded.set(true);
@@ -163,5 +256,22 @@ export class BrandingService {
         /* Keep everything empty so the i18n default fallbacks stay. */
       },
     });
+  }
+}
+
+function readStoredAccent(): string | null {
+  try {
+    return normalizeHex(localStorage.getItem(ACCENT_KEY));
+  } catch {
+    return null;
+  }
+}
+
+function storeAccent(accent: string | null): void {
+  try {
+    if (accent) localStorage.setItem(ACCENT_KEY, accent);
+    else localStorage.removeItem(ACCENT_KEY);
+  } catch {
+    /* ignore */
   }
 }

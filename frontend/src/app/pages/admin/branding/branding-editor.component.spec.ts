@@ -1,16 +1,24 @@
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
+import { ActivatedRoute } from '@angular/router';
 import { render, screen, within, waitFor } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
 import { NEVER, of, throwError } from 'rxjs';
 import { USE_MOCK_API } from '@core/api/api.config';
+import { BrandingService } from '@core/branding/branding.service';
+import { CATALOG } from '@core/i18n/translations';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { matchMediaQueries } from '../../../../testing/meeting-fixtures';
 import { AdminApiService } from '../admin-api.service';
 import type { Branding, SiteConfig } from '../admin.models';
-import { BrandingEditorComponent } from './branding-editor.component';
+import { BrandingEditorComponent, type BrandingSection } from './branding-editor.component';
 
-async function setup() {
+/** The route of one of the two pages. */
+function route(section: BrandingSection) {
+  return { provide: ActivatedRoute, useValue: { snapshot: { data: { section } } } };
+}
+
+async function setup(section: BrandingSection = 'texts') {
   const toast = { success: jest.fn(), error: jest.fn() };
   const view = await render(BrandingEditorComponent, {
     providers: [
@@ -18,19 +26,18 @@ async function setup() {
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: true },
       { provide: ToastService, useValue: toast },
+      route(section),
     ],
   });
-  // ngModel writes the draft into the fields after a tick.
+  // ngModel writes the branding into the fields after a tick.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   return { ...view, toast };
 }
 
-/** The version line under the header (the version list below repeats the number). */
-/** The version (the `meta` of the header) and the draft note under the header. */
-function stateLine(container: Element): string {
-  const text = (sel: string) => container.querySelector(sel)?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-  return [text('.ph__meta'), text('.br__state')].filter(Boolean).join(' · ');
+/** The version (the `meta` of the header). */
+function versionLine(container: Element): string {
+  return container.querySelector('.ph__meta')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
 function emptyBranding(): Branding {
@@ -48,20 +55,17 @@ function emptyBranding(): Branding {
   };
 }
 
-const STUB_CFG: SiteConfig = {
-  version: 3,
-  active: emptyBranding(),
-  draft: emptyBranding(),
-  hasDraftChanges: false,
-};
+const STUB_CFG: SiteConfig = { version: 3, branding: emptyBranding() };
 
-async function setupWithStub(api: Partial<Record<keyof AdminApiService, unknown>>) {
+async function setupWithStub(
+  api: Partial<Record<keyof AdminApiService, unknown>>,
+  section: BrandingSection = 'branding',
+) {
   const toast = { success: jest.fn(), error: jest.fn() };
   const fullApi = {
-    // A fresh draft per test: the editor changes the draft object in place.
-    getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: emptyBranding() })),
-    saveBrandingDraft: jest.fn(() => of({ ...STUB_CFG, hasDraftChanges: true })),
-    activateBranding: jest.fn(() => of({ ...STUB_CFG, version: 4, hasDraftChanges: false })),
+    // A fresh branding per test: the editor changes the object in place.
+    getSiteConfig: jest.fn(() => of({ ...STUB_CFG, branding: emptyBranding() })),
+    saveSiteConfig: jest.fn((b: Branding) => of({ version: 4, branding: b })),
     listConfigRevisions: jest.fn(() => of([])),
     ...api,
   };
@@ -69,21 +73,148 @@ async function setupWithStub(api: Partial<Record<keyof AdminApiService, unknown>
     providers: [
       { provide: AdminApiService, useValue: fullApi },
       { provide: ToastService, useValue: toast },
+      route(section),
     ],
   });
+  await view.fixture.whenStable();
+  view.fixture.detectChanges();
   return { ...view, toast, api: fullApi };
 }
 
 describe('BrandingEditorComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  it('loads the active version, the app name, the logos and the free texts', async () => {
-    const { container } = await setup();
-    expect(stateLine(container)).toBe('Version 1');
+  it('shows the texts on the page "Texte" and nothing of the branding', async () => {
+    const { container } = await setup('texts');
+    expect(screen.getByRole('heading', { level: 1, name: 'Texte' })).toBeInTheDocument();
+    expect(versionLine(container)).toBe('Version 1');
     expect(screen.getByRole('textbox', { name: 'Willkommenstext (DE)' })).toHaveValue('Willkommen auf der Antragsplattform.');
+    expect(screen.queryByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeNull();
+    expect(screen.queryByText('Vorschau', { selector: 'summary *' })).toBeNull();
+    expect(container.querySelector('details')).toBeNull();
+  });
+
+  it('shows the name, the accent, the switch and the logos on the page "Branding"', async () => {
+    await setup('branding');
+    expect(screen.getByRole('heading', { level: 1, name: 'Branding' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Voller Name (Browser-Tab)' })).toBeInTheDocument();
-    // An empty slot offers the file dialog; the button names its slot.
+    expect(screen.getByRole('heading', { name: 'Akzentfarbe' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Willkommenstext (DE)' })).toBeNull();
+    // An empty slot shows the built-in logo and offers the file dialog.
     expect(screen.getByRole('button', { name: 'Auswählen: Wortmarke' })).toBeInTheDocument();
+    expect(screen.getAllByText('Standard').length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('shows the built-in logo of an empty slot in the colours of the theme', async () => {
+    const { container } = await setupWithStub({});
+    const imgs = Array.from(container.querySelectorAll<HTMLImageElement>('.br__thumb img')).map((i) => i.getAttribute('src'));
+    expect(imgs).toEqual([expect.stringMatching(/^assets\/logos\/stupa-wordmark-(light|dark)\.svg$/), 'assets/logos/stupa-mark.svg', 'favicon.ico']);
+  });
+
+  it('shows the built-in texts muted as placeholders of the empty fields', async () => {
+    await setupWithStub({}, 'texts');
+    expect(screen.getByRole('textbox', { name: 'Copyright-Zeile (DE)' })).toHaveAttribute(
+      'placeholder',
+      'Eine Plattform des Studierendenparlaments',
+    );
+    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
+    expect(screen.getByRole('textbox', { name: 'Copyright-Zeile (EN)' })).toHaveAttribute('placeholder', expect.stringMatching(/\S/));
+  });
+
+  it('falls back to the German built-in text while the other catalogue is missing', async () => {
+    const { fixture } = await setupWithStub({}, 'texts');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    const { de, en } = CATALOG;
+    CATALOG.en = {};
+    try {
+      c.lang.set('en');
+      expect(c.copyrightDefault()).toBe('Eine Plattform des Studierendenparlaments');
+      CATALOG.de = { ...CATALOG.de, 'app.title': undefined };
+      expect(c.appNameDefault()).toBe('');
+    } finally {
+      CATALOG.en = en;
+      CATALOG.de = de;
+    }
+  });
+
+  it('saves at once as the new active version', async () => {
+    const { api, container, toast } = await setupWithStub({});
+    expect(versionLine(container)).toBe('Version 3');
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+    await userEvent.type(screen.getByRole('textbox', { name: 'Kurzname (PWA)' }), 'AP');
+    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+    expect(api.saveSiteConfig).toHaveBeenCalledWith(expect.objectContaining({ appShortName: 'AP' }));
+    expect(versionLine(container)).toBe('Version 4');
+    expect(toast.success).toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+  });
+
+  it('save is a no-op without a branding', async () => {
+    const { fixture, api } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, branding: null as unknown as Branding })) });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.save();
+    expect(api.saveSiteConfig).not.toHaveBeenCalled();
+  });
+
+  it('save toasts an error when the request fails and keeps the edits', async () => {
+    const { fixture, toast } = await setupWithStub({
+      saveSiteConfig: jest.fn(() => throwError(() => new Error('boom'))),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
+    c.setAppName('appName', 'AStA');
+    c.save();
+    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
+    expect(c.dirty()).toBe(true);
+  });
+
+  describe('accent colour', () => {
+    it('previews a picked accent on the whole page and saves it', async () => {
+      const { api, fixture } = await setupWithStub({});
+      const brand = fixture.debugElement.injector.get(BrandingService);
+      const preview = jest.spyOn(brand, 'previewAccent');
+      const hex = screen.getByRole('textbox', { name: 'Farbwert' });
+      expect(hex).toHaveValue('');
+      expect(hex).toHaveAttribute('placeholder', '#72a384');
+      await userEvent.type(hex, '#0075BF');
+      expect(preview).toHaveBeenLastCalledWith('#0075bf');
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('#0075bf');
+      await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
+      expect(api.saveSiteConfig).toHaveBeenCalledWith(expect.objectContaining({ accentColor: '#0075bf' }));
+      expect(brand.accentColor()).toBe('#0075bf');
+      // "Standard" goes back to the built-in accent.
+      await userEvent.click(screen.getByRole('button', { name: 'Standard' }));
+      fixture.detectChanges();
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('');
+      brand.applyBranding(null);
+    });
+
+    it('takes the native colour picker and ignores a partial value', async () => {
+      const { fixture, container } = await setupWithStub({});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      const picker = container.querySelector<HTMLInputElement>('input[type="color"]')!;
+      picker.value = '#ce1625';
+      picker.dispatchEvent(new Event('input'));
+      expect(c.draft().accentColor).toBe('#ce1625');
+      c.setAccent('#ce16');
+      expect(c.draft().accentColor).toBe('#ce1625');
+      c.setAccent('#72A384');
+      expect(c.draft().accentColor).toBeNull();
+    });
+
+    it('ends the preview when the page goes', async () => {
+      const { fixture } = await setupWithStub({});
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const c = fixture.componentInstance as any;
+      const brand = fixture.debugElement.injector.get(BrandingService);
+      c.setAccent('#7a4bc2');
+      const preview = jest.spyOn(brand, 'previewAccent');
+      fixture.destroy();
+      expect(preview).toHaveBeenCalledWith(undefined);
+    });
   });
 
   it('edits the footer columns with their links and the mail footer text (gaps N43)', async () => {
@@ -150,65 +281,26 @@ describe('BrandingEditorComponent', () => {
     expect(c.lang()).toBe('de');
   });
 
-  it('edits the app name and the legal links', async () => {
-    const { fixture } = await setup();
+  it('edits the app name', async () => {
+    const { fixture } = await setup('branding');
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     await userEvent.type(screen.getByRole('textbox', { name: 'Kurzname (PWA)' }), 'AP');
     expect(c.draft().appShortName).toBe('AP');
     await userEvent.type(screen.getByRole('textbox', { name: 'Voller Name (Browser-Tab)' }), 'Plattform');
     expect(c.draft().appName).toBe('Plattform');
+  });
+
+  it('edits the legal links', async () => {
+    const { fixture } = await setup();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = fixture.componentInstance as any;
     await userEvent.click(screen.getByRole('button', { name: 'Link entfernen: Datenschutz' }));
     expect(c.draft().legalLinks.map((l: { url: string }) => l.url)).toEqual(['https://example.org/impressum']);
   });
 
-  it('shows the draft in a live preview behind the "Vorschau" disclosure', async () => {
-    const { fixture } = await setup();
-    const summary = screen.getByText('Vorschau').closest('summary') as HTMLElement;
-    const details = summary.closest('details') as HTMLDetailsElement;
-    expect(details.open).toBe(false);
-    await userEvent.click(summary);
-    expect(details.open).toBe(true);
-    expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Willkommen auf der Antragsplattform.');
-    expect(screen.getByTestId('preview-support')).toHaveTextContent('support@example.org');
-    expect(screen.getByTestId('preview-footer')).toHaveTextContent('Über uns');
-    const legal = screen.getByTestId('preview-legal');
-    expect(legal).toHaveTextContent('Impressum');
-    expect(legal).toHaveTextContent('Datenschutz');
-    // The preview follows the form at once.
-    const welcome = screen.getByRole('textbox', { name: 'Willkommenstext (DE)' });
-    await userEvent.clear(welcome);
-    await userEvent.type(welcome, 'Servus');
-    fixture.detectChanges();
-    expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Servus');
-    // An empty text shows its field name as a placeholder.
-    await userEvent.clear(welcome);
-    fixture.detectChanges();
-    expect(screen.getByTestId('preview-welcome')).toHaveTextContent('Willkommenstext');
-    // The preview shows the language that is edited now.
-    await userEvent.click(screen.getByRole('radio', { name: 'EN' }));
-    fixture.detectChanges();
-    expect(screen.getByTestId('preview-footer')).toHaveTextContent('About');
-  });
-
-  it('shows "Speichern" only for unsaved edits; a saved draft can be activated', async () => {
-    const { container } = await setup();
-    const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });
-    expect(activate).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
-
-    await userEvent.type(screen.getByRole('textbox', { name: 'Kurzname (PWA)' }), 'AP');
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(stateLine(container)).toMatch(/^Version 1\s*·\s*Nicht aktivierter Entwurf$/);
-    expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
-    expect(activate).toBeEnabled();
-
-    await userEvent.click(activate);
-    expect(stateLine(container)).toBe('Version 2');
-  });
-
   it('uploads a logo by the file dialog and shows its row', async () => {
-    const { container } = await setup();
+    const { container } = await setup('branding');
     const inputs = container.querySelectorAll<HTMLInputElement>('input[type="file"]');
     const file = new File(['x'], 'logo.png', { type: 'image/png' });
     await userEvent.upload(inputs[1], file);
@@ -237,7 +329,7 @@ describe('BrandingEditorComponent', () => {
   });
 
   it('rejects a disallowed logo MIME type', async () => {
-    const { toast, container } = await setup();
+    const { toast, container } = await setup('branding');
     const input = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[2];
     const bad = new File(['x'], 'evil.exe', { type: 'application/x-msdownload' });
     // applyAccept is false, so the handler runs and its own guard rejects the type.
@@ -246,7 +338,7 @@ describe('BrandingEditorComponent', () => {
   });
 
   it('rejects an SVG logo upload (img-only contract, no inline-SVG XSS)', async () => {
-    const { toast, container } = await setup();
+    const { toast, container } = await setup('branding');
     const input = container.querySelectorAll<HTMLInputElement>('input[type="file"]')[1];
     const svg = new File(['<svg onload="alert(1)"/>'], 'logo.svg', { type: 'image/svg+xml' });
     await userEvent.upload(input, svg, { applyAccept: false });
@@ -266,7 +358,7 @@ describe('BrandingEditorComponent', () => {
     fixture.detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent('javascript:alert(1)');
     expect(screen.getByRole('button', { name: 'Speichern' })).toBeDisabled();
-    c.saveDraft();
+    c.save();
     expect(toast.error).toHaveBeenCalledWith(
       'Unzulässige Link-URL — nur http(s):// oder mailto: erlaubt.',
     );
@@ -295,8 +387,8 @@ describe('BrandingEditorComponent', () => {
     c.removeLegalLink(c.draft().legalLinks.length - 1); // drop the empty one, keep the valid seed
 
     c.removeLogo('wordmark'); // an absent slot takes the safe delete branch
-    c.saveDraft();
-    expect(c.hasDraftChanges()).toBe(true);
+    c.save();
+    expect(c.version()).toBe(2);
   });
 
   it('rejects an oversized logo file', async () => {
@@ -343,7 +435,7 @@ describe('BrandingEditorComponent', () => {
 
   describe('texts after the submission', () => {
     it('shows both fields with the built-in text as placeholder and preview', async () => {
-      const { fixture } = await setupWithStub({});
+      const { fixture } = await setupWithStub({}, 'texts');
       await fixture.whenStable();
       fixture.detectChanges();
       expect(screen.getByRole('heading', { name: 'Texte nach dem Einreichen' })).toBeInTheDocument();
@@ -358,7 +450,7 @@ describe('BrandingEditorComponent', () => {
     });
 
     it('writes the Markdown of the picked language into the draft and previews it safely', async () => {
-      const { fixture, api } = await setupWithStub({});
+      const { fixture, api } = await setupWithStub({}, 'texts');
       await fixture.whenStable();
       fixture.detectChanges();
       const internal = screen.getByRole('textbox', { name: 'Intern: angemeldet mit Konto (DE)' });
@@ -371,7 +463,7 @@ describe('BrandingEditorComponent', () => {
       expect(en).toHaveValue('');
       expect(en).toHaveAttribute('placeholder', expect.stringMatching(/^Thank you\. Your application is submitted/));
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      const saved = api.saveBrandingDraft.mock.calls[0][0] as Branding;
+      const saved = api.saveSiteConfig.mock.calls[0][0] as Branding;
       expect(saved.freetexts.submittedInternal).toEqual({ de: 'Danke **sehr** <b>x</b>' });
       expect(saved.freetexts.submittedExternal).toEqual({});
     });
@@ -403,20 +495,12 @@ describe('BrandingEditorComponent', () => {
   });
 
   it('patch is a no-op without a draft', async () => {
-    const { fixture } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: null as unknown as Branding })) });
+    const { fixture } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, branding: null as unknown as Branding })) });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = fixture.componentInstance as any;
     expect(c.draft()).toBeNull();
     expect(() => c.addColumn()).not.toThrow();
     expect(c.draft()).toBeNull();
-  });
-
-  it('saveDraft is a no-op without a draft', async () => {
-    const { fixture, api } = await setupWithStub({ getSiteConfig: jest.fn(() => of({ ...STUB_CFG, draft: null as unknown as Branding })) });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.saveDraft();
-    expect(api.saveBrandingDraft).not.toHaveBeenCalled();
   });
 
   it('switches the Gravatar images off and saves the switch with the draft', async () => {
@@ -427,117 +511,9 @@ describe('BrandingEditorComponent', () => {
     await userEvent.click(sw);
     await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'));
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    expect(api.saveBrandingDraft).toHaveBeenCalledWith(
+    expect(api.saveSiteConfig).toHaveBeenCalledWith(
       expect.objectContaining({ gravatarEnabled: false }),
     );
-  });
-
-  it('saveDraft toasts and persists on success', async () => {
-    const { fixture, api, toast } = await setupWithStub({});
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.saveDraft();
-    expect(api.saveBrandingDraft).toHaveBeenCalled();
-    expect(c.hasDraftChanges()).toBe(true);
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('saveDraft toasts an error when the request fails', async () => {
-    const { fixture, toast } = await setupWithStub({
-      saveBrandingDraft: jest.fn(() => throwError(() => new Error('boom'))),
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.saveDraft();
-    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-  });
-
-  it('activate bumps the version and toasts on success', async () => {
-    const { fixture, api, toast } = await setupWithStub({});
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.activate();
-    expect(api.activateBranding).toHaveBeenCalled();
-    expect(c.version()).toBe(4);
-    expect(c.hasDraftChanges()).toBe(false);
-    expect(toast.success).toHaveBeenCalled();
-  });
-
-  it('activate toasts an error when the request fails', async () => {
-    const { fixture, toast } = await setupWithStub({
-      activateBranding: jest.fn(() => throwError(() => new Error('boom'))),
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.activate();
-    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
-  });
-
-  it('saves unsaved edits before it activates, so the activation publishes the screen', async () => {
-    const calls: string[] = [];
-    const { api } = await setupWithStub({
-      saveBrandingDraft: jest.fn((d: Branding) => {
-        calls.push(`save:${d.freetexts.emailFooter.de}`);
-        return of({ ...STUB_CFG, hasDraftChanges: true });
-      }),
-      activateBranding: jest.fn(() => {
-        calls.push('activate');
-        return of({ ...STUB_CFG, version: 4, hasDraftChanges: false });
-      }),
-    });
-    const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });
-    expect(activate).toBeDisabled();
-
-    // Save once, then edit again: the server holds the older draft.
-    await userEvent.click(screen.getByRole('switch', { name: /Gravatar-Bilder zeigen/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-    await userEvent.type(screen.getByRole('textbox', { name: 'E-Mail-Fußzeile (DE)' }), 'Gruß');
-    expect(activate).toBeEnabled();
-
-    await userEvent.click(activate);
-    expect(calls).toEqual(['save:', 'save:Gruß', 'activate']);
-    expect(api.activateBranding).toHaveBeenCalledTimes(1);
-  });
-
-  it('activates without a second save when the screen holds no unsaved edits', async () => {
-    const { fixture, api } = await setupWithStub({});
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.saveDraft();
-    expect(c.dirty()).toBe(false);
-    c.activate();
-    expect(api.saveBrandingDraft).toHaveBeenCalledTimes(1);
-    expect(api.activateBranding).toHaveBeenCalledTimes(1);
-  });
-
-  it('enables the activate for local edits alone and blocks it for a bad link', async () => {
-    const { fixture, api, toast } = await setupWithStub({});
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    expect(c.canActivate()).toBe(false);
-    c.setAppName('appName', 'AStA');
-    expect(c.dirty()).toBe(true);
-    expect(c.canActivate()).toBe(true);
-    c.addLegalLink();
-    c.setUrl(c.draft().legalLinks[0], 'javascript:alert(1)');
-    expect(c.canActivate()).toBe(false);
-    c.activate();
-    expect(toast.error).toHaveBeenCalled();
-    expect(api.saveBrandingDraft).not.toHaveBeenCalled();
-    expect(api.activateBranding).not.toHaveBeenCalled();
-  });
-
-  it('keeps the edits unsaved when the save before the activate fails', async () => {
-    const { fixture, api, toast } = await setupWithStub({
-      saveBrandingDraft: jest.fn(() => throwError(() => new Error('boom'))),
-    });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    c.setAppName('appName', 'AStA');
-    c.activate();
-    expect(api.activateBranding).not.toHaveBeenCalled();
-    expect(c.dirty()).toBe(true);
-    expect(toast.error).toHaveBeenCalledWith('Speichern fehlgeschlagen.');
   });
 
   describe('on a phone', () => {
@@ -545,15 +521,14 @@ describe('BrandingEditorComponent', () => {
     beforeEach(() => (restore = matchMediaQueries(MEDIA.phone)));
     afterEach(() => restore());
 
-    it('keeps the activate in the header and shows "Speichern" only for unsaved edits', async () => {
+    it('shows "Speichern" only for unsaved edits and no activate', async () => {
       const { api } = await setupWithStub({});
-      const activate = screen.getByRole('button', { name: 'Entwurf aktivieren' });
-      expect(activate).toBeDisabled();
       expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
+      expect(screen.queryByRole('button', { name: /aktivieren/ })).toBeNull();
       await userEvent.click(screen.getByRole('switch', { name: /Gravatar-Bilder zeigen/ }));
       await userEvent.click(screen.getByRole('button', { name: 'Speichern' }));
-      expect(api.saveBrandingDraft).toHaveBeenCalled();
-      expect(activate).toBeEnabled();
+      expect(api.saveSiteConfig).toHaveBeenCalled();
+      expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     });
   });
 });

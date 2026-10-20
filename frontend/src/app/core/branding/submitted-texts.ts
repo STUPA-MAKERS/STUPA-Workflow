@@ -7,7 +7,7 @@ import { CATALOG, DEFAULT_LOCALE, type Locale } from '@core/i18n/translations';
  * - `internal`: a signed-in applicant. The application is submitted at once.
  * - `external`: a guest. The link in the e-mail confirms the application.
  *
- * `/admin/branding` sets each text per language as Markdown (`freetexts.submittedInternal`
+ * `/admin/texts` sets each text per language as Markdown (`freetexts.submittedInternal`
  * and `freetexts.submittedExternal` of the site config). An empty text of a language
  * falls back to the built-in text of that language, so a new installation shows the
  * same words as before.

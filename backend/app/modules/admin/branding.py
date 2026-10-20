@@ -256,6 +256,10 @@ class TicketSettings(_CamelModel):
     retention_months: int | None = Field(default=12, alias="retentionMonths", ge=1, le=120)
 
 
+#: The accent colour: six hex digits, so the frontend can derive the theme tokens.
+ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"
+
+
 class Branding(_CamelModel):
     """Full branding config (active or draft)."""
 
@@ -280,10 +284,19 @@ class Branding(_CamelModel):
     # contacts gravatar.com. False turns the proxy off: it answers 404 and the frontend
     # shows the initials. A config from before this field reads as True.
     gravatar_enabled: bool = Field(default=True, alias="gravatarEnabled")
+    # The accent colour of the whole app, as ``#rrggbb``. The frontend derives the
+    # accent tokens of the light and the dark theme from it. None means the built-in
+    # accent of the design system.
+    accent_color: str | None = Field(default=None, alias="accentColor", pattern=ACCENT_PATTERN)
     # The help menu and the ticket reports ("Hilfe & Tickets"). A config from before
     # these fields reads as the defaults.
     help: HelpSettings = Field(default_factory=HelpSettings)
     tickets: TicketSettings = Field(default_factory=TicketSettings)
+
+    @field_validator("accent_color")
+    @classmethod
+    def _lower_accent(cls, v: str | None) -> str | None:
+        return v.lower() if v is not None else None
 
     @field_validator("copyright")
     @classmethod

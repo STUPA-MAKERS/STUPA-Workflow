@@ -4,7 +4,7 @@ These tests add the service branches that the other suites leave open. They cove
 Gremium role CRUD with its conflict, not-found, forced-role and in-use blocks. They cover
 the idempotent forced-role backfill and the membership validation. They cover the pure
 helpers ``_iso``, ``_sanitize_perms`` and ``_role_out``. They also cover
-the site-config draft, activate, public and manifest paths with the fallback names.
+the site-config read, save, public and manifest paths with the fallback names.
 
 These tests need no DB. ``tests._support.auth_fakes.FakeSession`` serves prefilled result
 queues and ``get`` queues. Every audit ``record`` runs two ``execute`` calls: the
@@ -43,6 +43,7 @@ from app.modules.admin.site_config_service import (
     SiteConfigService,
     _branding,
 )
+from app.modules.audit.actions import AuditAction
 from app.shared.errors import ConflictError, NotFoundError
 from tests._support.auth_fakes import fake_session, result
 
@@ -336,132 +337,49 @@ def test_branding_helper_none_and_row() -> None:
 
 
 async def test_get_no_versions() -> None:
-    # _active -> None and _latest -> None, which covers the "latest is None" branch.
-    db = fake_session(result(), result())
+    # _active -> None gives version 0 and the default branding.
+    db = fake_session(result())
     out = await SiteConfigService(db).get()
     assert out.version == 0
-    assert out.has_draft_changes is False
+    assert out.branding == Branding()
 
 
-async def test_get_latest_is_active_no_draft() -> None:
-    active = _scv(3, active=True)
-    # _active -> active and _latest -> active, so latest.active is True.
-    db = fake_session(result(active), result(active))
+async def test_get_reads_the_active_version() -> None:
+    active = _scv(3, active=True, branding=Branding(appName="Aktiv").model_dump(by_alias=True))
+    db = fake_session(result(active))
     out = await SiteConfigService(db).get()
     assert out.version == 3
-    assert out.has_draft_changes is False
+    assert out.branding.app_name == "Aktiv"
 
 
-async def test_get_with_pending_draft() -> None:
-    active = _scv(3, active=True)
-    draft = _scv(4, active=False, branding=Branding(appName="Draft").model_dump(by_alias=True))
-    # _active -> active and _latest -> draft (inactive), so has_draft_changes is True.
-    db = fake_session(result(active), result(draft))
-    out = await SiteConfigService(db).get()
-    assert out.version == 3
-    assert out.has_draft_changes is True
-    assert out.draft.app_name == "Draft"
-
-
-async def test_get_draft_without_active_version() -> None:
-    # active None and latest inactive give version 0 and draft = latest branding.
-    draft = _scv(1, active=False)
-    db = fake_session(result(), result(draft))
-    out = await SiteConfigService(db).get()
-    assert out.version == 0
-    assert out.has_draft_changes is True
-
-
-async def test_put_draft_inplace_update_existing_draft() -> None:
-    # An inactive latest triggers an in-place update with no add.
-    draft = _scv(2, active=False)
+async def test_save_writes_a_new_active_version(
+    revisions: list[dict[str, object]],
+) -> None:
+    active = _scv(5, active=True, branding=Branding(appName="Alt").model_dump(by_alias=True))
     db = fake_session(
-        result(draft),  # _latest
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        # After the commit, get() calls _active and _latest again.
-        result(),  # get._active -> None
-        result(draft),  # get._latest -> draft (inactive)
-    )
-    svc = SiteConfigService(db)
-    out = await svc.put_draft(Branding(appName="Neu"), "admin")
-    # An in-place update adds no SiteConfigVersion row. Only the audit row appears.
-    assert not any(isinstance(o, SiteConfigVersion) for o in db.added)
-    assert draft.branding["appName"] == "Neu"
-    assert db.committed == 1
-    assert out.has_draft_changes is True
-
-
-async def test_put_draft_creates_new_version_above_active() -> None:
-    active = _scv(5, active=True)
-    db = fake_session(
-        result(active),  # _latest -> active, so the service creates a new draft
+        result(active),  # _latest
         result(active),  # _active -> the source of help and tickets
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
+        result(),  # execute(update active=False)
         result(active),  # get._active
     )
     _id_on_flush(db)
-    svc = SiteConfigService(db)
-    out = await svc.put_draft(Branding(appName="Brandneu"), "admin")
-    # The new row carries version base + 1 and stays inactive.
-    new_rows = [o for o in db.added if isinstance(o, SiteConfigVersion)]
-    assert len(new_rows) == 1
-    new_row = new_rows[0]
-    assert new_row.version == 6
-    assert new_row.active is False
+    await SiteConfigService(db).save(Branding(appName="Neu", accentColor="#0075BF"), "admin")
+    (row,) = [o for o in db.added if isinstance(o, SiteConfigVersion)]
+    assert (row.version, row.active) == (6, True)
+    assert row.branding["appName"] == "Neu"
+    assert row.branding["accentColor"] == "#0075bf"
     assert db.committed == 1
-    # get._latest finds no queue entry left and returns None, the latest-None branch.
-    assert out.version == 5
+    (rev,) = revisions
+    assert rev["action"] == AuditAction.CONFIG_ACTIVATION
+    assert rev["extra_data"] == {"siteConfigVersion": 6}
 
 
-async def test_put_draft_no_versions_creates_version_1() -> None:
-    db = fake_session(
-        result(),  # _latest -> None, so base is 0
-        result(),  # _active -> None, so help and tickets are the defaults
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        result(),  # get._active -> None
-        result(),  # get._latest -> None
-    )
-    _id_on_flush(db)
-    svc = SiteConfigService(db)
-    await svc.put_draft(Branding(appName="First"), "admin")
-    new_rows = [o for o in db.added if isinstance(o, SiteConfigVersion)]
-    assert new_rows[0].version == 1
-
-
-async def test_activate_conflict_when_no_draft_none() -> None:
-    db = fake_session(result())  # _latest -> None
-    with pytest.raises(ConflictError, match="no pending"):
-        await SiteConfigService(db).activate("admin")
-
-
-async def test_activate_conflict_when_latest_active() -> None:
-    active = _scv(2, active=True)
-    db = fake_session(result(active))  # _latest is active, so nothing needs activation
-    with pytest.raises(ConflictError):
-        await SiteConfigService(db).activate("admin")
-
-
-async def test_activate_promotes_draft() -> None:
-    draft = _scv(7, active=False)
-    db = fake_session(
-        result(draft),  # _latest
-        result(),  # execute(update active=False)
-        result(),  # config_revision: advisory lock (#config-versioning)
-        result(),  # config_revision: head (scalar -> None)
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
-        result(draft),  # get._active -> draft (active now)
-        result(draft),  # get._latest -> draft (the active-True branch)
-    )
-    svc = SiteConfigService(db)
-    out = await svc.activate("admin")
-    assert draft.active is True
-    assert db.committed == 1
-    assert out.version == 7
-    assert out.has_draft_changes is False
+def test_branding_accent_color_shape() -> None:
+    assert Branding().accent_color is None
+    assert Branding(accentColor="#AbCdEf").accent_color == "#abcdef"
+    for bad in ("72a384", "#72a38", "#72a3845", "red", "#ggg000"):
+        with pytest.raises(ValueError):
+            Branding(accentColor=bad)
 
 
 async def test_public_with_active_and_without() -> None:
@@ -636,30 +554,9 @@ async def test_put_help_tickets_writes_a_new_active_version(
     assert rev["extra_data"] == {"siteConfigVersion": 5, "section": "helpTickets"}
 
 
-async def test_put_help_tickets_patches_an_open_draft(
-    revisions: list[dict[str, object]],
-) -> None:
-    active = _scv(4, active=True)
-    draft = _scv(5, active=False, branding={"appName": "Draft"})
-    db = fake_session(result(active), result(draft), result())
-    await SiteConfigService(db).put_help_tickets(_settings(retentionMonths=None), "admin")
-    (row,) = [o for o in db.added if isinstance(o, SiteConfigVersion)]
-    assert row.version == 6
-    assert draft.version == 7
-    assert draft.branding["appName"] == "Draft"
-    assert draft.branding["help"] == {"wikiUrl": "https://w.example.org"}
-    assert draft.branding["tickets"]["retentionMonths"] is None
-
-
 async def test_put_help_tickets_on_an_empty_database(
     revisions: list[dict[str, object]],
 ) -> None:
-    draft = _scv(1, active=False, branding=None)
-    draft.branding = None  # type: ignore[assignment]
-    db = fake_session(result(), result(draft), result())
-    await SiteConfigService(db).put_help_tickets(_settings(), "admin")
-    assert draft.version == 3
-    assert draft.branding["tickets"]["notifyNew"] is False
     db = fake_session(result(), result(), result())
     await SiteConfigService(db).put_help_tickets(_settings(), "admin")
     (row,) = [o for o in db.added if isinstance(o, SiteConfigVersion)]

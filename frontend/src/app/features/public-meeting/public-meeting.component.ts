@@ -13,7 +13,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { AuthService } from '@core/auth/auth.service';
 import { I18nService } from '@core/i18n/i18n.service';
-import { ThemeService } from '@core/theme/theme.service';
+import { BrandingService } from '@core/branding/branding.service';
 import { LanguageSelectComponent } from '../../layout/language-select/language-select.component';
 import { SiteFooterComponent } from '../../layout/site-footer/site-footer.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -81,9 +81,8 @@ export class PublicMeetingComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
   protected readonly guest = inject(GuestSessionService);
-  private readonly theme = inject(ThemeService);
-  /** The wordmark of the own header, in the colours of the theme. */
-  protected readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
+  /** The wordmark of the own header: the branding upload, else the built-in one. */
+  protected readonly logoSrc = inject(BrandingService).wordmarkSrc;
 
   protected readonly name = signal('');
   /** The pending request shows the rename form. */

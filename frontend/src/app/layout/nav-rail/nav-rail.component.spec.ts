@@ -34,6 +34,7 @@ async function setup(tasks: number | null = 120, tickets: number | null = null) 
         provide: BrandingService,
         useValue: {
           appName: signal('Antragsplattform'),
+          markSrc: signal('assets/logos/stupa-mark.svg'),
           loaded: signal(false),
           gravatarEnabled: signal(true),
           wikiUrl: signal('https://wiki.example.org/handbook'),

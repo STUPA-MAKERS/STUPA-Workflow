@@ -13,6 +13,7 @@ import { ApiClient } from '@core/api/api-client.service';
 import type { AgendaItem, JoinLink, Meeting, Vote, VoteResult } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { BrandingService } from '@core/branding/branding.service';
 import { ThemeService } from '@core/theme/theme.service';
 import { LiveVoteService, type LiveVoteSession } from '@core/ws/live-vote.service';
 import type { VoteClosedMsg } from '@core/ws/ws-messages';
@@ -105,7 +106,7 @@ export class BeamerComponent implements OnDestroy {
     return { members: this.presentMembers(), guests };
   });
 
-  readonly logoSrc = computed(() => `assets/logos/stupa-wordmark-${this.theme.resolved()}.svg`);
+  readonly logoSrc = inject(BrandingService).wordmarkSrc;
 
   /** The agenda item that the room handles now: the stream first, then the meeting read. */
   private readonly currentItemId = computed(() => {

@@ -82,6 +82,10 @@ export interface PublicSiteConfig {
     >;
     /** Show the Gravatar images of the avatars (through the API proxy). Missing = on. */
     gravatarEnabled?: boolean;
+    /** The accent colour of the app (`#rrggbb`). Missing or null = the built-in accent. */
+    accentColor?: string | null;
+    /** The uploaded logos by slot. A missing slot shows the built-in logo. */
+    logos?: Partial<Record<'wordmark' | 'imagemark' | 'favicon', { url: string }>>;
   } | null;
   /** The handbook link of the help menu. Missing on an older server. */
   help?: { wikiUrl: string };

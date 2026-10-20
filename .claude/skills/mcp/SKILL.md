@@ -48,7 +48,7 @@ description: The antragsplattform_mcp MCP server, a standalone FastMCP package. 
   - Group → membership in a Gremium (default Gremium role `member`): `list_/create_/update_/delete_gremium_membership_mapping` (`/admin/gremium-membership-mappings`, body `{oidcGroup, gremiumId}`).
   - Group → Gremium role: `list_/create_/update_/delete_gremium_role_mapping` (`/admin/gremium-role-mappings`, body `{oidcGroup, gremiumRoleId}`). The role applies only to a principal who is a member of that Gremium through a membership mapping.
   Each mapping write makes the platform sync the memberships of all principals.
-- Site config: `get_site_config`/`set_site_config_draft` (PUT draft)/`activate_site_config`.
+- Site config: `get_site_config`/`set_site_config` (PUT, saves a new active version).
 - Audit: `list_audit` `GET /admin/audit` (keyset-paged via `before`) · `verify_audit_chain` `GET /admin/audit/verify` (live, stores nothing) · `get_latest_audit_verification` `GET /admin/audit/verify/latest` (newest stored check, `null` before the first).
 
 **Conventions & gotchas:**

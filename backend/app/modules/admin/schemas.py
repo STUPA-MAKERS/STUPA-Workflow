@@ -814,12 +814,10 @@ class WebhookDeliveryStatusOut(_CamelModel):
 
 
 class SiteConfigOut(_CamelModel):
-    """Active branding config plus current draft plus change flag."""
+    """The active branding config and its version (0 without one)."""
 
     version: int
-    active: Branding
-    draft: Branding
-    has_draft_changes: bool = Field(serialization_alias="hasDraftChanges")
+    branding: Branding
 
 
 class AttachmentLimitsOut(_CamelModel):

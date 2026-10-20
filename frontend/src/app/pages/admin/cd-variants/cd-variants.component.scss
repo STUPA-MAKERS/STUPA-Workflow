@@ -11,11 +11,10 @@
   padding: 0;
   list-style: none;
 }
-.cdv__variant {
-  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-}
-
+/* The head carries the padding of the row, so its hover fill reaches the edges of the
+   row. Padding on the row itself left an inset band. */
 .cdv__head {
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -82,7 +81,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  margin-top: var(--space-3);
+  padding: 0 var(--space-3) var(--space-3) var(--space-4);
 }
 .cdv__logos {
   margin: 0;

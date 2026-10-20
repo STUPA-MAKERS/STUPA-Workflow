@@ -57,6 +57,7 @@ export const ADMIN_PAGES: readonly AdminPage[] = [
   { link: 'deadlines', title: 'admin.nav.deadlines', desc: 'admin.nav.deadlinesDesc', icon: 'clock', group: 'applications', permissions: ['admin.deadlines'] },
   { link: 'cost-centres', title: 'admin.nav.costCentres', desc: 'admin.nav.costCentresDesc', icon: 'euro', group: 'finance', permissions: ['budget.structure'] },
   { link: 'branding', title: 'admin.nav.branding', desc: 'admin.nav.brandingDesc', icon: 'palette', group: 'appearance', permissions: ['admin.site'] },
+  { link: 'texts', title: 'admin.nav.texts', desc: 'admin.nav.textsDesc', icon: 'document', group: 'appearance', permissions: ['admin.site'] },
   { link: 'cd-variants', title: 'admin.nav.cdVariants', desc: 'admin.nav.cdVariantsDesc', icon: 'file', group: 'appearance', permissions: ['admin.cd_variants'] },
   { link: 'notifications', title: 'admin.nav.notifications', desc: 'admin.nav.notificationsDesc', icon: 'bell', group: 'communication', permissions: ['admin.notifications'] },
   { link: 'mail-templates', title: 'admin.nav.mailTemplates', desc: 'admin.nav.mailTemplatesDesc', icon: 'mail', group: 'communication', permissions: ['admin.notifications'] },
