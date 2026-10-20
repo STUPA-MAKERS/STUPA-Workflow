@@ -101,7 +101,7 @@ describe('BulkPanelComponent', () => {
     const apply = screen.getByRole('button', { name: 'Übernehmen' });
     expect(apply).toBeDisabled();
     await user.click(screen.getByRole('button', { name: /Kostenstelle/ }));
-    await user.click(screen.getByRole('button', { name: /Gesamthaushalt/ }));
+    await user.click(screen.getByRole('option', { name: /Gesamthaushalt/ }));
     expect(view.fixture.componentInstance.budgetId()).toBe('top');
     view.fixture.detectChanges();
     await user.click(screen.getByRole('button', { name: 'Übernehmen' }));

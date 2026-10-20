@@ -17,9 +17,11 @@ import { NgTemplateOutlet } from '@angular/common';
 import {
   anchorOutOfView,
   IconComponent,
+  type IconName,
   MEDIA,
   mediaQuery,
   placeAtField,
+  ScrollFadeDirective,
   showInTopLayer,
   SideSheetComponent,
   watchAnchoredPopover,
@@ -87,6 +89,12 @@ export interface CostCentreGroup {
  * path names the parents of the hits below it.
  *
  * - Desktop: a popover under the field, in the top layer. Phone: the shared bottom sheet.
+ *   The search stays in place; only the list scrolls, in the popover and in the sheet.
+ * - `allLabel` puts an extra choice with the value `''` on top of the list (for example
+ *   "Alle" in a filter, "Keine" for an application). The field then names it when no cost
+ *   centre is picked. An id that the tree does not hold shows as `unknownLabel`.
+ * - `variant="chip"`: the trigger is a filter chip (the look of `app-filter-select`):
+ *   the icon, the label and a chevron; with a pick a check mark and the name of the pick.
  * - The fiscal year of the free amount: `fiscalYearId` where the cost centre has it, else
  *   the year of its top-level budget in `fiscalYears`, else the only year it has.
  * - Keyboard: the search keeps the focus; Arrow Down/Up, Home and End move the active
@@ -97,10 +105,13 @@ export interface CostCentreGroup {
   selector: 'app-cost-centre-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, NgTemplateOutlet, SideSheetComponent, TranslatePipe],
+  imports: [IconComponent, NgTemplateOutlet, ScrollFadeDirective, SideSheetComponent, TranslatePipe],
   templateUrl: './cost-centre-select.component.html',
   styleUrl: './cost-centre-select.component.scss',
-  host: { '[class.ccs--card]': "variant() === 'card'" },
+  host: {
+    '[class.ccs--card]': "variant() === 'card'",
+    '[class.ccs--chip]': "variant() === 'chip'",
+  },
 })
 export class CostCentreSelectComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -118,12 +129,19 @@ export class CostCentreSelectComponent {
   readonly fiscalYears = input<ReadonlyMap<string, string>>(new Map());
   /** The text when the tree has no cost centre. */
   readonly emptyLabel = input('');
+  /** The extra top choice with the value `''`, or '' for none. */
+  readonly allLabel = input('');
+  /** The name of a picked id that the tree does not hold. */
+  readonly unknownLabel = input('');
   /**
    * `field`: a filled field like `app-select`. `card`: a larger card (a leg of a
    * transfer): the name on its own line, the path key below it, then the projected
-   * content (for example the free amount after the transfer); no chevron.
+   * content (for example the free amount after the transfer); no chevron. `chip`: a
+   * filter chip.
    */
-  readonly variant = input<'field' | 'card'>('field');
+  readonly variant = input<'field' | 'card' | 'chip'>('field');
+  /** The icon of the chip while nothing is picked. */
+  readonly icon = input<IconName>('pie');
   /** An id for the field button, for a label outside. */
   readonly id = input(`cc-select-${nextId++}`);
 
@@ -145,11 +163,12 @@ export class CostCentreSelectComponent {
 
   private readonly colors = computed(() => nodeColors([...this.nodes()]));
 
-  /** The picked cost centre, or null. */
+  /** The picked cost centre, the top choice, an unknown id, or null. */
   protected readonly pick = computed(() => {
     const id = this.value();
-    const node = id ? findBudgetNode(this.nodes(), id) : null;
-    if (!node) return null;
+    if (!id) return this.allLabel() ? { name: this.allLabel(), code: '', color: null } : null;
+    const node = findBudgetNode(this.nodes(), id);
+    if (!node) return this.unknownLabel() ? { name: this.unknownLabel(), code: '', color: null } : null;
     return {
       name: node.name,
       code: simplifyPathKey(node.pathKey),
@@ -157,11 +176,30 @@ export class CostCentreSelectComponent {
     };
   });
 
+  /** The text of the chip: the name of the pick, else the label. */
+  protected readonly chipText = computed(() => (this.value() ? this.pick()?.name : '') || this.label());
+
+  /** The extra top choice, while no search runs. */
+  protected readonly allChoice = computed<CostCentreChoice | null>(() =>
+    this.allLabel() && !this.query().trim()
+      ? {
+          id: '',
+          key: '',
+          name: { before: this.allLabel(), hit: '', after: '' },
+          color: null,
+          depth: 0,
+          free: null,
+          negative: false,
+          index: 0,
+        }
+      : null,
+  );
+
   /** The groups of the list: every top-level budget with a hit, its choices below. */
   protected readonly groups = computed<CostCentreGroup[]>(() => {
     const q = this.query().trim().toLocaleLowerCase();
     const out: CostCentreGroup[] = [];
-    let index = 0;
+    let index = this.allChoice() ? 1 : 0;
     for (const top of this.nodes()) {
       const lines: CostCentreLine[] = [];
       let lastParent: string | null = null;
@@ -193,12 +231,16 @@ export class CostCentreSelectComponent {
   });
 
   /** Every choice in the order of the list. */
-  private readonly choices = computed<CostCentreChoice[]>(() =>
-    this.groups().flatMap((g) => [
-      g.head,
-      ...g.lines.flatMap((l) => (l.kind === 'choice' ? [l.choice] : [])),
-    ]),
-  );
+  private readonly choices = computed<CostCentreChoice[]>(() => {
+    const all = this.allChoice();
+    return [
+      ...(all ? [all] : []),
+      ...this.groups().flatMap((g) => [
+        g.head,
+        ...g.lines.flatMap((l) => (l.kind === 'choice' ? [l.choice] : [])),
+      ]),
+    ];
+  });
 
   protected readonly activeId = computed(() => {
     const c = this.choices()[this.active()];

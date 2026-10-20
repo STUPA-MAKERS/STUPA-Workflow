@@ -106,23 +106,15 @@
             [emptyText]="'applications.list.filter.stateNone' | t"
           />
           @if (budgetTree().length) {
-            <button
-              type="button"
-              class="chip apps__chip"
-              [class.on]="budgetId() !== ''"
-              aria-haspopup="dialog"
-              [attr.aria-expanded]="budgetSheetOpen()"
-              [title]="budgetChipLabel()"
-              (click)="sheet.set('budget')"
-            >
-              @if (budgetId()) {
-                <app-icon name="check" [size]="15" />
-              }
-              <span class="ell">{{ budgetChipLabel() }}</span>
-              @if (!budgetId()) {
-                <app-icon name="down" [size]="15" />
-              }
-            </button>
+            <app-cost-centre-select
+              class="apps__chip"
+              variant="chip"
+              [label]="'applications.list.filter.budget' | t"
+              [allLabel]="'applications.list.filter.all' | t"
+              [nodes]="budgetTree()"
+              [value]="budgetId()"
+              (picked)="selectBudgetNode($event)"
+            />
           }
           @if (types().length) {
             <app-filter-select
@@ -298,22 +290,6 @@
     }
   </app-side-sheet>
 }
-
-<!-- Cost centre: the tree of the budget tab, with "Alle" on top. -->
-<app-side-sheet
-  [side]="sheetSide()"
-  [heading]="'applications.list.filter.budget' | t"
-  [open]="budgetSheetOpen()"
-  (openChange)="sheet.set($event ? 'budget' : null)"
->
-  <app-cost-centre-tree
-    [nodes]="budgetTree()"
-    [selectedId]="budgetId()"
-    [allLabel]="'applications.list.filter.all' | t"
-    [ariaLabel]="'applications.list.filter.budget' | t"
-    (picked)="selectBudgetNode($event)"
-  />
-</app-side-sheet>
 
 <!-- Amount and submission date: typed values, so the sheet edits a draft and only
      "Anwenden" applies it. Another close of the sheet leaves the filters as they were. -->

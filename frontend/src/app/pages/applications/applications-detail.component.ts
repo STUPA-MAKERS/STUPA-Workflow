@@ -63,7 +63,6 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  ScrollFadeDirective,
   SelectFieldComponent,
   type SelectOption,
   SheetBarComponent,
@@ -80,7 +79,7 @@ import {
   type FiscalYear,
   flattenBudgetOptions,
 } from '../budget/budget-tree.api';
-import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
+import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import { AttachmentsPanelComponent } from './attachments-panel.component';
 import { applicationTitle, transitionLooks } from './applications.util';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
@@ -170,8 +169,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     IconComponent,
     SelectFieldComponent,
     TabsComponent,
-    CostCentreTreeComponent,
-    ScrollFadeDirective,
+    CostCentreSelectComponent,
     AttachmentsPanelComponent,
     AnswerViewComponent,
     HistoryComponent,

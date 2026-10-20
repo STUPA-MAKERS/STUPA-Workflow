@@ -18,7 +18,7 @@ import {
   SheetBarComponent,
   SheetBarTitleDirective,
 } from '@stupa-makers/ui-kit';
-import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
+import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import type { BudgetTreeNode, Expense } from '../../budget/budget-tree.api';
 import {
   type CostCentreLabel,
@@ -48,7 +48,7 @@ import { formatMoney } from '@shared/format-money';
     SheetBarComponent,
     SheetBarTitleDirective,
     ButtonComponent,
-    CostCentrePickerComponent,
+    CostCentreSelectComponent,
     FormsModule,
     IconComponent,
     InputComponent,

@@ -1,42 +1,66 @@
-<div class="ccs__box" [class.ccs__box--open]="open()">
-  <span class="ccs__label" [id]="labelId()"
-    >{{ label() }}
-    @if (required()) {
-      <span class="ccs__req" aria-hidden="true"> *</span>
-    }
-  </span>
+@if (variant() === 'chip') {
   <button
     #trigger
     type="button"
-    class="ccs__trigger"
+    class="chip ccs__chip"
     data-cc-trigger
     aria-haspopup="listbox"
+    [class.on]="!!value()"
     [id]="id()"
     [attr.aria-expanded]="open()"
     [attr.aria-controls]="open() ? listId() : null"
-    [attr.aria-labelledby]="labelId() + ' ' + id() + '-value'"
-    [attr.aria-required]="required() ? 'true' : null"
+    [attr.aria-label]="value() ? label() + ': ' + chipText() : label()"
+    [title]="chipText()"
     (click)="toggle()"
     (keydown)="onTriggerKey($event)"
   >
-    <span class="ccs__value" [id]="id() + '-value'">
-      @if (pick(); as p) {
-        @if (p.color) {
-          <span class="ccs__swatch" aria-hidden="true" [style.background]="p.color"></span>
-        }
-        <span class="ccs__name">{{ p.name }}</span>
-        <span class="ccs__code mono">{{ p.code }}</span>
-      } @else {
-        <span class="ccs__placeholder">{{ placeholder() }}</span>
-      }
-    </span>
-    @if (variant() === 'card') {
-      <ng-content />
-    } @else {
-      <app-icon class="ccs__chevron" name="down" [size]="20" />
+    <app-icon [name]="value() ? 'check' : icon()" [size]="15" />
+    <span class="ell">{{ chipText() }}</span>
+    @if (!value()) {
+      <app-icon name="down" [size]="15" />
     }
   </button>
-</div>
+} @else {
+  <div class="ccs__box" [class.ccs__box--open]="open()">
+    <span class="ccs__label" [id]="labelId()"
+      >{{ label() }}
+      @if (required()) {
+        <span class="ccs__req" aria-hidden="true"> *</span>
+      }
+    </span>
+    <button
+      #trigger
+      type="button"
+      class="ccs__trigger"
+      data-cc-trigger
+      aria-haspopup="listbox"
+      [id]="id()"
+      [attr.aria-expanded]="open()"
+      [attr.aria-controls]="open() ? listId() : null"
+      [attr.aria-labelledby]="labelId() + ' ' + id() + '-value'"
+      [attr.aria-required]="required() ? 'true' : null"
+      (click)="toggle()"
+      (keydown)="onTriggerKey($event)"
+    >
+      <span class="ccs__value" [id]="id() + '-value'">
+        @if (pick(); as p) {
+          @if (p.color) {
+            <span class="ccs__swatch" aria-hidden="true" [style.background]="p.color"></span>
+          }
+          <span class="ccs__name">{{ p.name }}</span>
+          <span class="ccs__code mono">{{ p.code }}</span>
+        } @else {
+          <span class="ccs__placeholder">{{ placeholder() }}</span>
+        }
+      </span>
+      @if (variant() === 'card') {
+        <ng-content />
+      } @else {
+        <app-icon class="ccs__chevron" name="down" [size]="20" />
+      }
+    </button>
+  </div>
+}
 
 <ng-template #panel let-inSheet>
   <div class="ccs__search" [class.ccs__search--sheet]="inSheet">
@@ -58,8 +82,19 @@
       (keydown)="onListKey($event)"
     />
   </div>
-  @if (groups().length) {
-    <div class="ccs__list" role="listbox" [id]="listId()" [attr.aria-labelledby]="labelId()">
+  @if (groups().length || allChoice()) {
+    <div
+      class="ccs__list"
+      appScrollFade="y"
+      [class.ccs__list--sheet]="inSheet"
+      role="listbox"
+      [id]="listId()"
+      [attr.aria-labelledby]="variant() === 'chip' ? null : labelId()"
+      [attr.aria-label]="variant() === 'chip' ? label() : null"
+    >
+      @if (allChoice(); as all) {
+        <ng-container [ngTemplateOutlet]="option" [ngTemplateOutletContext]="{ $implicit: all }" />
+      }
       @for (g of groups(); track g.head.id) {
         <div
           class="ccs__group"
@@ -104,8 +139,10 @@
     (click)="choose(c)"
     (pointermove)="hover(c)"
   >
-    <span class="ccs__swatch" aria-hidden="true" [style.background]="c.color"></span>
-    <span class="ccs__key mono">{{ c.key }}</span>
+    @if (c.id) {
+      <span class="ccs__swatch" aria-hidden="true" [style.background]="c.color"></span>
+      <span class="ccs__key mono">{{ c.key }}</span>
+    }
     <span class="ccs__optName"
       >{{ c.name.before }}<mark class="ccs__hit">{{ c.name.hit }}</mark
       >{{ c.name.after }}</span
@@ -130,6 +167,7 @@
     animate.leave="om--leaving"
     popover="manual"
     [class.ccs__menu--placed]="placed()"
+    [style.--ccs-max]="position().maxHeight + 'px'"
     [style.top.px]="position().top"
     [style.left.px]="position().left"
     [style.width.px]="position().width"
@@ -144,6 +182,7 @@
   <div #layer class="ccs__layer" popover="manual">
     <app-side-sheet
       side="bottom"
+      [contentScrolls]="true"
       [heading]="label()"
       [open]="true"
       (openChange)="onSheetOpen($event)"
