@@ -419,6 +419,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'formly.validation.pattern': 'The input has an invalid format.',
   'formly.validation.email': 'Enter a valid email address.',
 
+  'apply.leave': 'Back to start',
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
   'apply.nav.submit': 'Submit application',

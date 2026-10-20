@@ -432,6 +432,7 @@ export const de = {
   'formly.validation.pattern': 'Eingabe hat ein ungültiges Format.',
   'formly.validation.email': 'Bitte eine gültige E-Mail-Adresse eingeben.',
 
+  'apply.leave': 'Zur Startseite',
   'apply.nav.back': 'Zurück',
   'apply.nav.discard': 'Entwurf verwerfen',
   'apply.nav.submit': 'Antrag absenden',
