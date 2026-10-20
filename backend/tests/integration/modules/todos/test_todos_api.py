@@ -208,6 +208,33 @@ async def test_gremium_boards_follow_the_gremium_roles(
         assert client.get(f"/api/todos/cards/{card['id']}").status_code == 404
 
 
+async def test_many_cards_in_one_read(api: Api, maker: async_sessionmaker[AsyncSession]) -> None:
+    gid, bid = await add_gremium(maker)
+    writer, writer_id = await add_person(maker, "Wera")
+    outsider, _ = await add_person(maker, "Olaf")
+    await add_member(maker, gid, writer_id, "todo.write")
+    with TestClient(api.app) as client:
+        api.login(writer)
+        a = _card(client, str(bid), "A")
+        b = _card(client, str(bid), "B")
+        _ok(client.post(f"/api/todos/cards/{b['id']}/checklist", json={"text": "x"}))
+        assert client.delete(f"/api/todos/cards/{a['id']}").status_code == 204
+        unknown = str(uuid.uuid4())
+        got = _ok(
+            client.get("/api/todos/cards", params={"ids": [b["id"], unknown, a["id"], b["id"]]})
+        )
+        # The order of the ids, an archived card too, no unknown card, no repeat.
+        assert [c["id"] for c in got] == [b["id"], a["id"]]
+        assert got[0] == _ok(client.get(f"/api/todos/cards/{b['id']}"))
+        assert got[1]["archivedAt"] is not None
+        assert client.get("/api/todos/cards").status_code == 422
+        too_many = [str(uuid.uuid4()) for _ in range(51)]
+        assert client.get("/api/todos/cards", params={"ids": too_many}).status_code == 422
+        # A reader without the board gets none of its cards, where the single read is 404.
+        api.login(outsider)
+        assert _ok(client.get("/api/todos/cards", params={"ids": [b["id"]]})) == []
+
+
 async def test_team_boards_follow_the_permission(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:

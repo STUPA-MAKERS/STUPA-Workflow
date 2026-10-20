@@ -78,9 +78,8 @@ describe('date-format', () => {
     });
 
     it('adds the closing dot when ICU leaves it out', () => {
-      const format = jest
-        .spyOn(Intl, 'DateTimeFormat')
-        .mockImplementation(() => ({ format: () => '13.10' }) as unknown as Intl.DateTimeFormat);
+      // The formats are made once and kept, so the spy sits on the shared prototype.
+      const format = jest.spyOn(Intl.DateTimeFormat.prototype, 'format', 'get').mockReturnValue(() => '13.10');
       expect(dayMonth(day, 'de-DE')).toBe('13.10.');
       expect(dayMonth(day, 'en-GB')).toBe('13.10');
       format.mockRestore();

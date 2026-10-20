@@ -182,7 +182,6 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
   // On a phone the board fills the free height too, so its column pages scroll inside;
   // the list scrolls as a page.
   host: { '[class.pane-page]': "!phone() || view() === 'board'", class: 'todos-host' },
-  providers: [TodoCacheService],
   templateUrl: './todos.component.html',
   styleUrl: './todos.component.scss',
 })
@@ -355,6 +354,17 @@ export class TodosComponent implements OnDestroy {
     return new Map(sorted.map((l) => [l.id, l]));
   });
 
+  /**
+   * The board list and the shown board answered, and the rows under it or of "Alle" too:
+   * the page shows what it shows first, and the read-ahead may start.
+   */
+  private readonly settled = computed(() => {
+    if (!this.boardsRead() || !this.boardId()) return false;
+    if (this.all()) return this.rowMatches() !== null;
+    if (this.loading()) return false;
+    return !this.withRows() || this.rowMatches() !== null;
+  });
+
   /** The personal board in the board list ("+ To-Do" of "Alle" starts there). */
   readonly personalId = computed(() => this.boards().find((b) => b.kind === 'personal')?.id ?? null);
   /** "+ To-Do" shows: a writable board, or "Alle". */
@@ -471,13 +481,6 @@ export class TodosComponent implements OnDestroy {
         this.boards.set(boards);
         this.boardsRead.set(true);
         if (!this.boardId() && (!this.cardId() || this.cardUnresolved())) this.openDefault(boards);
-        // Read every board and its cards ahead, so a board change and an opened card
-        // show at once; the shown board first.
-        const shown = this.boardId();
-        this.cache.prefetch(
-          boards.map((b) => b.id),
-          shown && shown !== ALL_BOARDS ? shown : null,
-        );
       },
       error: () => {
         if (!this.boardId()) {
@@ -507,6 +510,20 @@ export class TodosComponent implements OnDestroy {
       const id = this.boardId();
       if (!id) return;
       untracked(() => (id === ALL_BOARDS ? this.enterAll() : this.loadBoard(id)));
+    });
+
+    // Once the shown board (and the rows under it) answered, read every board and its
+    // cards ahead, so a board change and an opened card show at once. Before that the
+    // read-ahead would queue in front of the reads the page shows first.
+    effect(() => {
+      if (!this.settled()) return;
+      untracked(() => {
+        const shown = this.boardId();
+        this.cache.prefetch(
+          this.boards().map((b) => b.id),
+          shown && shown !== ALL_BOARDS ? shown : null,
+        );
+      });
     });
 
     // "Alle": my principal id is the one member of my personal board.
@@ -583,6 +600,7 @@ export class TodosComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.frame.fill.set(false);
+    this.cache.leave();
   }
 
   /** The rows answered with the number of cards they show. */
