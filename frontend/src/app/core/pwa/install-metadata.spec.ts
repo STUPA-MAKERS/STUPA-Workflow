@@ -48,6 +48,14 @@ describe('install metadata', () => {
     expect(png(join(PUBLIC, href as string))).toEqual({ width: 180, height: 180, alpha: false });
   });
 
+  it('keeps pinch zoom and lets the on-screen keyboard resize the layout', () => {
+    const content = /<meta\s+name="viewport"\s+content="([^"]+)"/.exec(indexHtml())?.[1] ?? '';
+    // WCAG 1.4.4: the person can zoom. The inputs are 16 px, so iOS does not zoom on focus.
+    expect(content).not.toMatch(/user-scalable=no|maximum-scale/);
+    expect(content).toContain('viewport-fit=cover');
+    expect(content).toContain('interactive-widget=resizes-content');
+  });
+
   it('marks the page as a standalone app for iOS', () => {
     expect(indexHtml()).toContain('<meta name="apple-mobile-web-app-capable" content="yes" />');
   });

@@ -53,6 +53,50 @@
 // keep their place in the cascade after the utilities.
 @include meta.load-css('rowgroup');
 
+// The installed app does not bounce as a whole page and has no pull-to-refresh: an
+// overscroll at the top edge reloaded the app by accident in Chrome, and on iOS the page
+// with the bars moved with the finger, which a native app never does. A browser tab keeps
+// both. The panes that scroll inside themselves keep `overscroll-behavior: contain`, so
+// they still end their own scroll without handing it to the page.
+@media (display-mode: standalone), (display-mode: fullscreen) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+// Phone with an on-screen keyboard: while a text field has the focus, the bottom bar
+// goes away and the pinned elements (chat composer, dock, FAB, wizard bar) drop to the
+// bottom edge. The viewport has `interactive-widget=resizes-content` (index.html), so on
+// Android the keyboard shrinks the layout viewport, and the bar would otherwise stand
+// between the field and the keyboard. A field in the bar itself does not count, so its
+// own sheet never closes under the finger.
+@media (pointer: coarse) {
+  .frame--phone:has(
+      :is(
+          input:not(
+              [type='checkbox'],
+              [type='radio'],
+              [type='range'],
+              [type='file'],
+              [type='button'],
+              [type='submit'],
+              [type='reset'],
+              [type='color']
+            ),
+          textarea,
+          [contenteditable]:not([contenteditable='false'])
+        ):not(app-bottom-bar *):focus
+    ) {
+    --app-bottom-inset: 0px;
+    --app-fab-clearance: 0px;
+
+    app-bottom-bar {
+      display: none;
+    }
+  }
+}
+
 // Nested surfaces step up: a table on a container that is itself a surface takes the
 // next higher surface (see `surface.context` in the ui-kit). The shared sheets set their
 // own context: the side sheet, the dialog, the detail pane of the list/detail layout.
@@ -158,8 +202,10 @@ app-dialog {
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.sheet-back-link:hover {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  .sheet-back-link:hover {
+    background: var(--color-surface-4);
+  }
 }
 
 // Mobile: the page itself must NEVER scroll horizontally. An element that overflows,

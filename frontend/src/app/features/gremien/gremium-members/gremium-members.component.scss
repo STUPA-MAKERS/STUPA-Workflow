@@ -111,9 +111,11 @@
   overflow-wrap: anywhere;
   text-decoration: none;
 }
-.gmb__mail:hover {
-  color: var(--color-accent-text);
-  text-decoration: underline;
+@media (hover: hover) {
+  .gmb__mail:hover {
+    color: var(--color-accent-text);
+    text-decoration: underline;
+  }
 }
 .gmb__mail:focus-visible {
   outline: 2px solid var(--color-focus-ring);

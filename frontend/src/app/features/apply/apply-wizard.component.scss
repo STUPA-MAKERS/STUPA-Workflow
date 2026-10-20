@@ -96,8 +96,10 @@
   text-align: start;
   cursor: pointer;
 }
-.wz__type:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .wz__type:hover {
+    background: var(--color-surface-3);
+  }
 }
 .wz__type.is-selected {
   background: var(--color-selected);

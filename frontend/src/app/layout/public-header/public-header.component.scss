@@ -71,9 +71,11 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.pub__icon:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+@media (hover: hover) {
+  .pub__icon:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
 }
 .pub__icon:focus-visible {
   outline: 2px solid var(--color-focus-ring);

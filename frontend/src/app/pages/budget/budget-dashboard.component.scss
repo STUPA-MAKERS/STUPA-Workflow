@@ -33,9 +33,13 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.bd__emptyLink:hover,
 .bd__emptyLink:focus-visible {
   text-decoration: underline;
+}
+@media (hover: hover) {
+  .bd__emptyLink:hover {
+    text-decoration: underline;
+  }
 }
 
 /* ------------------------------------------------------------------ frame
@@ -158,13 +162,20 @@
   padding: 4px var(--space-3) 4px calc(4px + var(--tn-depth, 0) * 20px);
   border-radius: var(--radius-lg);
 }
-.tn:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .tn:hover {
+    background: var(--color-surface-2);
+  }
 }
-.tn--on,
-.tn--on:hover {
+.tn--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+}
+@media (hover: hover) {
+  .tn--on:hover {
+    background: var(--color-selected);
+    color: var(--color-on-selected);
+  }
 }
 .tn__chev {
   display: grid;
@@ -182,8 +193,10 @@
 .tn__chev:disabled {
   cursor: default;
 }
-button.tn__chev:hover:not(:disabled) {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  button.tn__chev:hover:not(:disabled) {
+    background: var(--color-surface-3);
+  }
 }
 .tn__main {
   display: flex;
@@ -451,8 +464,10 @@ button.tn__chev:hover:not(:disabled) {
   text-align: start;
   cursor: pointer;
 }
-.bd__uname:hover:not(:disabled) {
-  text-decoration: underline;
+@media (hover: hover) {
+  .bd__uname:hover:not(:disabled) {
+    text-decoration: underline;
+  }
 }
 .bd__uname:disabled {
   cursor: default;

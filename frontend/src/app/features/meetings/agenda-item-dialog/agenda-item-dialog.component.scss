@@ -76,13 +76,20 @@
   border-radius: var(--radius-lg);
   cursor: pointer;
 }
-.aid__row:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .aid__row:hover {
+    background: var(--color-surface-2);
+  }
 }
-.aid__row--on,
-.aid__row--on:hover {
+.aid__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+}
+@media (hover: hover) {
+  .aid__row--on:hover {
+    background: var(--color-selected);
+    color: var(--color-on-selected);
+  }
 }
 .aid__row:has(.aid__radio:focus-visible) {
   outline: 2px solid var(--color-focus-ring);

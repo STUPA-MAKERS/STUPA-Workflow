@@ -218,8 +218,10 @@
     font-weight: var(--fw-regular);
   }
 }
-.ccs__opt:hover {
-  @include om.option-hover;
+@media (hover: hover) {
+  .ccs__opt:hover {
+    @include om.option-hover;
+  }
 }
 .ccs__opt--active {
   @include om.option-hover;

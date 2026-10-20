@@ -104,8 +104,10 @@
   text-align: start;
   cursor: pointer;
 }
-.sp__row:hover:not(:disabled) {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .sp__row:hover:not(:disabled) {
+    background: var(--color-surface-3);
+  }
 }
 .sp__row:disabled {
   cursor: default;

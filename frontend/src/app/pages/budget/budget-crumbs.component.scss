@@ -41,9 +41,11 @@ button.bd__crumb {
   max-width: var(--crumb-max);
   cursor: pointer;
 }
-button.bd__crumb:hover {
-  color: var(--color-text);
-  text-decoration: underline;
+@media (hover: hover) {
+  button.bd__crumb:hover {
+    color: var(--color-text);
+    text-decoration: underline;
+  }
 }
 /* Step 4 of the fit: the parents shorten, from their natural width down to the minimum
    (or their own width, when that is less). */

@@ -119,8 +119,10 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
-.pm__link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .pm__link:hover {
+    text-decoration: underline;
+  }
 }
 .pm__link:focus-visible {
   outline: 2px solid var(--color-focus-ring);

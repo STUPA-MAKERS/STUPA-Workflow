@@ -17,8 +17,10 @@
   border-radius: 50%;
   color: var(--color-text);
 }
-.ph__back:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .ph__back:hover {
+    background: var(--color-surface-2);
+  }
 }
 .ph__back:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -47,8 +49,10 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.ph__sub--link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .ph__sub--link:hover {
+    text-decoration: underline;
+  }
 }
 .ph__sub--link:focus-visible {
   outline: 2px solid var(--color-focus-ring);

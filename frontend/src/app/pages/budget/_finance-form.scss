@@ -161,9 +161,11 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.ff__iconBtn:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
+@media (hover: hover) {
+  .ff__iconBtn:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
 }
 .ff__iconBtn:focus-visible {
   outline: 2px solid var(--color-focus-ring);
