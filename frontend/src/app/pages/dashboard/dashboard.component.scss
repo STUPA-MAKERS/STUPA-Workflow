@@ -36,6 +36,7 @@
 :host(.dash--wide) > .dash__work {
   grid-area: 3 / 1;
   min-height: 0;
+  position: relative;
 }
 :host(.dash--wide) > .dash__today {
   grid-area: 1 / 2 / -1 / 3;
@@ -44,7 +45,7 @@
 
 /* ------------------------------------------------------------------ head */
 
-/* Search at the start, the action at the end edge. */
+/* The search pill at the start. */
 .dash__top {
   display: flex;
   align-items: center;
@@ -80,9 +81,7 @@
 }
 .dash__btn:focus-visible,
 .dash__more:focus-visible,
-.dash__me:focus-visible,
-.dash__iconBtn:focus-visible,
-.dash__budget:focus-visible {
+.dash__me:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
@@ -191,6 +190,8 @@
 }
 :host(.dash--wide) .dash__panel {
   flex: 1 1 auto;
+  /* Room for "Antrag stellen" below the last row. */
+  padding-bottom: calc(56px + var(--space-6));
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -289,37 +290,11 @@
   gap: var(--space-2);
   padding: 18px var(--space-3) 10px var(--space-5);
 }
-.dash__todayTitle {
-  display: flex;
-  flex: 1 1 auto;
-  flex-direction: column;
-  min-width: 0;
-}
-.dash__todayDate {
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  line-height: var(--lh-small);
-}
 .dash__todayH {
   margin: 0;
   font-size: var(--fs-h1);
   line-height: var(--lh-h1);
   font-weight: var(--fw-semibold);
-}
-.dash__iconBtn {
-  display: inline-grid;
-  flex: none;
-  place-items: center;
-  width: var(--control-height);
-  height: var(--control-height);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-}
-@media (hover: hover) {
-  .dash__iconBtn:hover {
-    background: var(--color-surface-2);
-    color: var(--color-text);
-  }
 }
 
 .dash__todayBody {
@@ -445,41 +420,6 @@
   color: var(--color-accent-text);
   font-weight: var(--fw-semibold);
 }
-
-/* The budget summary: a link card on surface 2. */
-.dash__budget {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: 12px 14px;
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-2);
-  color: inherit;
-  text-decoration: none;
-  transition: scale var(--motion-xs) var(--ease-standard);
-  /* A budget is a card that opens: it tints and shrinks a little while pressed. */
-  @include press.press($scale: true);
-}
-@media (hover: hover) {
-  .dash__budget:hover {
-    background: var(--color-surface-3);
-  }
-}
-.dash__budgetHead {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-}
-.dash__budgetTitle {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-weight: var(--fw-semibold);
-}
-.dash__budgetSum {
-  flex: none;
-  font-size: 0.9375rem;
-}
-
 
 /* Row feedback. In a row group the rows already sit on surface 2, the hover colour of
    the list item, so hover and press take surface 3. The row keeps the corners the group
