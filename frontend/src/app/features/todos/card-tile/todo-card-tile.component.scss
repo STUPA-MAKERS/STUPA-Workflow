@@ -15,14 +15,27 @@
   color: var(--color-text);
   cursor: grab;
   --stack-ring: var(--tile-bg);
+  transition: scale var(--motion-xs) var(--ease-standard);
 }
 :host-context([data-theme='dark']) {
   --tile-bg: var(--color-surface-3);
   --tile-hover: var(--color-surface-4);
   --avatar-bg: var(--color-surface-4);
 }
-:host(:hover) {
-  --tile-bg: var(--tile-hover);
+@media (hover: hover) {
+  :host(:hover) {
+    --tile-bg: var(--tile-hover);
+  }
+}
+/* The press of the kit (`_press.scss`) on the tile: a tint of the text colour, and a little
+   smaller until the finger lets go or the long press lifts the card. */
+:host(:active) {
+  background-image: linear-gradient(var(--press-tint), var(--press-tint));
+}
+@media (prefers-reduced-motion: no-preference) {
+  :host(:active) {
+    scale: var(--press-scale);
+  }
 }
 /* A tile with a long press (`appLongPress`): no text callout and no selection on touch. */
 :host(.long-press) {

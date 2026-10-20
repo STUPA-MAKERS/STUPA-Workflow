@@ -83,8 +83,10 @@
 .gv__voteCard {
   cursor: pointer;
 }
-.gv__voteCard:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .gv__voteCard:hover {
+    background: var(--color-surface-3);
+  }
 }
 .gv__voteCard:focus-visible {
   outline: 2px solid var(--color-focus-ring);

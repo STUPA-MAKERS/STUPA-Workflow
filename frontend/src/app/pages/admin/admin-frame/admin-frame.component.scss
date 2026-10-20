@@ -112,16 +112,22 @@
   color: var(--color-text);
   text-decoration: none;
 }
-.af__item:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .af__item:hover {
+    background: var(--color-surface-2);
+  }
 }
 .af__item:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
-.af__item--on,
-.af__item--on:hover {
+.af__item--on {
   background: var(--color-selected);
+}
+@media (hover: hover) {
+  .af__item--on:hover {
+    background: var(--color-selected);
+  }
 }
 
 .af__icon {
@@ -165,8 +171,10 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.af__back:hover {
-  background: var(--color-selected);
+@media (hover: hover) {
+  .af__back:hover {
+    background: var(--color-selected);
+  }
 }
 .af__back:focus-visible {
   outline: 2px solid var(--color-focus-ring);

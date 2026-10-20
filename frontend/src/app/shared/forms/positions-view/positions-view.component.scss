@@ -43,14 +43,16 @@
   text-align: start;
   cursor: pointer;
 }
-.pv__toggle:hover {
-  background: var(--color-surface-3);
-}
-.pv--bg1 .pv__toggle:hover {
-  background: var(--color-surface-2);
-}
-.pv--bg3 .pv__toggle:hover {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  .pv__toggle:hover {
+    background: var(--color-surface-3);
+  }
+  .pv--bg1 .pv__toggle:hover {
+    background: var(--color-surface-2);
+  }
+  .pv--bg3 .pv__toggle:hover {
+    background: var(--color-surface-4);
+  }
 }
 .pv__toggle:focus-visible {
   outline: 2px solid var(--color-focus-ring);

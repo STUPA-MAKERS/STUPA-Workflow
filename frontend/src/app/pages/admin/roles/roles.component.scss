@@ -38,8 +38,10 @@
   text-align: start;
   cursor: pointer;
 }
-.ar__toggle:hover .ar__name {
-  text-decoration: underline;
+@media (hover: hover) {
+  .ar__toggle:hover .ar__name {
+    text-decoration: underline;
+  }
 }
 .ar__toggle:focus-visible {
   outline: 2px solid var(--color-focus-ring);

@@ -207,9 +207,10 @@ app-status-text.pal__rowSub {
 }
 
 @include bp.phone {
+  /* Below the status bar of an installed iOS app (0 in a browser tab). */
   .pal {
-    top: var(--space-4);
-    max-height: calc(100dvh - 2 * var(--space-4));
+    top: calc(var(--space-4) + var(--app-top-safe-area, 0px));
+    max-height: calc(100dvh - 2 * var(--space-4) - var(--app-top-safe-area, 0px));
     border-radius: var(--radius-xl);
   }
   /* The key hints are keyboard advice. */

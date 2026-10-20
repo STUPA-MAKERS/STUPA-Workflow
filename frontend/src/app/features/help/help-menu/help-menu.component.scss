@@ -38,11 +38,13 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.hm__rail:hover {
-  color: var(--color-text);
-}
-.hm__rail:hover .hm__ind {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .hm__rail:hover {
+    color: var(--color-text);
+  }
+  .hm__rail:hover .hm__ind {
+    background: var(--color-surface-2);
+  }
 }
 .hm__rail.is-open {
   color: var(--color-text);
@@ -84,9 +86,13 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.hm__head:hover,
 .hm__head.is-open {
   background: var(--color-surface-2);
+}
+@media (hover: hover) {
+  .hm__head:hover {
+    background: var(--color-surface-2);
+  }
 }
 .hm__head:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -167,8 +173,10 @@
   flex: none;
   color: var(--color-text-muted);
 }
-.hm__item:hover {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  .hm__item:hover {
+    background: var(--color-surface-4);
+  }
 }
 .hm__item:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -198,6 +206,8 @@
   padding-inline: var(--space-2);
   border-radius: var(--radius-md);
 }
-.hm--sheet .hm__item:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .hm--sheet .hm__item:hover {
+    background: var(--color-surface-3);
+  }
 }

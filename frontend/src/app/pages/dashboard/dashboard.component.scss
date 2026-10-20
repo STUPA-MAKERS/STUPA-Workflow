@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'surface';
 @use 'scroll-fade' as fade;
+@use 'press';
 
 /* One column that scrolls with the page (narrow, phone): the head, "Heute", the work
    list. Wide, the host is a pane page (`.pane-page` in styles.scss) and a grid: the list
@@ -74,6 +75,8 @@
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard),
     background-color var(--motion-fast) var(--ease-standard);
+  @include press.chrome-text;
+  @include press.press;
 }
 .dash__btn:focus-visible,
 .dash__more:focus-visible,
@@ -87,8 +90,10 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
-.dash__btn--fill:hover {
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .dash__btn--fill:hover {
+    filter: brightness(1.08);
+  }
 }
 .dash__btn--block {
   width: 100%;
@@ -114,9 +119,12 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
   white-space: nowrap;
+  @include press.press;
 }
-.dash__more:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .dash__more:hover {
+    background: var(--color-surface-2);
+  }
 }
 
 .dash__dot {
@@ -307,9 +315,11 @@
   border-radius: var(--radius-pill);
   color: var(--color-text-muted);
 }
-.dash__iconBtn:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+@media (hover: hover) {
+  .dash__iconBtn:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
 }
 
 .dash__todayBody {
@@ -446,9 +456,14 @@
   background: var(--color-surface-2);
   color: inherit;
   text-decoration: none;
+  transition: scale var(--motion-xs) var(--ease-standard);
+  /* A budget is a card that opens: it tints and shrinks a little while pressed. */
+  @include press.press($scale: true);
 }
-.dash__budget:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .dash__budget:hover {
+    background: var(--color-surface-3);
+  }
 }
 .dash__budgetHead {
   display: flex;
@@ -472,9 +487,13 @@
 .rowgroup > app-list-item ::ng-deep .li {
   border-radius: inherit;
 }
-.rowgroup > app-list-item:hover ::ng-deep .li,
 .rowgroup > app-list-item:active ::ng-deep .li {
   background: var(--color-surface-3);
+}
+@media (hover: hover) {
+  .rowgroup > app-list-item:hover ::ng-deep .li {
+    background: var(--color-surface-3);
+  }
 }
 
 /* ------------------------------------------------------------------ narrow */

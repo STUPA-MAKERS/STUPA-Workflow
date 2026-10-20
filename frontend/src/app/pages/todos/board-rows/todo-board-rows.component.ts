@@ -34,6 +34,7 @@ import { TodoLiveService, batchPings } from '@core/ws/todo-live.service';
 import type { TodoPing } from '@core/ws/ws-messages';
 import {
   EmptyStateComponent,
+  haptic,
   IconComponent,
   LongPressDirective,
   ToastService,
@@ -657,6 +658,8 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   onDragStart(col: TodoColumn): void {
+    // The card lifts (after the long press on a touch screen): a short pulse says so.
+    haptic('lift');
     this.kb.set(null);
     this.ptr.set({ from: col.id, over: col.id });
   }

@@ -61,8 +61,10 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
-.al__reset:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .al__reset:hover {
+    text-decoration: underline;
+  }
 }
 
 .al__list {
@@ -91,8 +93,10 @@
   text-align: start;
   cursor: pointer;
 }
-.al__row:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .al__row:hover {
+    background: var(--color-surface-3);
+  }
 }
 .al__row:focus-visible {
   outline: 2px solid var(--color-focus-ring);

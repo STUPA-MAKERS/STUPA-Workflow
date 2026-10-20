@@ -272,9 +272,11 @@
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
 }
-.br__linkLabel:hover,
-.br__linkUrl:hover {
-  background: var(--color-surface-sunken);
+@media (hover: hover) {
+  .br__linkLabel:hover,
+  .br__linkUrl:hover {
+    background: var(--color-surface-sunken);
+  }
 }
 .br__linkLabel:focus-visible,
 .br__linkUrl:focus-visible {

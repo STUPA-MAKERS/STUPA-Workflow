@@ -15,9 +15,13 @@
   background: transparent;
   cursor: pointer;
 }
-.am__trigger:hover,
 .am__trigger--on {
   box-shadow: 0 0 0 2px var(--color-border-strong);
+}
+@media (hover: hover) {
+  .am__trigger:hover {
+    box-shadow: 0 0 0 2px var(--color-border-strong);
+  }
 }
 .am__trigger:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -91,9 +95,11 @@
   flex: none;
   color: var(--color-text-muted);
 }
-a.am__item:hover,
-button.am__item:hover {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  a.am__item:hover,
+  button.am__item:hover {
+    background: var(--color-surface-4);
+  }
 }
 .am__item:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -116,7 +122,9 @@ button.am__item:hover {
   padding-inline: var(--space-2);
   border-radius: var(--radius-md);
 }
-.am--sheet a.am__item:hover,
-.am--sheet button.am__item:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .am--sheet a.am__item:hover,
+  .am--sheet button.am__item:hover {
+    background: var(--color-surface-3);
+  }
 }

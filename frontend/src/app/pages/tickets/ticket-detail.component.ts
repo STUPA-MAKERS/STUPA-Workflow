@@ -53,7 +53,6 @@ import { appendOnce, toChatAttachments, withScanStates } from '@shared/ui/chat/c
 import {
   ButtonComponent,
   CheckboxComponent,
-  copyText,
   DialogComponent,
   EmptyStateComponent,
   FieldGroupComponent,
@@ -69,6 +68,7 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
+  shareOrCopy,
   SheetBarComponent,
   SheetBarTitleDirective,
   SkeletonComponent,
@@ -637,13 +637,16 @@ export class TicketDetailComponent {
     return !!own && reporter.email?.trim().toLowerCase() === own;
   }
 
-  /** Copy the link of the ticket. */
+  /**
+   * Hand on the link of the ticket: the share sheet on a phone (its own feedback; a closed
+   * sheet is no failure), else the clipboard.
+   */
   async copyLink(): Promise<void> {
-    if (await copyText(location.href.split('?')[0])) {
-      this.toast.success(this.t('tickets.detail.linkCopied'));
-    } else {
-      this.toast.error(this.t('tickets.detail.linkFailed'));
-    }
+    const t = this.ticket();
+    const title = t ? `${t.number} ${t.title}` : undefined;
+    const outcome = await shareOrCopy({ url: location.href.split('?')[0], title });
+    if (outcome === 'copied') this.toast.success(this.t('tickets.detail.linkCopied'));
+    else if (outcome === 'failed') this.toast.error(this.t('tickets.detail.linkFailed'));
   }
 
   /** "Erledigt" or "Ablehnen". With open to-dos the dialog asks first. */

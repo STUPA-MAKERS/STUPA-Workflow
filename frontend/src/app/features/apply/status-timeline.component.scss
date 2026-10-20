@@ -104,8 +104,10 @@
   text-align: start;
   cursor: pointer;
 }
-.sp__row:hover:not(:disabled) {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .sp__row:hover:not(:disabled) {
+    background: var(--color-surface-3);
+  }
 }
 .sp__row:disabled {
   cursor: default;
@@ -144,7 +146,8 @@
 /* The bar has the same edges as the form below it; on a phone it spans the gutters. */
 .sp__editBar {
   position: sticky;
-  top: 0;
+  /* Below the status bar of an installed iOS app (0 in a browser tab). */
+  top: var(--app-top-safe-area, 0px);
   z-index: 3;
   display: flex;
   align-items: center;

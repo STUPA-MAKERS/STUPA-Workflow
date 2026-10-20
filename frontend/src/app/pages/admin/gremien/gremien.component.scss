@@ -55,8 +55,10 @@
   text-align: start;
   cursor: pointer;
 }
-.grem__toggle:hover .grem__label {
-  text-decoration: underline;
+@media (hover: hover) {
+  .grem__toggle:hover .grem__label {
+    text-decoration: underline;
+  }
 }
 .grem__toggle:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -108,9 +110,11 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.grem__chev:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
+@media (hover: hover) {
+  .grem__chev:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
 }
 .grem__chev:focus-visible {
   outline: 2px solid var(--color-focus-ring);

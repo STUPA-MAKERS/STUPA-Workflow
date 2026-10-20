@@ -89,8 +89,10 @@
   text-align: start;
   cursor: pointer;
 }
-.pos__summary:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .pos__summary:hover {
+    background: var(--color-surface-3);
+  }
 }
 .pos__summary:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -144,9 +146,11 @@
 .pos__icon app-icon {
   pointer-events: none;
 }
-.pos__icon:hover:not(:disabled) {
-  background: var(--color-surface-3);
-  color: var(--color-text);
+@media (hover: hover) {
+  .pos__icon:hover:not(:disabled) {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
 }
 .pos__icon:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -220,8 +224,10 @@
 .pos__link app-icon {
   pointer-events: none;
 }
-.pos__link:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .pos__link:hover {
+    background: var(--color-surface-3);
+  }
 }
 .pos__link:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -242,9 +248,13 @@
   cursor: text;
 }
 /* On the card (surface 2) the fields take the next surface, so they stand out. */
-.pf,
-.pf:hover {
+.pf {
   background: var(--color-surface-3);
+}
+@media (hover: hover) {
+  .pf:hover {
+    background: var(--color-surface-3);
+  }
 }
 .pf--invalid {
   @include f.box-invalid;
