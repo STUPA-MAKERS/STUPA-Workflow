@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
-@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -389,16 +388,6 @@
 /* ------------------------------------------------------------------ dialogs */
 /* The tree scrolls here, above the fiscal year. An end fades only
    when more rows are past it (`appScrollFade` sets the classes). */
-.ad__ccTree {
-  max-height: 50vh;
-  max-height: 50dvh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-padding-block: var(--space-5);
-}
-.ad__ccTree {
-  @include fade.fade-y(var(--space-5));
-}
 .ad__ccFy {
   display: block;
   margin-top: var(--space-3);

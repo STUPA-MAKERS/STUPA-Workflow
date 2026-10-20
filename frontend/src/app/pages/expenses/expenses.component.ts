@@ -56,7 +56,7 @@ import {
   PageHeaderComponent,
 } from '@shared/ui';
 import { PageFrameService } from '../../layout/page-frame.service';
-import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
+import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import {
   BudgetTreeApi,
   type BudgetTransfer,
@@ -139,7 +139,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
     BulkPanelComponent,
     ButtonComponent,
     CheckboxComponent,
-    CostCentreTreeComponent,
+    CostCentreSelectComponent,
     EmptyStateComponent,
     FabComponent,
     FilterSelectComponent,
@@ -305,24 +305,8 @@ export class ExpensesComponent implements OnDestroy {
   });
 
   // --- filters ---------------------------------------------------------------------
-  /** The open filter sheet: the cost-centre tree. */
-  readonly pickerOpen = signal(false);
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
   readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
-
-  /** The cost centre the list shows, for its chip. */
-  readonly costCentreName = computed(() => {
-    const id = this.budgetId();
-    return (
-      (id && this.costCentres().get(id)?.name) || this.i18n.translate('expenses.filter.costCentre')
-    );
-  });
-
-  /** The colour swatch of the chosen cost centre, null for "all". */
-  readonly costCentreColor = computed(() => {
-    const id = this.budgetId();
-    return (id && this.costCentres().get(id)?.color) || null;
-  });
 
   readonly kindOptions = computed<FilterSelectOption[]>(() => [
     { value: '', label: this.i18n.translate('expenses.filter.all') },
@@ -811,7 +795,6 @@ export class ExpensesComponent implements OnDestroy {
   }
 
   selectBudget(id: string): void {
-    this.pickerOpen.set(false);
     this.list.selectBudget(id);
     if (this.tab() === 'transfers') this.transfers.reload();
   }

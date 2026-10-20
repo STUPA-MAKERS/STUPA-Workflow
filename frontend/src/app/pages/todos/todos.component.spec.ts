@@ -79,6 +79,7 @@ async function start(url: string, opts: Opts = {}) {
     moveCard: jest.fn(() => of(tile({ id: 'k-1', columnId: 'c-2', title: 'Raum buchen' }))),
     createCard: jest.fn(() => of(detail({ id: 'k-9', columnId: 'c-1', title: 'Neu' }))),
     card: jest.fn(opts.cardRead ?? (() => of(detail()))),
+    cards: jest.fn((ids: readonly string[]) => of(ids.map((id) => detail({ id })))),
     board: jest.fn(() => of(b)),
     linkTargets: jest.fn(() => of([])),
     archive: jest.fn(() => of({ items: [], total: 0, limit: 50, offset: 0 })),
@@ -358,9 +359,10 @@ describe('TodosComponent', () => {
 
   it('reads every board and its cards ahead, so a board change shows the board at once', async () => {
     const { cmp, api, router, harness, settle } = await start('/todos/b-1', { readAhead: true, perBoard: true });
-    expect(api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-0', 'b-2', 'b-3', 'b-1']);
+    // The shown board first; the read-ahead waits for it.
+    expect(api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-1', 'b-0', 'b-2', 'b-3']);
     expect(api.pollAllBoards).toHaveBeenCalledWith(null);
-    expect(api.card).toHaveBeenCalledWith('k-1');
+    expect(api.cards.mock.calls[0][0]).toEqual(['k-1', 'k-2', 'k-3']);
     api.pollBoard.mockReturnValue(new Subject<TodoBoardPoll>());
     await router.navigateByUrl('/todos/b-2');
     harness.detectChanges();
@@ -370,6 +372,34 @@ describe('TodosComponent', () => {
     expect(cmp.board()?.id).toBe('b-2');
     expect(api.pollBoard).toHaveBeenLastCalledWith('b-2', 'W/"b-2"');
     await settle();
+  });
+
+  it('starts the read-ahead only after the shown board answered', async () => {
+    const { api } = await start('/todos/b-1', { readAhead: true, pending: true });
+    expect(api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-1']);
+    expect(api.cards).not.toHaveBeenCalled();
+  });
+
+  it('starts the read-ahead under "Meine To-Dos" after the rows answered', async () => {
+    const rowsRead = new Subject<TodoAssignedPoll>();
+    const { api, settle } = await start('/todos/b-0', {
+      readAhead: true,
+      rowsRead,
+      board: board({ id: 'b-0', kind: 'personal', cards: [] }),
+    });
+    expect(api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-0']);
+    rowsRead.next({ boards: [], etag: 'W/"r"' });
+    await settle();
+    expect(api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-0', 'b-1', 'b-2', 'b-3']);
+  });
+
+  it('starts the read-ahead of "Alle" after its rows answered', async () => {
+    const all = new Subject<TodoAssignedPoll>();
+    const alle = await start('/todos/alle', { readAhead: true, all });
+    expect(alle.api.pollBoard).not.toHaveBeenCalled();
+    all.next({ boards: [], etag: 'W/"a"' });
+    await alle.settle();
+    expect(alle.api.pollBoard.mock.calls.map((c) => c[0])).toEqual(['b-0', 'b-1', 'b-2', 'b-3']);
   });
 
   it('shows a board read ahead that the read behind it no longer finds as missing', async () => {

@@ -67,7 +67,7 @@ import { exportDownload } from '@shared/download.util';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { RailStatusService } from '../../layout/rail-status.service';
 import { BudgetTreeApi, type BudgetTreeNode } from '../budget/budget-tree.api';
-import { CostCentreTreeComponent } from '../budget/cost-centre-tree.component';
+import { CostCentreSelectComponent } from '../budget/cost-centre-select/cost-centre-select.component';
 import { ApplicationsPageService } from './applications-page.service';
 import { ForceStatusDialogComponent } from './force-status-dialog/force-status-dialog.component';
 import { AgendaDialogComponent } from './agenda-dialog/agenda-dialog.component';
@@ -129,7 +129,7 @@ interface ListRow {
 }
 
 /** Which filter sheet is open. */
-type FilterSheet = 'budget' | 'more' | null;
+type FilterSheet = 'more' | null;
 
 /**
  * The applications page: the list pane with search and filters, and the detail of the
@@ -174,7 +174,7 @@ type FilterSheet = 'budget' | 'more' | null;
     SkeletonComponent,
     StatusTextComponent,
     ScrollFadeDirective,
-    CostCentreTreeComponent,
+    CostCentreSelectComponent,
     RowTransitionsMenuComponent,
     ShareLinksDialogComponent,
     ForceStatusDialogComponent,
@@ -286,7 +286,6 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** The open filter sheet. */
   readonly sheet = signal<FilterSheet>(null);
-  readonly budgetSheetOpen = computed(() => this.sheet() === 'budget');
   readonly moreSheetOpen = computed(() => this.sheet() === 'more');
   /** Phone: filters and pickers open from the bottom; wider: from the start edge. */
   readonly sheetSide = computed(() => (this.phone() ? 'bottom' : 'start'));
@@ -334,12 +333,6 @@ export class ApplicationsListComponent implements OnDestroy {
     return known.length === chosen.length
       ? known.join(', ')
       : this.i18n.translate('applications.list.filter.stateCount', { count: chosen.length });
-  });
-
-  readonly budgetChipLabel = computed(() => {
-    const id = this.budgetId();
-    if (!id) return this.i18n.translate('applications.list.filter.budget');
-    return findNode(this.budgetTree(), id)?.name ?? this.i18n.translate('applications.list.filter.budget');
   });
 
   readonly typeChipLabel = computed(() => {
@@ -596,7 +589,6 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** Pick a cost centre in the tree sheet. `''` means all. */
   selectBudgetNode(id: string): void {
-    this.sheet.set(null);
     this.navigate({ budget: id || null });
   }
 
@@ -983,16 +975,6 @@ function pruneHidden(nodes: BudgetTreeNode[]): BudgetTreeNode[] {
   return nodes
     .filter((n) => !n.hiddenInBudget)
     .map((n) => ({ ...n, children: pruneHidden(n.children) }));
-}
-
-/** Find a cost centre in the tree. */
-function findNode(nodes: BudgetTreeNode[], id: string): BudgetTreeNode | null {
-  for (const n of nodes) {
-    if (n.id === id) return n;
-    const hit = findNode(n.children, id);
-    if (hit) return hit;
-  }
-  return null;
 }
 
 /** The toast key of a failed transition: 403 and 409 have their own text. */
