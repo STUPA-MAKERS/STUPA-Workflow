@@ -24,7 +24,15 @@ function indexHtml(): string {
   return readFileSync(join(ROOT, 'src', 'index.html'), 'utf8');
 }
 
-function manifest(): { id: string; display: string; icons: ManifestIcon[] } {
+interface Manifest {
+  id: string;
+  display: string;
+  icons: ManifestIcon[];
+  shortcuts: { name: string; url: string; icons: Omit<ManifestIcon, 'purpose'>[] }[];
+  launch_handler: { client_mode: string[] };
+}
+
+function manifest(): Manifest {
   return JSON.parse(readFileSync(join(PUBLIC, 'manifest.webmanifest'), 'utf8'));
 }
 
@@ -66,6 +74,27 @@ describe('install metadata', () => {
       expect(existsSync(join(PUBLIC, icon.src))).toBe(true);
       expect(png(join(PUBLIC, icon.src))).toEqual({ width, height, alpha: false });
     }
+  });
+
+  it('offers the shortcuts of a long press on the app icon, on routes of the app', () => {
+    const m = manifest();
+    const routes = readFileSync(join(ROOT, 'src', 'app', 'app.routes.ts'), 'utf8');
+    expect(m.shortcuts.map((s) => [s.name, s.url])).toEqual([
+      ['Neuer Antrag', 'apply'],
+      ['Meine To-Dos', 'todos'],
+      ['Sitzungen', 'meetings'],
+    ]);
+    for (const shortcut of m.shortcuts) {
+      expect(routes).toContain(`path: '${shortcut.url}',`);
+      for (const icon of shortcut.icons) {
+        const [width, height] = icon.sizes.split('x').map(Number);
+        expect(png(join(PUBLIC, icon.src))).toEqual({ width, height, alpha: false });
+      }
+    }
+  });
+
+  it('opens a link in the running app, not in a second window', () => {
+    expect(manifest().launch_handler).toEqual({ client_mode: ['navigate-existing', 'auto'] });
   });
 
   it('declares the icons and the display mode that Chrome needs for the install', () => {
