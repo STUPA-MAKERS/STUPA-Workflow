@@ -2,7 +2,7 @@
 
 /* Fixed to the bottom edge. The bar has its own surface (surface 3) and a top border, so
    it stands out from the page and from the cards on it (surface 1 and 2) in both themes.
-   The entries fill the bar height, so each one is a 72px high touch target. The
+   The entries fill the bar height, so each one is a 64px high touch target. The
    safe-area padding keeps the entries above the gesture bar of an installed app
    (viewport-fit=cover). The shell sets --bottom-bar-height and keeps the page clear of
    the bar with it. */
@@ -18,10 +18,10 @@
   align-items: stretch;
   justify-content: space-around;
   box-sizing: border-box;
-  height: calc(var(--bottom-bar-height, 72px) + env(safe-area-inset-bottom));
+  height: calc(var(--bottom-bar-height, 64px) + env(safe-area-inset-bottom));
   /* In landscape the entries also keep clear of the notch and the round corners. */
-  padding: 0 max(var(--space-2), var(--app-right-safe-area, 0px)) env(safe-area-inset-bottom)
-    max(var(--space-2), var(--app-left-safe-area, 0px));
+  padding: 0 max(4px, var(--app-right-safe-area, 0px)) env(safe-area-inset-bottom)
+    max(4px, var(--app-left-safe-area, 0px));
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-surface-3);
   /* The live dot gets a ring in the colour of the bar. */
@@ -36,7 +36,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   max-width: 88px;
   padding: 0;
@@ -63,6 +63,7 @@
   width: 56px;
   height: 32px;
   border-radius: 16px;
+  transition: scale var(--motion-xs) var(--ease-standard);
 }
 .bb__item.is-active {
   color: var(--color-text);
@@ -105,6 +106,10 @@
 .bb__item:active .bb__ind::after {
   background: var(--press-tint);
 }
+/* The pill shrinks like a button while it is pressed; the entry itself keeps its size. */
+.bb__item:active .bb__ind {
+  @include press.press-scale;
+}
 .bb__item:focus-visible {
   outline: none;
 }
@@ -141,7 +146,8 @@
   text-align: start;
   text-decoration: none;
   cursor: pointer;
-  @include press.press;
+  transition: scale var(--motion-xs) var(--ease-standard);
+  @include press.press($scale: row);
 }
 .more__item > app-icon {
   flex: none;

@@ -75,7 +75,8 @@
   white-space: nowrap;
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-standard),
+    scale var(--motion-xs) var(--ease-standard);
   @include press.chrome-text;
   @include press.press;
 }
@@ -118,6 +119,7 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
   white-space: nowrap;
+  transition: scale var(--motion-xs) var(--ease-standard);
   @include press.press;
 }
 @media (hover: hover) {
