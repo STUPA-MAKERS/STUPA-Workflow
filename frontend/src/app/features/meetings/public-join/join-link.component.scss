@@ -44,8 +44,10 @@
   font-size: var(--fs-small);
   text-decoration: none;
 }
-.jl__url:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .jl__url:hover {
+    text-decoration: underline;
+  }
 }
 .jl__actions {
   display: flex;

@@ -63,8 +63,10 @@
   text-decoration: none;
   white-space: nowrap;
 }
-.pb__pdf:hover {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  .pb__pdf:hover {
+    background: var(--color-surface-4);
+  }
 }
 .pb__pdf:focus-visible {
   outline: 2px solid var(--color-focus-ring);

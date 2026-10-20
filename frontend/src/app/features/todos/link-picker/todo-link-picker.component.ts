@@ -24,6 +24,7 @@ import { TodosApiService, type TodoLinkKind, type TodoLinkTarget } from '@core/a
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate, TranslationKey } from '@core/i18n/translations';
+import { reducedMotion } from '@core/motion/motion';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -111,6 +112,8 @@ export class TodoLinkPickerComponent {
   private host: HTMLElement | null = null;
   /** Where the focus was before the panel opened; it goes back there on close. */
   private returnFocus: HTMLElement | null = null;
+  /** Stops the fade-out of a closing panel, when it opens again before the fade ends. */
+  private stopLeave: (() => void) | null = null;
 
   readonly search = liveSearch<TodoLinkTarget[]>({
     run: (q) => {
@@ -162,7 +165,10 @@ export class TodoLinkPickerComponent {
         else if (pop) this.attach(pop);
       });
     });
-    inject(DestroyRef).onDestroy(() => this.detach(false));
+    inject(DestroyRef).onDestroy(() => {
+      this.stopLeave?.();
+      this.dispose();
+    });
   }
 
   /** The root of the open view: the sheet on a phone, the floating panel on a desktop. */
@@ -171,7 +177,10 @@ export class TodoLinkPickerComponent {
   }
 
   private attach(pop: TemplateRef<unknown>): void {
-    if (this.outlet) return;
+    if (this.outlet) {
+      this.stopLeave?.();
+      return;
+    }
     this.host = this.document.createElement('div');
     this.host.className = 'lp-layer';
     this.document.body.appendChild(this.host);
@@ -179,15 +188,43 @@ export class TodoLinkPickerComponent {
     this.outlet.attach(new TemplatePortal(pop, this.viewContainer));
   }
 
-  private detach(restoreFocus = true): void {
-    if (!this.outlet) return;
-    this.outlet.dispose();
+  /**
+   * The panel closes: the focus goes back at once, the scrim and the panel fade out, and
+   * only then does the layer go. The portal outlet removes its nodes at once, so the leave
+   * runs here and not as an `animate.leave`. Without a running animation (reduced motion,
+   * jsdom) the layer goes at once.
+   */
+  private detach(): void {
+    if (!this.outlet || this.stopLeave) return;
+    const target = this.returnFocus;
+    this.returnFocus = null;
+    if (target?.isConnected) target.focus?.();
+    const nodes = [...(this.host?.querySelectorAll<HTMLElement>('.lp__scrim, .lp--pop') ?? [])];
+    for (const n of nodes) n.classList.add('motion-fade-out');
+    const running = reducedMotion() ? [] : nodes.flatMap((n) => n.getAnimations?.() ?? []);
+    if (!running.length) {
+      this.dispose();
+      return;
+    }
+    let stopped = false;
+    this.stopLeave = () => {
+      stopped = true;
+      this.stopLeave = null;
+      for (const n of nodes) n.classList.remove('motion-fade-out');
+    };
+    const done = (): void => {
+      if (stopped) return;
+      this.stopLeave = null;
+      this.dispose();
+    };
+    void Promise.all(running.map((a) => a.finished)).then(done, done);
+  }
+
+  private dispose(): void {
+    this.outlet?.dispose();
     this.outlet = null;
     this.host?.remove();
     this.host = null;
-    const target = this.returnFocus;
-    this.returnFocus = null;
-    if (restoreFocus && target?.isConnected) target.focus?.();
   }
 
   setKind(kind: PickerKind): void {

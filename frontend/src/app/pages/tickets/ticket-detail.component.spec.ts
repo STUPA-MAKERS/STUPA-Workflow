@@ -912,6 +912,34 @@ describe('TicketDetailComponent', () => {
     }
   });
 
+  it('hands the link of the ticket to the share sheet on a touch device, without a toast', async () => {
+    const { cmp, toast } = await start('/tickets/t40?kind=bug');
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(pointer: coarse)',
+    })) as unknown as typeof window.matchMedia;
+    const share = jest.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    try {
+      await cmp.copyLink();
+      const t = cmp.ticket();
+      expect(share).toHaveBeenCalledWith({
+        url: location.href.split('?')[0],
+        title: `${t?.number} ${t?.title}`,
+      });
+      share.mockReturnValueOnce(Promise.reject(new DOMException('closed', 'AbortError')));
+      await cmp.copyLink();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+      cmp.ticket.set(null);
+      await cmp.copyLink();
+      expect(share).toHaveBeenLastCalledWith({ url: location.href.split('?')[0] });
+    } finally {
+      window.matchMedia = realMatchMedia;
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    }
+  });
+
   it('opens a link to a note in the log and scrolls the note into view', async () => {
     const proto = Element.prototype as { scrollIntoView?: unknown };
     const before = proto.scrollIntoView;

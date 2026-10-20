@@ -54,9 +54,11 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.apps__tune:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
+@media (hover: hover) {
+  .apps__tune:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
 }
 .apps__tune:focus-visible {
   outline: 2px solid var(--color-focus-ring);

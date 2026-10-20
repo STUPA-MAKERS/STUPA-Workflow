@@ -1,6 +1,7 @@
 @use 'breakpoints' as bp;
 @use 'surface';
 @use 'scroll-fade' as fade;
+@use 'press';
 
 /* One column that scrolls with the page (narrow, phone): the head, "Heute", the work
    list. Wide, the host is a pane page (`.pane-page` in styles.scss) and a grid: the list
@@ -75,6 +76,8 @@
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard),
     background-color var(--motion-fast) var(--ease-standard);
+  @include press.chrome-text;
+  @include press.press;
 }
 .dash__btn:focus-visible,
 .dash__more:focus-visible,
@@ -86,8 +89,10 @@
   background: var(--color-accent);
   color: var(--color-on-accent);
 }
-.dash__btn--fill:hover {
-  filter: brightness(1.08);
+@media (hover: hover) {
+  .dash__btn--fill:hover {
+    filter: brightness(1.08);
+  }
 }
 .dash__btn--block {
   width: 100%;
@@ -113,9 +118,12 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
   white-space: nowrap;
+  @include press.press;
 }
-.dash__more:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .dash__more:hover {
+    background: var(--color-surface-2);
+  }
 }
 
 .dash__dot {
@@ -413,16 +421,19 @@
   font-weight: var(--fw-semibold);
 }
 
-
 /* Row feedback. In a row group the rows already sit on surface 2, the hover colour of
    the list item, so hover and press take surface 3. The row keeps the corners the group
    gives it. */
 .rowgroup > app-list-item ::ng-deep .li {
   border-radius: inherit;
 }
-.rowgroup > app-list-item:hover ::ng-deep .li,
 .rowgroup > app-list-item:active ::ng-deep .li {
   background: var(--color-surface-3);
+}
+@media (hover: hover) {
+  .rowgroup > app-list-item:hover ::ng-deep .li {
+    background: var(--color-surface-3);
+  }
 }
 
 /* ------------------------------------------------------------------ narrow */

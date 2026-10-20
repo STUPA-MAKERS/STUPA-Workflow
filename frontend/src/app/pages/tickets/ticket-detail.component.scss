@@ -158,9 +158,11 @@
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-.td__mail:hover,
-.td__url:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .td__mail:hover,
+  .td__url:hover {
+    text-decoration: underline;
+  }
 }
 /* An inline select: the value at the start, the chevron at the end of the field. */
 .td__select {
@@ -252,8 +254,10 @@
   text-align: start;
   cursor: pointer;
 }
-.td__dupHit:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .td__dupHit:hover {
+    background: var(--color-surface-3);
+  }
 }
 .td__dupHit:focus-visible {
   outline: 2px solid var(--color-focus-ring);

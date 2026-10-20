@@ -79,7 +79,7 @@
           }
         } @else {
           @for (group of groups(); track group.key) {
-            <section class="tk__group" [attr.aria-label]="group.label">
+            <section class="tk__group" animate.enter="motion-fade-in" [attr.aria-label]="group.label">
               <h2 class="sec tk__groupTitle">
                 {{ group.label }} <span class="tk__groupCount">{{ group.count }}</span>
               </h2>

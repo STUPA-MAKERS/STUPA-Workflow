@@ -24,7 +24,10 @@ describe('bottom bar styles', () => {
       /height: calc\(var\(--bottom-bar-height, 72px\) \+ env\(safe-area-inset-bottom\)\);/,
     );
     // No vertical padding above the entries: the entries centre in the bar.
-    expect(rule(bar, '.bb')).toMatch(/padding: 0 var\(--space-2\) env\(safe-area-inset-bottom\);/);
+    // The sides keep clear of the notch in landscape (the shell sets the insets).
+    expect(rule(bar, '.bb')).toMatch(
+      /padding: 0 max\(var\(--space-2\), var\(--app-right-safe-area, 0px\)\) env\(safe-area-inset-bottom\)\s+max\(var\(--space-2\), var\(--app-left-safe-area, 0px\)\);/,
+    );
   });
 
   it('keeps the page and fixed page elements clear of the bar', () => {

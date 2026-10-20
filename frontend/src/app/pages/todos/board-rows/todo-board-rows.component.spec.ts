@@ -283,6 +283,18 @@ describe('TodoBoardRowsComponent', () => {
     expect(api.moveCard).toHaveBeenCalledTimes(1);
   });
 
+  it('gives a short pulse when a card lifts for a pointer drag', async () => {
+    const { cmp } = await setup();
+    const vibrate = jest.fn(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    try {
+      cmp.onDragStart(cmp.rows()[0].columns[0]);
+      expect(vibrate).toHaveBeenCalledWith(15);
+    } finally {
+      delete (navigator as { vibrate?: unknown }).vibrate;
+    }
+  });
+
   it('moves the column counts with a pointer drag, also over another row', async () => {
     const { cmp } = await setup();
     const [r, other] = cmp.rows();

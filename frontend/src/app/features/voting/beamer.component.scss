@@ -30,14 +30,18 @@
   transition: opacity var(--motion-base) var(--ease-standard);
 
   &--shown,
-  &:hover,
   &:focus-visible {
     opacity: 1;
     pointer-events: auto;
   }
-
-  &:hover {
-    background: var(--color-surface-4);
+  @media (hover: hover) {
+    &:hover {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    &:hover {
+      background: var(--color-surface-4);
+    }
   }
 
   &:focus-visible {

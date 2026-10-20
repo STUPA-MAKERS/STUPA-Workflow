@@ -1010,6 +1010,32 @@ describe('TodoCardDetailComponent', () => {
     expect(toast.error).toHaveBeenCalledTimes(2);
   });
 
+  it('hands the link of the card to the share sheet on a touch device, without a toast', async () => {
+    const { cmp, toast } = await setup();
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(pointer: coarse)',
+    })) as unknown as typeof window.matchMedia;
+    const share = jest.fn(() => Promise.resolve());
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true });
+    try {
+      cmp.copyLink();
+      await new Promise((r) => setTimeout(r));
+      expect(share).toHaveBeenCalledWith({
+        url: `${location.origin}/todos?card=k-1`,
+        title: cmp.card()?.title,
+      });
+      share.mockReturnValueOnce(Promise.reject(new DOMException('closed', 'AbortError')));
+      cmp.copyLink();
+      await new Promise((r) => setTimeout(r));
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    } finally {
+      window.matchMedia = realMatchMedia;
+      Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+    }
+  });
+
   it('shows the files of a comment and sends new ones; a discard deletes the drafts', async () => {
     const { cmp, api, files } = await setup();
     expect(cmp.messages()[0].attachments).toEqual([

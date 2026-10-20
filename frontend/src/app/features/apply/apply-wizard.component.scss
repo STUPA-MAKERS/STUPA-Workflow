@@ -13,7 +13,7 @@
 }
 .wz__aside {
   position: sticky;
-  top: var(--space-5);
+  top: calc(var(--space-5) + var(--app-top-safe-area, 0px));
   display: flex;
   flex: 0 0 18.125rem; // 290px
   flex-direction: column;
@@ -96,8 +96,10 @@
   text-align: start;
   cursor: pointer;
 }
-.wz__type:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .wz__type:hover {
+    background: var(--color-surface-3);
+  }
 }
 .wz__type.is-selected {
   background: var(--color-selected);

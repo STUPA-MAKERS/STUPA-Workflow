@@ -179,7 +179,7 @@
             }
           </app-empty-state>
         } @else {
-          <div class="apps__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
+          <div class="apps__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
             @for (group of groups(); track group.key + $index) {
               <section class="apps__group" [attr.aria-label]="group.label || null">
                 @if (group.label) {
