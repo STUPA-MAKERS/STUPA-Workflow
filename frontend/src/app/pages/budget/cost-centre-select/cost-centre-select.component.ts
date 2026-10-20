@@ -3,7 +3,10 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  Injector,
+  afterNextRender,
   booleanAttribute,
+  type AfterRenderRef,
   computed,
   effect,
   inject,
@@ -115,6 +118,7 @@ export interface CostCentreGroup {
 })
 export class CostCentreSelectComponent {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
 
   readonly nodes = input<readonly BudgetTreeNode[]>([]);
@@ -251,6 +255,7 @@ export class CostCentreSelectComponent {
   private readonly menu = viewChild<ElementRef<HTMLElement>>('menu');
   private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
   private timer: ReturnType<typeof setTimeout> | null = null;
+  private rendered: AfterRenderRef | null = null;
 
   constructor() {
     // A resize across the phone limit swaps the popover and the sheet: close the list.
@@ -415,14 +420,14 @@ export class CostCentreSelectComponent {
     this.active.set(this.startIndex());
     this.open.set(true);
     if (this.phone()) {
-      this.later(() => {
+      this.afterRender(() => {
         showInTopLayer(this.layer()?.nativeElement);
         this.later(() => this.reveal());
       });
       return;
     }
     this.placed.set(false);
-    this.later(() => {
+    this.afterRender(() => {
       const menu = this.menu()?.nativeElement;
       if (!menu) return;
       showInTopLayer(menu);
@@ -478,8 +483,26 @@ export class CostCentreSelectComponent {
     });
   }
 
+  /**
+   * Run `fn` after the next render, when the list that `open` adds is in the DOM. A timer
+   * from the click handler is not enough: with event coalescing the change detection of
+   * the click runs after that timer, so the timer finds no list and the list stays shut.
+   */
+  private afterRender(fn: () => void): void {
+    this.clearTimer();
+    this.rendered = afterNextRender(
+      () => {
+        this.rendered = null;
+        fn();
+      },
+      { injector: this.injector },
+    );
+  }
+
   private clearTimer(): void {
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+    this.rendered?.destroy();
+    this.rendered = null;
   }
 }
