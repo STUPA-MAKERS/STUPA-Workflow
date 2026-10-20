@@ -103,8 +103,10 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.vc__link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .vc__link:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Board Telefon-Abstimmen: the phone header sits closer to the panel. */

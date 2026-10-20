@@ -53,6 +53,9 @@ DEFAULT_APP_SHORT_NAME = "STUPA"
 # effect.
 MANIFEST_COLORS: dict[str, str] = {"light": "#f6f7f5", "dark": "#101211"}
 
+# The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
+_SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png"}
+
 # The static manifest fields, that is everything except name and short_name.
 # They are the single source of truth for the PWA manifest that the API serves.
 _MANIFEST_BASE: dict = {
@@ -119,6 +122,17 @@ _MANIFEST_BASE: dict = {
             "purpose": "maskable",
         },
     ],
+    # The menu of a long press on the home screen icon (Android, desktop). The names are
+    # German, because the manifest is German (`lang`). Keep them equal to
+    # frontend/public/manifest.webmanifest.
+    "shortcuts": [
+        {"name": "Neuer Antrag", "url": "apply", "icons": [_SHORTCUT_ICON]},
+        {"name": "Meine To-Dos", "url": "todos", "icons": [_SHORTCUT_ICON]},
+        {"name": "Sitzungen", "url": "meetings", "icons": [_SHORTCUT_ICON]},
+    ],
+    # A link into the app opens in the running app and navigates there, not in a second
+    # window. A browser without navigate-existing takes its own default.
+    "launch_handler": {"client_mode": ["navigate-existing", "auto"]},
 }
 
 

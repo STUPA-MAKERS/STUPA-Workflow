@@ -56,8 +56,10 @@
   text-decoration: none;
   white-space: nowrap;
 }
-.cd__boardLink:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .cd__boardLink:hover {
+    text-decoration: underline;
+  }
 }
 .cd__titleForm,
 .cd__itemForm {
@@ -282,8 +284,10 @@
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-a.cd__linkTitle:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  a.cd__linkTitle:hover {
+    text-decoration: underline;
+  }
 }
 .cd__linkTitle--muted {
   color: var(--color-text-muted);
@@ -384,9 +388,11 @@ a.cd__linkTitle:hover {
   padding-inline-end: var(--space-1);
   border-radius: var(--radius-md);
 }
-.cd__item:hover {
-  border-radius: var(--radius-pill);
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .cd__item:hover {
+    border-radius: var(--radius-pill);
+    background: var(--color-surface-2);
+  }
 }
 .cd__item .cd__itemForm {
   flex: 1 1 auto;

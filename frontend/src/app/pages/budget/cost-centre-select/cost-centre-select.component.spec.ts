@@ -327,6 +327,9 @@ describe('CostCentreSelectComponent', () => {
     await tick();
     await user.click(within(screen.getByRole('dialog')).getAllByRole('button')[0]);
     expect(screen.queryByRole('dialog')).toBeNull();
+    // The layer goes once the sheet has gone, and not before.
+    await tick();
+    expect(document.querySelector('.ccs__layer')).toBeNull();
   });
 
   it('opens above the field when the room below is too small, inside the viewport', async () => {

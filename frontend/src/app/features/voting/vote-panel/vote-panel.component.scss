@@ -30,8 +30,10 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.vpn__app:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .vpn__app:hover {
+    text-decoration: underline;
+  }
 }
 /* The meeting line may be long: it shrinks and cuts, the rules beside it do not. */
 .vpn__app.vpn__where {

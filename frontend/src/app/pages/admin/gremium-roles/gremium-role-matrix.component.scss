@@ -103,16 +103,23 @@
   border-radius: var(--radius-md);
   cursor: pointer;
 }
-.rm__chip:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .rm__chip:hover {
+    background: var(--color-surface-3);
+  }
+  .rm--bg3 .rm__chip:hover {
+    background: var(--color-surface-4);
+  }
 }
-.rm--bg3 .rm__chip:hover {
-  background: var(--color-surface-4);
-}
-.rm__chip--off,
-.rm__chip--off:hover {
+.rm__chip--off {
   background: none;
   cursor: default;
+}
+@media (hover: hover) {
+  .rm__chip--off:hover {
+    background: none;
+    cursor: default;
+  }
 }
 .rm__chipText {
   display: none;
@@ -215,9 +222,13 @@
     background: var(--color-selected);
     box-shadow: none;
   }
-  .rm__chip--off.rm__chip--on,
-  .rm__chip--off.rm__chip--on:hover {
+  .rm__chip--off.rm__chip--on {
     background: var(--color-selected);
+  }
+  @media (hover: hover) {
+    .rm__chip--off.rm__chip--on:hover {
+      background: var(--color-selected);
+    }
   }
   .rm__chipText {
     display: inline;

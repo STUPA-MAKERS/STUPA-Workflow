@@ -47,8 +47,10 @@
   text-decoration: none;
   overflow-wrap: anywhere;
 }
-.dl__title:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .dl__title:hover {
+    text-decoration: underline;
+  }
 }
 .dl__date {
   font-size: var(--fs-sm);
@@ -113,8 +115,10 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
-.dl__more:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .dl__more:hover {
+    background: var(--color-surface-2);
+  }
 }
 .dl__more:focus-visible {
   outline: 2px solid var(--color-focus-ring);

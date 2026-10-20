@@ -108,16 +108,20 @@
   color: var(--color-accent-text);
   cursor: pointer;
 }
-.fe__crumb:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .fe__crumb:hover {
+    background: var(--color-surface-2);
+  }
 }
 .fe__crumb--current {
   font-weight: var(--fw-semibold);
   color: var(--color-text);
   cursor: default;
 }
-.fe__crumb--current:hover {
-  background: none;
+@media (hover: hover) {
+  .fe__crumb--current:hover {
+    background: none;
+  }
 }
 
 .fe__alert {
@@ -270,8 +274,10 @@
   stroke-width: 2;
   cursor: crosshair;
 }
-.fe__connector:hover {
-  stroke: var(--color-accent);
+@media (hover: hover) {
+  .fe__connector:hover {
+    stroke: var(--color-accent);
+  }
 }
 .fe__connector--branch {
   stroke: var(--color-warning);
@@ -383,8 +389,10 @@
   stroke-dasharray: 8 5;
   stroke-width: 2;
 }
-.fe__proxy-g:hover .fe__proxy {
-  stroke: var(--color-accent);
+@media (hover: hover) {
+  .fe__proxy-g:hover .fe__proxy {
+    stroke: var(--color-accent);
+  }
 }
 .fe__proxy-text {
   fill: var(--color-text-muted);

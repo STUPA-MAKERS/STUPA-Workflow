@@ -70,8 +70,10 @@
   white-space: inherit;
   cursor: text;
 }
-.ts__titleBtn:hover {
-  color: var(--color-accent-text);
+@media (hover: hover) {
+  .ts__titleBtn:hover {
+    color: var(--color-accent-text);
+  }
 }
 .ts__titleBtn:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -109,8 +111,10 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.ts__open:hover {
-  background: var(--color-selected);
+@media (hover: hover) {
+  .ts__open:hover {
+    background: var(--color-selected);
+  }
 }
 .ts__open:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -144,14 +148,21 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.ts__tool:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+@media (hover: hover) {
+  .ts__tool:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
 }
-.ts__tool--on,
-.ts__tool--on:hover {
+.ts__tool--on {
   background: var(--color-selected);
   color: var(--color-accent-text);
+}
+@media (hover: hover) {
+  .ts__tool--on:hover {
+    background: var(--color-selected);
+    color: var(--color-accent-text);
+  }
 }
 .ts__tool:focus-visible {
   outline: 2px solid var(--color-focus-ring);

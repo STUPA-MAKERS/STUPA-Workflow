@@ -1,3 +1,5 @@
+@use 'press';
+
 /* The rail sits on the page background, without an edge: the selected entry is the only
    accent in it. On a low viewport the entries first get more compact; below that only
    the areas scroll, so the administration and the account never leave the view. */
@@ -14,6 +16,8 @@
   height: 100%;
   padding: 20px 0 16px;
   overflow: hidden;
+  /* Chrome, not content: a long press on an entry selects no label and opens no callout. */
+  @include press.chrome-text;
 }
 
 /* The areas. A thin scroll bar is the sign that more entries sit below. */
@@ -83,11 +87,13 @@
   border-radius: 16px;
   transition: background-color var(--motion-fast) var(--ease-standard);
 }
-.rail__item:hover .rail__ind {
-  background: var(--color-surface-2);
-}
-.rail__item:hover {
-  color: var(--color-text);
+@media (hover: hover) {
+  .rail__item:hover .rail__ind {
+    background: var(--color-surface-2);
+  }
+  .rail__item:hover {
+    color: var(--color-text);
+  }
 }
 .rail__item.is-active {
   color: var(--color-text);
@@ -115,6 +121,18 @@
 }
 .rail__ind > app-icon {
   position: relative;
+}
+/* The press: the pill takes the press tint of the kit, on a layer above the fill, so the
+   active entry shows it too. */
+.rail__ind::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.rail__item:active .rail__ind::after {
+  background: var(--press-tint);
 }
 .rail__item:focus-visible,
 .rail__brand:focus-visible {

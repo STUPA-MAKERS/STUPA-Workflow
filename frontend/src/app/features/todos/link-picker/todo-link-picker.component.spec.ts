@@ -198,7 +198,47 @@ describe('TodoLinkPickerComponent', () => {
     expect(fixture.componentInstance.open()).toBe(false);
   });
 
-  it('uses the bottom sheet on the phone', async () => {
+  it('fades the panel out before the layer goes, and keeps it on an opening in the fade', async () => {
+    let finish: () => void = () => undefined;
+    const fading = () => [{ finished: new Promise<void>((r) => (finish = r)) } as unknown as Animation];
+    const { open, fixture } = await setup();
+    await open();
+    const panel = screen.getByRole('dialog');
+    const anims = jest.fn(fading);
+    Object.defineProperty(panel, 'getAnimations', { value: anims, configurable: true });
+    const close = () => {
+      fixture.componentInstance.open.set(false);
+      fixture.detectChanges();
+    };
+    close();
+    expect(panel).toHaveClass('motion-fade-out');
+    expect(document.querySelector('.lp-layer')).not.toBeNull();
+    // A second closing in the fade starts no second fade.
+    (fixture.componentInstance as unknown as { detach(): void }).detach();
+    expect(anims).toHaveBeenCalledTimes(1);
+    // An opening in the fade stops it.
+    fixture.componentInstance.open.set(true);
+    fixture.detectChanges();
+    expect(panel).not.toHaveClass('motion-fade-out');
+    close();
+    finish();
+    await fixture.whenStable();
+    await Promise.resolve();
+    expect(document.querySelector('.lp-layer')).toBeNull();
+    // A fade that ends after an opening in it leaves the panel.
+    await open();
+    const again = screen.getByRole('dialog');
+    Object.defineProperty(again, 'getAnimations', { value: jest.fn(fading), configurable: true });
+    close();
+    fixture.componentInstance.open.set(true);
+    fixture.detectChanges();
+    finish();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(screen.getByRole('dialog')).toBe(again);
+  });
+
+    it('uses the bottom sheet on the phone', async () => {
     asPhone(MEDIA.phone);
     const { open, container } = await setup();
     await open();

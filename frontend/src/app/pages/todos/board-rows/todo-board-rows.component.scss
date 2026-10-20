@@ -50,8 +50,10 @@
   text-align: start;
   cursor: pointer;
 }
-.br__toggle:hover {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .br__toggle:hover {
+    background: var(--color-surface-2);
+  }
 }
 .br__toggle:focus-visible,
 .br__open:focus-visible,
@@ -96,9 +98,11 @@
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
 }
-.br__open:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+@media (hover: hover) {
+  .br__open:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
 }
 
 /* The columns of the board, as on the board itself; the row scrolls sideways. */
@@ -200,8 +204,10 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
-.br__more:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .br__more:hover {
+    text-decoration: underline;
+  }
 }
 
 /* Phone: each row is one list of its cards at the full width; nothing scrolls sideways. */

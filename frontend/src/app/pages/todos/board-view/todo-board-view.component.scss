@@ -179,9 +179,11 @@
   font-weight: var(--fw-semibold);
   cursor: pointer;
 }
-.bv__link:hover,
-.bv__more:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .bv__link:hover,
+  .bv__more:hover {
+    text-decoration: underline;
+  }
 }
 .bv__link:focus-visible,
 .bv__more:focus-visible,
@@ -206,9 +208,11 @@
   text-align: start;
   cursor: pointer;
 }
-.bv__add:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+@media (hover: hover) {
+  .bv__add:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
 }
 .bv__quick {
   display: flex;

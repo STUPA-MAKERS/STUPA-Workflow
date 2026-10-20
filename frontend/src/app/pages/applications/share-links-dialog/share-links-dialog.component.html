@@ -15,6 +15,7 @@
         <p class="sld__url mono"><span class="sr-only">{{ 'applications.share.url' | t }}: </span><a class="sld__link" [href]="url" target="_blank" rel="noopener"><code>{{ url }}</code></a></p>
         <app-copy-button
           [text]="url"
+          [share]="true"
           [icon]="false"
           [resetMs]="0"
           [label]="'applications.share.copy' | t"

@@ -140,8 +140,10 @@
   background: transparent;
   cursor: pointer;
 }
-.cal__day:hover {
-  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+@media (hover: hover) {
+  .cal__day:hover {
+    background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  }
 }
 .cal__day:focus-visible {
   outline: 2px solid var(--color-focus-ring);

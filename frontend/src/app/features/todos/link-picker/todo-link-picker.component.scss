@@ -111,10 +111,15 @@
   text-align: start;
   cursor: pointer;
 }
-.lp__hit:hover,
 .lp__hit--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+}
+@media (hover: hover) {
+  .lp__hit:hover {
+    background: var(--color-selected);
+    color: var(--color-on-selected);
+  }
 }
 .lp__hit:focus-visible {
   outline: 2px solid var(--color-focus-ring);

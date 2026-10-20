@@ -50,9 +50,11 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.ap__add:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
+@media (hover: hover) {
+  .ap__add:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
 }
 .ap__add:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -108,9 +110,13 @@
   opacity: 0;
   cursor: grab;
 }
-.ap__row--drag:hover .ap__grip,
 .ap__row--drag:focus-within .ap__grip {
   opacity: 1;
+}
+@media (hover: hover) {
+  .ap__row--drag:hover .ap__grip {
+    opacity: 1;
+  }
 }
 
 .ap__trail {
