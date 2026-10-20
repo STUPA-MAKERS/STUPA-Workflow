@@ -108,12 +108,11 @@ describe('AdminOAuthGrantsComponent', () => {
     expect(inst.ownerEmail({ ...NAMED, principalName: 'alex@x.de' })).toBeNull();
   });
 
-  it('renders a missing expiry as a dash, never as "never expires"', async () => {
+  it('renders a missing expiry as "Unbegrenzt"', async () => {
     const { container } = await setup();
     const rows = container.querySelectorAll('.og__row');
-    expect(rows[1].querySelector('.og__field--access')?.textContent).toContain('—');
-    expect(rows[1].querySelector('.og__field--refresh')?.textContent).toContain('—');
-    expect(screen.queryByText(/nie ab/)).toBeNull();
+    expect(rows[1].querySelector('.og__field--access')?.textContent).toContain('Unbegrenzt');
+    expect(rows[1].querySelector('.og__field--refresh')?.textContent).toContain('Unbegrenzt');
     // A set expiry shows as a date.
     expect(rows[0].querySelector('.og__field--access')?.textContent).toContain('01.09.2026');
   });

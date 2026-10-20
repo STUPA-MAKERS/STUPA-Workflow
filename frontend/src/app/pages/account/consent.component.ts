@@ -22,8 +22,8 @@ import { scopeDesc, scopeLabel } from './scope-labels';
  * The page names the client (`clientId`) and lists EVERY scope that the client asks for,
  * with its label and description. A scope the person holds starts ticked. A scope the
  * person does not hold starts unticked and says so: the agent does not get it. A ticked
- * box thus never promises a right the agent does not get. The lifetimes come from the server (no "never",
- * every token expires), the default one starts chosen.
+ * box thus never promises a right the agent does not get. The lifetimes come from the server, "never" included
+ * (a token that only a revoke ends), the default one starts chosen.
  *
  * Without `mcp.use` (`canUseMcp` false) the page shows the error line instead of the
  * choices, and "Erlauben" stays disabled; "Ablehnen" still reports the denial to the

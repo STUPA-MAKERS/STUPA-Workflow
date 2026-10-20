@@ -90,34 +90,35 @@ SCOPES: dict[str, frozenset[str]] = {
 # the logged-in user. A non-admin gets only their own subset.
 DEFAULT_SCOPE = " ".join(SCOPES.keys())
 
-# Hard cap in seconds for every token lifetime. No token lives forever. This value bounds
-# even the longest selectable lifetime.
+# Hard cap in seconds for every finite token lifetime. This value bounds even the
+# longest finite selectable lifetime.
 MAX_LIFETIME_SECONDS = 90 * 24 * 3600
 
 # The selectable token lifetimes of the consent UI, mapped to the access-token TTL in
-# seconds. The order is the display order. There is no "never" option on purpose. Every
-# token expires after 90 days at the latest. The grants page can revoke a token at any
-# time.
-LIFETIMES: dict[str, int] = {
+# seconds. The order is the display order. `None` ("never") means that the token does
+# not expire: the access and the refresh token stay valid until a revoke on the grants
+# page ends them.
+LIFETIMES: dict[str, int | None] = {
     "1h": 3600,
     "8h": 8 * 3600,
     "1d": 24 * 3600,
     "30d": 30 * 24 * 3600,
     "90d": 90 * 24 * 3600,
+    "never": None,
 }
 DEFAULT_LIFETIME = "30d"
 
 
-def resolve_lifetime(key: str | None) -> int:
+def resolve_lifetime(key: str | None) -> int | None:
     """Map a lifetime key to an access TTL in seconds.
 
-    An unknown key and `None` both fall back to the default. The result is always finite
-    and capped by `MAX_LIFETIME_SECONDS`. The function never returns `None` for an
-    unlimited lifetime.
+    An unknown key and `None` both fall back to the default. A finite result is capped
+    by `MAX_LIFETIME_SECONDS`. The key "never" gives `None`, a token that never expires.
     """
     if key is None or key not in LIFETIMES:
         key = DEFAULT_LIFETIME
-    return min(LIFETIMES[key], MAX_LIFETIME_SECONDS)
+    ttl = LIFETIMES[key]
+    return None if ttl is None else min(ttl, MAX_LIFETIME_SECONDS)
 
 
 # Display order of the scopes in the consent UI. The i18n keys live in the frontend.
