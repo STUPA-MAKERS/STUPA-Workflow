@@ -190,6 +190,18 @@ export class MeetingsTimelineService {
     this.loadingSearch.set(false);
   }
 
+  /** The list or the search loads: a pull to refresh waits for it. */
+  readonly listBusy = computed(() => this.loadingList() || this.reloadingList() || this.loadingSearch());
+
+  /** Pull to refresh: the timeline loads again, or the search while one is active. */
+  refreshList(): void {
+    if (this.searchActive()) {
+      this.search.refresh();
+      return;
+    }
+    this.loadList();
+  }
+
   /** Switch the Gremium filter and reload the timeline or the search. */
   selectGremiumFilter(id: string): void {
     this.gremiumFilter.set(id);

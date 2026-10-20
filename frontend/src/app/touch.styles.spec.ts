@@ -6,6 +6,7 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { pressUses } from '../../vendor/ui-kit/testing/scss';
 
 const SRC = join(__dirname, '..');
 const read = (rel: string): string => readFileSync(join(__dirname, rel), 'utf8');
@@ -73,6 +74,12 @@ describe('touch styles', () => {
     expect(read('shared/ui/_list-pane.scss')).toMatch(/overscroll-behavior: contain;/);
   });
 
+  it('keeps the Markdown and the chat texts selectable on a touch screen', () => {
+    expect(read('../styles.scss')).toMatch(
+      /@media \(hover: none\) and \(pointer: coarse\) \{\s*\.mdv,\s*\.chat__text \{\s*@include press\.selectable;/,
+    );
+  });
+
   it('fades a tab panel in after a tab change', () => {
     expect(read('../styles.scss')).toMatch(
       /\[role='tabpanel'\]:not\(\[hidden\]\) \{\s*animation: motion-fade-in var\(--motion-base\)/,
@@ -96,15 +103,39 @@ describe('touch styles', () => {
     expect(scss).toContain("@use 'press';");
     expect(scss).toContain('@include press.chrome-text;');
     expect(scss).toContain(`${b}__item:active ${b}__ind::after {\n  background: var(--press-tint);`);
+    // The pill shrinks like a button; the entry keeps its size.
+    expect(scss).toContain(`${b}__item:active ${b}__ind {\n  @include press.press-scale;`);
   });
 
-  it('gives the app cards, dashboard buttons and header actions the press and chrome text', () => {
-    expect(read('pages/home.component.scss')).toContain('@include press.press($scale: true);');
-    const dash = read('pages/dashboard/dashboard.component.scss');
-    expect(dash).toContain('@include press.chrome-text;\n  @include press.press;');
-    expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
-      /:host\(:active\) \{\s*background-image: linear-gradient\(var\(--press-tint\), var\(--press-tint\)\);/,
+  it('shrinks every pressed element of the app and eases it back on the release', () => {
+    const files = [...scssFiles(SRC)];
+    const offenders = files.flatMap((file) =>
+      pressUses(readFileSync(file, 'utf8'))
+        .filter((u) => u.include.includes('$scale: none') || !u.transition?.includes('scale var(--motion-xs)'))
+        .map((u) => `${relative(SRC, file)}: ${u.selector}`),
     );
+    expect(offenders).toEqual([]);
+    // A press state of its own scales too. Two `:active` rules are no press: the canvas
+    // of the flow editor shows the grab cursor, and the rows of the dashboard colour an
+    // `app-list-item` that scales itself.
+    const own = files
+      .filter((file) => {
+        const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+        return /:active\b/.test(text) && !text.includes('@include press.press-scale');
+      })
+      .map((file) => relative(SRC, file));
+    expect(own).toEqual(['app/pages/admin/flow-editor/flow-editor.component.scss', 'app/pages/dashboard/dashboard.component.scss']);
+  });
+
+  it('gives the app cards and the page header actions the press and the chrome text', () => {
+    expect(read('pages/home.component.scss')).toContain('@include press.press($scale: row);');
+    const dash = read('pages/dashboard/dashboard.component.scss');
+    expect(dash).toContain('@include press.press;');
+    expect(dash).toContain('@include press.chrome-text;');
+    expect(read('features/todos/card-tile/todo-card-tile.component.scss')).toMatch(
+      /:host\(:active\) \{\s*background-image: linear-gradient\(var\(--press-tint\), var\(--press-tint\)\);\s*@include press\.press-scale\(row\);/,
+    );
+    expect(read('../styles.scss')).toMatch(/\.sheet-back-link \{[^}]*@include press\.press;/);
     expect(read('shared/ui/page-header/page-header.component.scss')).toContain(
       '@include press.chrome-text;',
     );

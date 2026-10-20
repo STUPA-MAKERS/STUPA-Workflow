@@ -350,6 +350,7 @@ export const de = {
   'invoices.dropButton': 'PDF wählen',
   'action.close': 'Schließen',
   'action.retry': 'Erneut versuchen',
+  'action.undo': 'Rückgängig',
 
   'theme.toggle': 'Erscheinungsbild wechseln',
 
@@ -431,6 +432,7 @@ export const de = {
   'formly.validation.pattern': 'Eingabe hat ein ungültiges Format.',
   'formly.validation.email': 'Bitte eine gültige E-Mail-Adresse eingeben.',
 
+  'apply.leave': 'Zur Startseite',
   'apply.nav.back': 'Zurück',
   'apply.nav.discard': 'Entwurf verwerfen',
   'apply.nav.submit': 'Antrag absenden',
@@ -765,8 +767,6 @@ export const de = {
   'applications.capture.incomplete': 'Bitte alle Pflichtangaben ausfüllen.',
   'applications.capture.done': 'Antrag erfasst. Die antragstellende Person bekommt eine E-Mail.',
   'applications.capture.error': 'Der Antrag konnte nicht erfasst werden.',
-  'applications.capture.note': 'Erfasst von {name} am {date}',
-  'applications.capture.noteReceived': 'eingegangen am {date}',
   // Edit mode of the detail (board Anträge-Bearbeiten).
   'applications.edit.title': 'Antrag bearbeiten',
   'applications.edit.saved': 'Gespeichert. Version {version} angelegt.',
@@ -3961,6 +3961,7 @@ export const de = {
   'todos.card.titleLabel': 'Titel',
   'todos.card.details': 'Details',
   'todos.card.activity': 'Aktivität',
+  'todos.card.activityOpen': 'Aktivität, {n}',
   'todos.card.move': 'Verschieben',
   'todos.card.reopen': 'Wieder öffnen',
   'todos.card.done': 'Erledigt',

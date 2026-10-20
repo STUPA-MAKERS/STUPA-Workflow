@@ -1241,4 +1241,94 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.deleting()).toBe(false);
     });
   });
+
+  describe('row swipe', () => {
+    /** The close callback of the last toast with an action. */
+    const lastClosed = (spy: jest.SpyInstance) =>
+      (spy.mock.calls.at(-1)![0] as { closed: (how: 'action' | 'timeout' | 'dismiss') => void }).closed;
+
+    it('takes share and archive from the row menu, with its labels and permissions', async () => {
+      const { cmp, harness } = await start();
+      const [first, , third] = cmp.rows();
+      expect(first.swipeRight).toEqual({ id: 'share', label: 'Öffentliche Links', icon: 'link' });
+      expect(first.swipeLeft).toEqual({ id: 'archive', label: 'Archivieren', icon: 'archive', leaves: true });
+      expect(third.swipeLeft?.label).toBe('Aus Archiv holen');
+      const plates = harness.fixture.nativeElement.querySelectorAll('.li-sw__plate--right');
+      expect(plates).toHaveLength(3);
+      cmp.archived.set('all');
+      expect(cmp.rows()[0].swipeLeft?.leaves).toBe(false);
+    });
+
+    it('has no side without its permission', async () => {
+      const { cmp } = await start('/applications', { perms: ['application.read'] });
+      expect(cmp.rows()[0].swipeRight).toBeNull();
+      expect(cmp.rows()[0].swipeLeft).toBeNull();
+    });
+
+    it('opens the share links like the menu', async () => {
+      const { cmp, http, harness } = await start();
+      cmp.onRowSwiped(cmp.items()[1], cmp.rows()[1].swipeRight!);
+      harness.detectChanges();
+      expect(cmp.shareFor()).toBe('app-2');
+      expect(cmp.shareOpen()).toBe(true);
+      http.expectOne((r) => r.url === '/api/applications/app-2/shares').flush([]);
+    });
+
+    it('archives at once, keeps the row out, and the undo brings it back', async () => {
+      const { cmp, http, toast, rail } = await start();
+      const action = jest.spyOn(toast, 'showAction');
+      cmp.onRowSwiped(cmp.items()[1], cmp.rows()[1].swipeLeft!);
+      expect(cmp.rows().map((r) => r.item.id)).toEqual(['app-1', 'app-3']);
+      http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
+      expect(rail.refresh).toHaveBeenCalled();
+      http.expectOne(LIST).flush(page([ROWS[0], ROWS[2]]));
+      expect(action).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'Antrag archiviert.', action: 'Rückgängig', variant: 'success' }),
+      );
+      lastClosed(action)('action');
+      http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-2/archive').flush(ROWS[1]);
+      http.expectOne(LIST).flush(page(ROWS));
+      expect(cmp.swipedAway().size).toBe(0);
+      expect(cmp.rows().map((r) => r.item.id)).toEqual(['app-1', 'app-2', 'app-3']);
+    });
+
+    it('lets the archive stand when the toast goes without the undo', async () => {
+      const { cmp, http, toast } = await start();
+      const action = jest.spyOn(toast, 'showAction');
+      cmp.onRowSwiped(cmp.items()[2], cmp.rows()[2].swipeLeft!);
+      http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-3/archive').flush(ROWS[2]);
+      http.expectOne(LIST).flush(page(ROWS.slice(0, 2)));
+      expect(action).toHaveBeenCalledWith(expect.objectContaining({ message: 'Antrag ist wieder in der Liste.' }));
+      lastClosed(action)('timeout');
+      expect(cmp.swipedAway().size).toBe(0);
+      http.verify();
+    });
+
+    it('brings the row back when the archive or its undo fails', async () => {
+      const { cmp, http, toast } = await start();
+      const error = jest.spyOn(toast, 'error');
+      const action = jest.spyOn(toast, 'showAction');
+      cmp.onRowSwiped(cmp.items()[0], cmp.rows()[0].swipeLeft!);
+      http.expectOne((r) => r.url.endsWith('/archive')).flush({}, { status: 500, statusText: 'x' });
+      expect(error).toHaveBeenCalledTimes(1);
+      expect(cmp.rows()).toHaveLength(3);
+      cmp.onRowSwiped(cmp.items()[0], cmp.rows()[0].swipeLeft!);
+      http.expectOne((r) => r.url.endsWith('/archive')).flush(ROWS[0]);
+      http.expectOne(LIST).flush(page(ROWS));
+      lastClosed(action)('action');
+      http.expectOne((r) => r.url.endsWith('/archive')).flush({}, { status: 500, statusText: 'x' });
+      expect(error).toHaveBeenCalledTimes(2);
+      expect(cmp.swipedAway().size).toBe(0);
+    });
+
+    it('archives in place without a leave when the list shows both', async () => {
+      const { cmp, http } = await start('/applications?archived=all');
+      cmp.onRowSwiped(cmp.items()[0], cmp.rows()[0].swipeLeft!);
+      expect(cmp.rows()).toHaveLength(3);
+      http.expectOne((r) => r.url.endsWith('/archive')).flush(ROWS[0]);
+      http.expectOne(LIST).flush(page(ROWS));
+      cmp.onRowSwiped(cmp.items()[0], { id: 'other', label: 'x', icon: 'x' });
+      http.verify();
+    });
+  });
 });

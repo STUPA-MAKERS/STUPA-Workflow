@@ -59,7 +59,14 @@
         }
       </app-sticky-bar>
 
-      <div class="vl__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
+      <div
+        class="vl__scroll"
+        appPullRefresh
+        [pullRefreshBusy]="loading() || reloading()"
+        (appPullRefresh)="reload()"
+        appScrollFade="y"
+        [attr.aria-busy]="reloading() || null"
+      >
         @if (error()) {
           <app-note class="vl__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">{{ 'voting.list.error' | t }}</app-note>
         } @else if (loading()) {

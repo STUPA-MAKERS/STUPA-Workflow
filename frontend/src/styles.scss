@@ -4,6 +4,7 @@
 @use 'surface';
 @use 'skeleton';
 @use 'breakpoints' as bp;
+@use 'press';
 @use 'sass:meta';
 
 // Tailwind adds utilities only. tailwind.config.js disables preflight, so there is no
@@ -189,6 +190,16 @@ app-dialog {
   border-bottom: var(--border-width) solid var(--color-border);
 }
 
+// A touch screen keeps the interface unselectable (`base.scss` of the kit). The Markdown
+// and the chat texts are content: a long press selects them, and the menu of the browser
+// opens on them (`core/touch/touch-context-menu.ts` names the same elements).
+@media (hover: none) and (pointer: coarse) {
+  .mdv,
+  .chat__text {
+    @include press.selectable;
+  }
+}
+
 // The way back of a detail sheet whose item is gone (`.sheet-back-link`): a tonal pill
 // link to the list.
 .sheet-back-link {
@@ -201,6 +212,9 @@ app-dialog {
   color: var(--color-text);
   font-weight: var(--fw-semibold);
   text-decoration: none;
+  transition: scale var(--motion-xs) var(--ease-standard);
+  @include press.press;
+  @include press.chrome-text;
 }
 @media (hover: hover) {
   .sheet-back-link:hover {

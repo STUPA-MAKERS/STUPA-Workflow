@@ -34,6 +34,7 @@ import {
   ScrollFadeDirective,
   SearchPillComponent,
   StickyBarComponent,
+  SwipeBackDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
@@ -144,6 +145,7 @@ const sheetScroll = new Map<number, number>();
     StickyBarComponent,
     ScrollFadeDirective,
     AdminHealthComponent,
+    SwipeBackDirective,
   ],
   host: { '[class.pane-page]': 'split() || fullPane()' },
   templateUrl: './admin-frame.component.html',
@@ -218,6 +220,31 @@ export class AdminFrameComponent {
   /** Below wide an account page shows "Zur Liste", which leads back to the navigation. */
   readonly showBack = computed(() => this.mode().backLink && !this.home() && !this.showNav());
 
+  /**
+   * One column, an area page (not the home page, not an editor that takes the full
+   * width): a swipe from the left edge of a phone leads back. The editors are left out,
+   * because their canvas and their columns take every touch.
+   */
+  readonly swipeBack = computed(() => !this.home() && !this.showNav() && !this.fullWidth());
+
+  /** A swipe back runs. */
+  protected readonly swiping = signal(false);
+
+  private readonly swipe = viewChild(SwipeBackDirective);
+
+  /** The parent of the open page in the breadcrumbs (`data.parent`), else the home page. */
+  private readonly parentPath = signal(parentOf(this.router.routerState.snapshot.root));
+
+  /**
+   * The way back of a swipe: "Zur Liste" of an account page, the nearest breadcrumb of an
+   * admin page (`data.parent`, the same target as the breadcrumb link).
+   */
+  protected goBack(): void {
+    const target = this.mode().backLink ? this.mode().home : (this.parentPath() ?? this.mode().home);
+    window.scrollTo(0, 0);
+    void this.router.navigateByUrl(target);
+  }
+
   /** The groups with the pages the principal may open and the search finds. */
   readonly groups = computed<NavGroup[]>(() => {
     const { groups, pages } = this.mode();
@@ -252,6 +279,10 @@ export class AdminFrameComponent {
         this.path.set(pathOf(e.urlAfterRedirects));
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
         this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
+        this.parentPath.set(parentOf(this.router.routerState.snapshot.root));
+        // A swipe back that led to another page in the frame: the sheet goes back to its
+        // place with the new page.
+        this.swipe()?.done();
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
         afterNextRender(
           () => {
@@ -313,4 +344,15 @@ export class AdminFrameComponent {
   protected linkOf(page: FramePage): string {
     return `${this.mode().home}/${page.link}`;
   }
+}
+
+/** The nearest parent path of the active route (`data.parent`), as a URL, or null. */
+function parentOf(root: ActivatedRouteSnapshot): string | null {
+  let parent: string | null = null;
+  for (let node: ActivatedRouteSnapshot | null = root; node; node = node.firstChild) {
+    const list = node.data?.['parent'] as string[] | undefined;
+    const last = list?.at(-1);
+    if (last) parent = `/${last}`;
+  }
+  return parent;
 }

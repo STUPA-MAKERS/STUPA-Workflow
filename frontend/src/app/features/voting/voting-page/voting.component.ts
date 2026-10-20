@@ -52,6 +52,7 @@ import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.componen
 import { clock, dayMonthYear } from '@shared/date-format';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
@@ -129,6 +130,7 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,
     PageHeaderComponent,

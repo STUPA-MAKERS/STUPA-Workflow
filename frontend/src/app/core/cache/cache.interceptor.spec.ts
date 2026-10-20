@@ -1,7 +1,7 @@
 import { HttpClient, provideHttpClient, withInterceptors } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { cacheInterceptor, cached, listContext } from './cache.interceptor';
+import { cacheInterceptor, cached, freshly, listContext } from './cache.interceptor';
 import { HttpCacheService } from './http-cache.service';
 
 describe('cacheInterceptor', () => {
@@ -37,6 +37,27 @@ describe('cacheInterceptor', () => {
 
       mock.expectOne('/api/expenses').flush({ items: ['a', 'b'], total: 2, offset: 0 });
       expect(seen).toHaveLength(2);
+    });
+
+    it('skips the stored page and a read in flight inside freshly(), and stores the answer', () => {
+      http.get('/api/expenses', { context: listContext(0) }).subscribe();
+      mock.expectOne('/api/expenses').flush({ items: ['a'] });
+      cache.set('/api/expenses/e1', { id: 'e1' });
+      // A read ahead in flight is not joined either.
+      http.get('/api/invoices', { context: listContext(0) }).subscribe();
+
+      const seen: unknown[] = [];
+      freshly(() => http.get('/api/expenses', { context: listContext(0) }).subscribe((b) => seen.push(b)));
+      freshly(() => http.get('/api/invoices', { context: listContext(0) }).subscribe());
+      expect(seen).toEqual([]);
+      mock.expectOne('/api/expenses').flush({ items: ['a', 'b'] });
+      expect(seen).toEqual([{ items: ['a', 'b'] }]);
+      const both = mock.match('/api/invoices');
+      expect(both).toHaveLength(2);
+      both.forEach((r) => r.flush({ items: [] }));
+      // The detail that the list read ahead stays.
+      expect(cache.get('/api/expenses/e1', 60_000)).toEqual({ id: 'e1' });
+      expect(cache.get('/api/expenses', 60_000)).toEqual({ items: ['a', 'b'] });
     });
 
     it('never caches a load-more page, which would append the same rows twice', () => {

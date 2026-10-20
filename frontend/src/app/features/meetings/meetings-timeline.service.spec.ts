@@ -171,6 +171,25 @@ describe('MeetingsTimelineService', () => {
     svc.loadMoreUpcoming();
   });
 
+  it('refreshes the timeline, or the search while one is active, and says when it loads', () => {
+    jest.useFakeTimers();
+    const { svc, calls, answer } = setup();
+    expect(svc.listBusy()).toBe(false);
+    svc.refreshList();
+    expect(svc.listBusy()).toBe(true);
+    expect(calls.map((c) => c.direction)).toEqual(['upcoming', 'past']);
+    answer(0, { items: [], nextCursor: null });
+    answer(1, { items: [], nextCursor: null });
+    expect(svc.listBusy()).toBe(false);
+    svc.onSearch('fin');
+    jest.advanceTimersByTime(400);
+    expect(calls).toHaveLength(3);
+    answer(2, { items: [], nextCursor: null });
+    svc.refreshList();
+    jest.advanceTimersByTime(400);
+    expect(calls[3]).toMatchObject({ q: 'fin' });
+  });
+
   it('searches after a pause, pages the hits and drops a late answer', () => {
     jest.useFakeTimers();
     const { svc, calls, answer, fail } = setup();

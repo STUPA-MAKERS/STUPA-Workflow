@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { render, screen } from '@testing-library/angular';
+import { MEDIA } from '@stupa-makers/ui-kit';
+import { drag, mediaMatching } from '../../../../testing/touch';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { AdminApiService } from '../admin-api.service';
@@ -54,6 +56,8 @@ async function setup(perms: string[], url = '/admin/users', wide = true) {
             { path: 'flow', component: StubPageComponent, data: { adminNav: false, adminPane: true } },
             { path: 'plain', component: StubPageComponent, data: { adminNav: false } },
             { path: 'cost-centres', component: StubPageComponent },
+            { path: 'gremien/g1/members', component: StubPageComponent, data: { parent: ['admin', 'admin/gremien'] } },
+            { path: 'users', component: StubPageComponent, data: { parent: ['admin'] } },
             { path: '**', component: StubPageComponent },
           ],
         },
@@ -73,6 +77,67 @@ function navLinks(): HTMLAnchorElement[] {
   const nav = screen.getByRole('navigation', { name: 'Verwaltungsbereiche' });
   return [...nav.querySelectorAll<HTMLAnchorElement>('a.af__item')];
 }
+
+describe('AdminFrameComponent swipe back on a phone', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  async function swipe(view: Awaited<ReturnType<typeof setup>>): Promise<Router> {
+    const router = view.fixture.debugElement.injector.get(Router);
+    jest.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    mediaMatching([MEDIA.phone, MEDIA.coarse]);
+    jest.useFakeTimers();
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    drag(page, { x: 4, y: 300 }, [{ x: 30, y: 300 }, { x: 300, y: 300 }], { release: false });
+    view.fixture.detectChanges();
+    expect(page).toHaveClass('af__page--swiping');
+    drag(page, { x: 0, y: 0 }, []);
+    jest.advanceTimersByTime(280);
+    expect(nav).toHaveBeenCalledTimes(1);
+    return router;
+  }
+
+  it('leads an admin page back to its nearest breadcrumb', async () => {
+    const view = await setup(ALL, '/admin/gremien/g1/members', false);
+    const router = await swipe(view);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/gremien');
+  });
+
+  it('leads an admin page without a parent to the home page', async () => {
+    const view = await setup(ALL, '/admin/backups', false);
+    const router = await swipe(view);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+  });
+
+  it('puts the sheet back in place after the navigation', async () => {
+    const view = await setup(ALL, '/admin/users', false);
+    const router = await swipe(view);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+    jest.mocked(router.navigateByUrl).mockRestore();
+    jest.useRealTimers();
+    await view.fixture.ngZone!.run(() => router.navigateByUrl('/admin/backups'));
+    view.fixture.detectChanges();
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    expect(page).not.toHaveClass('af__page--swiping');
+    expect(page.style.left).toBe('');
+  });
+
+  it.each([
+    ['/admin', false],
+    ['/admin/users', true],
+    ['/admin/flow', false],
+  ] as const)('has no swipe on %s (wide: %p)', async (url, wide) => {
+    const view = await setup(ALL, url, wide);
+    mediaMatching([MEDIA.phone, MEDIA.coarse]);
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    drag(page, { x: 4, y: 300 }, [{ x: 30, y: 300 }, { x: 300, y: 300 }], { release: false });
+    view.fixture.detectChanges();
+    expect(page).not.toHaveClass('af__page--swiping');
+  });
+});
 
 describe('AdminFrameComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
@@ -393,6 +458,21 @@ describe('AdminFrameComponent in account mode', () => {
       ],
     });
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
+  });
+
+  it('leads an account page back to the account navigation on a swipe', async () => {
+    const view = await setupAccount(['mcp.use'], '/account/notifications', false);
+    const router = view.fixture.debugElement.injector.get(Router);
+    jest.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    mediaMatching([MEDIA.phone, MEDIA.coarse]);
+    jest.useFakeTimers();
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    drag(page, { x: 4, y: 300 }, [{ x: 30, y: 300 }, { x: 300, y: 300 }]);
+    jest.advanceTimersByTime(280);
+    jest.useRealTimers();
+    expect(nav).toHaveBeenCalledWith('/account');
+    jest.restoreAllMocks();
   });
 
   it('shows "API-Zugang" only with mcp.use, like the account menu', async () => {

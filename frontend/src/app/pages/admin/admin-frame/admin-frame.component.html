@@ -76,7 +76,18 @@
        clips, the body in it scrolls, so the corners clip what scrolls. -->
   <!-- One column on the home page: the navigation is the page, the empty sheet does not
        show. -->
-  <div class="af__page" [class.af__hidden]="navOnly()">
+  <!-- One column, a phone: a swipe from the left edge leads back like the breadcrumb
+       ("Zur Liste" of an account page). -->
+  <div
+    class="af__page"
+    [class.af__hidden]="navOnly()"
+    [class.af__page--swiping]="swiping()"
+    appSwipeBack
+    [appSwipeBackOff]="!swipeBack()"
+    (appSwipeBackStart)="swiping.set(true)"
+    (appSwipeBack)="goBack()"
+    (appSwipeBackEnd)="swiping.set(false)"
+  >
     <div #page class="af__pageBody" appScrollFade="y">
       @if (showBack()) {
         <a class="af__back" [routerLink]="mode().home">

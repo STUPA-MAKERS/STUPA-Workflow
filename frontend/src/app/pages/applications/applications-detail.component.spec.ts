@@ -1108,7 +1108,7 @@ describe('ApplicationsDetailComponent', () => {
     expect(cmp.amount(app('10', null))).toContain('10,00');
   });
 
-  it('#11: notes a capture under the status line and in the history', async () => {
+  it('#11: notes a capture in the history only, not in the status line', async () => {
     const { http, detectChanges, cmp } = await setup();
     http.expectOne(url('')).flush({
       ...appWire(),
@@ -1126,22 +1126,12 @@ describe('ApplicationsDetailComponent', () => {
     ]);
     flushForm(http);
     detectChanges();
-    expect(cmp.captureParts()).toEqual([
-      'Erfasst von Clara Clerk am 05.06.2026',
-      'eingegangen am 01.06.2026',
-      'per PDF',
-    ]);
-    expect(screen.getAllByTestId('ad-capture').map((e) => e.textContent?.trim())).toEqual([
-      'Erfasst von Clara Clerk am 05.06.2026',
-      'eingegangen am 01.06.2026',
-      'per PDF',
-    ]);
+    expect(screen.queryByTestId('ad-capture')).toBeNull();
+    expect(screen.queryByText(/Erfasst von/)).toBeNull();
     expect(cmp.historyEntries()[0].body).toBe(
       'Version 1\nIm Auftrag der antragstellenden Person erfasst\nEingang: per PDF',
     );
     flushAttachments(http);
-
-    // The same day and no intake: only the first part. An unknown account stays nameless.
     cmp.app.update((a) =>
       a
         ? {
@@ -1150,13 +1140,7 @@ describe('ApplicationsDetailComponent', () => {
           }
         : a,
     );
-    expect(cmp.captureParts()).toEqual(['Erfasst von Ehemaliges Konto am 05.06.2026']);
     expect(cmp.historyEntries()[0].body).toBe('Version 1\nIm Auftrag der antragstellenden Person erfasst');
-    cmp.app.update((a) => (a ? { ...a, capture: { ...a.capture!, receivedOn: null } } : a));
-    expect(cmp.captureParts()).toHaveLength(1);
-    // An own submission has no note.
-    cmp.app.update((a) => (a ? { ...a, capture: null } : a));
-    expect(cmp.captureParts()).toBeNull();
     http.verify();
   });
 

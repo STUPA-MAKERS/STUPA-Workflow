@@ -1,3 +1,4 @@
+@use 'press';
 /* A tile a step above its column: white on the grey column in the light theme, surface 3
    on the surface 1 column in the dark theme. `--stack-ring` gives the avatar rings the
    colour of the tile. */
@@ -31,11 +32,7 @@
    smaller until the finger lets go or the long press lifts the card. */
 :host(:active) {
   background-image: linear-gradient(var(--press-tint), var(--press-tint));
-}
-@media (prefers-reduced-motion: no-preference) {
-  :host(:active) {
-    scale: var(--press-scale);
-  }
+  @include press.press-scale(row);
 }
 /* A tile with a long press (`appLongPress`): no text callout and no selection on touch. */
 :host(.long-press) {

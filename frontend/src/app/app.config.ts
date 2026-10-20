@@ -1,3 +1,4 @@
+import { DOCUMENT } from '@angular/common';
 import {
   type ApplicationConfig,
   inject,
@@ -35,6 +36,7 @@ import { ThemeService } from '@core/theme/theme.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { SwUpdateService } from '@core/pwa/sw-update.service';
+import { guardTouchContextMenu } from '@core/touch/touch-context-menu';
 import { AvatarService } from '@shared/ui/avatar/avatar.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -93,6 +95,8 @@ export const appConfig: ApplicationConfig = {
       inject(BrandingService).init(); // site-config app name: tab title, header, home
       inject(AuthService).ensureLoaded().subscribe();
       inject(SwUpdateService).init();
+      // A long press on a row link opens no link menu of the browser (Android).
+      guardTouchContextMenu(inject(DOCUMENT));
       // EN lives in a lazy chunk. Wait for it, so the first paint is not German.
       return i18n.ready();
     }),

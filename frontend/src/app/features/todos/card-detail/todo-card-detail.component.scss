@@ -32,19 +32,19 @@
 .cd__head {
   flex: none;
 }
-.cd__back {
-  display: inline-flex;
-  align-self: flex-start;
-  align-items: center;
-  gap: 2px;
-  min-height: 36px;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-accent-text);
-  font: inherit;
-  font-weight: var(--fw-semibold);
-  cursor: pointer;
+/* The count of the comments on the activity button of a phone: the small plate of the
+   comments button of an application (`.ad__commentsN`). */
+.cd__activityN {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
+  color: var(--color-text-muted);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
 }
 .cd__boardLink {
   display: inline-flex;
@@ -475,26 +475,11 @@
 }
 
 /* ------------------------------------------------------------------ phone */
-.cd__tabs {
-  flex: none;
-  margin-top: var(--space-2);
-}
-/* Two tabs of equal width that fill the row. */
-.cd__tabs ::ng-deep .tabs {
-  gap: 0;
-}
-.cd__tabs ::ng-deep .tabs__tab {
-  flex: 1 1 0;
-  justify-content: center;
-}
 .cd__panel {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
   padding-top: var(--space-4);
-}
-.cd__panel[hidden] {
-  display: none;
 }
 :host(.cd--phone) .cd__head {
   border-bottom: 0;
@@ -506,25 +491,21 @@
   grid-template-columns: max-content minmax(0, 1fr);
   column-gap: var(--space-4);
 }
-/* The tab "Aktivität" fills the drawer down to the bottom navigation: the log takes the
-   height between the tabs and the composer and scrolls inside, so it opens at the newest
-   message, and the composer bar sits on the navigation. */
-:host(.cd--phone) .cd__panel--chat:not([hidden]) {
+/* The activity of a phone fills its bottom sheet, as the comments of an application
+   (`.ad__chat`): the sheet passes its height down (`contentScrolls`), the log takes the
+   height of the thread up to the cap of the sheet and then scrolls inside, and the
+   composer stays at the foot of the sheet, not above the bottom navigation, because the
+   sheet lies over the navigation. The sheet is surface 2, so the messages of others take
+   the next step. */
+.cd__chat--sheet {
   flex: 1 1 auto;
   min-height: 0;
-  padding-top: 0;
-}
-:host(.cd--phone) .cd__chat {
-  flex: 1 1 auto;
-  --chat-log-min: 12rem;
-  --chat-log-max: none;
-  --chat-composer-bleed: var(--space-4);
-}
-/* The drawer of the board ends on the bottom navigation, so the composer bar sits at its
-   foot. In the pane of "Aufgaben" the page scrolls under the navigation, so the bar keeps
-   the default offset of the chat (`--app-bottom-inset`) and stays above it. */
-:host(.cd--phone:not(.cd--pane)) .cd__chat {
+  --chat-log-basis: auto;
+  --chat-log-min: 14rem;
   --chat-composer-bottom: 0px;
+  --chat-bubble: var(--color-surface-3);
+  --chat-composer-surface: transparent;
+  --chat-composer-bleed: var(--space-4);
 }
 .cd__bar {
   --cd-bar-bg: var(--color-surface);

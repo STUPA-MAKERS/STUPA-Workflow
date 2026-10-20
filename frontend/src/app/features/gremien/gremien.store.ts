@@ -23,6 +23,9 @@ export class GremienStore {
   /** True after the first answer, also after a failed one. */
   readonly loaded = signal(false);
 
+  /** A refresh runs while the rows show (pull to refresh). */
+  readonly refreshing = signal(false);
+
   readonly byId = computed(() => new Map(this.items().map((g) => [g.id, g])));
 
   load(): void {
@@ -39,6 +42,25 @@ export class GremienStore {
         this.loading.set(false);
         this.loaded.set(true);
       },
+    });
+  }
+
+  /**
+   * Load the list again while the rows show, without the placeholder of `load`. A failed
+   * refresh keeps the rows. Before the first answer it is a plain `load`.
+   */
+  refresh(): void {
+    if (!this.loaded() || this.error()) {
+      this.load();
+      return;
+    }
+    this.refreshing.set(true);
+    this.api.overview().subscribe({
+      next: (rows) => {
+        this.items.set(rows);
+        this.refreshing.set(false);
+      },
+      error: () => this.refreshing.set(false),
     });
   }
 

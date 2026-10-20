@@ -1,5 +1,5 @@
 import type { ActivatedRouteSnapshot, ViewTransitionInfo } from '@angular/router';
-import { MEDIA, matchesMedia } from '@stupa-makers/ui-kit';
+import { MEDIA, matchesMedia, takeGestureNavigation } from '@stupa-makers/ui-kit';
 
 /** True when the person asks the system for reduced motion. */
 export function reducedMotion(): boolean {
@@ -58,10 +58,15 @@ export function routeMotion(
 /**
  * The `onViewTransitionCreated` hook of the router. It skips the transitions that must
  * not show, and names the kind on `<html data-motion>` for the styles in `styles.scss`.
+ * A navigation that a gesture started (the swipe back of the list/detail layout) has no
+ * transition, because the finger already moved the page out; a pop on top would slide
+ * the list out a second time.
  */
 export function onRouteViewTransition({ transition, from, to }: ViewTransitionInfo): void {
   const phone = matchesMedia(MEDIA.phone);
-  const kind = reducedMotion() ? 'none' : routeMotion(routePath(from), routePath(to), phone);
+  const gesture = takeGestureNavigation();
+  const kind =
+    reducedMotion() || gesture ? 'none' : routeMotion(routePath(from), routePath(to), phone);
   if (kind === 'none') {
     transition.skipTransition();
     return;

@@ -208,6 +208,10 @@
     bottom: var(--app-bottom-inset, 0px);
   }
   .td__drawer {
+    /* The bar of the card (`app-list-detail-bar`) pulls into this top padding and over
+       the side padding, as it does on a list/detail page. */
+    --main-pad-top: var(--space-3);
+    --layout-gutter: var(--space-4);
     width: 100vw;
     padding: var(--space-3) var(--space-4) 0;
     border-radius: 0;

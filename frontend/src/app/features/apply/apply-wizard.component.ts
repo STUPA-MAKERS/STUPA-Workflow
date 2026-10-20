@@ -44,6 +44,8 @@ import {
   FieldRowComponent,
   IconComponent,
   InputComponent,
+  ListDetailBarComponent,
+  ListDetailNavDirective,
   MEDIA,
   mediaQuery,
   SkeletonComponent,
@@ -141,6 +143,8 @@ const STEP_LABEL: Record<StepKey, TranslationKey> = {
     StepperComponent,
     AltchaComponent,
     DraftFilesComponent,
+    ListDetailBarComponent,
+    ListDetailNavDirective,
     TranslatePipe,
   ],
   // The field types of the form (`provideFormly`) come with the component, so Formly is not
@@ -160,6 +164,11 @@ export class ApplyWizardComponent {
   private readonly destroyRef = inject(DestroyRef);
   protected readonly drafts = inject(DraftAttachmentsService);
   protected readonly phone = mediaQuery(MEDIA.phone);
+
+  /** The arrow of the phone bar: out of the wizard to the home page. */
+  protected leave(): void {
+    void this.router.navigateByUrl('/');
+  }
 
   /**
    * True when a principal is logged in. The account then gives the identity: no e-mail
