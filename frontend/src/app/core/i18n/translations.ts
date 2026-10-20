@@ -3962,6 +3962,7 @@ export const de = {
   'todos.card.titleLabel': 'Titel',
   'todos.card.details': 'Details',
   'todos.card.activity': 'Aktivität',
+  'todos.card.activityOpen': 'Aktivität, {n}',
   'todos.card.move': 'Verschieben',
   'todos.card.reopen': 'Wieder öffnen',
   'todos.card.done': 'Erledigt',

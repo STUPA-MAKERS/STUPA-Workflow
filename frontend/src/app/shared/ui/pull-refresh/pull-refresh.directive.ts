@@ -113,7 +113,7 @@ export class PullRefreshDirective {
 
   private onStart(e: TouchEvent): void {
     if (this.phase !== 'idle' || e.touches.length !== 1 || this.busy()) return;
-    if (!touchGesturesOn() || modalOpen() || !this.atTop()) return;
+    if (!touchGesturesOn() || modalOpen(document, this.el) || !this.atTop()) return;
     const t = e.touches[0];
     this.track = { x: t.clientX, y: t.clientY, lock: null, pull: 0, armed: false };
   }

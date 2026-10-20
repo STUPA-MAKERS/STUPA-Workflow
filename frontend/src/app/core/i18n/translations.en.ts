@@ -3886,6 +3886,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.card.titleLabel': 'Title',
   'todos.card.details': 'Details',
   'todos.card.activity': 'Activity',
+  'todos.card.activityOpen': 'Activity, {n}',
   'todos.card.move': 'Move',
   'todos.card.reopen': 'Reopen',
   'todos.card.done': 'Done',

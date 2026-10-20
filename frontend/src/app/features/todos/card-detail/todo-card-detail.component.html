@@ -4,12 +4,6 @@
        real text; the bars show after 300ms (`skel-in`). The close button works. -->
   <article class="cd cd--busy" aria-busy="true">
     <header class="sheet-head cd__head">
-      @if (phone() && mode() === 'drawer') {
-        <button type="button" class="cd__back" (click)="closed.emit()">
-          <app-icon name="back" [size]="18" />
-          {{ 'todos.card.back' | t }}
-        </button>
-      }
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
         <p appSheetBarTitle class="sheet-title cd__title skel-in" aria-hidden="true">
           <span class="skel-text cd__skelTitle"></span>
@@ -17,7 +11,7 @@
             <span class="skel-text cd__skelTitle cd__skelTitle--second"></span>
           }
         </p>
-        @if (!phone() && mode() === 'drawer') {
+        @if (phone() || mode() === 'drawer') {
           <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
         }
         <span class="cd__skelIcon skel-in" aria-hidden="true"><span class="skel-box"></span></span>
@@ -30,7 +24,6 @@
       <p class="sheet-line cd__created skel-in" aria-hidden="true"><span class="skel-text skel-text--muted cd__skelCreated"></span></p>
     </header>
     @if (phone()) {
-      <app-tabs class="cd__tabs" idPrefix="cd-busy" [tabs]="busyTabs()" [active]="'details'" aria-hidden="true" />
       <section class="cd__panel" aria-hidden="true">
         <ng-container *ngTemplateOutlet="detailsSkel" />
       </section>
@@ -61,12 +54,6 @@
 } @else if (card(); as card) {
   <article class="cd" aria-labelledby="cd-title">
     <header class="sheet-head cd__head">
-      @if (phone() && mode() === 'drawer') {
-        <button type="button" class="cd__back" (click)="closed.emit()">
-          <app-icon name="back" [size]="18" />
-          {{ 'todos.card.back' | t }}
-        </button>
-      }
       <app-sheet-bar [bleed]="mode() === 'pane' && split()">
         <!-- While the title is edited, the form takes its place below the bar. -->
         @if (!editingTitle()) {
@@ -81,6 +68,20 @@
         @if (!phone() && mode() === 'drawer') {
           <app-button variant="text" [iconOnly]="true" [ariaLabel]="'todos.card.copyLink' | t" (click)="copyLink()">
             <app-icon name="link" />
+          </app-button>
+        }
+        <!-- Phone: the activity opens in a sheet from the bottom, as the comments of an
+             application do; the count is the number of comments. -->
+        @if (phone()) {
+          <app-button
+            class="cd__activityBtn"
+            variant="text"
+            [ariaLabel]="'todos.card.activityOpen' | t: { n: card.comments.length }"
+            data-testid="cd-activity-open"
+            (click)="activityOpen.set(true)"
+          >
+            <app-icon name="chat" />
+            <span class="cd__activityN num" aria-hidden="true">{{ card.comments.length }}</span>
           </app-button>
         }
         @if (menuSections().length) {
@@ -127,34 +128,24 @@
     </header>
 
     @if (phone()) {
-      <app-tabs
-        #tabBar
-        class="cd__tabs"
-        idPrefix="cd"
-        [ariaLabel]="card.title"
-        [tabs]="tabs()"
-        [active]="tab()"
-        (activeChange)="selectTab($event ?? 'details')"
-      />
-      <section
-        class="cd__panel"
-        role="tabpanel"
-        [id]="tabBar.panelId('details')"
-        [attr.aria-labelledby]="tabBar.tabId('details')"
-        [hidden]="tab() !== 'details'"
-      >
+      <section class="cd__panel">
         <ng-container *ngTemplateOutlet="details; context: { $implicit: card }" />
       </section>
-      <section
-        class="cd__panel cd__panel--chat"
-        role="tabpanel"
-        [id]="tabBar.panelId('activity')"
-        [attr.aria-labelledby]="tabBar.tabId('activity')"
-        [hidden]="tab() !== 'activity'"
+      <!-- "Aktivität": the thread and the composer in the sheet from the bottom that the
+           comments of an application use. The chat exists only while the sheet shows, so a
+           hidden chat does not mark the thread as seen. -->
+      <app-side-sheet
+        #activitySheet
+        [(open)]="activityOpen"
+        [heading]="'todos.card.activity' | t"
+        side="bottom"
+        [contentScrolls]="true"
       >
-        <ng-container *ngTemplateOutlet="activity" />
-      </section>
-      @if (canWrite() && tab() === 'details') {
+        @if (activitySheet.shown()) {
+          <ng-container *ngTemplateOutlet="activity; context: { sheet: true }" />
+        }
+      </app-side-sheet>
+      @if (canWrite()) {
         <div class="cd__bar">
           <app-button class="btn-block" variant="tonal" [disabled]="busy()" (click)="moveOpen.set(true)">
             <app-icon name="swap" />
@@ -195,9 +186,10 @@
   />
 }
 
-<ng-template #activity>
+<ng-template #activity let-sheet="sheet">
   <app-chat
     class="cd__chat"
+    [class.cd__chat--sheet]="sheet"
     [draftKey]="'todo.' + cardId()"
     [messages]="messages()"
     [events]="events()"

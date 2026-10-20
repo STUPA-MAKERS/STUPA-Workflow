@@ -968,7 +968,6 @@ describe('TodoCardDetailComponent', () => {
     expect(cmp.labelOptions()).toEqual([]);
     expect(cmp.columnName()).toBe('');
     expect(cmp.isDone()).toBe(false);
-    expect(cmp.tabs()[1].count).toBe(0);
     expect(cmp.columnOptions()).toEqual([]);
     expect(cmp.memberOptions()).toHaveLength(3);
     expect(cmp.items()).toEqual([]);
@@ -1150,7 +1149,7 @@ describe('TodoCardDetailComponent', () => {
           removeEventListener: () => undefined,
         }) as unknown as MediaQueryList,
     );
-    const { fixture, files } = await setup();
+    const { fixture, files, cmp } = await setup();
     const chat = () => fixture.debugElement.query((d) => d.name === 'app-chat');
     const drafts = chat().injector.get(DraftAttachmentsService);
     const old = chat().componentInstance;
@@ -1160,6 +1159,9 @@ describe('TodoCardDetailComponent', () => {
     for (const fn of [...listeners]) fn({ matches: true } as MediaQueryListEvent);
     fixture.detectChanges();
     expect(fixture.nativeElement).toHaveClass('cd--phone');
+    // A phone shows the chat in the activity sheet.
+    cmp.activityOpen.set(true);
+    fixture.detectChanges();
     expect(chat().componentInstance).not.toBe(old);
     expect(chat().injector.get(DraftAttachmentsService)).toBe(drafts);
     expect(drafts.files()).toEqual([file]);
@@ -1253,39 +1255,46 @@ describe('TodoCardDetailComponent', () => {
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
 
-    it('draws the tabs without a count and the details while the card loads, with a working back link', async () => {
-      const { cmp, api, detect, closed, fixture } = await setup();
+    it('draws the details without tabs while the card loads, and no back link of its own', async () => {
+      const { api, detect, fixture } = await setup();
       api.card.mockReturnValueOnce(new Subject<TodoCardDetail>());
       fixture.componentRef.setInput('cardId', 'k-2');
       detect();
-      expect(cmp.busyTabs().map((t) => t.count)).toEqual([undefined, undefined]);
+      expect(screen.queryByRole('tablist')).toBeNull();
       expect(document.querySelector('.cd__skelTitle--second')).not.toBeNull();
       expect(document.querySelectorAll('.cd__panel .cd__item').length).toBe(3);
-      fireEvent.click(screen.getByRole('button', { name: /Zum Board/ }));
-      expect(closed).toHaveBeenCalled();
+      // The way back is the bar of the drawer (`app-list-detail-bar`), not a link here.
+      expect(screen.queryByRole('button', { name: /Zum Board/ })).toBeNull();
     });
 
-    it('has the tabs Details and Aktivität, the back link and the bar', async () => {
-      const { cmp, detect, closed, fixture } = await setup();
+    it('has no tabs: the fields, the bar, and the activity in a sheet from the bottom', async () => {
+      const { cmp, detect, fixture } = await setup();
       expect(fixture.nativeElement).toHaveClass('cd--phone');
-      const tabs = screen.getByRole('tablist');
-      expect(within(tabs).getAllByRole('tab').map((t) => t.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
-        'Details',
-        'Aktivität1',
-      ]);
+      expect(screen.queryByRole('tablist')).toBeNull();
       expect(screen.queryByRole('button', { name: 'Link kopieren' })).toBeNull();
+      // The chat waits for the sheet, so a closed sheet marks nothing as seen.
+      expect(fixture.nativeElement.querySelector('app-chat')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: /Verschieben/ }));
       expect(cmp.moveOpen()).toBe(true);
       cmp.moveOpen.set(false);
       fireEvent.click(screen.getByRole('button', { name: /Erledigt/ }));
-      cmp.selectTab('activity');
+      const open = screen.getByRole('button', { name: 'Aktivität, 1' });
+      expect(open.querySelector('.cd__activityN')?.textContent).toBe('1');
+      fireEvent.click(open);
       detect();
-      expect(screen.queryByRole('button', { name: /Verschieben/ })).toBeNull();
-      cmp.selectTab('details');
-      cmp.selectTab('odd');
-      expect(cmp.tab()).toBe('details');
-      fireEvent.click(screen.getByRole('button', { name: /Zum Board/ }));
-      expect(closed).toHaveBeenCalled();
+      expect(cmp.activityOpen()).toBe(true);
+      const sheet = screen.getByRole('dialog', { name: 'Aktivität' });
+      expect(sheet.querySelector('app-chat')).toHaveClass('cd__chat--sheet');
+      // The fields stay below the sheet.
+      expect(screen.getByRole('button', { name: /Verschieben/ })).toBeInTheDocument();
+    });
+
+    it('closes the activity sheet when another card opens', async () => {
+      const { cmp, fixture, detect } = await setup();
+      cmp.activityOpen.set(true);
+      fixture.componentRef.setInput('cardId', 'k-2');
+      detect();
+      expect(cmp.activityOpen()).toBe(false);
     });
 
     it('puts "Im Board öffnen" into the ⋮ menu of the pane', async () => {

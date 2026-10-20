@@ -21,6 +21,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { MEDIA, ToastService } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../layout/page-frame.service';
 import { BOARDS, MEMBERS, asPhone, board, detail, tile } from '../../../testing/todo-fixtures';
+import { drag, mediaMatching } from '../../../testing/touch';
 import { type FakeTodoLive } from '../../../testing/todo-live';
 import { TodoLiveService } from '@core/ws/todo-live.service';
 import { provideFakeTodoLive } from '../../../testing/todo-live';
@@ -1372,6 +1373,37 @@ describe('TodosComponent', () => {
 
   describe('phone', () => {
     beforeEach(() => asPhone(MEDIA.phone));
+
+    it('gives the card drawer the sticky bar of a detail: back closes, the actions sit in it', async () => {
+      const { settle, router } = await start('/todos/b-1?card=k-1');
+      const drawer = screen.getByRole('dialog', { name: 'Raum buchen' });
+      const bar = drawer.querySelector('app-list-detail-bar') as HTMLElement;
+      expect(bar).toHaveClass('ld__bar');
+      expect(drawer.firstElementChild).toBe(bar);
+      // The ⋮ menu of the card moved into the bar; the sheet bar keeps only the title.
+      expect(bar.querySelector('.ld__barActions app-row-menu')).not.toBeNull();
+      expect(drawer.querySelector('app-sheet-bar')).toHaveClass('sheet-bar--docked');
+      fireEvent.click(within(bar).getByRole('button', { name: 'Zum Board' }));
+      await settle();
+      expect(router.url).toBe('/todos/b-1');
+    });
+
+    it('closes the card drawer with the swipe back from the left edge', async () => {
+      mediaMatching([MEDIA.phone, MEDIA.coarse]);
+      Object.defineProperty(window, 'innerWidth', { value: 360, configurable: true });
+      jest.useFakeTimers({ doNotFake: ['queueMicrotask', 'setImmediate', 'nextTick'] });
+      try {
+        const { settle, router } = await start('/todos/b-1?card=k-1');
+        const drawer = screen.getByRole('dialog', { name: 'Raum buchen' });
+        drag(drawer, { x: 10, y: 300 }, [{ x: 30, y: 301 }, { x: 250, y: 302 }]);
+        jest.advanceTimersByTime(400);
+        jest.useRealTimers();
+        await settle();
+        expect(router.url).toBe('/todos/b-1');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
 
     it('draws the tabs, one column of tiles and the places of the menu and the filter while it loads', async () => {
       await start('/todos/b-1', { pending: true });
