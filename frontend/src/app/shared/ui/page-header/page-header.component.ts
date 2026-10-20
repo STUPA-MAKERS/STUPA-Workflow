@@ -28,6 +28,7 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
     '[class.ph--flush]': 'flush()',
     '[class.ph--rail]': 'rail()',
     '[class.ph--pane]': 'pane()',
+    '[class.ph--display]': 'display()',
   },
   templateUrl: './page-header.component.html',
   styleUrl: './page-header.component.scss',
@@ -82,6 +83,12 @@ export class PageHeaderComponent {
    * list header itself.
    */
   readonly pane = input(false);
+
+  /**
+   * Keep the page title size of the wide layout (d2, 28/36) on a phone too, where the
+   * title is otherwise h1 (22/28). The greeting of the dashboard uses it.
+   */
+  readonly display = input(false);
 
   /** The id of the title element, for an `aria-labelledby` of the region it names. */
   readonly titleId = input<string | null>(null);
