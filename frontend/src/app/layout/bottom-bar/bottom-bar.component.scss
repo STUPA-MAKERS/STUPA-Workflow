@@ -19,7 +19,9 @@
   justify-content: space-around;
   box-sizing: border-box;
   height: calc(var(--bottom-bar-height, 72px) + env(safe-area-inset-bottom));
-  padding: 0 var(--space-2) env(safe-area-inset-bottom);
+  /* In landscape the entries also keep clear of the notch and the round corners. */
+  padding: 0 max(var(--space-2), var(--app-right-safe-area, 0px)) env(safe-area-inset-bottom)
+    max(var(--space-2), var(--app-left-safe-area, 0px));
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-surface-3);
   /* The live dot gets a ring in the colour of the bar. */

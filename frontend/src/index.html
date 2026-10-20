@@ -31,12 +31,15 @@
     <!-- iOS and iPadOS do not read the icons of the manifest. "Add to Home Screen" takes
          this 180 px icon. It is opaque, because iOS fills a transparent area with black.
          The capable tags make iOS before 16.4 open the home screen icon as a standalone
-         app and not as a Safari tab; later versions read display from the manifest. -->
+         app and not as a Safari tab; later versions read display from the manifest.
+         black-translucent lets the page colour reach under the status bar, edge to edge;
+         the shell pads its top chrome by env(safe-area-inset-top) (--app-top-safe-area),
+         which is 0 in a browser tab. -->
     <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="STUPA" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- iOS launch images: without them an installed app starts on a white screen, also in
          the dark theme. iOS takes only an image of the exact screen size of the device, so
          there is one per iPhone screen and theme (portrait). scripts/make-splash.py renders

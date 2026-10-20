@@ -11,7 +11,8 @@
   flex: 1 1 0;
   flex-direction: column;
   min-height: 0;
-  margin-block: calc(-1 * var(--main-pad-top, var(--space-8)))
+  /* The top inset stays: the header starts below the status bar of an installed app. */
+  margin-block: calc(var(--app-top-safe-area, 0px) - var(--main-pad-top, var(--space-8)))
     calc(-1 * var(--main-pad-bottom, var(--space-8)));
   margin-inline: calc(-1 * var(--layout-gutter));
 }
