@@ -57,6 +57,22 @@ function dayNumber(d: Date): number {
   return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY_MS;
 }
 
+const formats = new Map<string, Intl.DateTimeFormat>();
+
+/**
+ * The `Intl.DateTimeFormat` of a locale and options, made once. A new one costs far more
+ * than a `format` call, and a board formats a date on every tile.
+ */
+function dateFormat(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${locale}|${JSON.stringify(options)}`;
+  let f = formats.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat(locale, options);
+    formats.set(key, f);
+  }
+  return f;
+}
+
 /**
  * Whole calendar days from `today` to `value` (negative in the past), or null for an
  * invalid value. Calendar days, not blocks of 24 hours: yesterday 23:00 is one day ago.
@@ -80,14 +96,14 @@ export function calendarDaysSince(at: DateValue, now: Date = new Date()): number
 export function weekdayName(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
-  return new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(d).replace(/\.$/, '');
+  return dateFormat(locale, { weekday: 'short' }).format(d).replace(/\.$/, '');
 }
 
 /** Day and month: "14.10." (de, always with the closing dot) or "14/10" (en). */
 export function dayMonth(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
-  const text = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit' }).format(d);
+  const text = dateFormat(locale, { day: '2-digit', month: '2-digit' }).format(d);
   // Some ICU versions write the German "14.10" without the closing dot.
   return locale.startsWith('de') && !text.endsWith('.') ? `${text}.` : text;
 }
@@ -96,7 +112,7 @@ export function dayMonth(value: DateValue, locale: string): string {
 export function dayMonthYear(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
-  return new Intl.DateTimeFormat(locale, {
+  return dateFormat(locale, {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -142,7 +158,7 @@ export function monthYear(
 ): string {
   const d = parseDay(value);
   if (!d) return '';
-  return new Intl.DateTimeFormat(locale, {
+  return dateFormat(locale, {
     month: 'long',
     year: 'numeric',
     ...(options.utc ? { timeZone: 'UTC' } : {}),
@@ -153,21 +169,21 @@ export function monthYear(
 export function monthShort(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
-  return new Intl.DateTimeFormat(locale, { month: 'short' }).format(d).replace(/\.$/, '');
+  return dateFormat(locale, { month: 'short' }).format(d).replace(/\.$/, '');
 }
 
 /** The written date: "14. Oktober 2026" (de), "14 October 2026" (en). */
 export function longDate(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'long' }).format(d);
+  return dateFormat(locale, { dateStyle: 'long' }).format(d);
 }
 
 /** The local clock time of a moment, `HH:MM`, always 24 h. */
 export function clock(value: DateValue, locale: string): string {
   const d = parseDay(value);
   if (!d) return '';
-  return new Intl.DateTimeFormat(locale, {
+  return dateFormat(locale, {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',

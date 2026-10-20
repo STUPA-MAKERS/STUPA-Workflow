@@ -16,7 +16,8 @@ carry a weak ``ETag`` over their body and answer 304 to a matching
 open). Mails of a write (``todo_assigned``, ``todo_mentioned``) go out as a background
 task after the commit. The change pings of a write (``live``) go to the broker after
 the route, so after its commit; ``GET /todos/cards/{id}/tile`` answers the tile that
-a ping names, and ``socket`` is the channel ``WS /api/ws/todos``.
+a ping names, and ``socket`` is the channel ``WS /api/ws/todos``. ``GET /todos/cards?ids=``
+reads up to 50 whole cards at once for the read-ahead of the board page.
 """
 
 from __future__ import annotations
@@ -443,6 +444,23 @@ async def create_card(
     out = await service.create(payload, principal)
     _send(service, background, request, settings, send)
     return out
+
+
+#: The most cards that one ``GET /todos/cards`` reads.
+CARD_BATCH = 50
+
+
+@router.get("/cards", response_model=list[TodoCardDetail], responses=_errors(401, 422))
+async def get_cards(
+    service: ServiceDep,
+    principal: Member,
+    ids: Annotated[list[UUID], Query(min_length=1, max_length=CARD_BATCH)],
+) -> list[TodoCardDetail]:
+    """The whole cards of ``ids`` (at most 50) in their order: the read-ahead of the page.
+
+    A card that the caller cannot read is left out, where ``GET /cards/{id}`` is 404.
+    """
+    return await service.cards(ids, principal)
 
 
 @router.get("/cards/{card_id}", response_model=TodoCardDetail, responses=_errors(401, 404))

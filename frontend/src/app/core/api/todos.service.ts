@@ -292,6 +292,9 @@ export interface TodoMember {
   displayName: string | null;
 }
 
+/** The most cards that one `cards()` read asks for (`CARD_BATCH` of the API). */
+export const CARD_BATCH = 50;
+
 @Injectable({ providedIn: 'root' })
 export class TodosApiService {
   private readonly http = inject(HttpClient);
@@ -413,6 +416,16 @@ export class TodosApiService {
     return this.http.get<TodoCardDetail>(`${this.base}/todos/cards/${cardId}`, {
       context: opts.detail ? detailContext() : skipLoading(),
     });
+  }
+
+  /**
+   * Many whole cards at once (at most `CARD_BATCH`), in the order of `ids`: the read-ahead
+   * of the board page. A card the caller cannot read is left out.
+   */
+  cards(ids: readonly Uuid[]): Observable<TodoCardDetail[]> {
+    let params = new HttpParams();
+    for (const id of ids) params = params.append('ids', id);
+    return this.http.get<TodoCardDetail[]>(`${this.base}/todos/cards`, { params, context: skipLoading() });
   }
 
   /** The tile of a live card, as the board read has it: what a live ping reads (404 when archived). */

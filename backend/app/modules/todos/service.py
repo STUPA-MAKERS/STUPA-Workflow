@@ -841,6 +841,36 @@ class TodoService:
         card, board = await self._card(card_id, principal)
         return await self._detail(card, board, principal)
 
+    async def cards(
+        self, card_ids: Sequence[uuid.UUID], principal: Principal
+    ) -> list[TodoCardDetail]:
+        """Return the whole cards of ``card_ids`` in their order, archived ones too.
+
+        The read-ahead of the board page reads many cards in one request. A card that
+        is unknown or whose board the caller cannot read is left out, as the single
+        read answers 404 for it. A repeated id gives one card.
+        """
+        ids = list(dict.fromkeys(card_ids))
+        found = {
+            card.id: card
+            for card in (await self.session.scalars(select(TodoCard).where(TodoCard.id.in_(ids))))
+        }
+        boards = {
+            board.id: board
+            for board in await self.session.scalars(
+                select(TodoBoard).where(TodoBoard.id.in_({c.board_id for c in found.values()}))
+            )
+        }
+        pairs: list[tuple[TodoCard, TodoBoard]] = []
+        for card_id in ids:
+            card = found.get(card_id)
+            if card is None:
+                continue
+            board = boards[card.board_id]
+            if await self.access.can_read(board, principal):
+                pairs.append((card, board))
+        return await self._details(pairs, principal)
+
     async def tile(self, card_id: uuid.UUID, principal: Principal) -> TodoCardTile:
         """Return the tile of a live card, the same one that the board read holds.
 
@@ -857,75 +887,98 @@ class TodoService:
     async def _detail(
         self, card: TodoCard, board: TodoBoard, principal: Principal
     ) -> TodoCardDetail:
-        facts = await self._facts([card], principal)
-        tile = self._tile(card, facts)
-        columns = await self._columns(board.id)
-        board_labels = await self._labels(board.id)
-        items = list(
-            (
-                await self.session.scalars(
-                    select(TodoCheckItem)
-                    .where(TodoCheckItem.card_id == card.id)
-                    .order_by(TodoCheckItem.position, TodoCheckItem.id)
-                )
-            ).all()
+        return (await self._details([(card, board)], principal))[0]
+
+    async def _details(
+        self, pairs: Sequence[tuple[TodoCard, TodoBoard]], principal: Principal
+    ) -> list[TodoCardDetail]:
+        """Build the whole cards of ``pairs`` with a fixed number of queries per board."""
+        cards = [card for card, _board in pairs]
+        ids = [card.id for card in cards]
+        facts = await self._facts(cards, principal)
+        boards = {board.id: board for _card, board in pairs}
+        columns = {board_id: await self._columns(board_id) for board_id in boards}
+        board_labels = {board_id: await self._labels(board_id) for board_id in boards}
+        writable = {
+            board_id: await self.access.can_write(board, principal)
+            for board_id, board in boards.items()
+        }
+        items = _by_card(
+            await self.session.scalars(
+                select(TodoCheckItem)
+                .where(TodoCheckItem.card_id.in_(ids))
+                .order_by(TodoCheckItem.position, TodoCheckItem.id)
+            )
         )
-        events = list(
-            (
-                await self.session.scalars(
-                    select(TodoEvent)
-                    .where(TodoEvent.card_id == card.id)
-                    .order_by(TodoEvent.created_at, TodoEvent.id)
-                )
-            ).all()
+        events = _by_card(
+            await self.session.scalars(
+                select(TodoEvent)
+                .where(TodoEvent.card_id.in_(ids))
+                .order_by(TodoEvent.created_at, TodoEvent.id)
+            )
         )
-        comments = list(
-            (
-                await self.session.scalars(
-                    select(TodoComment)
-                    .where(TodoComment.card_id == card.id, TodoComment.deleted_at.is_(None))
-                    .order_by(TodoComment.created_at, TodoComment.id)
-                )
-            ).all()
+        comments = _by_card(
+            await self.session.scalars(
+                select(TodoComment)
+                .where(TodoComment.card_id.in_(ids), TodoComment.deleted_at.is_(None))
+                .order_by(TodoComment.created_at, TodoComment.id)
+            )
         )
-        links = facts.links.get(card.id, [])
-        refs: set[tuple[str, uuid.UUID]] = {(link.kind, link.target_id) for link in links}
-        people: set[uuid.UUID | None] = {card.created_by}
-        for event in events:
-            people.add(event.actor_id)
-            if event.kind == "assigned":
-                people.add(_uuid_of(event.payload.get("principalId")))
-            if event.kind in ("linked", "unlinked"):
-                ref = _ref_of(event.payload)
-                if ref is not None:
-                    refs.add(ref)
-        for comment in comments:
-            people.add(comment.author_id)
-            people.update(_uuid_of(m) for m in comment.mentions or [])
+        refs: set[tuple[str, uuid.UUID]] = set()
+        people: set[uuid.UUID | None] = set()
+        for card in cards:
+            refs.update((link.kind, link.target_id) for link in facts.links.get(card.id, []))
+            people.add(card.created_by)
+            for event in events.get(card.id, []):
+                people.add(event.actor_id)
+                if event.kind == "assigned":
+                    people.add(_uuid_of(event.payload.get("principalId")))
+                if event.kind in ("linked", "unlinked"):
+                    ref = _ref_of(event.payload)
+                    if ref is not None:
+                        refs.add(ref)
+            for comment in comments.get(card.id, []):
+                people.add(comment.author_id)
+                people.update(_uuid_of(m) for m in comment.mentions or [])
         resolved = await self.links.resolve(refs, principal)
         persons = await person_refs(self.session, people)
         me = await self.access.me(principal)
-        own_labels = set(tile.label_ids)
-        files = await self.files.message_attachments("todo_comment", [c.id for c in comments])
-        return TodoCardDetail(
-            **tile.model_dump(by_alias=False),
-            description_md=card.description_md,
-            board_name=board.name,
-            board_kind=board.kind,  # pyright: ignore[reportArgumentType]
-            can_write=await self.access.can_write(board, principal),
-            columns=[TodoColumnRef(id=c.id, name=c.name, is_done=c.is_done) for c in columns],
-            labels=[_label_out(label) for label in board_labels if label.id in own_labels],
-            board_labels=[_label_out(label) for label in board_labels],
-            created_by=persons.get(card.created_by, DELETED_PERSON),
-            links=[_link_out(link, resolved) for link in links],
-            checklist_items=[
-                TodoCheckItemOut(id=i.id, text=i.text, done=i.done, position=i.position)
-                for i in items
-            ],
-            events=[_event_out(e, persons, resolved) for e in events],
-            comments=[_comment_out(c, persons, me, files.get(c.id, [])) for c in comments],
-            archived_at=card.archived_at,
+        files = await self.files.message_attachments(
+            "todo_comment", [c.id for card in cards for c in comments.get(card.id, [])]
         )
+        out: list[TodoCardDetail] = []
+        for card, board in pairs:
+            tile = self._tile(card, facts)
+            own_labels = set(tile.label_ids)
+            labels = board_labels[board.id]
+            out.append(
+                TodoCardDetail(
+                    **tile.model_dump(by_alias=False),
+                    description_md=card.description_md,
+                    board_name=board.name,
+                    board_kind=board.kind,  # pyright: ignore[reportArgumentType]
+                    can_write=writable[board.id],
+                    columns=[
+                        TodoColumnRef(id=c.id, name=c.name, is_done=c.is_done)
+                        for c in columns[board.id]
+                    ],
+                    labels=[_label_out(label) for label in labels if label.id in own_labels],
+                    board_labels=[_label_out(label) for label in labels],
+                    created_by=persons.get(card.created_by, DELETED_PERSON),
+                    links=[_link_out(link, resolved) for link in facts.links.get(card.id, [])],
+                    checklist_items=[
+                        TodoCheckItemOut(id=i.id, text=i.text, done=i.done, position=i.position)
+                        for i in items.get(card.id, [])
+                    ],
+                    events=[_event_out(e, persons, resolved) for e in events.get(card.id, [])],
+                    comments=[
+                        _comment_out(c, persons, me, files.get(c.id, []))
+                        for c in comments.get(card.id, [])
+                    ],
+                    archived_at=card.archived_at,
+                )
+            )
+        return out
 
     # -- card writes ------------------------------------------------------------
 
@@ -2088,6 +2141,16 @@ def _new_link(card_id: uuid.UUID, kind: str, target_id: uuid.UUID, actor: uuid.U
     link = TodoLink(id=uuid.uuid4(), card_id=card_id, created_by=actor, created_at=_now())
     setattr(link, LINK_COLUMNS[kind], target_id)
     return link
+
+
+def _by_card[R: (TodoCheckItem, TodoEvent, TodoComment)](
+    rows: Iterable[R],
+) -> dict[uuid.UUID, list[R]]:
+    """Group rows by their card and keep the order of the query."""
+    out: dict[uuid.UUID, list[R]] = {}
+    for row in rows:
+        out.setdefault(row.card_id, []).append(row)
+    return out
 
 
 def _uuid_of(value: Any) -> uuid.UUID | None:
