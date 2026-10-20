@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, computed, signal } from '@angular/core';
 
 /**
  * Delay before the loading bar appears. The same 300ms as the skeletons (`.skel-in`), so a
@@ -17,6 +17,13 @@ const MIN_VISIBLE_MS = 400;
 @Injectable({ providedIn: 'root' })
 export class LoadingService {
   private count = 0;
+  /** The count as a signal, for {@link active}. */
+  private readonly running = signal(0);
+  /**
+   * At least one counted request runs, without the delay of the bar. Pull to refresh
+   * waits on it: its reload counts on the bar (`visibly`).
+   */
+  readonly active = computed(() => this.running() > 0);
   private shownAt = 0;
   private showTimer: ReturnType<typeof setTimeout> | null = null;
   private hideTimer: ReturnType<typeof setTimeout> | null = null;
@@ -40,6 +47,7 @@ export class LoadingService {
   /** Register an in-flight request. */
   inc(): void {
     this.count++;
+    this.running.set(this.count);
     if (this.count !== 1) return;
     this.clearHide();
     if (this._visible() || this.showTimer !== null) return;
@@ -55,6 +63,7 @@ export class LoadingService {
   /** Deregister a completed request (success or error). */
   dec(): void {
     if (this.count > 0) this.count--;
+    this.running.set(this.count);
     if (this.count === 0) this.scheduleHide();
   }
 

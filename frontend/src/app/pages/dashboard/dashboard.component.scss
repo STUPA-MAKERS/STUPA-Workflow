@@ -75,7 +75,8 @@
   white-space: nowrap;
   text-decoration: none;
   transition: filter var(--motion-fast) var(--ease-standard),
-    background-color var(--motion-fast) var(--ease-standard);
+    background-color var(--motion-fast) var(--ease-standard),
+    scale var(--motion-xs) var(--ease-standard);
   @include press.chrome-text;
   @include press.press;
 }
@@ -118,6 +119,7 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
   white-space: nowrap;
+  transition: scale var(--motion-xs) var(--ease-standard);
   @include press.press;
 }
 @media (hover: hover) {
@@ -304,6 +306,10 @@
   min-height: 0;
   padding: 0 14px 14px;
 }
+/* Without the title "Heute" (no meeting today), the body keeps the inset at the top. */
+.dash__todayBody:first-child {
+  padding-top: 14px;
+}
 .dash__todayBody > * {
   flex: none;
 }
@@ -457,6 +463,15 @@
 :host(.dash--phone) .dash__today {
   border-radius: 0;
   background: none;
+}
+/* The greeting on a phone takes the page title size of the wide layout (d2), not the
+   smaller phone title of the page header. */
+:host(.dash--phone) > .dash__head ::ng-deep .ph__bar {
+  --ph-title-lh: var(--lh-d2);
+}
+:host(.dash--phone) > .dash__head ::ng-deep .ph__title {
+  font-size: var(--fs-d2);
+  line-height: var(--lh-d2);
 }
 :host(.dash--phone) .dash__todayHead {
   padding: 0 var(--space-1) var(--space-1);

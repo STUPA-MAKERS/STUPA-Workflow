@@ -47,6 +47,7 @@ import { localized } from '../gremien.util';
 import { weekdayDate } from '@shared/date-format';
 import { GremiumLogoComponent } from '../gremium-logo/gremium-logo.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** The permission that shows every gremium, also without a membership. */
 export const GREMIUM_VIEW_ALL = 'gremium.view_all';
@@ -83,6 +84,7 @@ export interface GremiumRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,
     NgTemplateOutlet,

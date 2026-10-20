@@ -277,7 +277,16 @@
     tabindex="-1"
     aria-labelledby="cd-title"
     (keydown)="onDrawerKey($event)"
+    [appListDetailNav]="phone()"
+    appSwipeBack
+    [appSwipeBackOff]="!phone()"
+    (appSwipeBack)="closeCard()"
   >
+    <!-- Phone: the sticky bar of a detail, as in the list/detail pages: the back arrow
+         closes the card, the actions of the card sit in it, and the title slides into it. -->
+    @if (phone()) {
+      <app-list-detail-bar [label]="'todos.card.back' | t" (back)="closeCard()" />
+    }
     <app-todo-card-detail
       [cardId]="id"
       [board]="board()"

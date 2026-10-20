@@ -636,6 +636,28 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).upcoming()).toHaveLength(2);
     });
 
+    it('titles the sheet "Heute" only when a meeting is today', async () => {
+      const iso = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const later = new Date(Date.now() + 3 * 86_400_000);
+      const { fixture } = await setup(MEMBER, {
+        timeline: { items: [meeting('p-later', 'planned', { date: iso(later) })], nextCursor: null },
+      });
+      expect(cmp(fixture).hasToday()).toBe(false);
+      expect(screen.queryByRole('heading', { name: 'Heute' })).not.toBeInTheDocument();
+      expect(screen.getByRole('complementary', { name: 'Heute' })).toBeInTheDocument();
+    });
+
+    it('titles the sheet "Heute" for a meeting planned today', async () => {
+      const d = new Date(Date.now());
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const { fixture } = await setup(MEMBER, {
+        timeline: { items: [meeting('p-today', 'planned', { date: today })], nextCursor: null },
+      });
+      expect(cmp(fixture).hasToday()).toBe(true);
+      expect(screen.getByRole('heading', { name: 'Heute' })).toBeInTheDocument();
+    });
+
     it('says "Keine Sitzungen" and why for a person in no gremium', async () => {
       const { fixture } = await setup(MEMBER, { delegations: 'error' });
       expect(cmp(fixture).noMeetings()).toBe(true);

@@ -57,6 +57,9 @@ import {
   StickyBarComponent,
   ToastService,
   trapTab,
+  ListDetailBarComponent,
+  ListDetailNavDirective,
+  SwipeBackDirective,
 } from '@stupa-makers/ui-kit';
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
@@ -161,12 +164,15 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     FabComponent,
     FilterSelectComponent,
     IconComponent,
+    ListDetailBarComponent,
+    ListDetailNavDirective,
     PageHeaderComponent,
     RowMenuComponent,
     SearchPillComponent,
     SegmentedComponent,
     StickyBarComponent,
     ScrollFadeDirective,
+    SwipeBackDirective,
     TodoArchiveSheetComponent,
     TodoBoardPickerComponent,
     TodoBoardRowsComponent,

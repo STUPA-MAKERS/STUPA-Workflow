@@ -59,7 +59,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
 
   'ui.rowMenu.trigger': 'More actions',
   'ui.selection.toolbar': 'Selection',
-  'ui.listDetail.back': 'Back to list',
   'ui.history.noDate': 'No date',
   'ui.history.showValues': 'Show values',
   'ui.history.hideValues': 'Hide values',
@@ -198,6 +197,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'table.actions': 'Actions',
   'action.close': 'Close',
   'action.retry': 'Try again',
+  'action.undo': 'Undo',
 
   'expenses.title': 'Bookings',
   'expenses.add': 'Add booking',
@@ -418,6 +418,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'formly.validation.pattern': 'The input has an invalid format.',
   'formly.validation.email': 'Enter a valid email address.',
 
+  'apply.leave': 'Back to start',
   'apply.nav.back': 'Back',
   'apply.nav.discard': 'Discard draft',
   'apply.nav.submit': 'Submit application',
@@ -748,8 +749,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.capture.incomplete': 'Fill in all required fields.',
   'applications.capture.done': 'Application entered. The applicant gets an email.',
   'applications.capture.error': 'The application could not be entered.',
-  'applications.capture.note': 'Entered by {name} on {date}',
-  'applications.capture.noteReceived': 'received on {date}',
   'applications.edit.title': 'Edit application',
   'applications.edit.saved': 'Saved. Version {version} created.',
   'applications.edit.invalid': 'Check the marked fields.',
@@ -3885,6 +3884,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'todos.card.titleLabel': 'Title',
   'todos.card.details': 'Details',
   'todos.card.activity': 'Activity',
+  'todos.card.activityOpen': 'Activity, {n}',
   'todos.card.move': 'Move',
   'todos.card.reopen': 'Reopen',
   'todos.card.done': 'Done',

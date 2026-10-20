@@ -270,7 +270,7 @@
   .wz__nav {
     flex-wrap: nowrap;
     padding: 10px var(--space-4);
-    border-radius: 0;
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl);
     background: var(--color-surface-3);
   }
 }

@@ -94,7 +94,6 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { provideFormly } from '@shared/formly/formly.providers';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { AmountComponent } from '@shared/ui/amount/amount.component';
-import { localToday } from '@shared/date-format';
 import { formatMoney } from '@shared/format-money';
 
 /** Field types whose old and new value do not fit on one line of the history. The
@@ -689,29 +688,6 @@ export class ApplicationsDetailComponent {
   readonly typeName = computed(() => {
     const app = this.app();
     return app ? (this.types().find((t) => t.id === app.typeId)?.name ?? null) : null;
-  });
-
-  /**
-   * #11: the note of a captured application, as parts of one line: "Erfasst von <Name>
-   * am <Datum>", "eingegangen am <Datum>" when the received date differs from the
-   * capture day, and the free-text "Eingang". Null for an own submission.
-   */
-  readonly captureParts = computed<string[] | null>(() => {
-    const cap = this.app()?.capture;
-    if (!cap) return null;
-    const t = (key: TranslationKey, params?: Record<string, string | number>) =>
-      this.i18n.translate(key, params);
-    const day = (d: Date) =>
-      new Intl.DateTimeFormat(this.i18n.formatLocale(), { dateStyle: 'medium' }).format(d);
-    const captured = new Date(cap.capturedAt);
-    const name = this.actor(cap.capturedBy, null) ?? t('actor.deleted');
-    const parts = [t('applications.capture.note', { name, date: day(captured) })];
-    if (cap.receivedOn && cap.receivedOn !== localToday(captured)) {
-      const [y, m, d] = cap.receivedOn.split('-').map(Number);
-      parts.push(t('applications.capture.noteReceived', { date: day(new Date(y, m - 1, d)) }));
-    }
-    if (cap.intake) parts.push(cap.intake);
-    return parts;
   });
 
   /** The status of the application as coloured text. */

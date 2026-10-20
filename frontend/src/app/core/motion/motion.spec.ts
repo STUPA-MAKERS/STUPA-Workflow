@@ -1,4 +1,5 @@
 import type { ActivatedRouteSnapshot, ViewTransitionInfo } from '@angular/router';
+import { markGestureNavigation } from '@stupa-makers/ui-kit';
 import { onRouteViewTransition, routeMotion, routePath, withViewTransition } from './motion';
 
 function snap(...levels: string[][]): ActivatedRouteSnapshot {
@@ -97,6 +98,18 @@ describe('onRouteViewTransition', () => {
     onRouteViewTransition(reduced);
     expect(reduced.transition.skipTransition).toHaveBeenCalled();
     expect(document.documentElement.dataset['motion']).toBeUndefined();
+  });
+
+  it('skips the pop after a swipe back, once', () => {
+    media({ [PHONE]: true });
+    markGestureNavigation();
+    const swiped = info(['antraege', '1'], ['antraege']);
+    onRouteViewTransition(swiped);
+    expect(swiped.transition.skipTransition).toHaveBeenCalled();
+    const next = info(['antraege', '1'], ['antraege']);
+    onRouteViewTransition(next);
+    expect(next.transition.skipTransition).not.toHaveBeenCalled();
+    expect(document.documentElement.dataset['motion']).toBe('pop');
   });
 });
 

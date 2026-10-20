@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter, withComponentInputBinding } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { render, screen } from '@testing-library/angular';
+import { MEDIA } from '@stupa-makers/ui-kit';
+import { drag, mediaMatching } from '../../../../testing/touch';
 import userEvent from '@testing-library/user-event';
 import { AuthService } from '@core/auth/auth.service';
 import { AdminApiService } from '../admin-api.service';
@@ -54,6 +56,13 @@ async function setup(perms: string[], url = '/admin/users', wide = true) {
             { path: 'flow', component: StubPageComponent, data: { adminNav: false, adminPane: true } },
             { path: 'plain', component: StubPageComponent, data: { adminNav: false } },
             { path: 'cost-centres', component: StubPageComponent },
+            { path: 'gremien/g1/members', component: StubPageComponent, data: { parent: ['admin', 'admin/gremien'] } },
+            { path: 'users', component: StubPageComponent, data: { parent: ['admin'] } },
+            {
+              path: 'forms/:id',
+              component: StubPageComponent,
+              data: { parent: ['admin', 'admin/forms'] },
+            },
             { path: '**', component: StubPageComponent },
           ],
         },
@@ -73,6 +82,67 @@ function navLinks(): HTMLAnchorElement[] {
   const nav = screen.getByRole('navigation', { name: 'Verwaltungsbereiche' });
   return [...nav.querySelectorAll<HTMLAnchorElement>('a.af__item')];
 }
+
+describe('AdminFrameComponent swipe back on a phone', () => {
+  afterEach(() => {
+    jest.useRealTimers();
+    jest.restoreAllMocks();
+  });
+
+  async function swipe(view: Awaited<ReturnType<typeof setup>>): Promise<Router> {
+    const router = view.fixture.debugElement.injector.get(Router);
+    jest.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    mediaMatching([MEDIA.phone, MEDIA.coarse]);
+    jest.useFakeTimers();
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    drag(page, { x: 4, y: 300 }, [{ x: 30, y: 300 }, { x: 300, y: 300 }], { release: false });
+    view.fixture.detectChanges();
+    expect(page).toHaveClass('af__page--swiping');
+    drag(page, { x: 0, y: 0 }, []);
+    jest.advanceTimersByTime(280);
+    expect(nav).toHaveBeenCalledTimes(1);
+    return router;
+  }
+
+  it('leads an admin page back to its nearest breadcrumb', async () => {
+    const view = await setup(ALL, '/admin/gremien/g1/members', false);
+    const router = await swipe(view);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin/gremien');
+  });
+
+  it('leads an admin page without a parent to the home page', async () => {
+    const view = await setup(ALL, '/admin/backups', false);
+    const router = await swipe(view);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+  });
+
+  it('puts the sheet back in place after the navigation', async () => {
+    const view = await setup(ALL, '/admin/users', false);
+    const router = await swipe(view);
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/admin');
+    jest.mocked(router.navigateByUrl).mockRestore();
+    jest.useRealTimers();
+    await view.fixture.ngZone!.run(() => router.navigateByUrl('/admin/backups'));
+    view.fixture.detectChanges();
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    expect(page).not.toHaveClass('af__page--swiping');
+    expect(page.style.left).toBe('');
+  });
+
+  it.each([
+    ['/admin', false],
+    ['/admin/users', true],
+    ['/admin/flow', false],
+  ] as const)('has no swipe on %s (wide: %p)', async (url, wide) => {
+    const view = await setup(ALL, url, wide);
+    mediaMatching([MEDIA.phone, MEDIA.coarse]);
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    drag(page, { x: 4, y: 300 }, [{ x: 30, y: 300 }, { x: 300, y: 300 }], { release: false });
+    view.fixture.detectChanges();
+    expect(page).not.toHaveClass('af__page--swiping');
+  });
+});
 
 describe('AdminFrameComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
@@ -285,6 +355,32 @@ describe('AdminFrameComponent', () => {
     expect(page.container.querySelector('.af')).not.toHaveClass('af--split');
   });
 
+  it('below wide: an admin page sits below the bar of a one-view page', async () => {
+    const view = await setup(ALL, '/admin/users', false);
+    expect(view.container.querySelector('app-list-detail-bar')).not.toBeNull();
+    expect(view.container.querySelector('.af__pageBody')).toHaveClass('ld-under-bar');
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
+    await view.fixture.whenStable();
+    expect(view.fixture.debugElement.injector.get(Router).url).toBe('/admin');
+  });
+
+  it('below wide: the back arrow leads to the parent page of the route', async () => {
+    const view = await setup(ALL, '/admin/forms/f1', false);
+    await userEvent.click(screen.getByRole('button', { name: 'Zur Liste' }));
+    await view.fixture.whenStable();
+    expect(view.fixture.debugElement.injector.get(Router).url).toBe('/admin/forms');
+  });
+
+  it('has no bar on the home page below wide', async () => {
+    const home = await setup(ALL, '/admin', false);
+    expect(home.container.querySelector('app-list-detail-bar')).toBeNull();
+  });
+
+  it('has no bar beside the navigation', async () => {
+    const wide = await setup(ALL, '/admin/users');
+    expect(wide.container.querySelector('app-list-detail-bar')).toBeNull();
+  });
+
   it('keeps the navigation above the page on the home page below wide', async () => {
     const home = await setup(ALL, '/admin', false);
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
@@ -395,6 +491,21 @@ describe('AdminFrameComponent in account mode', () => {
     expect(screen.getByRole('navigation', { name: 'Verwaltungsbereiche' })).toBeInTheDocument();
   });
 
+  it('leads an account page back to the account navigation on a swipe', async () => {
+    const view = await setupAccount(['mcp.use'], '/account/notifications', false);
+    const router = view.fixture.debugElement.injector.get(Router);
+    jest.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
+    const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+    mediaMatching([MEDIA.phone, MEDIA.coarse]);
+    jest.useFakeTimers();
+    const page = view.container.querySelector('.af__page') as HTMLElement;
+    drag(page, { x: 4, y: 300 }, [{ x: 30, y: 300 }, { x: 300, y: 300 }]);
+    jest.advanceTimersByTime(280);
+    jest.useRealTimers();
+    expect(nav).toHaveBeenCalledWith('/account');
+    jest.restoreAllMocks();
+  });
+
   it('shows "API-Zugang" only with mcp.use, like the account menu', async () => {
     await setupAccount([]);
     expect(accountLinks()).toEqual(['/account/notifications']);
@@ -426,12 +537,11 @@ describe('AdminFrameComponent in account mode', () => {
     expect(screen.getByText('MCP-Server und Zugriffe von Agenten')).toBeInTheDocument();
   });
 
-  it('below wide: an account page fills the width and "Zur Liste" leads back', async () => {
+  it('below wide: an account page fills the width and the back arrow of the bar leads back', async () => {
     const view = await setupAccount(['mcp.use'], '/account/grants', false);
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
-    const back = screen.getByRole('link', { name: 'Zur Liste' });
-    expect(back).toHaveAttribute('href', '/account');
+    const back = screen.getByRole('button', { name: 'Zur Liste' });
     await userEvent.click(back);
     await view.fixture.whenStable();
     view.fixture.detectChanges();

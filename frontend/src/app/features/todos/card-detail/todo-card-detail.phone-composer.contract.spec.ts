@@ -1,14 +1,13 @@
 /**
- * The phone composer of a card sits above the bottom navigation.
+ * The phone composer of a card sits at the foot of the activity sheet.
  *
- * In the drawer of the board the drawer ends on the bottom navigation, so the composer bar
- * sits at the foot of the drawer (`--chat-composer-bottom: 0px`). In the pane of
- * "Aufgaben" (`mode="pane"`) the page scrolls under the navigation, and the same offset put
- * the composer under the navigation. There the chat keeps its default offset
- * (`--app-bottom-inset`).
+ * On a phone the activity opens in a sheet from the bottom, in the board drawer and in the
+ * pane of "Aufgaben". The sheet lies over the bottom navigation, so its composer takes no
+ * offset for the navigation (`--chat-composer-bottom: 0px`). The chat of the wide columns
+ * keeps the default offset of the chat.
  *
- * jsdom applies no styles, so this spec reads the source: every rule of the card detail
- * that sets `--chat-composer-bottom` must leave out the pane.
+ * jsdom applies no styles, so this spec reads the source: only the chat of the sheet sets
+ * `--chat-composer-bottom`.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,11 +27,7 @@ function selectorsSetting(css: string, prop: string): string[] {
 }
 
 describe('card detail: phone composer offset', () => {
-  it('sets the zero composer offset only outside the pane of Aufgaben', () => {
-    const selectors = selectorsSetting(SCSS, '--chat-composer-bottom');
-    expect(selectors.length).toBeGreaterThan(0);
-    for (const selector of selectors) {
-      expect(selector).toContain(':not(.cd--pane)');
-    }
+  it('sets the zero composer offset only on the chat of the activity sheet', () => {
+    expect(selectorsSetting(SCSS, '--chat-composer-bottom')).toEqual(['.cd__chat--sheet']);
   });
 });

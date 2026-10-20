@@ -1,5 +1,27 @@
-import { render } from '@testing-library/angular';
+import { Component, inject } from '@angular/core';
+import { provideRouter } from '@angular/router';
+import { render, screen } from '@testing-library/angular';
+import { ListDetailBarComponent, ListDetailNav } from '@stupa-makers/ui-kit';
 import { PageHeaderComponent } from './page-header.component';
+
+/** An admin page below wide: the frame shows the bar, the page has its header. */
+@Component({
+  standalone: true,
+  imports: [ListDetailBarComponent, PageHeaderComponent],
+  providers: [ListDetailNav],
+  template: `
+    <app-list-detail-bar />
+    <app-page-header title="Flow-Editor">
+      <button actions type="button">Mehr</button>
+    </app-page-header>
+  `,
+})
+class OneViewPageComponent {
+  readonly nav = inject(ListDetailNav);
+  constructor() {
+    this.nav.active.set(true);
+  }
+}
 
 /**
  * The header carries two layout flags, and both exist because of a misalignment that
@@ -92,5 +114,17 @@ describe('PageHeaderComponent', () => {
     const host = await setup({ pane: true, titleTag: 'p' });
     expect(host.querySelector('h1')).toBeNull();
     expect(host.querySelector('p.ph__title')?.textContent).toBe('Anträge');
+  });
+
+  it('below the bar of a one-view page hands its actions and its title to the bar and drops the breadcrumbs', async () => {
+    const view = await render(OneViewPageComponent, { providers: [provideRouter([])] });
+    view.fixture.detectChanges();
+    const action = screen.getByRole('button', { name: 'Mehr' });
+    expect(action.closest('.ld__barActions')).not.toBeNull();
+    expect(view.container.querySelector('.ph__actions')).toBeNull();
+    expect(view.container.querySelector('app-breadcrumbs')).toBeNull();
+    // The bar shows the title; the header keeps it for screen readers only.
+    expect(screen.getByRole('heading', { level: 1, name: 'Flow-Editor' })).toHaveClass('sr-only');
+    expect(view.fixture.componentInstance.nav.title()).toBe('Flow-Editor');
   });
 });

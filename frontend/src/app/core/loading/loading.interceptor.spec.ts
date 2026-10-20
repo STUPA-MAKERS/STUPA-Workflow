@@ -4,7 +4,7 @@ import {
   HttpTestingController,
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
-import { SKIP_LOADING, loadingInterceptor, skipLoading } from './loading.interceptor';
+import { SKIP_LOADING, loadingInterceptor, quietly, skipLoading, visibly } from './loading.interceptor';
 import { LoadingService } from './loading.service';
 
 describe('loadingInterceptor', () => {
@@ -82,5 +82,20 @@ describe('loadingInterceptor', () => {
     expect(inc).toHaveBeenCalledTimes(1);
     httpMock.expectOne('/api/load').flush({});
     expect(dec).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts a quiet GET inside visibly(), and reports it as active', () => {
+    expect(loading.active()).toBe(false);
+    visibly(() => http.get('/api/list', { context: skipLoading() }).subscribe());
+    expect(inc).toHaveBeenCalledTimes(1);
+    expect(loading.active()).toBe(true);
+    httpMock.expectOne('/api/list').flush({});
+    expect(loading.active()).toBe(false);
+    // Outside it the context counts again, and quietly() still wins inside it.
+    http.get('/api/poll', { context: skipLoading() }).subscribe();
+    visibly(() => quietly(() => http.get('/api/ahead').subscribe()));
+    expect(inc).toHaveBeenCalledTimes(1);
+    httpMock.expectOne('/api/poll').flush({});
+    httpMock.expectOne('/api/ahead').flush({});
   });
 });

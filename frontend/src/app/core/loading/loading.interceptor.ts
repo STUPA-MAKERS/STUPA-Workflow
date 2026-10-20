@@ -27,6 +27,25 @@ export function quietly<T>(start: () => T): T {
   }
 }
 
+/** Reads started inside {@link visibly} right now. */
+let loud = 0;
+
+/**
+ * Start reads that count toward the bar although their call sets `SKIP_LOADING`: the
+ * reload of a pull to refresh. A list reads its first page quietly, because it shows its
+ * own placeholder; after a pull the person asked for the read, so the bar runs. Like
+ * {@link quietly}, the counter reaches every GET that `start` subscribes synchronously.
+ * {@link quietly} still wins: a read ahead stays quiet.
+ */
+export function visibly<T>(start: () => T): T {
+  loud++;
+  try {
+    return start();
+  } finally {
+    loud--;
+  }
+}
+
 /** Ready-made {@link HttpContext} that suppresses the global loading bar. */
 export function skipLoading(): HttpContext {
   return new HttpContext().set(SKIP_LOADING, true);
@@ -51,7 +70,7 @@ export function skipLoading(): HttpContext {
  * duration, including the auth and mock layers.
  */
 export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
-  if (req.method !== 'GET' || quiet > 0 || req.context.get(SKIP_LOADING)) {
+  if (req.method !== 'GET' || quiet > 0 || (req.context.get(SKIP_LOADING) && loud === 0)) {
     return next(req);
   }
   const loading = inject(LoadingService);

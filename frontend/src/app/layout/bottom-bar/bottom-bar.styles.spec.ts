@@ -18,15 +18,15 @@ function rule(css: string, selector: string): string {
 }
 
 describe('bottom bar styles', () => {
-  it('is 72px high plus the safe area, from the height the shell sets', () => {
-    expect(rule(shell, ':host')).toMatch(/--bottom-bar-height: 72px;/);
+  it('is 64px high plus the safe area, from the height the shell sets', () => {
+    expect(rule(shell, ':host')).toMatch(/--bottom-bar-height: 64px;/);
     expect(rule(bar, '.bb')).toMatch(
-      /height: calc\(var\(--bottom-bar-height, 72px\) \+ env\(safe-area-inset-bottom\)\);/,
+      /height: calc\(var\(--bottom-bar-height, 64px\) \+ env\(safe-area-inset-bottom\)\);/,
     );
     // No vertical padding above the entries: the entries centre in the bar.
     // The sides keep clear of the notch in landscape (the shell sets the insets).
     expect(rule(bar, '.bb')).toMatch(
-      /padding: 0 max\(var\(--space-2\), var\(--app-right-safe-area, 0px\)\) env\(safe-area-inset-bottom\)\s+max\(var\(--space-2\), var\(--app-left-safe-area, 0px\)\);/,
+      /padding: 0 max\(4px, var\(--app-right-safe-area, 0px\)\) env\(safe-area-inset-bottom\)\s+max\(4px, var\(--app-left-safe-area, 0px\)\);/,
     );
   });
 

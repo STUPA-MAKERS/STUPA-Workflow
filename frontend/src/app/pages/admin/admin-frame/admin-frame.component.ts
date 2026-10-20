@@ -29,11 +29,14 @@ import type { TranslationKey } from '@core/i18n/translations';
 import {
   EmptyStateComponent,
   IconComponent,
+  ListDetailBarComponent,
+  ListDetailNav,
   MEDIA,
   mediaQuery,
   ScrollFadeDirective,
   SearchPillComponent,
   StickyBarComponent,
+  SwipeBackDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { AdminHealthComponent } from '../admin-health/admin-health.component';
@@ -110,7 +113,11 @@ const sheetScroll = new Map<number, number>();
  *   stays in view; the page sits on a sheet with round corners that scrolls inside
  *   itself, so the corners clip its content in every scroll position. The breadcrumbs
  *   then leave out "Verwaltung", because the navigation shows it.
- * - Narrower: an admin page fills the width and the breadcrumb "Verwaltung" leads back.
+ * - Narrower: an admin page fills the width below the bar of a one-view page
+ *   (`app-list-detail-bar`), the same bar as above the detail of a list/detail page: the
+ *   back arrow to the parent page (`data.parent`, else the home page), the title in small
+ *   type once the big title has scrolled under the bar, and the actions of the page
+ *   header. The page header then has no breadcrumbs.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. Every other admin page,
  *   the cost centres too, keeps the navigation at every wide size (D6).
@@ -125,15 +132,17 @@ const sheetScroll = new Map<number, number>();
  * Account mode (route data `frame: 'account'`, see `FRAME_MODES`): the navigation
  * "Konto" lists the account pages (`ACCOUNT_PAGES`), without the search and without the
  * tiles. Wide, `/account` shows an empty sheet beside the navigation. Below wide,
- * `/account` shows the navigation alone, and an account page shows "Zur Liste" above
- * it, which leads back to the navigation.
+ * `/account` shows the navigation alone, and an account page has the same bar as an
+ * admin page.
  */
 @Component({
   selector: 'app-admin-frame',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [ListDetailNav],
   imports: [
     EmptyStateComponent,
+    ListDetailBarComponent,
     PageHeaderComponent,
     RouterOutlet,
     RouterLink,
@@ -144,6 +153,7 @@ const sheetScroll = new Map<number, number>();
     StickyBarComponent,
     ScrollFadeDirective,
     AdminHealthComponent,
+    SwipeBackDirective,
   ],
   host: { '[class.pane-page]': 'split() || fullPane()' },
   templateUrl: './admin-frame.component.html',
@@ -155,6 +165,8 @@ export class AdminFrameComponent {
   private readonly router = inject(Router);
   private readonly pageFrame = inject(PageFrameService);
   private readonly injector = inject(Injector);
+  /** The link to the bar: the page header reports its title and hands its actions to it. */
+  protected readonly nav = inject(ListDetailNav);
 
   /** The page sheet. Beside the navigation it is the scroll container of the page. */
   private readonly page = viewChild<ElementRef<HTMLElement>>('page');
@@ -215,8 +227,34 @@ export class AdminFrameComponent {
    */
   readonly navOnly = computed(() => this.home() && !this.split());
 
-  /** Below wide an account page shows "Zur Liste", which leads back to the navigation. */
-  readonly showBack = computed(() => this.mode().backLink && !this.home() && !this.showNav());
+  /** Below wide a page shows the bar of a one-view page, with the way back. */
+  readonly showBar = computed(() => !this.home() && !this.showNav());
+
+
+  /**
+   * One column, an area page (not the home page, not an editor that takes the full
+   * width): a swipe from the left edge of a phone leads back. The editors are left out,
+   * because their canvas and their columns take every touch.
+   */
+  readonly swipeBack = computed(() => !this.home() && !this.showNav() && !this.fullWidth());
+
+  /** A swipe back runs. */
+  protected readonly swiping = signal(false);
+
+  private readonly swipe = viewChild(SwipeBackDirective);
+
+  /** The parent of the open page in the breadcrumbs (`data.parent`), else the home page. */
+  private readonly parentPath = signal(parentOf(this.router.routerState.snapshot.root));
+
+  /**
+   * The way back of the bar and of a swipe: the parent page (`data.parent`, the same
+   * target as the breadcrumb link), else the home page of the area.
+   */
+  protected goBack(): void {
+    const target = this.parentPath() ?? this.mode().home;
+    window.scrollTo(0, 0);
+    void this.router.navigateByUrl(target);
+  }
 
   /** The groups with the pages the principal may open and the search finds. */
   readonly groups = computed<NavGroup[]>(() => {
@@ -252,6 +290,10 @@ export class AdminFrameComponent {
         this.path.set(pathOf(e.urlAfterRedirects));
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
         this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
+        this.parentPath.set(parentOf(this.router.routerState.snapshot.root));
+        // A swipe back that led to another page in the frame: the sheet goes back to its
+        // place with the new page.
+        this.swipe()?.done();
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
         afterNextRender(
           () => {
@@ -263,6 +305,7 @@ export class AdminFrameComponent {
       }
     });
     afterNextRender(() => this.revealActive());
+    effect(() => this.nav.active.set(this.showBar()));
 
     // Beside the navigation the frame is a pane page: it fills the window, without the
     // bottom padding of a page that scrolls.
@@ -313,4 +356,15 @@ export class AdminFrameComponent {
   protected linkOf(page: FramePage): string {
     return `${this.mode().home}/${page.link}`;
   }
+}
+
+/** The nearest parent path of the active route (`data.parent`), as a URL, or null. */
+function parentOf(root: ActivatedRouteSnapshot): string | null {
+  let parent: string | null = null;
+  for (let node: ActivatedRouteSnapshot | null = root; node; node = node.firstChild) {
+    const list = node.data?.['parent'] as string[] | undefined;
+    const last = list?.at(-1);
+    if (last) parent = `/${last}`;
+  }
+  return parent;
 }

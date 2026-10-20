@@ -64,9 +64,8 @@ import {
   shareOrCopy,
   SheetBarComponent,
   SheetBarTitleDirective,
+  SideSheetComponent,
   SkeletonComponent,
-  type TabItem,
-  TabsComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { TodoDueChipComponent } from '../due-chip/todo-due-chip.component';
@@ -84,8 +83,6 @@ import {
 } from '../todos.util';
 import { isoDay, weekdayDate } from '@shared/date-format';
 import { personName } from '@shared/person-label.util';
-
-type CardTab = 'details' | 'activity';
 
 /** The error codes of the card routes and their texts. */
 const ERROR_TEXT: Record<string, TranslationKey> = {
@@ -111,8 +108,11 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
  * Side by side: the thread (`app-chat`: the comments and the events, with no heading of its
  * own; its column is labelled "Aktivität") beside the fields
  * Spalte, Zuständig, Fällig, Label, then "Verknüpft" with the link picker,
- * "Beschreibung" and "Checkliste". Phone: the tabs Details | Aktivität and a bar with
- * "Verschieben" (the move sheet) and "Erledigt".
+ * "Beschreibung" and "Checkliste". Phone: the fields, a bar with "Verschieben" (the move
+ * sheet) and "Erledigt", and a chat button with the comment count in the sheet bar that
+ * opens the activity in a sheet from the bottom, as the comments of an application. In
+ * the board drawer of a phone the sheet bar docks into the bar of the drawer
+ * (`app-list-detail-bar`), as in the pane of "Aufgaben".
  *
  * Every change goes to the server at once and the answer replaces the card; `changed`
  * gives it to the board. The content edits (title, description, due date) carry the
@@ -149,8 +149,8 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
     SegBarComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
+    SideSheetComponent,
     SkeletonComponent,
-    TabsComponent,
     TodoDueChipComponent,
     TodoLinkPickerComponent,
     TodoMoveSheetComponent,
@@ -212,7 +212,8 @@ export class TodoCardDetailComponent {
   readonly notFound = signal(false);
   readonly error = signal(false);
   readonly members = signal<TodoMember[]>([]);
-  readonly tab = signal<CardTab>('details');
+  /** Phone: the sheet with the activity (the comments and the events) is open. */
+  readonly activityOpen = signal(false);
   readonly busy = signal(false);
 
   readonly editingTitle = signal(false);
@@ -409,17 +410,6 @@ export class TodoCardDetailComponent {
     })),
   );
 
-  /** The tabs while the card loads: no count yet. */
-  readonly busyTabs = computed<TabItem[]>(() => [
-    { id: 'details', label: this.t('todos.card.details') },
-    { id: 'activity', label: this.t('todos.card.activity') },
-  ]);
-
-  readonly tabs = computed<TabItem[]>(() => [
-    { id: 'details', label: this.t('todos.card.details') },
-    { id: 'activity', label: this.t('todos.card.activity'), count: this.card()?.comments.length ?? 0 },
-  ]);
-
   /**
    * The ⋮ menu. In the pane of "Aufgaben" on a phone it also holds "Im Board öffnen": the
    * header of a phone keeps the title and one action, so the link leaves the kicker line.
@@ -554,7 +544,7 @@ export class TodoCardDetailComponent {
       this.addingItem.set(false);
       this.editingItem.set(null);
       this.showDone.set(false);
-      this.tab.set('details');
+      this.activityOpen.set(false);
     }
     this.notFound.set(false);
     this.error.set(false);
@@ -1065,9 +1055,5 @@ export class TodoCardDetailComponent {
         if (current()) this.toast.error(this.t('todos.error.comment'));
       },
     });
-  }
-
-  selectTab(id: string): void {
-    this.tab.set(id === 'activity' ? 'activity' : 'details');
   }
 }
