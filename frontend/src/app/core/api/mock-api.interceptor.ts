@@ -2084,7 +2084,7 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
     if (p.endsWith('/auth/magic-link/verify')) {
       // Cookie model: the real server sets an HttpOnly applicant cookie. The
       // mock returns only the scope and the application id, no session token.
-      const res: MagicLinkVerifyResult = { application_id: MOCK_APP_ID, scope: 'edit', confirmed: true };
+      const res: MagicLinkVerifyResult = { application_id: MOCK_APP_ID, scope: 'edit', confirmed: false };
       return ok(res);
     }
     if (p.endsWith('/comments')) {
