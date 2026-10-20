@@ -56,6 +56,28 @@ describe('install metadata', () => {
     expect(png(join(PUBLIC, href as string))).toEqual({ width: 180, height: 180, alpha: false });
   });
 
+  it('gives every iPhone screen a launch image in the light and the dark theme', () => {
+    const links = [
+      ...indexHtml().matchAll(/<link rel="apple-touch-startup-image" media="([^"]+)" href="([^"]+)"/g),
+    ];
+    const screens = new Map<string, Set<string>>();
+    for (const [, media, href] of links) {
+      const w = Number(/\(device-width: (\d+)px\)/.exec(media)?.[1]);
+      const h = Number(/\(device-height: (\d+)px\)/.exec(media)?.[1]);
+      const ratio = Number(/\(-webkit-device-pixel-ratio: (\d)\)/.exec(media)?.[1]);
+      const scheme = /\(prefers-color-scheme: (light|dark)\)/.exec(media)?.[1] as string;
+      expect(media).toContain('(orientation: portrait)');
+      // iOS takes the image only when it is exactly as large as the screen.
+      expect(png(join(PUBLIC, href))).toEqual({ width: w * ratio, height: h * ratio, alpha: false });
+      const key = `${w}x${h}@${ratio}`;
+      screens.set(key, (screens.get(key) ?? new Set()).add(scheme));
+    }
+    // From the iPhone SE (375 x 667) to the 16 Pro Max and 17 Pro Max (440 x 956).
+    expect(screens.has('375x667@2')).toBe(true);
+    expect(screens.has('440x956@3')).toBe(true);
+    for (const schemes of screens.values()) expect([...schemes].sort()).toEqual(['dark', 'light']);
+  });
+
   it('keeps pinch zoom and lets the on-screen keyboard resize the layout', () => {
     const content = /<meta\s+name="viewport"\s+content="([^"]+)"/.exec(indexHtml())?.[1] ?? '';
     // WCAG 1.4.4: the person can zoom. The inputs are 16 px, so iOS does not zoom on focus.
