@@ -11,6 +11,7 @@ import { formatMoment } from '@core/i18n/localized-date.pipe';
 import {
   calendarDaysSince,
   clock,
+  daysUntil,
   shortDay,
   shortTime,
   weekdayName,
@@ -466,6 +467,13 @@ export class DashboardComponent {
       .slice(0, cap)
       .map((m) => ({ meeting: m, note: this.delegationNote(m.id), when: this.plannedLabel(m) }));
   });
+
+  /** A meeting runs or is planned for today: only then the sheet has the title "Heute". */
+  readonly hasToday = computed(
+    () =>
+      this.live().length > 0 ||
+      this.planned().some((m) => daysUntil(m.date, new Date(Date.now())) === 0),
+  );
 
   /** No live and no planned meeting (after the load): the sheet says so. */
   readonly noMeetings = computed(
