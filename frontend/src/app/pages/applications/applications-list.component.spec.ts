@@ -544,20 +544,21 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.stateOptions().map((o) => o.value)).toEqual(['s1', 's2']);
     });
 
-    it('picks a cost centre in the tree sheet, without the hidden ones', async () => {
+    it('picks a cost centre in the list of the chip, without the hidden ones', async () => {
       const { cmp, harness, http } = await start();
       expect(cmp.budgetTree()[0].children.map((c) => c.id)).toEqual(['b2']);
-      await userEvent.click(screen.getByRole('button', { name: 'Kostenstelle' }));
+      const chip = screen.getByRole('button', { name: 'Kostenstelle' });
+      await userEvent.click(chip);
       harness.detectChanges();
-      expect(cmp.budgetSheetOpen()).toBe(true);
-      cmp.selectBudgetNode('b2');
+      expect(chip.getAttribute('aria-expanded')).toBe('true');
+      await userEvent.click(screen.getByRole('option', { name: /Kultur/ }));
       await harness.fixture.whenStable();
       const req = http.expectOne(LIST);
       expect(req.request.params.get('budget')).toBe('b2');
       req.flush(page(ROWS));
       harness.detectChanges();
-      expect(cmp.sheet()).toBeNull();
-      expect(cmp.budgetChipLabel()).toBe('Kultur');
+      expect(chip.getAttribute('aria-expanded')).toBe('false');
+      expect(chip.textContent).toContain('Kultur');
       cmp.selectBudgetNode('');
       await harness.fixture.whenStable();
       const back = http.expectOne(LIST);
@@ -566,9 +567,9 @@ describe('ApplicationsListComponent', () => {
     });
 
     it('names an unknown cost centre with the filter name', async () => {
-      const { cmp, go } = await start();
+      const { go } = await start();
       await go('/applications?budget=gone');
-      expect(cmp.budgetChipLabel()).toBe('Kostenstelle');
+      expect(screen.getByRole('button', { name: /^Kostenstelle/ }).textContent?.trim()).toBe('Kostenstelle');
     });
 
     it('hides the cost-centre chip without a tree, and the type chip without types', async () => {

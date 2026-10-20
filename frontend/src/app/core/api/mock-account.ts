@@ -108,7 +108,7 @@ function consentRequest(): ConsentRequest {
     canUseMcp: !noMcp(),
     // The demo person holds no flow rights, so one scope shows the "not held" line.
     requestedScopes: keys.map((key) => ({ key, held: key !== 'flows:write' })),
-    lifetimes: ['1h', '8h', '1d', '30d', '90d'],
+    lifetimes: ['1h', '8h', '1d', '30d', '90d', 'never'],
     defaultLifetime: '30d',
   };
 }

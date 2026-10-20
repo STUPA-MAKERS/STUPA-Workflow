@@ -397,4 +397,68 @@ describe('CostCentreSelectComponent', () => {
     expect(view.container.querySelector('app-cost-centre-select')).toHaveClass('ccs--card');
     expect(view.container.querySelector('.ccs__chevron')).toBeNull();
   });
+
+  it('runs as a filter chip with "Alle" on top, and names an unknown id', async () => {
+    @Component({
+      standalone: true,
+      imports: [CostCentreSelectComponent],
+      template: `<app-cost-centre-select
+        variant="chip"
+        label="Kostenstelle"
+        allLabel="Alle"
+        unknownLabel="Unbekannt"
+        [nodes]="nodes"
+        [value]="value()"
+        (picked)="value.set($event)"
+      />`,
+    })
+    class ChipHost {
+      readonly nodes = TREE;
+      readonly value = signal('');
+    }
+    const view = await render(ChipHost);
+    const user = userEvent.setup();
+    const chip = screen.getByRole('button', { name: 'Kostenstelle' });
+    expect(view.container.querySelector('app-cost-centre-select')).toHaveClass('ccs--chip');
+    expect(chip).toHaveTextContent('Kostenstelle');
+    expect(chip).not.toHaveClass('on');
+    await user.click(chip);
+    const list = screen.getByRole('listbox', { name: 'Kostenstelle' });
+    const options = within(list).getAllByRole('option');
+    // "Alle" is the first choice and is picked while no cost centre is.
+    expect(options[0]).toHaveTextContent('Alle');
+    expect(options[0]).toHaveAttribute('aria-selected', 'true');
+    expect(options[0].querySelector('.ccs__swatch')).toBeNull();
+    await user.click(screen.getByRole('option', { name: /Erstsemesterparty/ }));
+    view.fixture.detectChanges();
+    expect(chip).toHaveAccessibleName('Kostenstelle: Erstsemesterparty');
+    expect(chip).toHaveClass('on');
+    // A search hides "Alle"; Enter picks the first hit.
+    await user.click(chip);
+    const search = screen.getByRole('combobox');
+    await user.type(search, 'tutor');
+    expect(screen.queryByRole('option', { name: 'Alle' })).toBeNull();
+    await user.keyboard('{Enter}');
+    expect(view.fixture.componentInstance.value()).toBe('tut');
+    // Back to "Alle" from the top of the list.
+    await user.click(chip);
+    await user.click(screen.getByRole('option', { name: 'Alle' }));
+    expect(view.fixture.componentInstance.value()).toBe('');
+    view.fixture.componentInstance.value.set('gone');
+    view.fixture.detectChanges();
+    expect(chip).toHaveTextContent('Unbekannt');
+  });
+
+  it('names "Alle" in the field while no cost centre is picked', async () => {
+    @Component({
+      standalone: true,
+      imports: [CostCentreSelectComponent],
+      template: `<app-cost-centre-select label="Kostenstelle" allLabel="Keine" [nodes]="nodes" value="" />`,
+    })
+    class AllHost {
+      readonly nodes = TREE;
+    }
+    await render(AllHost);
+    expect(screen.getByRole('button', { name: /^Kostenstelle/ })).toHaveTextContent('Keine');
+  });
 });

@@ -21,7 +21,7 @@ import {
   type NotifyRecipient,
   type TransitionDef,
 } from '../admin.models';
-import { CostCentrePickerComponent } from '../../budget/cost-centre-picker.component';
+import { CostCentreSelectComponent } from '../../budget/cost-centre-select/cost-centre-select.component';
 import { GuardEditorComponent } from './guard-editor.component';
 import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.util';
 
@@ -43,7 +43,7 @@ import { actionParamOf, recipientNeedsRef, recipientsOf } from './flow-guard.uti
     InputComponent,
     SelectFieldComponent,
     GuardEditorComponent,
-    CostCentrePickerComponent,
+    CostCentreSelectComponent,
   ],
   templateUrl: './transition-detail.component.html',
   styleUrl: './transition-detail.component.scss',

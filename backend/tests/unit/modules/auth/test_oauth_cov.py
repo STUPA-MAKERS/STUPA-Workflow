@@ -462,6 +462,28 @@ def test_consent_approve_success_mints_code(monkeypatch: pytest.MonkeyPatch) -> 
     assert db.committed == 1
 
 
+def test_consent_never_mints_code_without_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
+    db = fake_session(result("pid-row"))
+    seen: dict[str, object] = {}
+
+    async def _create(db: object, **kw: object) -> str:
+        seen.update(kw)
+        return "apac_never"
+
+    monkeypatch.setattr(
+        oauth_router_mod.oauth_service, "create_authorization_code", _create
+    )
+    client = _build_client(ENABLED, db=db, principal=_mcp_principal())
+    client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope="read"))
+    resp = client.post(
+        "/api/oauth/consent",
+        json={"approve": True, "scopes": ["read"], "lifetime": "never"},
+    )
+    assert resp.status_code == 200
+    # "never" → access_ttl_seconds None: the token pair never expires.
+    assert seen["access_ttl_seconds"] is None
+
+
 def test_consent_approve_success_without_state(monkeypatch: pytest.MonkeyPatch) -> None:
     db = fake_session(result("pid-row"))
 

@@ -2672,20 +2672,17 @@ describe('ExpensesComponent (list/detail)', () => {
     http.match((r) => r.url.endsWith('/expenses')).forEach((r) => r.flush(page([])));
   });
 
-  it('opens the cost-centre tree as a sheet and filters by the picked node', async () => {
+  it('opens the cost-centre list of the chip and filters by the picked node', async () => {
     const { fixture, http } = await setup({ page: page([EXPENSE]), tree: FIG_TREE });
-    const chip = await screen.findByRole('button', { name: /^Kostenstelle: Kostenstelle/ });
+    const chip = await screen.findByRole('button', { name: 'Kostenstelle' });
     await userEvent.click(chip);
     expect(chip.getAttribute('aria-expanded')).toBe('true');
-    await userEvent.click(screen.getByRole('button', { name: /Öffentlichkeit/ }));
+    await userEvent.click(screen.getByRole('option', { name: /Öffentlichkeit/ }));
     const req = http.expectOne((r) => r.url.endsWith('/expenses') && r.params.get('budget') === 'b-1');
     req.flush(page([EXPENSE]));
     fixture.detectChanges();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const c = fixture.componentInstance as any;
-    expect(c.pickerOpen()).toBe(false);
-    expect(c.costCentreName()).toBe('Öffentlichkeit');
-    expect(c.costCentreColor()).toBe('#2f7fc1');
+    expect(chip.getAttribute('aria-expanded')).toBe('false');
+    expect(chip.getAttribute('aria-label')).toBe('Kostenstelle: Öffentlichkeit');
   });
 
   it('runs the kind, period and amount chips', () => {

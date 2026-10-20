@@ -133,7 +133,9 @@ and every live card, done ones too; `cardCount` = the live cards of the column; 
 token gate (403), the same weak ETag and 304, and a constant number of queries: one for
 the boards, one for the cards, one each for columns and labels, and the tile facts),
 `GET /link-targets` (`kind` = `all` or a `TodoLinkKind`), `GET /linked?kind&targetId`
-(`TodoLinkedKind`: every kind but `todo`), `POST /cards`, `GET|PATCH
+(`TodoLinkedKind`: every kind but `todo`), `GET /cards?ids=` (the read-ahead of the board
+page: up to 50 whole cards (`CARD_BATCH`) in the order of `ids`; an unreadable or unknown
+card is left out, not 404; `TodoService.cards`), `POST /cards`, `GET|PATCH
 /cards/{id}` (PATCH needs `version`, 409 `card_version_conflict`), `POST
 /cards/{id}/move` (`afterId`/`beforeId`, 422 `rank_neighbors_invalid`), `POST
 /cards/{id}/transfer` (`CardTransfer`: `boardId`, `columnId?` = default the first column,

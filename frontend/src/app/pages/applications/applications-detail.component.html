@@ -452,15 +452,14 @@
   [closeLabel]="'action.close' | t"
   (closed)="budgetDialogOpen.set(false)"
 >
-  <div class="ad__ccTree" appScrollFade="y">
-    <app-cost-centre-tree
-      [nodes]="budgetTree()"
-      [selectedId]="budgetChoice()"
-      [allLabel]="'applications.budget.none' | t"
-      [ariaLabel]="'applications.budget.field' | t"
-      (picked)="onBudgetPicked($event)"
-    />
-  </div>
+  <app-cost-centre-select
+    [label]="'applications.budget.field' | t"
+    [allLabel]="'applications.budget.none' | t"
+    [nodes]="budgetTree()"
+    [value]="budgetChoice()"
+    [fiscalYearId]="fiscalChoice()"
+    (picked)="onBudgetPicked($event)"
+  />
   @if (budgetChoice()) {
     <app-select
       class="ad__ccFy"

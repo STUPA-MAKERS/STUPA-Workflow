@@ -154,8 +154,8 @@ describe('TransitionDetailComponent', () => {
       },
       { budgetTree: TREE },
     );
-    // The pickers show the path key and the name, an unknown id shows no id.
-    expect(screen.getAllByText('VSM · Studierendenschaft')).toHaveLength(2);
+    // The fields show the name, an unknown id shows no id.
+    expect(screen.getAllByText('Studierendenschaft')).toHaveLength(2);
     expect(screen.getByText('Unbekannte Kostenstelle')).toBeInTheDocument();
     expect(screen.queryByText('gone')).toBeNull();
   });

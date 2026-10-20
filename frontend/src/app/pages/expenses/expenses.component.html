@@ -62,26 +62,15 @@
         />
         <div class="exp__chips" role="group" appScrollFade="x" [attr.aria-label]="'expenses.filter.group' | t">
           @if (budgetTree().length) {
-            <button
-              type="button"
-              class="chip exp__chip"
-              [class.on]="budgetId() !== ''"
-              aria-haspopup="dialog"
-              [attr.aria-expanded]="pickerOpen()"
-              [attr.aria-label]="('expenses.filter.costCentre' | t) + ': ' + costCentreName()"
-              [title]="costCentreName()"
-              (click)="pickerOpen.set(true)"
-            >
-              @if (costCentreColor(); as c) {
-                <span class="exp__swatch" aria-hidden="true" [style.background]="c"></span>
-              } @else {
-                <app-icon name="pie" [size]="15" />
-              }
-              <span class="ell">{{ costCentreName() }}</span>
-              @if (!budgetId()) {
-                <app-icon name="down" [size]="15" />
-              }
-            </button>
+            <app-cost-centre-select
+              class="exp__chip"
+              variant="chip"
+              [label]="'expenses.filter.costCentre' | t"
+              [allLabel]="'expenses.filter.all' | t"
+              [nodes]="budgetTree()"
+              [value]="budgetId()"
+              (picked)="selectBudget($event)"
+            />
           }
           @if (tab() === 'bookings') {
             <app-filter-select
@@ -549,17 +538,6 @@
     <ng-container *ngTemplateOutlet="form; context: { $implicit: true }" />
   </app-side-sheet>
 }
-
-<!-- Cost centre: the tree of the applications page, with "Alle" on top. -->
-<app-side-sheet [side]="sheetSide()" [heading]="'expenses.filter.costCentre' | t" [(open)]="pickerOpen">
-  <app-cost-centre-tree
-    [nodes]="budgetTree()"
-    [selectedId]="budgetId()"
-    [allLabel]="'expenses.filter.all' | t"
-    [ariaLabel]="'expenses.filter.costCentre' | t"
-    (picked)="selectBudget($event)"
-  />
-</app-side-sheet>
 
 <!-- "Umbuchen" one pane at a time; side by side it is a section of the bulk panel. -->
 <app-side-sheet [side]="sheetSide()" [heading]="'expenses.bulk.reassignTitle' | t" [(open)]="bulkReassignOpen">

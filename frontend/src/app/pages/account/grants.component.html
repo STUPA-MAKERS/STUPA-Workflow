@@ -89,7 +89,7 @@
                 <span class="gr__metaItem"
                   >{{ 'account.grants.expires' | t }}
                   <span class="mono">{{
-                    g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : '—'
+                    g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : ('account.lifetime.never' | t)
                   }}</span></span
                 >
               </span>

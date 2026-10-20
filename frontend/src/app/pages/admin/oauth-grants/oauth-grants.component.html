@@ -53,11 +53,11 @@
             </div>
             <div class="og__field og__field--access">
               <span class="og__lbl">{{ 'admin.oauthGrants.col.accessExpires' | t }}</span>
-              <span>{{ g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : '—' }}</span>
+              <span>{{ g.accessExpiresAt ? (g.accessExpiresAt | ldate: 'medium') : ('account.lifetime.never' | t) }}</span>
             </div>
             <div class="og__field og__field--refresh">
               <span class="og__lbl">{{ 'admin.oauthGrants.col.refreshExpires' | t }}</span>
-              <span>{{ g.refreshExpiresAt ? (g.refreshExpiresAt | ldate: 'mediumDate') : '—' }}</span>
+              <span>{{ g.refreshExpiresAt ? (g.refreshExpiresAt | ldate: 'mediumDate') : ('account.lifetime.never' | t) }}</span>
             </div>
             @if (canRevoke()) {
               <div class="og__act">
