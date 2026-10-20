@@ -1,8 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { catchError, distinctUntilChanged, forkJoin, map, of, startWith, Subject, switchMap, type Observable } from 'rxjs';
+import { catchError, map, of, startWith, Subject, switchMap, type Observable } from 'rxjs';
 import { ApiClient } from '@core/api/api-client.service';
 import { type Delegation, DelegationsApiService } from '@core/api/delegations.service';
 import { AuthService } from '@core/auth/auth.service';
@@ -11,10 +11,8 @@ import { formatMoment } from '@core/i18n/localized-date.pipe';
 import {
   calendarDaysSince,
   clock,
-  localToday,
   shortDay,
   shortTime,
-  weekdayDate,
   weekdayName,
 } from '@shared/date-format';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
@@ -63,13 +61,6 @@ import { closedStatus } from '../../features/voting/election.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
 import { NavService } from '../../layout/nav.service';
-import {
-  type BudgetAllocationView,
-  type BudgetTreeNode,
-  BudgetTreeApi,
-  type FiscalYear,
-} from '../budget/budget-tree.api';
-import { formatMoney } from '@shared/format-money';
 
 /** The rows a tab loads. The list scrolls inside its pane; "Alle … öffnen" shows the rest. */
 const ROWS = 25;
@@ -81,8 +72,6 @@ const MEETINGS_XL = 5;
 const PHONE_MEETINGS = 2;
 /** Meetings the timeline loads: the live ones and enough planned ones for every width. */
 const TIMELINE_LIMIT = 8;
-/** At most this many cost-centre roots in the budget summary. */
-const BUDGET_ROOTS = 2;
 
 /** The tabs of the work list. The URL keeps the choice as `?tab=`. */
 export type WorkTab = 'tasks' | 'mine' | 'votes';
@@ -93,14 +82,12 @@ export interface WorkRow {
   id: Uuid;
   link: readonly string[];
   title: string;
-  type: string;
   statusLabel: string;
   statusKind: StatusKind;
   /** "4 Tage" (tasks) or "28.08." (own applications). */
   since: string;
   /** The exact moment, for the tooltip. */
   sinceTitle: string | null;
-  amount: string | null;
 }
 
 /** A row of "Abstimmungen". */
@@ -134,31 +121,19 @@ export interface UpcomingRow {
   when: string;
 }
 
-/** The figures of one cost-centre root for its current fiscal year. */
-export interface BudgetSummary {
-  id: Uuid;
-  fyId: Uuid;
-  title: string;
-  available: string;
-  /** Bound plus spent, in percent of the allocation. */
-  used: number;
-  allocated: number;
-  committed: number;
-}
-
 type Loaded<T> = T | null | undefined;
 
 /**
  * The start page of a signed-in person (variant B "Arbeitsliste + Seitenleiste").
  *
- * Left: the search pill with "Antrag stellen", the greeting, and ONE work list with the
+ * Left: the search pill, the greeting, and ONE work list with the
  * tabs "Offene Aufgaben", "Meine Anträge" and "Abstimmungen". The tabs show their counts
  * and the URL keeps the choice (`?tab=`). Each tab is a table with real columns; a row
- * opens its detail page, and "Alle … öffnen" opens the full list.
+ * opens its detail page, and "Alle … öffnen" opens the full list. Wide, "Antrag stellen"
+ * is a floating button at the foot of the list column; narrower, at the foot of the page.
  *
  * Right: the sheet "Heute" with the live meeting (progress, the own vote state, "Live
- * beitreten"), the next meetings (with "Du vertrittst …" from the delegations) and, for a
- * person who may see budgets, a budget summary.
+ * beitreten") and the next meetings (with "Du vertrittst …" from the delegations).
  *
  * Wide, the page is a pane page: the document does not scroll, the list and the sheet
  * scroll inside themselves and reach down to the pane gap, because the page has no
@@ -211,7 +186,6 @@ export class DashboardComponent {
   /** The search pill at the top opens the global search. */
   protected readonly palette = inject(CommandPaletteService);
   private readonly api = inject(ApiClient);
-  private readonly budgetApi = inject(BudgetTreeApi);
   private readonly i18n = inject(I18nService);
   private readonly nav = inject(NavService);
   private readonly delegationsApi = inject(DelegationsApiService);
@@ -252,34 +226,6 @@ export class DashboardComponent {
     { initialValue: [] as ApplicationType[] },
   );
 
-  /** The budget pages are open to the user (a global budget right or a scoped view). */
-  readonly canSeeBudget = computed(() => this.navVisible('budget'));
-  /** The invoice list is open to the user (a global budget right). */
-  private readonly canSeeInvoices = computed(() => this.navVisible('invoices'));
-  /** The budget summary. It loads once the session shows the right, never without it. */
-  readonly budgets = toSignal(
-    toObservable(this.canSeeBudget).pipe(
-      distinctUntilChanged(),
-      switchMap((allowed) => (allowed ? this.budgetSummaries() : of([] as BudgetSummary[]))),
-    ),
-    { initialValue: [] as BudgetSummary[] },
-  );
-  /** Open invoices, counted only for a person who may open the invoice list. */
-  readonly openInvoices = toSignal(
-    toObservable(this.canSeeInvoices).pipe(
-      distinctUntilChanged(),
-      switchMap((allowed) =>
-        allowed
-          ? this.budgetApi.listInvoicesPaged({ status: 'open', limit: 1 }).pipe(
-              map((page) => page.total),
-              catchError(() => of(0)),
-            )
-          : of(0),
-      ),
-    ),
-    { initialValue: 0 },
-  );
-
   private readonly typeName = computed(() => {
     const names = new Map(this.types().map((t) => [t.id, t.name]));
     // No raw id as a fallback: the types load late or can fail.
@@ -293,14 +239,6 @@ export class DashboardComponent {
 
   /** The first word of the display name: "Willkommen, Mara". */
   readonly firstName = computed(() => this.auth.displayName().trim().split(/\s+/)[0]);
-
-  /** The gremien of the user, as one line under the greeting. */
-  readonly gremienLine = computed(() =>
-    this.auth
-      .gremien()
-      .map((g) => g.name)
-      .join(' · '),
-  );
 
   // ---------------------------------------------------------------- tabs
 
@@ -421,14 +359,12 @@ export class DashboardComponent {
   /** The columns of "Offene Aufgaben" and "Meine Anträge". */
   readonly workColumns = computed<ColumnDef[]>(() => [
     { key: 'title', label: this.i18n.translate('dashboard.col.application'), card: 'title' },
-    { key: 'type', label: this.i18n.translate('dashboard.col.type'), width: '9rem' },
     { key: 'status', label: this.i18n.translate('dashboard.col.status'), width: '9rem' },
     {
       key: 'since',
       label: this.i18n.translate(this.tab() === 'mine' ? 'dashboard.col.since' : 'dashboard.col.waiting'),
       width: '6.5rem',
     },
-    { key: 'amount', label: this.i18n.translate('dashboard.col.amount'), align: 'end', width: '7rem' },
     { key: 'go', label: '', align: 'end', width: '3.25rem' },
   ]);
 
@@ -459,12 +395,10 @@ export class DashboardComponent {
       id: item.id,
       link,
       title: item.title?.trim() || type || this.i18n.translate('applications.list.untitled'),
-      type,
       statusLabel: item.state?.label ?? '',
       statusKind: flowColorKind(item.state?.color),
       since,
       sinceTitle: this.longMoment(at),
-      amount: this.money(item.amount, item.currency),
     };
   }
 
@@ -504,7 +438,6 @@ export class DashboardComponent {
   // ---------------------------------------------------------------- today
 
   /** "Di, 29.09.2026". */
-  readonly todayLabel = computed(() => weekdayDate(new Date(Date.now()), this.i18n.formatLocale()));
 
   readonly meetingsLoading = computed(() => this.timeline() === undefined);
   /** The meetings page is open to the user: the sheet links to it. */
@@ -577,66 +510,10 @@ export class DashboardComponent {
     return [day, shortTime(m.startTime)].filter((s) => !!s).join(', ');
   }
 
-  // ---------------------------------------------------------------- budget
-
-  /**
-   * The budget figures of the cost-centre roots the server shows the user, for the fiscal
-   * year that holds today (else the active one, else the first one the server lists).
-   */
-  private budgetSummaries(): Observable<BudgetSummary[]> {
-    return this.budgetApi.tree().pipe(
-      switchMap((tree) => {
-        const roots = tree.filter((n) => !n.hiddenInBudget).slice(0, BUDGET_ROOTS);
-        if (!roots.length) return of([] as (BudgetSummary | null)[]);
-        return forkJoin(
-          roots.map((root) =>
-            this.budgetApi.listFiscalYears(root.id).pipe(
-              map((fys) => this.summary(root, fys, roots.length > 1)),
-              catchError(() => of(null)),
-            ),
-          ),
-        );
-      }),
-      map((rows) => rows.filter((r): r is BudgetSummary => r !== null)),
-      catchError(() => of([] as BudgetSummary[])),
-    );
-  }
-
-  private summary(root: BudgetTreeNode, fys: FiscalYear[], named: boolean): BudgetSummary | null {
-    const today = localToday(new Date(Date.now()));
-    const fy =
-      fys.find((f) => f.startDate <= today && today <= f.endDate) ??
-      fys.find((f) => f.active) ??
-      fys[0];
-    const view: BudgetAllocationView | undefined = fy
-      ? root.byFiscalYear.find((v) => v.fiscalYearId === fy.id)
-      : undefined;
-    if (!fy || !view) return null;
-    const allocated = Number(view.allocated) || 0;
-    const committed = (Number(view.bound) || 0) + (Number(view.expended) || 0);
-    return {
-      id: root.id,
-      fyId: fy.id,
-      title: named
-        ? this.i18n.translate('dashboard.today.budgetNamed', { name: root.name, year: fy.display })
-        : this.i18n.translate('dashboard.today.budget', { year: fy.display }),
-      available: this.money(view.available, root.currency) ?? '',
-      used: allocated > 0 ? Math.round((committed / allocated) * 100) : 0,
-      allocated,
-      committed,
-    };
-  }
-
   // ---------------------------------------------------------------- format
 
   private navVisible(key: string): boolean {
     return this.nav.visible().some((i) => i.key === key);
-  }
-
-  /** The amount in its currency, or null without an amount. */
-  private money(value: string | null | undefined, currency: string | null | undefined): string | null {
-    if (value === null || value === undefined || value === '') return null;
-    return formatMoney(value, this.i18n.formatLocale(), { currency }) || value;
   }
 
   /** How long a task waits, in calendar days: "heute", "1 Tag", "5 Tage". */

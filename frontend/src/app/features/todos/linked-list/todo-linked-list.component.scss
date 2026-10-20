@@ -55,8 +55,10 @@
   inset: 0;
   content: '';
 }
-.tl__link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .tl__link:hover {
+    text-decoration: underline;
+  }
 }
 .tl__link:focus-visible {
   outline: none;

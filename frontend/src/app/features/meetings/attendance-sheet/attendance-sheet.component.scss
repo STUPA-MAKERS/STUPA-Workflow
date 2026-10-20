@@ -156,9 +156,11 @@
 .as__opt + .as__opt {
   border-inline-start: var(--border-width) solid var(--color-border-strong);
 }
-.as__opt:hover:not(.as__opt--on):not([aria-disabled='true']) {
-  background: var(--color-surface-4);
-  color: var(--color-text);
+@media (hover: hover) {
+  .as__opt:hover:not(.as__opt--on):not([aria-disabled='true']) {
+    background: var(--color-surface-4);
+    color: var(--color-text);
+  }
 }
 .as__opt:focus-visible {
   outline: 2px solid var(--color-focus-ring);

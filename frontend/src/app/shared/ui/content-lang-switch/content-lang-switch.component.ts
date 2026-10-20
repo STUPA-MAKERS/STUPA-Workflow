@@ -19,6 +19,9 @@ const OPTIONS: readonly SegmentedOption[] = [
  * ```html
  * <app-content-lang-switch [(value)]="lang" [ariaLabel]="'admin.brand.textLang' | t" />
  * ```
+ *
+ * `width="fill"` lets the switch take the width of its container, so a page can make it
+ * full width on a phone.
  */
 @Component({
   selector: 'app-content-lang-switch',
@@ -33,6 +36,8 @@ export class ContentLangSwitchComponent {
   readonly value = model<ContentLang>('de');
   /** The accessible name of the switch. */
   readonly ariaLabel = input.required<string>();
+  /** `equal`: as wide as its segments. `fill`: as wide as its container. */
+  readonly width = input<'equal' | 'fill'>('equal');
 
   protected readonly options = OPTIONS as SegmentedOption[];
 

@@ -107,8 +107,10 @@
   white-space: nowrap;
   cursor: pointer;
 }
-.sd__chip:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .sd__chip:hover {
+    background: var(--color-surface-3);
+  }
 }
 .sd__chip:focus-visible {
   outline: 2px solid var(--color-focus-ring);
@@ -126,8 +128,10 @@
 .sd__chip--static {
   cursor: default;
 }
-.sd__chip--static:hover {
-  background: transparent;
+@media (hover: hover) {
+  .sd__chip--static:hover {
+    background: transparent;
+  }
 }
 .sd__chipText {
   min-width: 0;

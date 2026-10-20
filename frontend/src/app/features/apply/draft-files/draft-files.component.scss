@@ -80,9 +80,11 @@
   color: var(--color-text-muted);
   cursor: pointer;
 }
-.df__remove:hover {
-  background: var(--color-surface-3);
-  color: var(--color-text);
+@media (hover: hover) {
+  .df__remove:hover {
+    background: var(--color-surface-3);
+    color: var(--color-text);
+  }
 }
 .df__row--failed .df__name {
   color: var(--color-text-muted);

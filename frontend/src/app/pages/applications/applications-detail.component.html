@@ -90,6 +90,7 @@
     <!-- A file dropped anywhere on the application becomes an attachment. -->
     <article
       class="ad"
+      animate.enter="motion-fade-in"
       [class.ad--split]="split()"
       [class.ad--stale]="switching()"
       [attr.inert]="switching() ? '' : null"

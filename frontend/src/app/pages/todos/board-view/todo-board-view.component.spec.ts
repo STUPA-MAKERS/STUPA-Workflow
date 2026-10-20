@@ -315,6 +315,18 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toBeNull();
   });
 
+  it('gives a short pulse when a card lifts for a pointer drag', async () => {
+    const { cmp } = await setup();
+    const vibrate = jest.fn(() => true);
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true });
+    try {
+      cmp.onDragStart(cmp.columns()[0]);
+      expect(vibrate).toHaveBeenCalledWith(15);
+    } finally {
+      delete (navigator as { vibrate?: unknown }).vibrate;
+    }
+  });
+
   it('marks the board as a scroll container for the drag', async () => {
     const { container } = await setup();
     expect(container.querySelector('.bv')).toHaveAttribute('cdkScrollable');

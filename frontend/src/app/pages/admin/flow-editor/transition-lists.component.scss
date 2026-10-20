@@ -38,8 +38,10 @@
   color: var(--color-text);
   cursor: pointer;
 }
-.tl__row:hover {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  .tl__row:hover {
+    background: var(--color-surface-4);
+  }
 }
 .tl__row:focus-visible {
   outline: 2px solid var(--color-focus-ring);

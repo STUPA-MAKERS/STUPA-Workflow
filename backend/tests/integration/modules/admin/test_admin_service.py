@@ -4,7 +4,7 @@ The tests run against a real schema. Flow version creation maps the graph to sta
 transition rows. The version counter grows, and a partial unique index keeps exactly
 one version active. CRUD for Gremium, application type, role and webhook reports a
 conflict on a duplicate key. RBAC delegation runs through `role_assignment` and
-`group_mapping`. The site-config draft and activate cycle (#21) produces a new active
+`group_mapping`. Each site-config save (#21) produces a new active
 version. Each of these steps writes an audit entry.
 """
 
@@ -447,32 +447,24 @@ async def test_webhook_crud_secret_not_exposed(session: AsyncSession, engine: En
         await svc.update_webhook(uuid.uuid4(), WebhookUpdate(active=True), _ACTOR)
 
 
-async def test_site_config_draft_activate_cycle(session: AsyncSession) -> None:
+async def test_site_config_save_cycle(session: AsyncSession) -> None:
     svc = SiteConfigService(session)
     empty = await svc.get()
-    assert empty.version == 0 and empty.has_draft_changes is False
+    assert empty.version == 0
 
-    b1 = Branding.model_validate({"copyright": {"de": "© 2026 StuPa"}})
-    after_draft = await svc.put_draft(b1, _ACTOR)
-    assert after_draft.has_draft_changes is True
-    assert after_draft.version == 0  # not activated yet
+    b1 = Branding.model_validate({"copyright": {"de": "© 2026 STUPA"}})
+    first = await svc.save(b1, _ACTOR)
+    assert first.version == 1
+    assert first.branding.copyright == {"de": "© 2026 STUPA"}
 
-    activated = await svc.activate(_ACTOR)
-    assert activated.version == 1 and activated.has_draft_changes is False
-    assert activated.active.copyright == {"de": "© 2026 StuPa"}
-
-    b2 = Branding.model_validate({"copyright": {"de": "© 2027"}})
-    await svc.put_draft(b2, _ACTOR)
-    mid = await svc.get()
-    assert mid.version == 1 and mid.has_draft_changes is True
-    assert mid.active.copyright == {"de": "© 2026 StuPa"}
-    assert mid.draft.copyright == {"de": "© 2027"}
-
-    final = await svc.activate(_ACTOR)
+    b2 = Branding.model_validate({"copyright": {"de": "© 2027"}, "accentColor": "#0075BF"})
+    final = await svc.save(b2, _ACTOR)
     assert final.version == 2
+    assert final.branding.accent_color == "#0075bf"
 
     pub = await svc.public()
     assert pub.version == 2 and pub.branding.copyright == {"de": "© 2027"}
+    assert pub.branding.accent_color == "#0075bf"
 
     # Exactly one active version, held by the partial unique index.
     actives = (
@@ -484,11 +476,7 @@ async def test_site_config_draft_activate_cycle(session: AsyncSession) -> None:
     ).all()
     assert actives[0] == 1
 
-    # Activation without an open draft raises a conflict.
-    with pytest.raises(ConflictError):
-        await svc.activate(_ACTOR)
-
-    # Every activation writes an audit entry.
+    # Every save writes an audit entry.
     acts = (
         await session.scalars(
             select(AuditEntry.action).where(AuditEntry.target_type == "site_config")

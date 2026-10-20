@@ -30,10 +30,6 @@
       [label]="'search.title' | t"
       (activate)="palette.open()"
     />
-    <a class="dash__btn dash__btn--fill" routerLink="/apply">
-      <app-icon name="plus" [size]="18" />
-      {{ 'dashboard.apply.title' | t }}
-    </a>
   }
 </div>
 
@@ -41,26 +37,12 @@
   class="dash__head"
   [flush]="true"
   [title]="'dashboard.greeting' | t: { name: firstName() }"
-  [subtitle]="gremienLine() || null"
 />
 
-<!-- "Heute": the live meeting, the next meetings, the budget. -->
+<!-- "Heute": the live meeting and the next meetings. -->
 <aside class="dash__today" aria-labelledby="dash-today-h">
   <header class="dash__todayHead">
-    <div class="dash__todayTitle">
-      <span class="dash__todayDate">{{ todayLabel() }}</span>
-      <h2 id="dash-today-h" class="dash__todayH">{{ 'dashboard.today.title' | t }}</h2>
-    </div>
-    @if (canSeeMeetings()) {
-      <a
-        class="dash__iconBtn"
-        routerLink="/meetings"
-        [attr.aria-label]="'dashboard.today.meetings' | t"
-        [title]="'dashboard.today.meetings' | t"
-      >
-        <app-icon name="cal" [size]="20" />
-      </a>
-    }
+    <h2 id="dash-today-h" class="dash__todayH">{{ 'dashboard.today.title' | t }}</h2>
   </header>
 
   <div class="dash__todayBody" appScrollFade="y">
@@ -154,33 +136,6 @@
       />
     }
 
-    @if (budgets().length) {
-      <section class="dash__block" aria-labelledby="dash-finance-h">
-        <div class="dash__blockHead">
-          <h3 id="dash-finance-h" class="sec">{{ 'dashboard.today.finance' | t }}</h3>
-        </div>
-        @for (b of budgets(); track b.id; let first = $first) {
-          <a class="dash__budget" routerLink="/budget" [queryParams]="{ budget: b.id, fy: b.fyId }">
-            <span class="dash__budgetHead">
-              <span class="dash__budgetTitle">{{ b.title }}</span>
-              <span class="mono dash__budgetSum">{{ b.available }}</span>
-            </span>
-            <app-seg-bar
-              size="thin"
-              [segments]="[{ value: b.committed, tone: 'filled' }]"
-              [total]="b.allocated"
-              [label]="'dashboard.today.used' | t: { n: b.used }"
-            />
-            <span class="dash__sub">
-              {{ 'dashboard.today.available' | t }}<span class="dash__dot" aria-hidden="true">·</span>{{ 'dashboard.today.used' | t: { n: b.used } }}
-              @if (first && openInvoices()) {
-                <span class="dash__dot" aria-hidden="true">·</span>{{ (openInvoices() === 1 ? 'dashboard.today.invoicesOne' : 'dashboard.today.invoices') | t: { n: openInvoices() } }}
-              }
-            </span>
-          </a>
-        }
-      </section>
-    }
   </div>
 </aside>
 
@@ -263,12 +218,6 @@
                 @if (r.statusLabel) {
                   <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
                 }
-                @if (r.statusLabel && r.amount) {
-                  <span class="dash__dot" aria-hidden="true">·</span>
-                }
-                @if (r.amount) {
-                  <span class="mono">{{ r.amount }}</span>
-                }
               </span>
               <span trail class="dash__date num" [attr.title]="r.sinceTitle">{{ r.since }}</span>
             </app-list-item>
@@ -329,6 +278,10 @@
   @if (phone()) {
     <ng-container *ngTemplateOutlet="allLinkTpl" />
   }
+  @if (wide()) {
+    <!-- Wide: the button stands at the end of the work list, beside the sheet "Heute". -->
+    <app-fab [label]="'fab.application' | t" link="/apply" [contained]="true" />
+  }
 </section>
 
 <ng-template #allLinkTpl>
@@ -339,9 +292,10 @@
   }
 </ng-template>
 
-@if (phone()) {
+@if (!wide()) {
   <app-fab [label]="'fab.application' | t" link="/apply" />
-
+}
+@if (phone()) {
   <app-side-sheet side="bottom" [heading]="'shell.account.region' | t" [(open)]="accountOpen">
     <app-account-menu variant="sheet" (navigated)="closeAccount()" />
   </app-side-sheet>

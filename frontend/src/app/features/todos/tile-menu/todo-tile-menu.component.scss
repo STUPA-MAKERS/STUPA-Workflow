@@ -35,8 +35,10 @@
   text-align: start;
   cursor: pointer;
 }
-.tm__item:hover:not(:disabled) {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .tm__item:hover:not(:disabled) {
+    background: var(--color-surface-3);
+  }
 }
 .tm__item:focus-visible {
   outline: 2px solid var(--color-focus-ring);

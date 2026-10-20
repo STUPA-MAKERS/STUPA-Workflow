@@ -1,7 +1,7 @@
 """Branding and site-config schema for the editor frontend.
 
-This schema is the single source of truth. Logos, footer (link columns,
-copyright and legal links) and i18n freetexts come from the config. The route
+This schema is the single source of truth. Logos, footer (copyright and legal
+links) and i18n freetexts come from the config. The route
 ``/admin/config-schemas`` serves the schema.
 
 Security contract for the logos. The frontend sends a logo inline as a base64
@@ -178,16 +178,6 @@ class FooterLink(_CamelModel):
         return _reject_unsafe_url(v)
 
 
-class FooterColumn(_CamelModel):
-    label: I18nMap = Field(default_factory=dict)
-    links: list[FooterLink] = Field(default_factory=list, max_length=50)
-
-    @field_validator("label")
-    @classmethod
-    def _cap_label(cls, v: I18nMap) -> I18nMap:
-        return _cap_i18n(v, MAX_LABEL_CHARS)
-
-
 class SiteFreetexts(_CamelModel):
     """i18n freetexts (login hint, welcome, support, e-mail footer, apply info,
     texts after the submission)."""
@@ -256,6 +246,10 @@ class TicketSettings(_CamelModel):
     retention_months: int | None = Field(default=12, alias="retentionMonths", ge=1, le=120)
 
 
+#: The accent colour: six hex digits, so the frontend can derive the theme tokens.
+ACCENT_PATTERN = r"^#[0-9a-fA-F]{6}$"
+
+
 class Branding(_CamelModel):
     """Full branding config (active or draft)."""
 
@@ -267,9 +261,6 @@ class Branding(_CamelModel):
         default="", alias="appShortName", max_length=MAX_LABEL_CHARS
     )
     logos: dict[LogoSlot, BrandingAsset] = Field(default_factory=dict)
-    footer_columns: list[FooterColumn] = Field(
-        default_factory=list, alias="footerColumns", max_length=20
-    )
     copyright: I18nMap = Field(default_factory=dict)
     legal_links: list[FooterLink] = Field(
         default_factory=list, alias="legalLinks", max_length=50
@@ -280,10 +271,28 @@ class Branding(_CamelModel):
     # contacts gravatar.com. False turns the proxy off: it answers 404 and the frontend
     # shows the initials. A config from before this field reads as True.
     gravatar_enabled: bool = Field(default=True, alias="gravatarEnabled")
+    # The accent colour of the whole app, as ``#rrggbb``. The frontend derives the
+    # accent tokens of the light and the dark theme from it. None means the built-in
+    # accent of the design system.
+    accent_color: str | None = Field(default=None, alias="accentColor", pattern=ACCENT_PATTERN)
     # The help menu and the ticket reports ("Hilfe & Tickets"). A config from before
     # these fields reads as the defaults.
     help: HelpSettings = Field(default_factory=HelpSettings)
     tickets: TicketSettings = Field(default_factory=TicketSettings)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_footer_columns(cls, data: object) -> object:
+        # The footer has no link columns. A stored config from before still carries
+        # the key, and `extra="forbid"` would reject that config, so it is dropped.
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if k not in ("footerColumns", "footer_columns")}
+        return data
+
+    @field_validator("accent_color")
+    @classmethod
+    def _lower_accent(cls, v: str | None) -> str | None:
+        return v.lower() if v is not None else None
 
     @field_validator("copyright")
     @classmethod

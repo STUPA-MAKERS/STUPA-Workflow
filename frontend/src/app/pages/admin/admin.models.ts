@@ -1252,11 +1252,6 @@ export interface FooterLink {
   url: string;
 }
 
-export interface FooterColumn {
-  label: I18nMap;
-  links: FooterLink[];
-}
-
 export interface SiteFreetexts {
   /** Login hint, landing/welcome, support, email footer — each i18n. */
   loginHint: I18nMap;
@@ -1279,12 +1274,13 @@ export interface Branding {
   /** Short app name (PWA icon/home screen). Empty ⇒ the default. */
   appShortName?: string;
   logos: Partial<Record<LogoSlot, BrandingAsset>>;
-  footerColumns: FooterColumn[];
   copyright: I18nMap;
   legalLinks: FooterLink[];
   freetexts: SiteFreetexts;
   /** Show the Gravatar images of the avatars. Missing (an older config) = on. */
   gravatarEnabled?: boolean;
+  /** The accent colour of the app (`#rrggbb`). Missing or null = the built-in accent. */
+  accentColor?: string | null;
   /** The handbook link of the help menu (page "Hilfe & Tickets"). */
   help?: { wikiUrl: string };
   /** The ticket settings (page "Hilfe & Tickets"). */
@@ -1307,12 +1303,10 @@ export interface HelpTicketsSettings {
 }
 
 /** Versioned site config: active version + editable draft. */
+/** `GET`/`PUT /admin/site-config`: the active branding and its version. */
 export interface SiteConfig {
   version: number;
-  active: Branding;
-  draft: Branding;
-  /** true when `draft` carries unsaved/unactivated changes. */
-  hasDraftChanges: boolean;
+  branding: Branding;
 }
 
 /**

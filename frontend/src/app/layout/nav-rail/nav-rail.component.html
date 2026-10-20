@@ -1,6 +1,6 @@
 <nav class="rail" [attr.aria-label]="'nav.main' | t">
   <a class="rail__brand" routerLink="/dashboard" [attr.aria-label]="'shell.nav.brand' | t: { name: branding.appName() }">
-    <img [src]="markSrc" alt="" width="40" height="40" />
+    <img [src]="markSrc()" alt="" width="40" height="40" />
   </a>
 
   <!-- The search stays in reach on every page, not only on the start page. -->

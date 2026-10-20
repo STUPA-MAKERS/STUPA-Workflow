@@ -1365,7 +1365,7 @@ async def put_login_settings(
     return LoginSettingsOut.model_validate(row, from_attributes=True)
 
 
-# Site config and branding with draft and activate semantics.
+# Site config and branding: a save writes a new active version, there is no draft.
 @router.get(
     "/site-config",
     response_model=SiteConfigOut,
@@ -1373,33 +1373,23 @@ async def put_login_settings(
     responses=_errors(401, 403),
 )
 async def get_site_config(service: SiteServiceDep) -> SiteConfigOut:
-    """Active branding config plus current draft plus change flag."""
+    """The active branding config and its version."""
     return await service.get()
 
 
 @router.put(
-    "/site-config/draft",
+    "/site-config",
     response_model=SiteConfigOut,
     responses=_errors(400, 401, 403, 422),
 )
-async def put_site_config_draft(
+async def put_site_config(
     payload: Branding, service: SiteServiceDep, principal: SiteAdmin
 ) -> SiteConfigOut:
-    """Set the branding draft.
+    """Save the branding as the new active version (version bump, audited).
 
     A logo must be an image. Inline SVG is not allowed. An invalid payload gives 422.
     """
-    return await service.put_draft(payload, principal.sub)
-
-
-@router.post(
-    "/site-config/activate",
-    response_model=SiteConfigOut,
-    responses=_errors(400, 401, 403, 409),
-)
-async def activate_site_config(service: SiteServiceDep, principal: SiteAdmin) -> SiteConfigOut:
-    """Activate the draft as a new active version (version bump, audited)."""
-    return await service.activate(principal.sub)
+    return await service.save(payload, principal.sub)
 
 
 # The page "Hilfe & Tickets" saves directly, without draft and activate.

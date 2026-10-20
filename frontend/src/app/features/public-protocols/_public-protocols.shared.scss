@@ -14,9 +14,11 @@
     color: var(--color-text-muted);
     text-decoration: none;
   }
-  #{$sel} a:hover {
-    color: var(--color-text);
-    text-decoration: underline;
+  @media (hover: hover) {
+    #{$sel} a:hover {
+      color: var(--color-text);
+      text-decoration: underline;
+    }
   }
   #{$sel} a:focus-visible {
     outline: 2px solid var(--color-focus-ring);
@@ -64,8 +66,10 @@
     white-space: nowrap;
     cursor: pointer;
   }
-  #{$sel}:hover {
-    background: var(--color-surface-2);
+  @media (hover: hover) {
+    #{$sel}:hover {
+      background: var(--color-surface-2);
+    }
   }
   #{$sel}:focus-visible {
     outline: 2px solid var(--color-focus-ring);
@@ -76,16 +80,20 @@
     background: var(--color-accent);
     color: var(--color-on-accent);
   }
-  #{$sel}--fill:hover {
-    background: var(--color-accent);
-    filter: brightness(1.08);
+  @media (hover: hover) {
+    #{$sel}--fill:hover {
+      background: var(--color-accent);
+      filter: brightness(1.08);
+    }
   }
   #{$sel}--tonal {
     border-color: transparent;
     background: var(--color-surface-3);
     color: var(--color-text);
   }
-  #{$sel}--tonal:hover {
-    background: var(--color-surface-4);
+  @media (hover: hover) {
+    #{$sel}--tonal:hover {
+      background: var(--color-surface-4);
+    }
   }
 }

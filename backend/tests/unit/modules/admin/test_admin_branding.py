@@ -28,7 +28,6 @@ def _png(url: str = "data:image/png;base64,iVBORw0KGgo=") -> dict:
 def test_empty_branding_defaults() -> None:
     b = Branding()
     assert b.logos == {}
-    assert b.footer_columns == []
     assert b.freetexts.welcome == {}
     assert b.freetexts.submitted_internal == {}
     assert b.freetexts.submitted_external == {}
@@ -37,9 +36,6 @@ def test_empty_branding_defaults() -> None:
 def test_full_branding_roundtrip_by_alias() -> None:
     raw = {
         "logos": {"wordmark": _png(), "imagemark": _png(), "favicon": _png()},
-        "footerColumns": [
-            {"label": {"de": "Links"}, "links": [{"label": {"de": "X"}, "url": "/x"}]}
-        ],
         "copyright": {"de": "© 2026"},
         "legalLinks": [{"label": {"de": "Impressum"}, "url": "https://e.x/impressum"}],
         "freetexts": {
@@ -54,7 +50,7 @@ def test_full_branding_roundtrip_by_alias() -> None:
     b = Branding.model_validate(raw)
     assert set(b.logos) == {"wordmark", "imagemark", "favicon"}
     dumped = b.model_dump(by_alias=True)
-    assert "footerColumns" in dumped
+    assert "footerColumns" not in dumped
     assert dumped["freetexts"]["loginHint"] == {"de": "Hinweis"}
     assert dumped["freetexts"]["submittedInternal"]["en"] == "Thanks."
     assert dumped["freetexts"]["submittedExternal"] == {"de": "Bitte bestätige die E-Mail."}
@@ -211,10 +207,18 @@ def test_overlong_submitted_text_rejected(key: str) -> None:
         Branding.model_validate({"freetexts": {key: {"en": "x" * (MAX_FREETEXT_CHARS + 1)}}})
 
 
+def test_stored_footer_columns_are_dropped() -> None:
+    raw = {"footerColumns": [{"label": {"de": "Links"}, "links": []}], "copyright": {"de": "©"}}
+    b = Branding.model_validate(raw)
+    assert "footerColumns" not in b.model_dump(by_alias=True)
+    assert b.copyright == {"de": "©"}
+    assert Branding.model_validate(Branding()).copyright == {}
+
+
 def test_overlong_footer_label_rejected() -> None:
     with pytest.raises(ValidationError):
         Branding.model_validate(
-            {"footerColumns": [{"label": {"de": "y" * 600}, "links": []}]}
+            {"legalLinks": [{"label": {"de": "y" * 600}, "url": "https://e.x"}]}
         )
 
 

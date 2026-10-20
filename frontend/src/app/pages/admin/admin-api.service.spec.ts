@@ -94,20 +94,15 @@ describe('AdminApiService — mock mode', () => {
     expect(saved.permissions).toContain('flow.configure');
   });
 
-  it('saves a branding draft and activates a new version', (done) => {
+  it('saves the branding as a new active version', (done) => {
     const s = svc();
     s.getSiteConfig().subscribe((cfg) => {
       expect(cfg.version).toBe(1);
-      expect(cfg.hasDraftChanges).toBe(false);
-      const draft: Branding = { ...cfg.draft, copyright: { de: 'Neu', en: 'New' } };
-      s.saveBrandingDraft(draft).subscribe((withDraft) => {
-        expect(withDraft.hasDraftChanges).toBe(true);
-        s.activateBranding().subscribe((activated) => {
-          expect(activated.version).toBe(2);
-          expect(activated.active.copyright['de']).toBe('Neu');
-          expect(activated.hasDraftChanges).toBe(false);
-          done();
-        });
+      const branding: Branding = { ...cfg.branding, copyright: { de: 'Neu', en: 'New' } };
+      s.saveSiteConfig(branding).subscribe((saved) => {
+        expect(saved.version).toBe(2);
+        expect(saved.branding.copyright['de']).toBe('Neu');
+        done();
       });
     });
   });
@@ -174,10 +169,10 @@ describe('AdminApiService — real mode (contract)', () => {
 
     s.getSiteConfig().subscribe();
     http.expectOne('/api/admin/site-config').flush({});
-    s.saveBrandingDraft({} as never).subscribe();
-    expect(http.expectOne('/api/admin/site-config/draft').request.method).toBe('PUT');
-    s.activateBranding().subscribe();
-    expect(http.expectOne('/api/admin/site-config/activate').request.method).toBe('POST');
+    s.saveSiteConfig({} as never).subscribe();
+    const put = http.expectOne('/api/admin/site-config');
+    expect(put.request.method).toBe('PUT');
+    put.flush({});
   });
 
   it('wires principal/role-assignment/permission endpoints', () => {

@@ -24,12 +24,11 @@ describe('isAllowedLinkUrl', () => {
 });
 
 describe('brandingLinkErrors', () => {
-  function branding(footerUrl: string, legalUrl: string): Branding {
+  function branding(...urls: string[]): Branding {
     return {
       logos: {},
-      footerColumns: [{ label: { de: 'x' }, links: [{ label: { de: 'l' }, url: footerUrl }] }],
       copyright: { de: '©' },
-      legalLinks: [{ label: { de: 'p' }, url: legalUrl }],
+      legalLinks: urls.map((url) => ({ label: { de: 'p' }, url })),
       freetexts: { loginHint: {}, welcome: {}, support: {}, emailFooter: {} },
     };
   }
@@ -38,7 +37,7 @@ describe('brandingLinkErrors', () => {
     expect(brandingLinkErrors(branding('https://a.org', 'mailto:a@b.org'))).toEqual([]);
   });
 
-  it('collects unsafe footer and legal links', () => {
+  it('collects unsafe legal links', () => {
     const errs = brandingLinkErrors(branding('javascript:1', 'data:x'));
     expect(errs).toContain('javascript:1');
     expect(errs).toContain('data:x');
@@ -49,17 +48,7 @@ describe('brandingLinkErrors', () => {
     expect(brandingLinkErrors(undefined)).toEqual([]);
   });
 
-  it('collects links across multiple footer columns', () => {
-    const b: Branding = {
-      logos: {},
-      footerColumns: [
-        { label: { de: 'a' }, links: [{ label: { de: 'l1' }, url: 'https://ok.org' }] },
-        { label: { de: 'b' }, links: [{ label: { de: 'l2' }, url: 'ftp://bad' }] },
-      ],
-      copyright: { de: '©' },
-      legalLinks: [],
-      freetexts: { loginHint: {}, welcome: {}, support: {}, emailFooter: {} },
-    };
-    expect(brandingLinkErrors(b)).toEqual(['ftp://bad']);
+  it('keeps only the unsafe ones of several links', () => {
+    expect(brandingLinkErrors(branding('https://ok.org', 'ftp://bad'))).toEqual(['ftp://bad']);
   });
 });

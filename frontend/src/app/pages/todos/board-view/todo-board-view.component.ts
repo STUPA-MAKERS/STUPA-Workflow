@@ -23,6 +23,7 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import {
   ButtonComponent,
+  haptic,
   IconComponent,
   LongPressDirective,
   matchesMedia,
@@ -289,6 +290,8 @@ export class TodoBoardViewComponent {
   }
 
   onDragStart(col: TodoColumn): void {
+    // The card lifts (after the long press on a touch screen): a short pulse says so.
+    haptic('lift');
     // A pointer drag computes its move from the shown lists, so a held card goes back first.
     this.cancelKeyDrag();
     this.ptr.set({ from: col.id, over: col.id });

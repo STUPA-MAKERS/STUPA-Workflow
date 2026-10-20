@@ -81,10 +81,15 @@
   text-align: start;
   cursor: pointer;
 }
-.bp__row:hover,
 .bp__row[aria-current='true'] {
   background: var(--color-selected);
   color: var(--color-on-selected);
+}
+@media (hover: hover) {
+  .bp__row:hover {
+    background: var(--color-selected);
+    color: var(--color-on-selected);
+  }
 }
 .bp__row:focus-visible {
   outline: 2px solid var(--color-focus-ring);
