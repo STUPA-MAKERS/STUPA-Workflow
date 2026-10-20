@@ -171,6 +171,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'account.lifetime.1d': '1 day',
   'account.lifetime.30d': '30 days',
   'account.lifetime.90d': '90 days',
+  'account.lifetime.never': 'Never expires',
   'account.scope.read.label': 'Read',
   'account.scope.read.desc': 'Read applications, budgets, meetings, votes.',
   'account.scope.applications_write.label': 'Edit applications',

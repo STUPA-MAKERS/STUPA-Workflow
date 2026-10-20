@@ -47,7 +47,7 @@ describe('mockAccount (FE13 demo data)', () => {
     expect(req.canUseMcp).toBe(true);
     expect(req.requestedScopes).toHaveLength(8);
     expect(req.requestedScopes.filter((s) => !s.held).map((s) => s.key)).toEqual(['flows:write']);
-    expect(req.lifetimes).not.toContain('never');
+    expect(req.lifetimes).toContain('never');
     localStorage.setItem('mockNoMcp', '1');
     expect((mockAccount('GET', '/api/oauth/consent-request', null)!.body as ConsentRequest).canUseMcp).toBe(false);
   });

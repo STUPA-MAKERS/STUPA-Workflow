@@ -102,13 +102,15 @@ def test_resolve_lifetime_known_and_default() -> None:
     assert oauth.resolve_lifetime("bogus") == default
 
 
-def test_resolve_lifetime_never_dropped_and_bounded() -> None:
-    # The "never" option is gone → an unknown key → the default, not None.
-    assert "never" not in oauth.LIFETIMES
-    assert oauth.resolve_lifetime("never") == oauth.LIFETIMES[oauth.DEFAULT_LIFETIME]
-    # Every lifetime is finite and capped by MAX_LIFETIME_SECONDS.
+def test_resolve_lifetime_never_and_bounded() -> None:
+    # "never" → None, a token without expiry.
+    assert oauth.LIFETIMES["never"] is None
+    assert oauth.resolve_lifetime("never") is None
+    # Every finite lifetime is capped by MAX_LIFETIME_SECONDS.
     assert oauth.MAX_LIFETIME_SECONDS == 90 * 24 * 3600
-    for key in oauth.LIFETIMES:
+    for key, value in oauth.LIFETIMES.items():
+        if value is None:
+            continue
         ttl = oauth.resolve_lifetime(key)
         assert ttl is not None
         assert ttl <= oauth.MAX_LIFETIME_SECONDS

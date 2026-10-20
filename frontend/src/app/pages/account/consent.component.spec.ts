@@ -38,7 +38,7 @@ const REQ: ConsentRequest = {
   clientId: 'antragsplattform-mcp',
   canUseMcp: true,
   requestedScopes: ALL_SCOPES.map((key) => ({ key, held: key !== 'flows:write' })),
-  lifetimes: ['1h', '8h', '1d', '30d', '90d'],
+  lifetimes: ['1h', '8h', '1d', '30d', '90d', 'never'],
   defaultLifetime: '30d',
 };
 
@@ -122,9 +122,9 @@ describe('OAuthConsentComponent', () => {
     expect(screen.getByRole('checkbox', { name: 'future:write' })).toBeInTheDocument();
   });
 
-  it('offers the lifetimes of the server, the default chosen, and no "never"', async () => {
+  it('offers the lifetimes of the server, "never" included, the default chosen', async () => {
     await setup();
-    const chips = ['1 Stunde', '8 Stunden', '1 Tag', '30 Tage', '90 Tage'].map((n) =>
+    const chips = ['1 Stunde', '8 Stunden', '1 Tag', '30 Tage', '90 Tage', 'Unbegrenzt'].map((n) =>
       screen.getByRole('radio', { name: n }),
     );
     expect(screen.getByRole('radiogroup', { name: 'Gültigkeitsdauer' })).toBeInTheDocument();
@@ -134,8 +134,8 @@ describe('OAuthConsentComponent', () => {
       'false',
       'true',
       'false',
+      'false',
     ]);
-    expect(screen.queryByText(/nie ab/)).toBeNull();
   });
 
   it('shows an unknown lifetime by its key', async () => {
