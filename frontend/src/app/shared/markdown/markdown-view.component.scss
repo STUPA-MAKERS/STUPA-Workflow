@@ -110,6 +110,13 @@
   text-align: start;
   vertical-align: top;
   border-bottom: var(--border-width) solid var(--color-border);
+  /* The view and hosts such as the card description break text anywhere. In a cell that
+     splits a word such as "Genehmigt" at a random letter, because the column then shrinks
+     below its longest word. A cell breaks a word only at a hyphenation point, and a table
+     too wide for its cells scrolls sideways in its wrapper. */
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: auto;
 }
 .mdv th {
   font-size: var(--fs-cap);

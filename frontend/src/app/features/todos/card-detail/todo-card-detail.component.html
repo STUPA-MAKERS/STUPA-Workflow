@@ -171,7 +171,7 @@
         <section class="cd__col cd__col--chat" [class.cd__col--readonly]="!canWrite()" [attr.aria-label]="'todos.card.activity' | t">
           <ng-container *ngTemplateOutlet="activity" />
         </section>
-        <div class="cd__col cd__col--details">
+        <div class="cd__col cd__col--details" appScrollFade="y">
           <ng-container *ngTemplateOutlet="details; context: { $implicit: card }" />
         </div>
       </div>
