@@ -259,7 +259,7 @@ describe('CommandPaletteComponent', () => {
     cmp.onQuery('zzz');
     await answer(http, { hits: [], truncated: false, failed: [] });
     fixture.detectChanges();
-    expect(screen.getByText('Nichts gefunden.')).toBeInTheDocument();
+    expect(screen.getByText('Nichts gefunden.').closest('app-empty-state')).not.toBeNull();
   });
 
   it('survives a failed request without leaving the spinner up', async () => {
