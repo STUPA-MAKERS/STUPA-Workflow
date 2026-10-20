@@ -106,13 +106,12 @@ describe('AccountGrantsComponent', () => {
     expect(second).toHaveTextContent('Erstellt —');
   });
 
-  it('never says "Läuft nie ab": a grant without an expiry shows a dash', async () => {
+  it('shows a grant without an expiry as "Unbegrenzt"', async () => {
     const api = makeApi({
       listGrants: jest.fn(() => of([{ ...clone(GRANTS[0]), accessExpiresAt: null }])),
     });
     await setup({ api });
-    expect(rows()[0]).toHaveTextContent('Läuft ab —');
-    expect(screen.queryByText(/nie ab/)).toBeNull();
+    expect(rows()[0]).toHaveTextContent('Läuft ab Unbegrenzt');
   });
 
   it('shows an unknown scope by its key', async () => {

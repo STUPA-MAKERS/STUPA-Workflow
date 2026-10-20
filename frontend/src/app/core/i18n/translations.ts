@@ -175,6 +175,7 @@ export const de = {
   'account.lifetime.1d': '1 Tag',
   'account.lifetime.30d': '30 Tage',
   'account.lifetime.90d': '90 Tage',
+  'account.lifetime.never': 'Unbegrenzt',
   'account.scope.read.label': 'Lesen',
   'account.scope.read.desc': 'Anträge, Budgets, Sitzungen, Abstimmungen lesen.',
   'account.scope.applications_write.label': 'Anträge bearbeiten',
