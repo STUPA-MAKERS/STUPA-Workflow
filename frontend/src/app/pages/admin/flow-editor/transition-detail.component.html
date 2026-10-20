@@ -45,9 +45,8 @@
               />
             }
             @case ('assignBudgetFromApplicantGremium') {
-              <app-cost-centre-picker
+              <app-cost-centre-select
                 [label]="'admin.flow.actSubtree' | t"
-                [placeholder]="'admin.flow.actSubtreeAll' | t"
                 [allLabel]="'admin.flow.actSubtreeAll' | t"
                 [unknownLabel]="'admin.flow.ccUnknown' | t"
                 [emptyLabel]="'admin.flow.ccEmpty' | t"
@@ -73,7 +72,7 @@
                     [ngModel]="row.value"
                     (ngModelChange)="setMapValue(ai, act, mi, $event)"
                   />
-                  <app-cost-centre-picker
+                  <app-cost-centre-select
                     class="td__mapBudget"
                     [label]="'admin.flow.actMapBudget' | t"
                     [placeholder]="'admin.flow.ccPick' | t"

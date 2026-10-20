@@ -3,9 +3,19 @@
 // on top and the cost centres grouped by their top-level budget.
 @use 'field' as f;
 @use 'option-menu' as om;
+@use 'scroll-fade' as fade;
 
 :host {
   display: block;
+  min-width: 0;
+}
+:host(.ccs--chip) {
+  display: inline-flex;
+  max-width: 100%;
+}
+// The chip: the global `.chip` of the filter bars; the name is cut at the end.
+.ccs__chip {
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -180,6 +190,17 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0 var(--space-2) var(--space-2);
+  @include fade.fade-y(var(--space-5));
+}
+// The popover gives the list its own limit: the room of the popover less the search. The
+// list then scrolls even where a flex item in a box with only a `max-height` does not
+// shrink.
+.ccs__menu .ccs__list {
+  max-height: calc(var(--ccs-max, 30rem) - 2.75rem - 2 * var(--space-3));
+}
+// The sheet: the search stays in place, the list scrolls below it.
+.ccs__list--sheet {
+  padding: 0;
 }
 .ccs__group + .ccs__group {
   margin-top: var(--space-2);

@@ -94,11 +94,6 @@
 .ff__grid--3 {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-/* A grid with a picker in it (`app-cost-centre-picker inGrid`): its tree takes a row of
-   its own, and the cells after the picker stay in the row of the picker. */
-.ff__grid--dense {
-  grid-auto-flow: row dense;
-}
 @include bp.phone {
   .ff__grid--3 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -123,14 +118,6 @@
   font-family: var(--font-mono);
   font-size: 0.8125rem;
 }
-/* The tree of a cost-centre picker (`app-cost-centre-picker`), open below the field. */
-.ff {
-  --ccp-tree-bg: var(--color-surface-2);
-}
-.ff--sheet {
-  --ccp-tree-bg: var(--color-surface-3);
-}
-
 /* A value without a lock, in the box of a field. A locked value is `app-locked-field`. */
 .ff__box--static {
   flex-direction: column;

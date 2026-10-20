@@ -1,12 +1,8 @@
 <ng-template #reassignForm>
   <div class="bp__card">
-    <div class="ff__grid ff__grid--dense bp__fields">
-      <app-cost-centre-picker
-        inGrid
-        swatch
-        text="name"
+    <div class="ff__grid bp__fields">
+      <app-cost-centre-select
         [label]="'expenses.field.costCentre' | t"
-        [placeholder]="'expenses.bulk.keepValue' | t"
         [allLabel]="'expenses.bulk.keepValue' | t"
         unknownLabel="—"
         [nodes]="tree()"
