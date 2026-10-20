@@ -44,7 +44,12 @@
     @if (failed()) {
       <p class="lp__note lp__note--error">{{ 'todos.picker.error' | t }}</p>
     } @else if (search.applied() && !search.pending() && !groups().length) {
-      <p class="lp__note">{{ 'todos.picker.none' | t }}</p>
+      <app-empty-state
+        class="lp__empty"
+        shape="file"
+        rows="3"
+        [heading]="'todos.picker.none' | t"
+      />
     }
     @for (group of groups(); track group.key) {
       <p class="lp__group">{{ group.label | t }}</p>
