@@ -766,8 +766,6 @@ export const de = {
   'applications.capture.incomplete': 'Bitte alle Pflichtangaben ausfüllen.',
   'applications.capture.done': 'Antrag erfasst. Die antragstellende Person bekommt eine E-Mail.',
   'applications.capture.error': 'Der Antrag konnte nicht erfasst werden.',
-  'applications.capture.note': 'Erfasst von {name} am {date}',
-  'applications.capture.noteReceived': 'eingegangen am {date}',
   // Edit mode of the detail (board Anträge-Bearbeiten).
   'applications.edit.title': 'Antrag bearbeiten',
   'applications.edit.saved': 'Gespeichert. Version {version} angelegt.',

@@ -749,8 +749,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'applications.capture.incomplete': 'Fill in all required fields.',
   'applications.capture.done': 'Application entered. The applicant gets an email.',
   'applications.capture.error': 'The application could not be entered.',
-  'applications.capture.note': 'Entered by {name} on {date}',
-  'applications.capture.noteReceived': 'received on {date}',
   'applications.edit.title': 'Edit application',
   'applications.edit.saved': 'Saved. Version {version} created.',
   'applications.edit.invalid': 'Check the marked fields.',
