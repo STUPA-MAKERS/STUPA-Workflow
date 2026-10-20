@@ -189,8 +189,10 @@ thead .gat__th--name {
 button.gat__cell {
   cursor: pointer;
 }
-button.gat__cell:hover {
-  box-shadow: 0 0 0 2px var(--color-border-strong);
+@media (hover: hover) {
+  button.gat__cell:hover {
+    box-shadow: 0 0 0 2px var(--color-border-strong);
+  }
 }
 button.gat__cell:focus-visible {
   outline: 2px solid var(--color-focus-ring);

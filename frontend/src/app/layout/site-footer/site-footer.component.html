@@ -1,18 +1,4 @@
 <footer class="ft" [attr.aria-label]="'nav.footer' | t">
-  @if (columns().length > 0) {
-    <div class="ft__cols">
-      @for (col of columns(); track $index) {
-        <div class="ft__col">
-          @if (col.label) {
-            <h2 class="ft__colTitle">{{ col.label }}</h2>
-          }
-          @for (link of col.links; track $index) {
-            <a class="ft__link" [href]="link.url">{{ link.label }}</a>
-          }
-        </div>
-      }
-    </div>
-  }
   <!-- The separator dot is CSS (::before of every part). The clip hides the dot of the
        part that starts a line, so a dot only shows between two visible parts. -->
   <div class="ft__line ft__clip">

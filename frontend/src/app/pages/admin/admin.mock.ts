@@ -483,12 +483,6 @@ export const MOCK_SITE_REVISIONS: ConfigRevision[] = [
 
 export const MOCK_BRANDING: Branding = {
   logos: {},
-  footerColumns: [
-    {
-      label: { de: 'Über uns', en: 'About' },
-      links: [{ label: { de: 'Impressum', en: 'Imprint' }, url: 'https://example.org/impressum' }],
-    },
-  ],
   copyright: { de: '© Studierendenschaft', en: '© Student body' },
   legalLinks: [
     { label: { de: 'Impressum', en: 'Imprint' }, url: 'https://example.org/impressum' },

@@ -126,8 +126,10 @@
   outline-offset: 1px;
 }
 
-.hist__more:hover {
-  background: var(--color-selected);
+@media (hover: hover) {
+  .hist__more:hover {
+    background: var(--color-selected);
+  }
 }
 .hist__more:focus-visible {
   outline: 2px solid var(--color-focus-ring);

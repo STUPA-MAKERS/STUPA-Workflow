@@ -544,7 +544,17 @@ export const routes: Routes = [
           },
           {
             path: 'branding',
-            data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'] },
+            data: { title: 'admin.brand.title', permission: 'admin.site', parent: ['admin'], section: 'branding' },
+            canActivate: [authGuard],
+            loadComponent: () =>
+              import('./pages/admin/branding/branding-editor.component').then(
+                (m) => m.BrandingEditorComponent,
+              ),
+          },
+          {
+            // The same editor and the same site config, with the text sections.
+            path: 'texts',
+            data: { title: 'admin.texts.title', permission: 'admin.site', parent: ['admin'], section: 'texts' },
             canActivate: [authGuard],
             loadComponent: () =>
               import('./pages/admin/branding/branding-editor.component').then(

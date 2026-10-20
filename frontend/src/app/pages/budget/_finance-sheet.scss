@@ -122,8 +122,10 @@
   font-weight: var(--fw-semibold);
   text-decoration: none;
 }
-.fd__secLink:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .fd__secLink:hover {
+    text-decoration: underline;
+  }
 }
 .fd__count {
   margin-inline-start: 4px;
@@ -191,8 +193,10 @@
   color: var(--color-text);
   text-decoration: none;
 }
-.fd__link:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .fd__link:hover {
+    background: var(--color-surface-3);
+  }
 }
 .fd__link:focus-visible {
   outline: 2px solid var(--color-focus-ring);

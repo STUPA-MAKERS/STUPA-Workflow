@@ -20,8 +20,10 @@
   text-align: start;
   cursor: pointer;
 }
-.altcha__btn:hover:not(:disabled) {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .altcha__btn:hover:not(:disabled) {
+    background: var(--color-surface-3);
+  }
 }
 .altcha__btn:disabled {
   cursor: default;

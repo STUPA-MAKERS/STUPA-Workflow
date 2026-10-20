@@ -102,8 +102,10 @@
 .lv__circle[aria-checked='true'] {
   color: var(--color-accent-text);
 }
-.lv__circle:hover:not(:disabled) {
-  background: var(--color-surface-2);
+@media (hover: hover) {
+  .lv__circle:hover:not(:disabled) {
+    background: var(--color-surface-2);
+  }
 }
 .lv__open {
   padding: 0;
@@ -116,8 +118,10 @@
   overflow-wrap: anywhere;
   cursor: pointer;
 }
-.lv__open:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .lv__open:hover {
+    text-decoration: underline;
+  }
 }
 .lv__circle:focus-visible,
 .lv__open:focus-visible,

@@ -527,9 +527,7 @@ class _SiteFake:
         return {"name": "Antrag", "short_name": "A", "icons": [], "scheme": scheme}
 
     async def get(self) -> SiteConfigOut:
-        return SiteConfigOut(
-            version=1, active=Branding(), draft=Branding(), has_draft_changes=False
-        )
+        return SiteConfigOut(version=1, branding=Branding())
 
     async def public(self) -> PublicSiteConfigOut:
         return PublicSiteConfigOut(version=1, branding=PublicBranding())

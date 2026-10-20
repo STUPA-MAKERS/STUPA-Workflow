@@ -49,7 +49,6 @@ import {
   AvatarComponent,
   ButtonComponent,
   ChipComponent,
-  copyText,
   EmptyStateComponent,
   FilterSelectComponent,
   type FilterSelectOption,
@@ -62,6 +61,7 @@ import {
   type RowMenuItem,
   type RowMenuSection,
   SegBarComponent,
+  shareOrCopy,
   SheetBarComponent,
   SheetBarTitleDirective,
   SkeletonComponent,
@@ -1002,11 +1002,12 @@ export class TodoCardDetailComponent {
     if (!c) return;
     // The card only: the link stays valid when the card moves to another board.
     const url = `${location.origin}/todos?card=${c.id}`;
-    void copyText(url).then((ok) =>
-      ok
-        ? this.toast.success(this.t('todos.card.linkCopied'))
-        : this.toast.error(this.t('todos.card.linkFailed')),
-    );
+    // On a phone the share sheet hands the link on; it is its own feedback, and a closed
+    // sheet is no failure. Elsewhere the link goes on the clipboard.
+    void shareOrCopy({ url, title: c.title }).then((outcome) => {
+      if (outcome === 'copied') this.toast.success(this.t('todos.card.linkCopied'));
+      else if (outcome === 'failed') this.toast.error(this.t('todos.card.linkFailed'));
+    });
   }
 
   // ------------------------------------------------------------------ comments

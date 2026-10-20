@@ -63,13 +63,20 @@
   padding: 10px 14px;
   cursor: pointer;
 }
-.dd__row:hover:not(.dd__row--off) {
-  background: var(--color-surface-4);
+@media (hover: hover) {
+  .dd__row:hover:not(.dd__row--off) {
+    background: var(--color-surface-4);
+  }
 }
-.dd__row--on,
-.dd__row--on:hover:not(.dd__row--off) {
+.dd__row--on {
   background: var(--color-selected);
   color: var(--color-on-selected);
+}
+@media (hover: hover) {
+  .dd__row--on:hover:not(.dd__row--off) {
+    background: var(--color-selected);
+    color: var(--color-on-selected);
+  }
 }
 .dd__row--off {
   cursor: default;

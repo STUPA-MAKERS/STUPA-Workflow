@@ -1,6 +1,8 @@
+@use 'press';
+
 /* Fixed to the bottom edge. The bar has its own surface (surface 3) and a top border, so
    it stands out from the page and from the cards on it (surface 1 and 2) in both themes.
-   The entries fill the bar height, so each one is a 64px high touch target. The
+   The entries fill the bar height, so each one is a 72px high touch target. The
    safe-area padding keeps the entries above the gesture bar of an installed app
    (viewport-fit=cover). The shell sets --bottom-bar-height and keeps the page clear of
    the bar with it. */
@@ -16,12 +18,16 @@
   align-items: stretch;
   justify-content: space-around;
   box-sizing: border-box;
-  height: calc(var(--bottom-bar-height, 64px) + env(safe-area-inset-bottom));
-  padding: 0 4px env(safe-area-inset-bottom);
+  height: calc(var(--bottom-bar-height, 72px) + env(safe-area-inset-bottom));
+  /* In landscape the entries also keep clear of the notch and the round corners. */
+  padding: 0 max(var(--space-2), var(--app-right-safe-area, 0px)) env(safe-area-inset-bottom)
+    max(var(--space-2), var(--app-left-safe-area, 0px));
   border-top: var(--border-width) solid var(--color-border);
   background: var(--color-surface-3);
   /* The live dot gets a ring in the colour of the bar. */
   --nav-mark-ring: var(--color-surface-3);
+  /* Chrome, not content: a long press on an entry selects no label and opens no callout. */
+  @include press.chrome-text;
 }
 
 .bb__item {
@@ -30,7 +36,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
   max-width: 88px;
   padding: 0;
@@ -87,6 +93,18 @@
 .bb__ind > app-icon {
   position: relative;
 }
+/* The press: the pill takes the press tint of the kit over its fill, as the indicator of
+   a native tab bar does. A layer above the fill, so the active entry shows it too. */
+.bb__ind::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.bb__item:active .bb__ind::after {
+  background: var(--press-tint);
+}
 .bb__item:focus-visible {
   outline: none;
 }
@@ -123,13 +141,16 @@
   text-align: start;
   text-decoration: none;
   cursor: pointer;
+  @include press.press;
 }
 .more__item > app-icon {
   flex: none;
   color: var(--color-text-muted);
 }
-.more__item:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .more__item:hover {
+    background: var(--color-surface-3);
+  }
 }
 /* The label takes the room; a count sits at the end of the row. */
 .more__label {

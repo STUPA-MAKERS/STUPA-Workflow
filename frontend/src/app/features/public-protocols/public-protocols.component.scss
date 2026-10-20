@@ -114,8 +114,10 @@
   color: var(--color-text);
   text-decoration: none;
 }
-.pp__cardTitle a:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .pp__cardTitle a:hover {
+    text-decoration: underline;
+  }
 }
 .pp__cardTitle a:focus-visible,
 .pp__view:focus-visible {

@@ -5,8 +5,8 @@ prove:
 * the proxy hashes the stored e-mail of the requested principal (SHA-256, trimmed,
   lower case) and answers the image; ``me`` reads the own row by ``sub``;
 * a principal without e-mail and an unknown id give 404 without a fetch;
-* the switch ``gravatarEnabled`` of the ACTIVE site config turns the proxy off, a
-  draft does not; the public site config carries the switch.
+* the switch ``gravatarEnabled`` of the saved site config turns the proxy off; the
+  public site config carries the switch.
 """
 
 from __future__ import annotations
@@ -135,16 +135,13 @@ async def test_active_site_config_switches_the_proxy_off(
     fetcher = _Fetcher()
     client = _api(migrated, monkeypatch, fetcher)
 
-    # A draft with the switch off changes nothing until it is active.
-    async with maker() as session:
-        await SiteConfigService(session).put_draft(
-            Branding.model_validate({"gravatarEnabled": False}), actor="admin"
-        )
     assert client.get(f"/api/principals/{row.id}/avatar").status_code == 200
 
     async with maker() as session:
-        out = await SiteConfigService(session).activate(actor="admin")
-        assert out.active.gravatar_enabled is False
+        out = await SiteConfigService(session).save(
+            Branding.model_validate({"gravatarEnabled": False}), actor="admin"
+        )
+        assert out.branding.gravatar_enabled is False
         public = await SiteConfigService(session).public()
     assert public.model_dump(by_alias=True)["branding"]["gravatarEnabled"] is False
 

@@ -102,9 +102,13 @@
 .pie__item:disabled {
   cursor: default;
 }
-.pie__item--on,
-.pie__item:hover:not(:disabled) {
+.pie__item--on {
   background: var(--color-surface-2);
+}
+@media (hover: hover) {
+  .pie__item:hover:not(:disabled) {
+    background: var(--color-surface-2);
+  }
 }
 .pie__item:focus-visible {
   outline: 2px solid var(--color-focus-ring);

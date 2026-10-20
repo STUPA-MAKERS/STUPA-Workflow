@@ -186,9 +186,7 @@ export class AdminApiService {
     oauthGrants: structuredCopy(MOCK_OAUTH_GRANTS),
     site: <SiteConfig>{
       version: 1,
-      active: structuredCopy(MOCK_BRANDING),
-      draft: structuredCopy(MOCK_BRANDING),
-      hasDraftChanges: false,
+      branding: structuredCopy(MOCK_BRANDING),
     },
   };
 
@@ -1523,25 +1521,14 @@ export class AdminApiService {
     return this.http.get<SiteConfig>(`${this.base}/admin/site-config`);
   }
 
-  /** Save the draft (not yet active) — PUT /admin/site-config/draft. */
-  saveBrandingDraft(draft: Branding): Observable<SiteConfig> {
+  /** Save the branding as the new active version — PUT /admin/site-config. */
+  saveSiteConfig(branding: Branding): Observable<SiteConfig> {
     if (this.mock) {
-      this.store.site.draft = structuredCopy(draft);
-      this.store.site.hasDraftChanges = true;
-      return of(structuredCopy(this.store.site));
-    }
-    return this.http.put<SiteConfig>(`${this.base}/admin/site-config/draft`, draft);
-  }
-
-  /** Activate the draft → new version — POST /admin/site-config/activate. */
-  activateBranding(): Observable<SiteConfig> {
-    if (this.mock) {
-      this.store.site.active = structuredCopy(this.store.site.draft);
+      this.store.site.branding = structuredCopy(branding);
       this.store.site.version += 1;
-      this.store.site.hasDraftChanges = false;
       return of(structuredCopy(this.store.site));
     }
-    return this.http.post<SiteConfig>(`${this.base}/admin/site-config/activate`, {});
+    return this.http.put<SiteConfig>(`${this.base}/admin/site-config`, branding);
   }
 
   private upsert<T extends { id: Uuid }>(list: T[], item: T, prefix: string): T {

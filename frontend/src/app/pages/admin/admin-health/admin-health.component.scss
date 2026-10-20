@@ -29,13 +29,19 @@
   text-decoration: none;
   border-radius: inherit;
 }
-.ah__tile:hover {
-  background: var(--color-surface-3);
+@media (hover: hover) {
+  .ah__tile:hover {
+    background: var(--color-surface-3);
+  }
 }
 /* The page of the tile is open (beside an admin page the tiles stay in the column). */
-.ah__tile.ah__tile--on,
-.ah__tile.ah__tile--on:hover {
+.ah__tile.ah__tile--on {
   background: var(--color-selected);
+}
+@media (hover: hover) {
+  .ah__tile.ah__tile--on:hover {
+    background: var(--color-selected);
+  }
 }
 .ah__tile:focus-visible {
   outline: 2px solid var(--color-focus-ring);

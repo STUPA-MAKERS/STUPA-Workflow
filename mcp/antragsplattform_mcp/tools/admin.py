@@ -535,24 +535,17 @@ async def set_notification_preferences(preferences: list[dict[str, Any]]) -> dic
 
 @group.tool
 async def get_site_config() -> dict:
-    """Get the current site and branding config, both the active one and the draft."""
+    """Get the active site and branding config and its version."""
     return await api().get("/admin/site-config")
 
 
 @group.tool
-async def set_site_config_draft(branding: dict[str, Any]) -> dict:
-    """Set the branding draft.
+async def set_site_config(branding: dict[str, Any]) -> dict:
+    """Save the branding as the new active version. It applies at once.
 
-    Use the same shape as the draft in `get_site_config`. Call `activate_site_config`
-    to make the draft active. Requires admin.site.
+    Use the same shape as `branding` in `get_site_config`. Requires admin.site.
     """
-    return await api().put("/admin/site-config/draft", json=branding)
-
-
-@group.tool
-async def activate_site_config() -> dict:
-    """Activate the current branding draft. Requires admin.site."""
-    return await api().post("/admin/site-config/activate")
+    return await api().put("/admin/site-config", json=branding)
 
 
 @group.tool

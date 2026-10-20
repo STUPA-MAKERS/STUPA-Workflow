@@ -4,8 +4,8 @@ These tests prove four things.
 
 1. Each area keeps its own permission gate: admin.config, admin.roles, webhook.manage.
 2. The DTOs serialize to camelCase.
-3. The site-config read returns ``{version, active, draft, hasDraftChanges}`` for the
-   frontend, and the public read needs no auth.
+3. The site-config read returns ``{version, branding}`` for the frontend, a save bumps
+   the version, and the public read needs no auth.
 4. Every mutation with a body declares ``400`` as problem+json (be-contract).
 """
 
@@ -289,30 +289,15 @@ class _FakeConfig:
 
 class _FakeSite:
     def __init__(self) -> None:
-        self._active = Branding()
-        self._draft = Branding()
-        self._has = False
+        self._branding = Branding()
         self._version = 1
 
     async def get(self):
-        return SiteConfigOut(
-            version=self._version,
-            active=self._active,
-            draft=self._draft,
-            has_draft_changes=self._has,
-        )
+        return SiteConfigOut(version=self._version, branding=self._branding)
 
-    async def put_draft(self, branding, actor):  # noqa: ANN001
-        self._draft = branding
-        self._has = True
-        return await self.get()
-
-    async def activate(self, actor):  # noqa: ANN001
-        if not self._has:
-            raise ConflictError("no draft")
-        self._active = self._draft
+    async def save(self, branding, actor):  # noqa: ANN001
+        self._branding = branding
         self._version += 1
-        self._has = False
         return await self.get()
 
     async def help_tickets(self):
@@ -327,7 +312,7 @@ class _FakeSite:
     async def public(self):
         return PublicSiteConfigOut(
             version=self._version,
-            branding=PublicBranding.model_validate(self._active.model_dump(by_alias=True)),
+            branding=PublicBranding.model_validate(self._branding.model_dump(by_alias=True)),
         )
 
 
@@ -851,24 +836,32 @@ def test_group_mappings_page_reads_gremium_roles(app: FastAPI, client: TestClien
     assert client.get(f"/api/admin/gremien/{uuid4()}/roles").status_code == 200
 
 
-def test_site_config_draft_activate_cycle(app: FastAPI, client: TestClient) -> None:
+def test_site_config_save_cycle(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
     r = client.get("/api/admin/site-config")
     assert r.status_code == 200
     empty = Branding().model_dump(by_alias=True)
-    assert r.json() == {"version": 1, "active": empty, "draft": empty, "hasDraftChanges": False}
-    put = client.put("/api/admin/site-config/draft", json={"copyright": {"de": "© 2026"}})
-    assert put.status_code == 200 and put.json()["hasDraftChanges"] is True
-    act = client.post("/api/admin/site-config/activate")
-    assert act.status_code == 200
-    body = act.json()
-    assert body["version"] == 2 and body["hasDraftChanges"] is False
-    assert body["active"]["copyright"] == {"de": "© 2026"}
+    assert r.json() == {"version": 1, "branding": empty}
+    put = client.put(
+        "/api/admin/site-config",
+        json={"copyright": {"de": "© 2026"}, "accentColor": "#0075bf"},
+    )
+    assert put.status_code == 200
+    body = put.json()
+    assert body["version"] == 2
+    assert body["branding"]["copyright"] == {"de": "© 2026"}
+    assert body["branding"]["accentColor"] == "#0075bf"
 
 
-def test_site_config_draft_rejects_inline_svg_422(app: FastAPI, client: TestClient) -> None:
+def test_site_config_rejects_a_bad_accent_422(app: FastAPI, client: TestClient) -> None:
     _as_admin(app)
-    draft = {
+    r = client.put("/api/admin/site-config", json={"accentColor": "green"})
+    assert r.status_code == 422
+
+
+def test_site_config_rejects_inline_svg_422(app: FastAPI, client: TestClient) -> None:
+    _as_admin(app)
+    branding = {
         "logos": {
             "favicon": {
                 "url": "data:image/svg+xml;base64,PHN2Zz4=",
@@ -878,14 +871,8 @@ def test_site_config_draft_rejects_inline_svg_422(app: FastAPI, client: TestClie
             }
         }
     }
-    r = client.put("/api/admin/site-config/draft", json=draft)
+    r = client.put("/api/admin/site-config", json=branding)
     assert r.status_code == 422
-
-
-def test_activate_without_draft_409(app: FastAPI, client: TestClient) -> None:
-    _as_admin(app)
-    r = client.post("/api/admin/site-config/activate")
-    assert r.status_code == 409
 
 
 def test_public_site_config_no_auth_and_cache_header(client: TestClient) -> None:
@@ -912,8 +899,7 @@ def test_mutating_endpoints_declare_400(app: FastAPI) -> None:
         ("/api/admin/group-mappings/{mapping_id}", "patch"),
         ("/api/admin/webhooks", "post"),
         ("/api/admin/webhooks/{webhook_id}", "patch"),
-        ("/api/admin/site-config/draft", "put"),
-        ("/api/admin/site-config/activate", "post"),
+        ("/api/admin/site-config", "put"),
     ]
     for path, method in cases:
         responses = spec["paths"][path][method]["responses"]

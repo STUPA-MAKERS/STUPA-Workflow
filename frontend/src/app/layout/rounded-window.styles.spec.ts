@@ -64,7 +64,10 @@ describe('rounded sheet styles', () => {
 
   it('gives a pane page the gutter as the gap at the bottom and at the top', () => {
     expect(rule(shell, '.main')).toMatch(/--pane-foot-gap: var\(--layout-gutter\);/);
-    expect(rule(shell, '.frame--rail .main')).toMatch(/--main-pad-top: var\(--layout-gutter\);/);
+    // The top inset of an installed iOS app comes on top (0 in a browser tab).
+    expect(rule(shell, '.frame--rail .main')).toMatch(
+      /--main-pad-top: calc\(var\(--layout-gutter\) \+ var\(--app-top-safe-area\)\);/,
+    );
     expect(rule(shell, '.frame--rail .main.main--fill')).toMatch(
       /--main-pad-bottom: var\(--pane-foot-gap\);/,
     );
