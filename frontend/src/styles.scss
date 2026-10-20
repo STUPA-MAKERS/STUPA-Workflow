@@ -381,6 +381,13 @@ app-dialog {
   pointer-events: none;
   animation: motion-fade-out var(--motion-xs) var(--ease-exit) forwards;
 }
+/* A tab panel that shows after a tab change (Details | Aktivität and the other tab bars of
+   the app). The panels stay in the DOM behind `hidden`, and a change from `display: none`
+   starts the animation again, so one rule covers every tab bar. Reduced motion cuts it to
+   nothing (`base.scss` of the kit). */
+[role='tabpanel']:not([hidden]) {
+  animation: motion-fade-in var(--motion-base) var(--ease-standard);
+}
 @keyframes motion-expand-in {
   from {
     height: 0;

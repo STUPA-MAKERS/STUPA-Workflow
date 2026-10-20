@@ -73,6 +73,12 @@ describe('touch styles', () => {
     expect(read('shared/ui/_list-pane.scss')).toMatch(/overscroll-behavior: contain;/);
   });
 
+  it('fades a tab panel in after a tab change', () => {
+    expect(read('../styles.scss')).toMatch(
+      /\[role='tabpanel'\]:not\(\[hidden\]\) \{\s*animation: motion-fade-in var\(--motion-base\)/,
+    );
+  });
+
   it('hides the bottom bar while a text field outside it has the focus on a touch phone', () => {
     const styles = read('../styles.scss');
     const rule = styles.slice(styles.indexOf('@media (pointer: coarse) {'));

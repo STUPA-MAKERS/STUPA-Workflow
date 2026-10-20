@@ -157,6 +157,12 @@ export class CostCentreSelectComponent {
   protected readonly open = signal(false);
   protected readonly popoverOpen = computed(() => this.open() && !this.phone());
   protected readonly sheetOpen = computed(() => this.open() && this.phone());
+  /**
+   * The layer of the phone sheet is in the DOM. It stays after a closing until the sheet
+   * has slid out (`shown` of the sheet turns false), because a layer that goes with the
+   * closing takes the sheet with it before its leave animation runs.
+   */
+  protected readonly sheetMounted = signal(false);
   protected readonly query = signal('');
   protected readonly active = signal(-1);
   protected readonly placed = signal(false);
@@ -254,6 +260,7 @@ export class CostCentreSelectComponent {
   private readonly trigger = viewChild.required<ElementRef<HTMLButtonElement>>('trigger');
   private readonly menu = viewChild<ElementRef<HTMLElement>>('menu');
   private readonly layer = viewChild<ElementRef<HTMLElement>>('layer');
+  private readonly sheet = viewChild(SideSheetComponent);
   private timer: ReturnType<typeof setTimeout> | null = null;
   private rendered: AfterRenderRef | null = null;
 
@@ -262,6 +269,10 @@ export class CostCentreSelectComponent {
     effect(() => {
       this.phone();
       untracked(() => this.close(false));
+    });
+    effect(() => {
+      const sheet = this.sheet();
+      if (sheet && !sheet.shown() && !this.sheetOpen()) untracked(() => this.sheetMounted.set(false));
     });
     watchAnchoredPopover({
       isOpen: () => this.popoverOpen(),
@@ -420,6 +431,7 @@ export class CostCentreSelectComponent {
     this.active.set(this.startIndex());
     this.open.set(true);
     if (this.phone()) {
+      this.sheetMounted.set(true);
       this.afterRender(() => {
         showInTopLayer(this.layer()?.nativeElement);
         this.later(() => this.reveal());

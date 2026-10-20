@@ -104,7 +104,7 @@
             <ng-container *ngTemplateOutlet="loadPast" />
           }
         } @else {
-          <div class="mtl__groups" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
+          <div class="mtl__groups" animate.enter="motion-fade-in" [class.skel-stale]="timeline.reloadingList()" [attr.inert]="timeline.reloadingList() ? '' : null">
           @if (!hasUpcoming()) {
             <app-empty-state shape="date" class="mtl__upcoming" rows="2" [heading]="'meetings.list.noUpcoming' | t" />
           }

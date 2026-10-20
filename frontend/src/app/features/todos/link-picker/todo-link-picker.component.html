@@ -89,11 +89,13 @@
 
 <!-- Desktop: the panel floats over the whole page, like the search palette. It is
      rendered into the end of <body>, because a dialog or a drawer around the picker
-     clips and transforms its content. -->
+     clips and transforms its content. It pops in like the account menu, and on a closing it
+     fades out before it goes (`detach` in the class). -->
 <ng-template #pop>
-  <div class="lp__scrim" (click)="close()"></div>
+  <div class="lp__scrim" animate.enter="motion-fade-in" (click)="close()"></div>
   <div
     class="lp lp--pop"
+    animate.enter="motion-pop-in"
     role="dialog"
     aria-modal="true"
     [attr.aria-label]="'todos.picker.title' | t"

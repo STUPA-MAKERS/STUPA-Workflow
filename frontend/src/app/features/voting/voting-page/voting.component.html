@@ -92,7 +92,7 @@
             />
           }
         } @else {
-          <div class="vl__groups" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
+          <div class="vl__groups" animate.enter="motion-fade-in" [class.skel-stale]="reloading()" [attr.inert]="reloading() ? '' : null">
           @for (group of groups(); track group.key) {
             <section class="vl__group" [attr.aria-labelledby]="'vl-g-' + group.key">
               <h2 class="sec vl__month" [id]="'vl-g-' + group.key">{{ group.label }}</h2>
