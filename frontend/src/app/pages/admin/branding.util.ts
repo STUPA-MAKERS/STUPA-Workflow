@@ -20,12 +20,8 @@ export function isAllowedLinkUrl(url: string | null | undefined): boolean {
   }
 }
 
-/** All disallowed link URLs of a branding draft: the footer links and the legal links. */
+/** All disallowed URLs of the legal links of a branding draft. */
 export function brandingLinkErrors(branding: Branding | null | undefined): string[] {
   if (!branding) return [];
-  const urls: string[] = [
-    ...branding.footerColumns.flatMap((c) => c.links.map((l) => l.url)),
-    ...branding.legalLinks.map((l) => l.url),
-  ];
-  return urls.filter((u) => !isAllowedLinkUrl(u));
+  return branding.legalLinks.map((l) => l.url).filter((u) => !isAllowedLinkUrl(u));
 }

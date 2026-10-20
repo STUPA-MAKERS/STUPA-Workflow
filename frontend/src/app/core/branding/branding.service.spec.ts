@@ -162,6 +162,114 @@ describe('BrandingService', () => {
     // The EN and DE titles differ, so a change proves the computed value ran again.
     expect(en).not.toBe(de);
   });
+  describe('accent colour and logos', () => {
+    afterEach(() => {
+      svc.applyBranding(null);
+      TestBed.tick();
+      document.head.querySelectorAll('link[data-test-icon]').forEach((l) => l.remove());
+    });
+
+    it('applies the accent of the config to the root and keeps it for the next start', () => {
+      svc.init();
+      http.expectOne('/api/site-config').flush({ version: 1, branding: { accentColor: '#0075BF' } });
+      TestBed.tick();
+      expect(svc.accentColor()).toBe('#0075bf');
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('#0075bf');
+      expect(localStorage.getItem('ap.accent')).toBe('#0075bf');
+      svc.applyBranding({ accentColor: null });
+      TestBed.tick();
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('');
+      expect(localStorage.getItem('ap.accent')).toBeNull();
+    });
+
+    it('starts with the stored accent before the config loads', () => {
+      localStorage.setItem('ap.accent', '#ce1625');
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting(), { provide: USE_MOCK_API, useValue: false }],
+      });
+      const fresh = TestBed.inject(BrandingService);
+      http = TestBed.inject(HttpTestingController);
+      TestBed.tick();
+      expect(fresh.accentColor()).toBe('#ce1625');
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('#ce1625');
+      svc = fresh;
+    });
+
+    it('previews an accent and goes back to the saved one', () => {
+      svc.applyBranding({ accentColor: '#0075bf' });
+      svc.previewAccent('#7A4BC2');
+      TestBed.tick();
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('#7a4bc2');
+      svc.previewAccent(null);
+      TestBed.tick();
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('');
+      svc.previewAccent(undefined);
+      TestBed.tick();
+      expect(document.documentElement.style.getPropertyValue('--c-accent')).toBe('#0075bf');
+    });
+
+    it('gives the uploaded logos and the built-in ones for an empty slot', () => {
+      expect(svc.wordmarkSrc()).toMatch(/^assets\/logos\/stupa-wordmark-(light|dark)\.svg$/);
+      expect(svc.markSrc()).toBe('assets/logos/stupa-mark.svg');
+      expect(svc.faviconSrc()).toBe('favicon.ico');
+      expect(svc.logoUpload('wordmark')).toBeNull();
+      svc.applyBranding({ logos: { wordmark: { url: 'data:image/png;base64,AA' }, imagemark: { url: '/m.png' } } });
+      expect(svc.wordmarkSrc()).toBe('data:image/png;base64,AA');
+      expect(svc.markSrc()).toBe('/m.png');
+      expect(svc.faviconSrc()).toBe('favicon.ico');
+      expect(svc.logoUpload('imagemark')).toBe('/m.png');
+    });
+
+    it('puts an uploaded favicon on the icon links and the built-in one back', () => {
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/svg+xml';
+      link.href = 'assets/logos/stupa-mark.svg';
+      link.setAttribute('data-test-icon', '');
+      document.head.appendChild(link);
+      TestBed.tick();
+      svc.applyBranding({ logos: { favicon: { url: 'data:image/png;base64,BB' } } });
+      TestBed.tick();
+      expect(link.getAttribute('href')).toBe('data:image/png;base64,BB');
+      expect(link.hasAttribute('type')).toBe(false);
+      svc.applyBranding({});
+      TestBed.tick();
+      expect(link.getAttribute('href')).toBe('assets/logos/stupa-mark.svg');
+      // A link without an href gets an empty one back.
+      const bare = document.createElement('link');
+      bare.rel = 'icon';
+      bare.setAttribute('data-test-icon', '');
+      document.head.appendChild(bare);
+      svc.applyBranding({ logos: { favicon: { url: '/f.png' } } });
+      TestBed.tick();
+      expect(bare.getAttribute('href')).toBe('/f.png');
+      svc.applyBranding({});
+      TestBed.tick();
+      expect(bare.getAttribute('href')).toBe('');
+    });
+
+    it('works without a usable browser storage', () => {
+      const get = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      expect(() => svc.applyBranding({ accentColor: '#0075bf' })).not.toThrow();
+      get.mockRestore();
+      const read = jest.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+        throw new Error('blocked');
+      });
+      TestBed.resetTestingModule();
+      TestBed.configureTestingModule({
+        providers: [provideHttpClient(), provideHttpClientTesting(), { provide: USE_MOCK_API, useValue: false }],
+      });
+      const fresh = TestBed.inject(BrandingService);
+      http = TestBed.inject(HttpTestingController);
+      expect(fresh.accentColor()).toBeNull();
+      read.mockRestore();
+      svc = fresh;
+    });
+  });
+
   describe('footer branding (public, no session required)', () => {
     it('keeps the copyright and the legal links from the public config', () => {
       svc.init();

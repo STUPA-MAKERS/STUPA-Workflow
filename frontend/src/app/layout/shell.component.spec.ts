@@ -49,15 +49,15 @@ function brandingStub(
   over: {
     copyright?: Record<string, string> | null;
     legalLinks?: { label: Record<string, string>; url: string }[];
-    footerColumns?: { label: Record<string, string>; links: { label: Record<string, string>; url: string }[] }[];
   } = {},
 ) {
   return {
     appName: signal('STUPA'),
     homeHeading: signal('Willkommen'),
+    wordmarkSrc: signal('assets/logos/stupa-wordmark-light.svg'),
+    markSrc: signal('assets/logos/stupa-mark.svg'),
     copyright: signal(over.copyright ?? null),
     legalLinks: signal(over.legalLinks ?? []),
-    footerColumns: signal(over.footerColumns ?? []),
     // The avatars read these; the config is not loaded, so they show the initials.
     loaded: signal(false),
     gravatarEnabled: signal(true),
@@ -324,9 +324,6 @@ describe('ShellComponent', () => {
     const branding = brandingStub({
       copyright: { de: '© Verfasste Studierendenschaft' },
       legalLinks: [{ label: { de: 'Impressum' }, url: 'https://example.org/impressum' }],
-      footerColumns: [
-        { label: { de: 'Kontakt' }, links: [{ label: { de: 'AStA-Büro' }, url: 'https://example.org/asta' }] },
-      ],
     });
 
     it('shows the branded footer on a public page', async () => {
@@ -337,7 +334,6 @@ describe('ShellComponent', () => {
         'href',
         'https://example.org/impressum',
       );
-      expect(within(footer).getByRole('link', { name: 'AStA-Büro' })).toBeInTheDocument();
     });
 
     it('shows the footer on every public page, also without route data `footer`', async () => {
@@ -353,7 +349,7 @@ describe('ShellComponent', () => {
       fixture.detectChanges();
       const footer = screen.getByRole('contentinfo');
       expect(within(footer).getByRole('link', { name: 'Impressum' })).toBeInTheDocument();
-      expect(within(footer).getByRole('heading', { name: 'Kontakt' })).toBeInTheDocument();
+      expect(within(footer).getByText('© Verfasste Studierendenschaft')).toBeInTheDocument();
     });
 
     it('leaves the footer out on a signed-in work page, and brings it back on a public page', async () => {

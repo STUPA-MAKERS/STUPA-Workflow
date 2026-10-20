@@ -45,6 +45,6 @@ export class NavRailComponent {
   readonly mainItems = computed(() => this.nav.visible().filter((i) => i.place === 'main'));
   readonly endItems = computed(() => this.nav.visible().filter((i) => i.place === 'end'));
 
-  /** The mark without the wordmark: one file for both themes. */
-  readonly markSrc = 'assets/logos/stupa-mark.svg';
+  /** The mark without the wordmark: the upload of the branding, else the built-in one. */
+  readonly markSrc = this.branding.markSrc;
 }

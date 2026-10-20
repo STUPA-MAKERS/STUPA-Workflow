@@ -1,11 +1,10 @@
 """Site-config and branding service.
 
-The service versions the config like form and flow. An edit goes to the draft,
-either as a new inactive version or in place on the existing draft. An edit
-never touches the active version.
-
-Activation flips ``active`` and writes a ``config_activation`` audit entry. A
-partial unique index allows at most one active version.
+The service versions the config like form and flow. A save writes a new active
+version and deactivates the one before; there is no draft. Each save writes a
+config revision and a ``config_activation`` audit entry. A partial unique index
+allows at most one active version. Inactive rows from the time of the draft stay
+as history and are never read as a draft.
 
 ``admin.branding.Branding`` validates the branding. A logo must be an image and
 inline SVG is not allowed. Invalid branding fails with 422.
@@ -35,14 +34,12 @@ from app.modules.admin.schemas import (
 )
 from app.modules.applications.guest_settings import load_guest_settings
 from app.modules.audit.actions import AuditAction
-from app.modules.audit.service import record as audit_record
 from app.modules.config_revision.service import (
     ENTITY_SITE_CONFIG,
     GLOBAL_ID,
     ConfigRevisionService,
 )
 from app.settings import get_settings
-from app.shared.errors import ConflictError
 
 # Fallback app names for the case where the config leaves them empty. They match the
 # defaults in ``frontend/public/manifest.webmanifest``.
@@ -176,78 +173,20 @@ class SiteConfigService:
         ).first()
 
     async def get(self) -> SiteConfigOut:
+        """Return the active branding and its version (0 without one)."""
         active = await self._active()
-        latest = await self._latest()
-        active_branding = _branding(active)
-        if latest is None or latest.active:
-            # No open draft: the draft mirrors the active version.
-            return SiteConfigOut(
-                version=active.version if active else 0,
-                active=active_branding,
-                draft=active_branding,
-                has_draft_changes=False,
-            )
-        return SiteConfigOut(
-            version=active.version if active else 0,
-            active=active_branding,
-            draft=_branding(latest),
-            has_draft_changes=True,
-        )
+        return SiteConfigOut(version=active.version if active else 0, branding=_branding(active))
 
-    async def put_draft(self, branding: Branding, actor: str) -> SiteConfigOut:
-        """Save the branding as the open draft.
+    async def save(self, branding: Branding, actor: str) -> SiteConfigOut:
+        """Save the branding as the new active version.
 
-        ``help`` and ``tickets`` in the payload are ignored: the draft keeps the
-        values of the open draft, or of the active version without one. The
-        "Hilfe & Tickets" page is the only writer of these two sections, because an
-        editor that loaded the branding earlier sends stale values back, and an
-        activation of them would switch anonymous reports on again unnoticed.
+        The admin pages save directly, without a draft. ``help`` and ``tickets`` in
+        the payload are ignored and keep the values of the active version, because the
+        "Hilfe & Tickets" page is their only writer: an editor that loaded the branding
+        earlier sends stale values back, and a save of them would switch anonymous
+        reports on again unnoticed.
         """
-        latest = await self._latest()
-        current = latest if latest is not None and not latest.active else None
-        source = _branding(current) if current is not None else _branding(await self._active())
-        payload = _with_help_tickets_of(branding, source)
-        if latest is not None and not latest.active:
-            # The latest version is an open draft. Update it in place.
-            latest.branding = payload
-            target_id = latest.id
-        else:
-            # No open draft exists. Add an inactive draft above the active version.
-            base = latest.version if latest is not None else 0
-            row = SiteConfigVersion(
-                version=base + 1, active=False, branding=payload, created_by=actor
-            )
-            self.session.add(row)
-            await self.session.flush()
-            target_id = row.id
-        await audit_record(
-            self.session,
-            actor=actor,
-            action=AuditAction.CONFIG_CHANGE,
-            target_type="site_config",
-            target_id=str(target_id),
-        )
-        await self.session.commit()
-        return await self.get()
-
-    async def activate(self, actor: str) -> SiteConfigOut:
-        latest = await self._latest()
-        if latest is None or latest.active:
-            raise ConflictError("no pending site-config draft to activate")
-        await self.session.execute(
-            update(SiteConfigVersion).where(SiteConfigVersion.active.is_(True)).values(active=False)
-        )
-        latest.active = True
-        await ConfigRevisionService(self.session).record(
-            entity_type=ENTITY_SITE_CONFIG,
-            entity_id=GLOBAL_ID,
-            snapshot=dict(latest.branding or {}),
-            actor=actor,
-            action=AuditAction.CONFIG_ACTIVATION,
-            extra_data={"siteConfigVersion": latest.version},
-        )
-        await self.session.commit()
-        return await self.get()
+        return await self.restore_branding(branding, actor, action=AuditAction.CONFIG_ACTIVATION)
 
     async def restore_branding(
         self,
@@ -265,7 +204,7 @@ class SiteConfigService:
         the values of the active version, because the "Hilfe & Tickets" page is
         their only writer: a restore of an older snapshot would otherwise bring
         back its ticket settings, or the defaults (``publicEnabled=true``) for a
-        snapshot without them. An open draft is not touched.
+        snapshot without them.
         """
         latest = await self._latest()
         base = latest.version if latest is not None else 0
@@ -322,12 +261,9 @@ class SiteConfigService:
     ) -> HelpTicketsSettings:
         """Save the help and ticket settings as a new active version.
 
-        The admin page saves directly, without draft and activate. The method copies
-        the active branding, replaces ``help`` and ``tickets`` and writes it as a new
-        active version with a config revision and the ``config_activation`` audit
-        entry, as ``activate`` does. An open draft gets the same two values and moves
-        above the new version, so it stays the draft and a later activation of it
-        does not revert them.
+        The method copies the active branding, replaces ``help`` and ``tickets`` and
+        writes it as a new active version with a config revision and the
+        ``config_activation`` audit entry, as ``save`` does.
         """
         help_settings = HelpSettings(wikiUrl=payload.wiki_url)
         ticket_settings = TicketSettings(
@@ -337,7 +273,6 @@ class SiteConfigService:
         )
         active = await self._active()
         latest = await self._latest()
-        draft = latest if latest is not None and not latest.active else None
         branding = _branding(active).model_copy(
             update={"help": help_settings, "tickets": ticket_settings}
         )
@@ -349,13 +284,6 @@ class SiteConfigService:
         row = SiteConfigVersion(version=base + 1, active=True, branding=snapshot, created_by=actor)
         self.session.add(row)
         await self.session.flush()
-        if draft is not None:
-            draft.version = base + 2
-            draft.branding = {
-                **(draft.branding or {}),
-                "help": help_settings.model_dump(by_alias=True),
-                "tickets": ticket_settings.model_dump(by_alias=True),
-            }
         await ConfigRevisionService(self.session).record(
             entity_type=ENTITY_SITE_CONFIG,
             entity_id=GLOBAL_ID,

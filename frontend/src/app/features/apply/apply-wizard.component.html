@@ -51,7 +51,7 @@
         @if (loadingForm()) {
           <app-skeleton variant="lines" [count]="3" [label]="'apply.form.loading' | t" />
         }
-        <!-- Configured info text: set per language as markdown in /admin/branding. -->
+        <!-- Configured info text: set per language as markdown in /admin/texts. -->
         @if (applyInfoHtml()) {
           <div class="wz__info" [innerHTML]="applyInfoHtml()"></div>
         }

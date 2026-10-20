@@ -2,24 +2,24 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   inject,
   signal,
-  viewChild,
 } from '@angular/core';
-import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { switchMap } from 'rxjs';
+import { ActivatedRoute } from '@angular/router';
+import { BrandingService, DEFAULT_LOGOS } from '@core/branding/branding.service';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
-import type { TranslationKey } from '@core/i18n/translations';
+import { CATALOG, type TranslationKey } from '@core/i18n/translations';
+import { DEFAULT_ACCENT, normalizeHex } from '@core/theme/accent';
+import { ThemeService } from '@core/theme/theme.service';
 import type { I18nMap } from '@core/api/models';
 import {
   defaultSubmittedText,
   SUBMITTED_FREETEXT,
-  submittedMarkdown,
   type SubmittedKind,
 } from '@core/branding/submitted-texts';
-import { resolveI18n } from '@shared/forms/i18n-text';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import {
@@ -28,26 +28,20 @@ import {
   formatBytes,
   IconComponent,
   InputComponent,
-  MoveButtonsComponent,
-  moveItem,
   NoteComponent,
   SkeletonComponent,
   SwitchComponent,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { AdminApiService } from '../admin-api.service';
-import { VersionHistoryComponent } from '../version-history/version-history.component';
 import {
   type Branding,
-  type FooterColumn,
   type FooterLink,
   LOGO_ACCEPT_MIME,
   LOGO_MAX_SIZE_MB,
   type LogoSlot,
 } from '../admin.models';
 import { brandingLinkErrors } from '../branding.util';
-import { renderMarkdown } from '../../../features/meetings/meetings.util';
-import { I18nInputComponent } from '@shared/ui/i18n-input/i18n-input.component';
 import { type ContentLang, ContentLangSwitchComponent } from '@shared/ui/content-lang-switch/content-lang-switch.component';
 import { SectionHeaderComponent } from '@shared/ui/section-header/section-header.component';
 
@@ -58,29 +52,25 @@ type TextLang = ContentLang;
 const FREETEXTS = ['welcome', 'loginHint', 'support', 'emailFooter', 'applyInfo'] as const;
 type FreetextKey = (typeof FREETEXTS)[number];
 
+/** The two admin pages of the site config: "Branding" and "Texte". */
+export type BrandingSection = 'branding' | 'texts';
+
 /**
- * Branding and site-config editor (board Admin-Branding).
+ * Branding and site-config editor. One component serves two admin pages, picked by the
+ * route data `section`; both save the same site config.
  *
- * The floating button "Speichern" saves the draft and shows only while the screen holds
- * edits that the server does not have. The header activates the draft ("Entwurf
- * aktivieren"); the line under it names the active version and whether the draft holds
- * changes that are not active yet. The left column holds the app name, the three logo
- * slots (Wortmarke, Bildmarke, Favicon; a file with a MIME and a size guard, by drop or
- * by the file dialog) and the free texts, including the e-mail footer (gaps N43). The
- * right column holds the footer columns with their links (gaps N43), the copyright line
- * and the legal links. A text field shows the language that "Texte in" picks.
+ * - "Branding": the app name, the accent colour, the Gravatar switch and the three logo
+ *   slots (Wortmarke, Bildmarke, Favicon; a file with a MIME and a size guard, by drop
+ *   or by the file dialog). An empty slot shows the built-in logo. A change of the
+ *   accent shows at once on the whole page, before the save.
+ * - "Texte": the free texts, the texts after the submission, the copyright line of the
+ *   footer and the legal links. A text field shows the language that the switch DE | EN
+ *   above them picks. An empty field shows the built-in text as its placeholder.
  *
- * "Texte nach dem Einreichen" holds the Markdown text of the confirmation page for a
- * signed-in applicant (intern) and for a guest (extern). The placeholder and the preview
- * show the built-in text while the field is empty.
- *
+ * The floating button "Speichern" shows only while the screen holds edits that the
+ * server does not have. A save applies to everyone at once; there is no draft.
  * A link may carry `http:`, `https:` or `mailto:` only; another scheme blocks the save.
- * The version list below restores an older version. It works against
- * `/api/admin/site-config`.
- *
- * The page counts the local edits. When the screen holds edits that the server does not
- * have yet, "Entwurf aktivieren" saves the draft first and activates it after that. Thus
- * the activation publishes the draft that the preview shows.
+ * It works against `/api/admin/site-config`.
  */
 @Component({
   selector: 'app-branding-editor',
@@ -88,10 +78,7 @@ type FreetextKey = (typeof FREETEXTS)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     FilePickerComponent,
-    MoveButtonsComponent,
-    NgTemplateOutlet,
     SectionHeaderComponent,
-    I18nInputComponent,
     FabComponent,
     SkeletonComponent,
     FormsModule,
@@ -102,7 +89,6 @@ type FreetextKey = (typeof FREETEXTS)[number];
     NoteComponent,
     ContentLangSwitchComponent,
     SwitchComponent,
-    VersionHistoryComponent,
     PageHeaderComponent,
   ],
   templateUrl: './branding-editor.component.html',
@@ -112,14 +98,19 @@ export class BrandingEditorComponent {
   private readonly api = inject(AdminApiService);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);
+  private readonly brand = inject(BrandingService);
+  private readonly theme = inject(ThemeService);
+
+  /** The page this instance shows. */
+  protected readonly section: BrandingSection =
+    inject(ActivatedRoute).snapshot.data['section'] === 'texts' ? 'texts' : 'branding';
 
   protected readonly accept = LOGO_ACCEPT_MIME.join(',');
   protected readonly logoSlots: readonly LogoSlot[] = ['wordmark', 'imagemark', 'favicon'];
   protected readonly freetexts = FREETEXTS;
   protected readonly submittedKinds: readonly SubmittedKind[] = ['internal', 'external'];
 
-  protected readonly version = signal(0);
-  protected readonly hasDraftChanges = signal(false);
+  /** The edited copy of the active branding. */
   protected readonly draft = signal<Branding | null>(null);
   /** The count of local edits. `patch()` increments it. */
   private readonly editRev = signal(0);
@@ -127,8 +118,8 @@ export class BrandingEditorComponent {
   private readonly savedRev = signal(0);
   /** The screen holds edits that are not saved yet. */
   protected readonly dirty = computed(() => this.editRev() !== this.savedRev());
-  /** The save of the draft runs. */
-  protected readonly savingDraft = signal(false);
+  /** The save runs. */
+  protected readonly saving = signal(false);
   /** The slot a file is dragged over, for the drop look. */
   protected readonly dropSlot = signal<LogoSlot | null>(null);
 
@@ -138,28 +129,26 @@ export class BrandingEditorComponent {
   /** Disallowed link URLs. Their scheme is not http, https or mailto. They block a save. */
   protected readonly linkErrors = computed(() => brandingLinkErrors(this.draft()));
 
-  /**
-   * Activate needs valid links and a draft with changes, saved or local. With local
-   * edits, the activate saves the draft first.
-   */
-  protected readonly canActivate = computed(
-    () => (this.hasDraftChanges() || this.dirty()) && this.linkErrors().length === 0,
-  );
-
-  /** Version sidebar. Reload it after an activate or a restore. */
-  protected readonly history = viewChild(VersionHistoryComponent);
+  /** The built-in accent: the placeholder of the colour field. */
+  protected readonly defaultAccent = DEFAULT_ACCENT;
+  /** The accent of the edited copy, or the built-in one. */
+  protected readonly accent = computed(() => normalizeHex(this.draft()?.accentColor) ?? DEFAULT_ACCENT);
+  /** The edited copy carries an own accent. */
+  protected readonly customAccent = computed(() => this.accent() !== DEFAULT_ACCENT);
 
   constructor() {
     this.loadConfig();
+    // An accent that was not saved leaves with the page.
+    inject(DestroyRef).onDestroy(() => this.brand.previewAccent(undefined));
   }
 
-  /** Load the active branding and the draft, also after a version restore. */
+  /** Load the active branding. */
   protected loadConfig(): void {
     this.api.getSiteConfig().subscribe((cfg) => {
-      this.version.set(cfg.version);
-      this.hasDraftChanges.set(cfg.hasDraftChanges);
-      this.draft.set(cfg.draft);
+      this.draft.set(cfg.branding);
       this.markSaved(this.editRev());
+      this.brand.applyBranding(cfg.branding);
+      this.brand.previewAccent(undefined);
     });
   }
 
@@ -185,9 +174,25 @@ export class BrandingEditorComponent {
     return formatBytes(bytes, this.i18n.formatLocale());
   }
 
-  /** One text of the draft in the language that is edited now, for the preview. */
-  protected text(map: I18nMap | null | undefined): string {
-    return resolveI18n(map, this.lang());
+  /** The built-in logo of a slot, in the colours of the theme. */
+  protected defaultLogo(slot: LogoSlot): string {
+    const logo = DEFAULT_LOGOS[slot];
+    return typeof logo === 'string' ? logo : logo[this.theme.resolved()];
+  }
+
+  /** The built-in copyright line in the picked language: the placeholder of the field. */
+  protected copyrightDefault(): string {
+    return this.builtIn('footer.coBranding');
+  }
+
+  /** The built-in app name: the placeholder of the name field. */
+  protected appNameDefault(): string {
+    return this.builtIn('app.title');
+  }
+
+  /** A built-in text in the picked language; German while that catalogue is not loaded. */
+  private builtIn(key: TranslationKey): string {
+    return CATALOG[this.lang()][key] ?? CATALOG.de[key] ?? '';
   }
 
   /** The text map of a free text. `applyInfo` is missing in an older config. */
@@ -215,16 +220,6 @@ export class BrandingEditorComponent {
     return defaultSubmittedText(kind, this.lang());
   }
 
-  /** The field of the picked language is empty, so the page shows the built-in text. */
-  protected submittedIsDefault(d: Branding, kind: SubmittedKind): boolean {
-    return !(d.freetexts[SUBMITTED_FREETEXT[kind]]?.[this.lang()] ?? '').trim();
-  }
-
-  /** The preview as the confirmation page renders it (escaped Markdown). */
-  protected submittedPreview(d: Branding, kind: SubmittedKind): string {
-    return renderMarkdown(submittedMarkdown(d.freetexts[SUBMITTED_FREETEXT[kind]], kind, this.lang()));
-  }
-
   /** Write the text of the picked language into a map and refresh the draft. */
   protected setText(map: I18nMap, value: string): void {
     this.patch(() => {
@@ -235,13 +230,6 @@ export class BrandingEditorComponent {
   protected setUrl(link: FooterLink, value: string): void {
     this.patch(() => {
       link.url = value;
-    });
-  }
-
-  /** The column heading in one language; both stand side by side. */
-  protected setColumnLabel(col: FooterColumn, lang: TextLang, value: string): void {
-    this.patch(() => {
-      col.label[lang] = value;
     });
   }
 
@@ -306,36 +294,6 @@ export class BrandingEditorComponent {
     });
   }
 
-  protected addColumn(): void {
-    this.patch((d) => {
-      d.footerColumns = [...d.footerColumns, { label: { de: '', en: '' }, links: [] }];
-    });
-  }
-
-  protected removeColumn(i: number): void {
-    this.patch((d) => {
-      d.footerColumns = d.footerColumns.filter((_, idx) => idx !== i);
-    });
-  }
-
-  protected moveColumn(i: number, dir: -1 | 1): void {
-    this.patch((d) => {
-      d.footerColumns = moveItem(d.footerColumns, i, dir);
-    });
-  }
-
-  protected addLink(col: FooterColumn): void {
-    this.patch(() => {
-      col.links = [...col.links, { label: { de: '', en: '' }, url: '' }];
-    });
-  }
-
-  protected removeLink(col: FooterColumn, li: number): void {
-    this.patch(() => {
-      col.links = col.links.filter((_, idx) => idx !== li);
-    });
-  }
-
   protected addLegalLink(): void {
     this.patch((d) => {
       d.legalLinks = [...d.legalLinks, { label: { de: '', en: '' }, url: '' }];
@@ -348,7 +306,21 @@ export class BrandingEditorComponent {
     });
   }
 
-  /** Turn the Gravatar images of the avatars on or off (saved with the draft). */
+  /**
+   * Set the accent colour, or the built-in one for null. The whole page shows it at
+   * once; the save keeps it.
+   */
+  protected setAccent(value: string | null): void {
+    const hex = value === null ? null : normalizeHex(value);
+    if (value !== null && !hex) return;
+    const accent = hex === DEFAULT_ACCENT ? null : hex;
+    this.patch((d) => {
+      d.accentColor = accent;
+    });
+    this.brand.previewAccent(accent);
+  }
+
+  /** Turn the Gravatar images of the avatars on or off (saved with the config). */
   protected setGravatar(on: boolean): void {
     this.patch((d) => {
       d.gravatarEnabled = on;
@@ -364,53 +336,28 @@ export class BrandingEditorComponent {
     this.editRev.update((n) => n + 1);
   }
 
-  protected saveDraft(): void {
+  /** Save the branding. It applies to everyone at once. */
+  protected save(): void {
     const d = this.draft();
-    if (!d || this.savingDraft()) return;
+    if (!d || this.saving()) return;
     if (this.linkErrors().length > 0) {
       this.toast.error(this.i18n.translate('admin.brand.badUrl'));
       return;
     }
     const rev = this.editRev();
-    this.savingDraft.set(true);
-    this.api.saveBrandingDraft(d).subscribe({
+    this.saving.set(true);
+    this.api.saveSiteConfig(d).subscribe({
       next: (cfg) => {
-        this.savingDraft.set(false);
-        this.hasDraftChanges.set(cfg.hasDraftChanges);
-        this.markSaved(rev);
+        this.saving.set(false);
+          this.markSaved(rev);
+        this.brand.applyBranding(cfg.branding);
+        this.brand.previewAccent(undefined);
         this.toast.success(this.i18n.translate('admin.common.saved'));
       },
       error: () => {
-        this.savingDraft.set(false);
+        this.saving.set(false);
         this.toast.error(this.i18n.translate('admin.common.saveFailed'));
       },
-    });
-  }
-
-  /**
-   * Activate the draft. When the screen holds unsaved edits, save the draft first, so
-   * that the activation publishes what the page shows.
-   */
-  protected activate(): void {
-    const d = this.draft();
-    if (this.linkErrors().length > 0) {
-      this.toast.error(this.i18n.translate('admin.brand.badUrl'));
-      return;
-    }
-    const activate$ =
-      this.dirty() && d
-        ? this.api.saveBrandingDraft(d).pipe(switchMap(() => this.api.activateBranding()))
-        : this.api.activateBranding();
-    activate$.subscribe({
-      next: (cfg) => {
-        this.version.set(cfg.version);
-        this.hasDraftChanges.set(cfg.hasDraftChanges);
-        this.draft.set(cfg.draft);
-        this.markSaved(this.editRev());
-        this.toast.success(this.i18n.translate('admin.brand.activated', { n: cfg.version }));
-        this.history()?.reload();
-      },
-      error: () => this.toast.error(this.i18n.translate('admin.common.saveFailed')),
     });
   }
 }

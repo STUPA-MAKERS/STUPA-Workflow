@@ -32,7 +32,7 @@ import { shortRef } from './apply.util';
  * Both show the reference: the first 8 characters of the id (house rule
  * `no-uuids-in-ui` allows only this short form).
  *
- * The main text of each state comes from `/admin/branding` ("Texte nach dem
+ * The main text of each state comes from `/admin/texts` ("Texte nach dem
  * Einreichen", `freetexts.submittedInternal` and `freetexts.submittedExternal`) as
  * Markdown in the language of the page. An empty text gives the built-in text.
  * `renderMarkdown` escapes all HTML first, and Angular sanitizes the `innerHTML`.
