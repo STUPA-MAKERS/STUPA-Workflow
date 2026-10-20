@@ -164,53 +164,6 @@ function delegation(direction: string | null, extra: Record<string, unknown> = {
   };
 }
 
-function budgetRoot(id: string, extra: Record<string, unknown> = {}): unknown {
-  return {
-    id,
-    parentId: null,
-    gremiumId: null,
-    key: 'VS',
-    pathKey: 'VS',
-    name: `Haushalt ${id}`,
-    currency: 'EUR',
-    active: true,
-    color: null,
-    acceptedStateKeys: [],
-    deniedStateKeys: [],
-    hiddenInBudget: false,
-    viewGremiumId: null,
-    fiscalStartMonth: 1,
-    fiscalStartDay: 1,
-    byFiscalYear: [
-      {
-        fiscalYearId: 'fy26',
-        allocated: '186000.00',
-        bound: '60000.00',
-        expended: '27230.00',
-        income: '0',
-        committed: '87230.00',
-        requested: '16061.20',
-        available: '97770.00',
-      },
-    ],
-    children: [],
-    ...extra,
-  };
-}
-
-function fiscalYear(id: string, year: number, extra: Record<string, unknown> = {}): unknown {
-  return {
-    id,
-    budgetId: 'b1',
-    year,
-    display: String(year),
-    startDate: `${year}-01-01`,
-    endDate: `${year}-12-31`,
-    active: false,
-    ...extra,
-  };
-}
-
 type Body = unknown | 'error' | 'pending';
 
 interface SetupOpts {
@@ -220,10 +173,6 @@ interface SetupOpts {
   timeline?: Body;
   delegations?: Body;
   types?: Body;
-  /** Budget tree, then the fiscal years by root id; only for a person with the right. */
-  budgets?: Body;
-  fiscalYears?: Record<string, Body>;
-  invoices?: Body;
   phone?: boolean;
   wide?: boolean;
   extraWide?: boolean;
@@ -288,22 +237,8 @@ async function setup(principal: Principal, opts: SetupOpts = {}) {
   answer(requests.delegations, opts.delegations ?? []);
   answer(requests.types, opts.types ?? TYPES);
 
-  // The budget requests follow the session: they start once it shows the right.
-  view.fixture.detectChanges();
-  await view.fixture.whenStable();
-  const budgetReq = http.match((r) => r.url.endsWith('/api/budgets'));
-  for (const req of budgetReq) answer(req, opts.budgets ?? []);
-  view.fixture.detectChanges();
-  for (const [id, body] of Object.entries(opts.fiscalYears ?? {})) {
-    for (const req of http.match((r) => r.url.endsWith(`/api/budgets/${id}/fiscal-years`))) {
-      answer(req, body);
-    }
-  }
-  const invoiceReq = http.match((r) => r.url.endsWith('/api/invoices'));
-  for (const req of invoiceReq) answer(req, opts.invoices ?? { items: [], total: 0, limit: 1, offset: 0 });
-
   view.detectChanges();
-  return { ...view, auth, http, router, requests, budgetReq, invoiceReq };
+  return { ...view, auth, http, router, requests };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -317,7 +252,7 @@ describe('DashboardComponent', () => {
   afterEach(() => jest.restoreAllMocks());
 
   describe('head', () => {
-    it('greets the member by first name and lists the gremien in one line', async () => {
+    it('greets the member by first name, without a line of gremien', async () => {
       const { http } = await setup({
         ...MEMBER,
         gremien: [
@@ -326,13 +261,17 @@ describe('DashboardComponent', () => {
         ],
       } as Principal);
       expect(screen.getByRole('heading', { level: 1, name: 'Willkommen, Mia' })).toBeInTheDocument();
-      expect(screen.getByText('Studierendenparlament · Finanzausschuss')).toBeInTheDocument();
+      expect(screen.queryByText('Studierendenparlament · Finanzausschuss')).not.toBeInTheDocument();
       http.verify();
     });
 
-    it('offers "Antrag stellen" and opens the search from the pill', async () => {
+    it('opens the search from the pill; "Antrag stellen" is the floating button', async () => {
       const { http, fixture } = await setup(MEMBER);
-      expect(screen.getByRole('link', { name: /Antrag stellen/ })).toHaveAttribute('href', '/apply');
+      expect(screen.queryByRole('link', { name: /Antrag stellen/ })).not.toBeInTheDocument();
+      const router = fixture.debugElement.injector.get(Router);
+      const nav = jest.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
+      screen.getByRole('button', { name: 'Antrag stellen' }).click();
+      expect(nav).toHaveBeenCalledWith('/apply');
       const palette = fixture.debugElement.injector.get(CommandPaletteService);
       screen.getByRole('button', { name: 'Suche' }).click();
       expect(palette.isOpen()).toBe(true);
@@ -369,7 +308,7 @@ describe('DashboardComponent', () => {
   });
 
   describe('work list', () => {
-    it('shows the tasks as a table with type, status, waiting time and amount', async () => {
+    it('shows the tasks as a table with status and waiting time', async () => {
       const { http } = await setup(MEMBER);
       expect(screen.getByRole('tab', { name: 'Offene Aufgaben 1' })).toHaveAttribute('aria-selected', 'true');
       expect(screen.getByRole('tab', { name: 'Meine Anträge 7' })).toBeInTheDocument();
@@ -378,10 +317,11 @@ describe('DashboardComponent', () => {
       const table = screen.getByRole('table');
       expect(within(table).getByText('Wartet')).toBeInTheDocument();
       expect(within(table).getByText('Zuschuss Erstsemester-Party')).toBeInTheDocument();
-      expect(within(table).getByText('Förderantrag')).toBeInTheDocument();
       expect(within(table).getByText('Eingereicht')).toBeInTheDocument();
       expect(within(table).getByText('1 Tag')).toBeInTheDocument();
-      expect(within(table).getByText(/1\.250,00/)).toBeInTheDocument();
+      expect(within(table).queryByText('Typ')).not.toBeInTheDocument();
+      expect(within(table).queryByText('Betrag')).not.toBeInTheDocument();
+      expect(within(table).queryByText(/1\.250,00/)).not.toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Alle Aufgaben öffnen' })).toHaveAttribute('href', '/tasks');
       http.verify();
     });
@@ -549,11 +489,8 @@ describe('DashboardComponent', () => {
       // No type name (the types failed) and no title: "Ohne Titel".
       expect(rows[0].title).toBe(cmp(fixture).i18n.translate('applications.list.untitled'));
       expect(rows[0].statusLabel).toBe('');
-      expect(rows[0].amount).toBeNull();
       // Without `stateSince` the waiting time counts from the last change.
       expect(rows[0].since).toBe('9 Tage');
-      expect(rows[1].amount).toMatch(/^12,00\s€$/);
-      expect(rows[3].amount).toBe('abc');
       expect(rows[1].since).toBe('—');
       expect(rows[1].sinceTitle).toBeNull();
       expect(rows[2].since).toBe('heute');
@@ -600,6 +537,10 @@ describe('DashboardComponent', () => {
         },
       });
       expect(fixture.nativeElement.classList).toContain('pane-page');
+      // Wide: "Antrag stellen" stands at the foot of the work list, outside the sheet.
+      const fab = (fixture.nativeElement as HTMLElement).querySelector('app-fab');
+      expect(fab?.closest('.dash__work')).not.toBeNull();
+      expect(fab?.closest('.dash__today')).toBeNull();
       const live = screen.getByRole('region', { name: 'Laufende Sitzung' });
       expect(within(live).getByText('seit 18:04 · Du führst Protokoll')).toBeInTheDocument();
       expect(within(live).getByText('3 / 8')).toBeInTheDocument();
@@ -668,7 +609,8 @@ describe('DashboardComponent', () => {
       expect(rows[2].when).toBe('');
       expect(screen.getByText('Du vertrittst Konrad Pfeiffer')).toBeInTheDocument();
       expect(screen.getByRole('link', { name: '12. Sitzung' })).toHaveAttribute('href', '/meetings/m-plan');
-      expect(screen.getByRole('link', { name: 'Sitzungen öffnen' })).toHaveAttribute('href', '/meetings');
+      expect(screen.getByRole('link', { name: 'Alle' })).toHaveAttribute('href', '/meetings');
+      expect(screen.queryByRole('link', { name: 'Sitzungen öffnen' })).not.toBeInTheDocument();
     });
 
     const PLANNED = Array.from({ length: 6 }, (_, i) =>
@@ -699,8 +641,6 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).noMeetings()).toBe(true);
       expect(screen.getByText('Keine Sitzungen')).toBeInTheDocument();
       expect(screen.getByText(/Du bist in keinem Gremium/)).toBeInTheDocument();
-      // Without access to the meetings page, the sheet has no link to it.
-      expect(screen.queryByRole('link', { name: 'Sitzungen öffnen' })).not.toBeInTheDocument();
     });
 
     it('says "Keine Sitzungen" to a member when nothing is planned', async () => {
@@ -719,101 +659,14 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).noMeetings()).toBe(true);
     });
 
-    it('names the date of today', async () => {
-      const { fixture } = await setup(MEMBER);
-      expect(cmp(fixture).todayLabel()).toBe('Di, 29.09.2026');
-    });
   });
 
   describe('budget', () => {
-    it('loads no budget for a person without the right', async () => {
-      const { budgetReq, invoiceReq, fixture } = await setup(MEMBER);
-      expect(budgetReq).toHaveLength(0);
-      expect(invoiceReq).toHaveLength(0);
-      expect(cmp(fixture).budgets()).toEqual([]);
+    it('loads no budget and no invoice count, also for a person with the right', async () => {
+      const { http } = await setup(TREASURER);
+      http.expectNone((r) => r.url.endsWith('/api/budgets'));
+      http.expectNone((r) => r.url.endsWith('/api/invoices'));
       expect(screen.queryByRole('heading', { name: 'Finanzen' })).not.toBeInTheDocument();
-    });
-
-    it('shows the current fiscal year: available, used share and open invoices', async () => {
-      const { fixture } = await setup(TREASURER, {
-        budgets: [budgetRoot('b1')],
-        fiscalYears: { b1: [fiscalYear('fy25', 2025), fiscalYear('fy26', 2026)] },
-        invoices: { items: [], total: 2, limit: 1, offset: 0 },
-      });
-      const [b] = cmp(fixture).budgets();
-      expect(b).toEqual(
-        expect.objectContaining({ id: 'b1', fyId: 'fy26', title: 'Budget HHJ 2026', used: 47 }),
-      );
-      expect(screen.getByRole('heading', { name: 'Finanzen' })).toBeInTheDocument();
-      const link = screen.getByRole('link', { name: /Budget HHJ 2026/ });
-      expect(link).toHaveAttribute('href', '/budget?budget=b1&fy=fy26');
-      expect(link).toHaveTextContent('2 offene Rechnungen');
-      expect(link).toHaveTextContent('47 % gebunden oder ausgegeben');
-    });
-
-    it('names each root when there are more, and picks the active or the first year', async () => {
-      const { fixture } = await setup(TREASURER, {
-        budgets: [
-          budgetRoot('b1'),
-          budgetRoot('b2', {
-            byFiscalYear: [
-              { fiscalYearId: 'fyx', allocated: '0', bound: 'x', expended: '0', income: '0', committed: '0', requested: '0', available: '0' },
-            ],
-          }),
-          budgetRoot('b3'),
-          budgetRoot('hidden', { hiddenInBudget: true }),
-        ],
-        fiscalYears: {
-          b1: [fiscalYear('fy26', 2027), fiscalYear('fy99', 2028, { active: true })],
-          b2: [fiscalYear('fyx', 2030)],
-        },
-        invoices: { items: [], total: 1, limit: 1, offset: 0 },
-      });
-      const rows = cmp(fixture).budgets();
-      // b1: no year holds today and the active one has no figures.
-      expect(rows.map((r: { id: string }) => r.id)).toEqual(['b2']);
-      expect(rows[0].title).toBe('Haushalt b2 · HHJ 2030');
-      expect(rows[0].used).toBe(0);
-      expect(screen.getByText(/1 offene Rechnung$/)).toBeInTheDocument();
-    });
-
-    it('picks the active year when no year holds today', async () => {
-      const { fixture } = await setup(TREASURER, {
-        budgets: [budgetRoot('b1')],
-        fiscalYears: { b1: [fiscalYear('fy0', 2020), fiscalYear('fy26', 2027, { active: true })] },
-      });
-      expect(cmp(fixture).budgets()[0].fyId).toBe('fy26');
-      expect(cmp(fixture).budgets()[0].available).toMatch(/97\.770,00/);
-    });
-
-    it('drops a root whose years fail or are missing; a failed invoice count is 0', async () => {
-      const { fixture } = await setup(TREASURER, {
-        budgets: [budgetRoot('b1'), budgetRoot('b2')],
-        fiscalYears: { b1: 'error', b2: [] },
-        invoices: 'error',
-      });
-      expect(cmp(fixture).budgets()).toEqual([]);
-      expect(cmp(fixture).openInvoices()).toBe(0);
-    });
-
-    it('leaves the amount out when the server sends none', async () => {
-      const root = budgetRoot('b1') as { byFiscalYear: Record<string, string>[] };
-      root.byFiscalYear[0]['available'] = '';
-      const { fixture } = await setup(TREASURER, {
-        budgets: [root],
-        fiscalYears: { b1: [fiscalYear('fy26', 2026)] },
-      });
-      expect(cmp(fixture).budgets()[0].available).toBe('');
-    });
-
-    it('survives a failed tree', async () => {
-      const { fixture } = await setup(TREASURER, { budgets: 'error' });
-      expect(cmp(fixture).budgets()).toEqual([]);
-    });
-
-    it('shows nothing when every root is hidden', async () => {
-      const { fixture } = await setup(TREASURER, { budgets: [budgetRoot('h', { hiddenInBudget: true })] });
-      expect(cmp(fixture).budgets()).toEqual([]);
     });
   });
 
