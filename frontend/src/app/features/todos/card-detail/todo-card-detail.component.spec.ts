@@ -1276,7 +1276,12 @@ describe('TodoCardDetailComponent', () => {
       expect(fixture.nativeElement.querySelector('app-chat')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: /Verschieben/ }));
       expect(cmp.moveOpen()).toBe(true);
-      cmp.moveOpen.set(false);
+      detect();
+      fireEvent.click(screen.getByRole('button', { name: 'In anderes Board verschieben' }));
+      expect(cmp.moveOpen()).toBe(false);
+      expect(cmp.transferOpen()).toBe(true);
+      cmp.transferOpen.set(false);
+      detect();
       fireEvent.click(screen.getByRole('button', { name: /Erledigt/ }));
       const open = screen.getByRole('button', { name: 'Aktivität, 1' });
       expect(open.querySelector('.cd__activityN')?.textContent).toBe('1');

@@ -1,8 +1,5 @@
-<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open">
+<app-side-sheet side="bottom" [heading]="'todos.move.title' | t" [(open)]="open" (closed)="dismissed.emit()">
   <div class="ms">
-    @if (cardTitle()) {
-      <p class="ms__sub">{{ cardTitle() }}</p>
-    }
     <div class="ms__list" role="radiogroup" [attr.aria-label]="'todos.move.column' | t">
       @for (col of columns(); track col.id) {
         <button
@@ -21,7 +18,12 @@
         </button>
       }
     </div>
-    <p class="ms__cap" id="ms-pos">{{ 'todos.move.position' | t }}</p>
+    @if (canTransfer()) {
+      <button type="button" class="ms__row ms__row--transfer" (click)="moveOn()">
+        <app-icon class="ms__radio" name="arrow" [size]="20" />
+        <span class="ms__name">{{ 'todos.card.transfer' | t }}</span>
+      </button>
+    }
     <app-segmented
       width="fill"
       ariaLabel="{{ 'todos.move.position' | t }}"

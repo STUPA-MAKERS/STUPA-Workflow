@@ -218,6 +218,13 @@
     width: 100vw;
     padding: 0 var(--space-4);
     border-radius: 0;
+    /* The bottom bar lies over the drawer, as over any page: no shadow falls on it. */
+    box-shadow: none;
+  }
+  /* The bar takes the colour of the drawer, not of the page (`--color-bg`), so it does not
+     stand out from the card below it. */
+  .td__drawer > app-list-detail-bar {
+    background: var(--color-surface);
   }
 }
 /* Motion, as `app-side-sheet` from the end: the drawer slides in from the end edge and goes

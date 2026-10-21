@@ -301,10 +301,12 @@
 
 @if (phone()) {
   <p class="sr-only" aria-live="assertive">{{ tileSaid() }}</p>
-  <app-todo-tile-menu
+  <app-todo-move-sheet
     [(open)]="tileMenuOpen"
-    [request]="tileMenu()"
-    (column)="onTileColumn($event)"
+    [columns]="tileColumns()"
+    [current]="tileMenu()?.card?.columnId ?? null"
+    [canTransfer]="true"
+    (moved)="onTileMove($event)"
     (transfer)="tileTransferOpen.set(true)"
     (dismissed)="tileMenu.set(null)"
   />
