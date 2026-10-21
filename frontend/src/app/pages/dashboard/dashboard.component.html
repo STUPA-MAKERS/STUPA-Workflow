@@ -146,7 +146,7 @@
   </div>
 </aside>
 
-<!-- The work list: one table, three tabs. -->
+<!-- The work list: one table, two tabs. -->
 <section class="dash__work" [attr.aria-label]="'dashboard.work.label' | t">
   <div class="dash__tabbar">
     <app-tabs
@@ -158,7 +158,7 @@
       [active]="tab()"
       (activeChange)="setTab($event)"
     />
-    <!-- Phone: the link goes under the rows, so the three tabs keep the width. -->
+    <!-- Phone: the link goes under the rows, so the tabs keep the width. -->
     @if (!phone()) {
       <ng-container *ngTemplateOutlet="allLinkTpl" />
     }
@@ -179,9 +179,6 @@
         @switch (tab()) {
           @case ('mine') {
             <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.mine' | t" [body]="'dashboard.empty.mineBody' | t" />
-          }
-          @case ('votes') {
-            <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.votes' | t" [body]="'dashboard.empty.votesBody' | t" />
           }
           @default {
             <app-empty-state [shape]="phone() ? 'row' : 'table'" rows="3" [heading]="'dashboard.empty.tasks' | t" [body]="'dashboard.empty.tasksBody' | t" />
@@ -205,62 +202,17 @@
       <app-skeleton variant="rows" [count]="4" [label]="'dashboard.loading' | t" />
     } @else if (phone()) {
       <div class="rowgroup">
-        @if (tab() === 'votes') {
-          @for (r of voteRows(); track r.id) {
-            <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
-              <span sub>
-                <app-status-text [kind]="r.statusKind">{{ r.statusKey | t }}</app-status-text>
-                @if (r.ballot) {
-                  <span class="dash__dot" aria-hidden="true">·</span>
-                  <span>{{ (r.ballot === 'cast' ? 'voting.list.ballot.cast' : 'voting.list.ballot.pending') | t }}</span>
-                }
-              </span>
-              <app-icon trail class="dash__chev" name="right" [size]="17" />
-            </app-list-item>
-          }
-        } @else {
-          @for (r of tab() === 'mine' ? mineRows() : taskRows(); track r.id) {
-            <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
-              <span sub>
-                @if (r.statusLabel) {
-                  <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
-                }
-              </span>
-              <span trail class="dash__date num" [attr.title]="r.sinceTitle">{{ r.since }}</span>
-            </app-list-item>
-          }
+        @for (r of tab() === 'mine' ? mineRows() : taskRows(); track r.id) {
+          <app-list-item [title]="r.title" [link]="r.link" [wrap]="true">
+            <span sub>
+              @if (r.statusLabel) {
+                <app-status-text [kind]="r.statusKind">{{ r.statusLabel }}</app-status-text>
+              }
+            </span>
+            <span trail class="dash__date num" [attr.title]="r.sinceTitle">{{ r.since }}</span>
+          </app-list-item>
         }
       </div>
-    } @else if (tab() === 'votes') {
-      <app-data-table
-        surface="rowgroup"
-        [columns]="voteColumns()"
-        [rows]="voteRows()"
-        [loading]="tabLoading()"
-        [skeletonRowCount]="4"
-        [loadingText]="'dashboard.loading' | t"
-        [rowKey]="rowKey"
-        [clickable]="true"
-        (rowClick)="openRow($event)"
-      >
-        <ng-template appCell="title" let-r><span class="dash__cellTitle" [title]="$any(r).title">{{ $any(r).title }}</span></ng-template>
-        <ng-template appCell="where" let-r><span class="dash__muted">{{ $any(r).where ?? '—' }}</span></ng-template>
-        <ng-template appCell="status" let-r><app-status-text [kind]="$any(r).statusKind">{{ $any(r).statusKey | t }}</app-status-text></ng-template>
-        <ng-template appCell="ballot" let-r>
-          @switch ($any(r).ballot) {
-            @case ('cast') {
-              <span class="dash__ballot"><app-icon name="check" [size]="14" />{{ 'voting.list.ballot.cast' | t }}</span>
-            }
-            @case ('pending') {
-              <span class="dash__ballot dash__ballot--pending">{{ 'voting.list.ballot.pending' | t }}</span>
-            }
-            @default {
-              <span class="dash__muted">—</span>
-            }
-          }
-        </ng-template>
-        <ng-template appCell="go"><app-icon class="dash__chev" name="right" [size]="17" /></ng-template>
-      </app-data-table>
     } @else {
       <app-data-table
         surface="rowgroup"

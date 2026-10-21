@@ -26,7 +26,6 @@ import type {
   MeetingPage,
   Page,
   Uuid,
-  VoteListItem,
 } from '@core/api/models';
 import {
   AvatarComponent,
@@ -54,11 +53,7 @@ import {
 // it uses.
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
-import {
-  flowColorKind,
-  meetingVoteStatus,
-} from '@shared/status-kind.util';
-import { closedStatus } from '../../features/voting/election.util';
+import { flowColorKind } from '@shared/status-kind.util';
 import { CommandPaletteService } from '../../features/search/command-palette.service';
 import { AccountMenuComponent } from '../../layout/account-menu/account-menu.component';
 import { NavService } from '../../layout/nav.service';
@@ -75,8 +70,8 @@ const PHONE_MEETINGS = 2;
 const TIMELINE_LIMIT = 8;
 
 /** The tabs of the work list. The URL keeps the choice as `?tab=`. */
-export type WorkTab = 'tasks' | 'mine' | 'votes';
-const TABS: readonly WorkTab[] = ['tasks', 'mine', 'votes'];
+export type WorkTab = 'tasks' | 'mine';
+const TABS: readonly WorkTab[] = ['tasks', 'mine'];
 
 /** A row of "Offene Aufgaben" or "Meine Anträge". */
 export interface WorkRow {
@@ -89,18 +84,6 @@ export interface WorkRow {
   since: string;
   /** The exact moment, for the tooltip. */
   sinceTitle: string | null;
-}
-
-/** A row of "Abstimmungen". */
-export interface VoteRow {
-  id: Uuid;
-  link: readonly string[];
-  title: string;
-  /** "34. Sitzung · TOP 3", the gremium of a vote without a meeting, or null. */
-  where: string | null;
-  statusKey: TranslationKey;
-  statusKind: StatusKind;
-  ballot: 'cast' | 'pending' | null;
 }
 
 /** A live meeting in the sheet. */
@@ -128,7 +111,7 @@ type Loaded<T> = T | null | undefined;
  * The start page of a signed-in person (variant B "Arbeitsliste + Seitenleiste").
  *
  * Left: the search pill, the greeting, and ONE work list with the
- * tabs "Offene Aufgaben", "Meine Anträge" and "Abstimmungen". The tabs show their counts
+ * tabs "Offene Aufgaben" and "Meine Anträge". The tabs show their counts
  * and the URL keeps the choice (`?tab=`). Each tab is a table with real columns; a row
  * opens its detail page, and "Alle … öffnen" opens the full list. Wide, "Antrag stellen"
  * is a floating button at the foot of the list column; narrower, at the foot of the page.
@@ -212,8 +195,6 @@ export class DashboardComponent {
   private readonly mine = this.load<Page<ApplicationListItem>>(
     this.api.listApplications({ mine: true, limit: ROWS, sort: 'stateSince', order: 'desc' }),
   );
-  /** The votes the server lets the user read, the open ones first. */
-  private readonly votes = this.load<Page<VoteListItem>>(this.api.listVotes({ limit: ROWS }));
   /** The live and the next meetings. The timeline already scopes and sorts them. */
   private readonly timeline = this.load<MeetingPage>(
     this.api.listMeetingsTimeline({ direction: 'upcoming', limit: TIMELINE_LIMIT }),
@@ -258,7 +239,6 @@ export class DashboardComponent {
     const short = this.phone();
     const tasks = this.tasks();
     const mine = this.mine();
-    const votes = this.votes();
     return [
       {
         id: 'tasks',
@@ -269,12 +249,6 @@ export class DashboardComponent {
         id: 'mine',
         label: this.i18n.translate(short ? 'dashboard.tab.mineShort' : 'dashboard.applications.title'),
         count: mine ? mine.total : null,
-      },
-      {
-        id: 'votes',
-        label: this.i18n.translate('dashboard.tab.votes'),
-        // The open votes only: the ended ones need nobody.
-        count: votes ? votes.items.filter((v) => v.status === 'open').length : null,
       },
     ];
   });
@@ -298,8 +272,6 @@ export class DashboardComponent {
     switch (this.tab()) {
       case 'mine':
         return this.mine();
-      case 'votes':
-        return this.votes();
       default:
         return this.tasks();
     }
@@ -321,18 +293,12 @@ export class DashboardComponent {
     }),
   );
 
-  readonly voteRows = computed<VoteRow[]>(() =>
-    (this.votes()?.items ?? []).slice(0, this.rowCap()).map((v) => this.voteRow(v)),
-  );
-
   /** The rows of the open tab are empty (and loaded). */
   readonly tabEmpty = computed(() => {
     if (this.tabLoading() || this.tabError()) return false;
     switch (this.tab()) {
       case 'mine':
         return this.mineRows().length === 0;
-      case 'votes':
-        return this.voteRows().length === 0;
       default:
         return this.taskRows().length === 0;
     }
@@ -341,20 +307,12 @@ export class DashboardComponent {
   /** No own application yet: the empty tab gets the card "Antrag stellen" beside it. */
   readonly newUser = computed(() => this.mine()?.total === 0);
 
-  /** "Alle … öffnen" of the open tab, or null when the target is closed to the user. */
-  readonly allLink = computed<{ key: TranslationKey; link: string; query: Record<string, string> | null } | null>(
-    () => {
-      switch (this.tab()) {
-        case 'mine':
-          return { key: 'dashboard.all.mine', link: '/applications', query: { mine: 'true' } };
-        case 'votes':
-          return this.navVisible('voting')
-            ? { key: 'dashboard.all.votes', link: '/voting', query: null }
-            : null;
-        default:
-          return { key: 'dashboard.all.tasks', link: '/tasks', query: null };
-      }
-    },
+  /** "Alle … öffnen" of the open tab. */
+  readonly allLink = computed<{ key: TranslationKey; link: string; query: Record<string, string> | null }>(
+    () =>
+      this.tab() === 'mine'
+        ? { key: 'dashboard.all.mine', link: '/applications', query: { mine: 'true' } }
+        : { key: 'dashboard.all.tasks', link: '/tasks', query: null },
   );
 
   /** The columns of "Offene Aufgaben" and "Meine Anträge". */
@@ -369,20 +327,11 @@ export class DashboardComponent {
     { key: 'go', label: '', align: 'end', width: '3.25rem' },
   ]);
 
-  /** The columns of "Abstimmungen". */
-  readonly voteColumns = computed<ColumnDef[]>(() => [
-    { key: 'title', label: this.i18n.translate('dashboard.col.question'), card: 'title' },
-    { key: 'where', label: this.i18n.translate('dashboard.col.where'), width: '12rem' },
-    { key: 'status', label: this.i18n.translate('dashboard.col.status'), width: '8rem' },
-    { key: 'ballot', label: this.i18n.translate('dashboard.col.ballot'), width: '9rem' },
-    { key: 'go', label: '', align: 'end', width: '3.25rem' },
-  ]);
-
   readonly rowKey = (row: unknown): unknown => (row as { id: Uuid }).id;
 
   /** A row of the table opens its detail page. */
   openRow(row: unknown): void {
-    void this.router.navigate((row as WorkRow | VoteRow).link as string[]);
+    void this.router.navigate((row as WorkRow).link as string[]);
   }
 
   private workRow(
@@ -400,34 +349,6 @@ export class DashboardComponent {
       statusKind: flowColorKind(item.state?.color),
       since,
       sinceTitle: this.longMoment(at),
-    };
-  }
-
-  private voteRow(v: VoteListItem): VoteRow {
-    const status =
-      v.status === 'closed' && v.result
-        ? closedStatus(v.kind, v.result)
-        : v.status === 'draft'
-          ? { kind: 'neutral' as const, key: 'voting.list.status.draft' as const }
-          : meetingVoteStatus(v.status);
-    let where = v.gremiumName;
-    if (v.meetingTitle) {
-      where =
-        v.agendaPosition === null
-          ? v.meetingTitle
-          : this.i18n.translate('dashboard.votes.where', {
-              meeting: v.meetingTitle,
-              n: v.agendaPosition,
-            });
-    }
-    return {
-      id: v.id,
-      link: ['/voting', v.id],
-      title: v.question?.trim() || this.i18n.translate('meetings.vote.untitled'),
-      where,
-      statusKey: status.key,
-      statusKind: status.kind,
-      ballot: this.ballotOf(v.myBallot.cast, v.status === 'open' && v.canCast),
     };
   }
 
@@ -520,10 +441,6 @@ export class DashboardComponent {
 
   // ---------------------------------------------------------------- format
 
-  private navVisible(key: string): boolean {
-    return this.nav.visible().some((i) => i.key === key);
-  }
-
   /** How long a task waits, in calendar days: "heute", "1 Tag", "5 Tage". */
   private waited(at: IsoDateTime): string {
     const days = calendarDaysSince(at, new Date(Date.now()));
@@ -547,7 +464,7 @@ export class DashboardComponent {
   /** Send the request of the open tab again after it failed. */
   retryTab(): void {
     const tab = this.tab();
-    const source = tab === 'mine' ? this.mine : tab === 'votes' ? this.votes : this.tasks;
+    const source = tab === 'mine' ? this.mine : this.tasks;
     this.reloads.get(source)?.();
   }
 

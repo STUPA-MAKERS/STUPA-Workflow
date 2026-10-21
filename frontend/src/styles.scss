@@ -66,14 +66,17 @@
   }
 }
 
-// Phone with an on-screen keyboard: while a text field has the focus, the bottom bar
-// goes away and the pinned elements (chat composer, dock, FAB, wizard bar) drop to the
-// bottom edge. The viewport has `interactive-widget=resizes-content` (index.html), so on
-// Android the keyboard shrinks the layout viewport, and the bar would otherwise stand
-// between the field and the keyboard. A field in the bar itself does not count, so its
-// own sheet never closes under the finger.
+// Phone with an on-screen keyboard: while a text field has the focus and the keyboard is
+// open, the bottom bar goes away and the pinned elements (chat composer, dock, FAB,
+// wizard bar) drop to the bottom edge. The viewport has
+// `interactive-widget=resizes-content` (index.html), so on Android the keyboard shrinks
+// the layout viewport, and the bar would otherwise stand between the field and the
+// keyboard. The focus alone is not enough: Android closes the keyboard on the back
+// gesture and the field keeps the focus, so the bar must come back then.
+// `frame--keyboard` (KeyboardService) is set only while the keyboard is open. A field in
+// the bar itself does not count, so its own sheet never closes under the finger.
 @media (pointer: coarse) {
-  .frame--phone:has(
+  .frame--phone.frame--keyboard:has(
       :is(
           input:not(
               [type='checkbox'],
