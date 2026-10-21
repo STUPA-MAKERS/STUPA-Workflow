@@ -3105,6 +3105,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
     '{names} is linked to an application or is a sub-booking and keeps its cost centre.',
   'expenses.bulk.selectRow': 'Select “{description}”',
   'expenses.bulk.start': 'Select several',
+  'expenses.bulk.pick': 'Select',
   'expenses.bulk.stop': 'End selection',
   'expenses.bulk.sum': 'Total',
   'expenses.bulk.title': '{count} bookings selected',

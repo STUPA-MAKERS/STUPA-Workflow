@@ -33,6 +33,7 @@ import {
   InfiniteScrollDirective,
   ListDetailLayoutComponent,
   ListItemComponent,
+  LongPressDirective,
   MEDIA,
   mediaQuery,
   RangeChipComponent,
@@ -86,7 +87,7 @@ import { TransferFormComponent } from './transfer-form/transfer-form.component';
 import { DetailNoneComponent } from '@shared/ui/detail-none/detail-none.component';
 import { CostCentreLabelComponent } from '../budget/cost-centre-label/cost-centre-label.component';
 import { dayMonth } from '@shared/date-format';
-import { deleteAfterUndo, swipeFrom } from '@shared/row-swipe';
+import { swipeFrom } from '@shared/row-swipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { TodosApiService } from '@core/api/todos.service';
@@ -151,6 +152,7 @@ const SORTS: readonly { field: ExpenseSortField; order: 'asc' | 'desc'; key: str
     IconComponent,
     ListDetailLayoutComponent,
     ListItemComponent,
+    LongPressDirective,
     NgTemplateOutlet,
     RangeChipComponent,
     RowMenuComponent,
@@ -454,16 +456,9 @@ export class ExpensesComponent implements OnDestroy {
   });
 
   /** The list groups by month while it sorts by a date. */
-  /**
-   * The bookings that a swipe took out and that wait for the end of the undo. The list
-   * leaves them out, so the gap closes at once.
-   */
-  readonly swipedAway = signal<ReadonlySet<string>>(new Set());
-
   readonly groups = computed(() => {
     const field = this.sortField();
-    const away = this.swipedAway();
-    const shown = this.items().filter((e) => !away.has(e.id));
+    const shown = this.items();
     const date = (e: Expense): string | null =>
       field === 'invoiceDate'
         ? e.invoiceDate
@@ -970,40 +965,30 @@ export class ExpensesComponent implements OnDestroy {
     return swipeFrom(menu, 'edit');
   }
 
-  /** The swipe to the left: "Löschen" of the row menu. */
-  swipeLeft(menu: readonly RowMenuSection[]): RowSwipeAction | null {
-    return swipeFrom(menu, 'delete', true);
+  /** The swipe to the left: start the selection with this booking. */
+  swipeLeft(): RowSwipeAction | null {
+    if (!this.canManage() || this.tab() !== 'bookings') return null;
+    return { id: 'select', label: this.i18n.translate('expenses.bulk.pick'), icon: 'check' };
   }
 
   /** A swipe of a phone carried out an item of the row menu. */
   onRowSwiped(action: RowSwipeAction, e: Expense): void {
-    if (action.id === 'edit') {
-      this.openEdit(e);
-      return;
-    }
-    if (action.id !== 'delete') return;
-    // Delete without the question: the row goes now, the request when the undo is over.
-    this.setSwipedAway(e.id, true);
-    deleteAfterUndo(this.toast, {
-      message: this.i18n.translate('expenses.toast.deleted'),
-      undo: this.i18n.translate('action.undo'),
-      restore: () => this.setSwipedAway(e.id, false),
-      send: () =>
-        this.dialogs.remove(e, {
-          quiet: true,
-          done: () => this.setSwipedAway(e.id, false),
-          failed: () => this.setSwipedAway(e.id, false),
-        }),
-    });
+    if (action.id === 'edit') this.openEdit(e);
+    else if (action.id === 'select') this.selectWith(e);
   }
 
-  private setSwipedAway(id: string, away: boolean): void {
-    this.swipedAway.update((cur) => {
-      const next = new Set(cur);
-      if (away) next.add(id);
-      else next.delete(id);
-      return next;
-    });
+  /**
+   * A long press or the swipe to the left: start the selection with this booking, or, in
+   * the selection already, toggle it.
+   */
+  selectWith(e: Expense): void {
+    if (!this.canManage()) return;
+    if (!this.selecting()) {
+      this.startSelecting();
+      this.toggleSelect(e.id, true);
+      return;
+    }
+    this.toggleSelect(e.id, !this.isSelected(e.id));
   }
 
   readonly transferMenu = computed<RowMenuSection[]>(() => [

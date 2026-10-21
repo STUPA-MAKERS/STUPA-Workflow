@@ -77,7 +77,7 @@ import {
   RowTransitionsMenuComponent,
   type RowAction,
   rowArchiveItem,
-  rowShareItem,
+  rowForceItem,
 } from './row-transitions-menu/row-transitions-menu.component';
 import { ShareLinksDialogComponent } from './share-links-dialog/share-links-dialog.component';
 import { ApplicationCaptureComponent } from './capture/application-capture.component';
@@ -130,7 +130,7 @@ interface ListRow {
   amount: string | null;
   /** F1: the approved amount when it deviates; the row then strikes `amount` through. */
   approved: string | null;
-  /** The swipe of a phone: "Öffentliche Links" to the right, archive to the left. */
+  /** The swipe of a phone: "Status setzen" to the right, archive to the left. */
   swipeRight: RowSwipeAction | null;
   swipeLeft: RowSwipeAction | null;
 }
@@ -419,10 +419,10 @@ export class ApplicationsListComponent implements OnDestroy {
    */
   private swipeOf(item: ApplicationListItem): Pick<ListRow, 'swipeRight' | 'swipeLeft'> {
     const t = (key: TranslationKey) => this.i18n.translate(key);
-    const share = rowShareItem(this.auth, t);
+    const force = rowForceItem(this.auth, t);
     const archive = rowArchiveItem(this.auth, t, item);
     return {
-      swipeRight: share ? { id: share.id, label: share.label, icon: 'link' } : null,
+      swipeRight: force ? { id: force.id, label: force.label, icon: 'flow' } : null,
       swipeLeft: archive
         ? { id: archive.id, label: archive.label, icon: 'archive', leaves: this.archived() !== 'all' }
         : null,
@@ -766,7 +766,7 @@ export class ApplicationsListComponent implements OnDestroy {
 
   /** A swipe of a phone carried out an item of the row menu. */
   onRowSwiped(item: ApplicationListItem, action: RowSwipeAction): void {
-    if (action.id === 'share') this.onRowAction(item, { kind: 'share' });
+    if (action.id === 'force') this.onRowAction(item, { kind: 'force' });
     else if (action.id === 'archive') this.swipeArchive(item, action.leaves === true);
   }
 

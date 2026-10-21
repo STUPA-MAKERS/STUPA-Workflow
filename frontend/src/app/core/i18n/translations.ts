@@ -3174,6 +3174,7 @@ export const de = {
     '{names} ist mit einem Antrag verknüpft oder eine Unterbuchung und behält die Kostenstelle.',
   'expenses.bulk.selectRow': '„{description}“ auswählen',
   'expenses.bulk.start': 'Mehrere auswählen',
+  'expenses.bulk.pick': 'Auswählen',
   'expenses.bulk.stop': 'Auswahl beenden',
   'expenses.bulk.sum': 'Summe',
   'expenses.bulk.title': '{count} Buchungen ausgewählt',
