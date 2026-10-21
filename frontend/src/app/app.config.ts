@@ -14,7 +14,7 @@ import {
   withInMemoryScrolling,
   withViewTransitions,
 } from '@angular/router';
-import { onRouteViewTransition } from '@core/motion/motion';
+import { onRouteViewTransition, watchUAVisualTransitions } from '@core/motion/motion';
 import { authInterceptor } from '@core/auth/auth.interceptor';
 import { AuthService } from '@core/auth/auth.service';
 import { lazyMockApiInterceptor } from '@core/api/mock-api.lazy';
@@ -97,6 +97,8 @@ export const appConfig: ApplicationConfig = {
       inject(SwUpdateService).init();
       // A long press on a row link opens no link menu of the browser (Android).
       guardTouchContextMenu(inject(DOCUMENT));
+      // A back gesture that the browser animated gets no second transition from us.
+      watchUAVisualTransitions();
       // EN lives in a lazy chunk. Wait for it, so the first paint is not German.
       return i18n.ready();
     }),

@@ -57,7 +57,11 @@
   margin-top: auto;
 }
 /* Phone: the log runs edge to edge. */
+/* The on-screen keyboard shrinks the viewport (`interactive-widget=resizes-content`) and a
+   bottom sheet with it. The minimum of the log then yields to the viewport, because a log
+   taller than the space left runs on under the pinned composer. */
 :host(.chat--phone) .chat__log {
+  min-height: min(var(--chat-log-min, 10rem), 25dvh);
   padding: 4px 0 12px;
   border: 0;
   border-radius: 0;
