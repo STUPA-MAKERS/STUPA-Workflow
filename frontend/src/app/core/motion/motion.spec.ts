@@ -1,6 +1,13 @@
-import type { ActivatedRouteSnapshot, ViewTransitionInfo } from '@angular/router';
+import { TestBed } from '@angular/core/testing';
+import { Router, type ActivatedRouteSnapshot, type ViewTransitionInfo } from '@angular/router';
 import { markGestureNavigation } from '@stupa-makers/ui-kit';
-import { onRouteViewTransition, routeMotion, routePath, withViewTransition } from './motion';
+import {
+  onRouteViewTransition,
+  routeMotion,
+  routePath,
+  watchUAVisualTransitions,
+  withViewTransition,
+} from './motion';
 
 function snap(...levels: string[][]): ActivatedRouteSnapshot {
   let child: ActivatedRouteSnapshot | null = null;
@@ -43,6 +50,12 @@ describe('routeMotion', () => {
     expect(routeMotion(['antraege', '42'], ['antraege'], true)).toBe('pop');
     expect(routeMotion(['antraege', '41'], ['antraege', '42'], true)).toBe('none');
   });
+
+  it('neither pushes nor pops when the navigation replaces the history entry', () => {
+    expect(routeMotion(['todos'], ['todos', 'b1'], true, true)).toBe('none');
+    expect(routeMotion(['tasks', '1'], ['tasks'], true, true)).toBe('none');
+    expect(routeMotion(['dashboard'], ['todos'], true, true)).toBe('section');
+  });
 });
 
 describe('onRouteViewTransition', () => {
@@ -57,12 +70,25 @@ describe('onRouteViewTransition', () => {
     };
   }
 
+  let replaceUrl = false;
+  beforeEach(() => {
+    replaceUrl = false;
+    TestBed.configureTestingModule({
+      providers: [
+        { provide: Router, useValue: { currentNavigation: () => ({ extras: { replaceUrl } }) } },
+      ],
+    });
+  });
+  function run(i: ViewTransitionInfo): void {
+    TestBed.runInInjectionContext(() => onRouteViewTransition(i));
+  }
+
   afterEach(() => delete document.documentElement.dataset['motion']);
 
   it('names the kind on <html> until the transition ends', async () => {
     media({});
     const i = info(['antraege'], ['sitzungen']);
-    onRouteViewTransition(i);
+    run(i);
     expect(document.documentElement.dataset['motion']).toBe('section');
     finish();
     await Promise.resolve();
@@ -72,9 +98,9 @@ describe('onRouteViewTransition', () => {
 
   it('keeps a newer kind that a later navigation set', async () => {
     media({ [PHONE]: true });
-    onRouteViewTransition(info(['antraege'], ['antraege', '1']));
+    run(info(['antraege'], ['antraege', '1']));
     const first = finish;
-    onRouteViewTransition(info(['antraege', '1'], ['antraege']));
+    run(info(['antraege', '1'], ['antraege']));
     first();
     await Promise.resolve();
     await Promise.resolve();
@@ -84,30 +110,59 @@ describe('onRouteViewTransition', () => {
   it('treats a browser without matchMedia as a wide screen with full motion', () => {
     (window.matchMedia as unknown) = undefined;
     const i = info(['antraege'], ['antraege', '1']);
-    onRouteViewTransition(i);
+    run(i);
     expect(i.transition.skipTransition).toHaveBeenCalled();
   });
 
   it('skips a transition inside a section and with reduced motion', () => {
     media({});
     const same = info(['antraege'], ['antraege', '1']);
-    onRouteViewTransition(same);
+    run(same);
     expect(same.transition.skipTransition).toHaveBeenCalled();
     media({ [REDUCED]: true });
     const reduced = info(['antraege'], ['sitzungen']);
-    onRouteViewTransition(reduced);
+    run(reduced);
     expect(reduced.transition.skipTransition).toHaveBeenCalled();
     expect(document.documentElement.dataset['motion']).toBeUndefined();
+  });
+
+  it('skips the push of a navigation that replaces the history entry', () => {
+    media({ [PHONE]: true });
+    replaceUrl = true;
+    const replaced = info(['todos'], ['todos', 'b1']);
+    run(replaced);
+    expect(replaced.transition.skipTransition).toHaveBeenCalled();
+    expect(document.documentElement.dataset['motion']).toBeUndefined();
+  });
+
+  it('skips the transition after a back that the browser animated, once', () => {
+    media({ [PHONE]: true });
+    const navigation = new EventTarget();
+    watchUAVisualTransitions({ navigation } as unknown as Window);
+    navigation.dispatchEvent(Object.assign(new Event('navigate'), { hasUAVisualTransition: true }));
+    const animated = info(['antraege', '1'], ['antraege']);
+    run(animated);
+    expect(animated.transition.skipTransition).toHaveBeenCalled();
+    navigation.dispatchEvent(
+      Object.assign(new Event('navigate'), { hasUAVisualTransition: false }),
+    );
+    const next = info(['antraege', '1'], ['antraege']);
+    run(next);
+    expect(next.transition.skipTransition).not.toHaveBeenCalled();
+  });
+
+  it('notes nothing without the Navigation API', () => {
+    expect(() => watchUAVisualTransitions({} as Window)).not.toThrow();
   });
 
   it('skips the pop after a swipe back, once', () => {
     media({ [PHONE]: true });
     markGestureNavigation();
     const swiped = info(['antraege', '1'], ['antraege']);
-    onRouteViewTransition(swiped);
+    run(swiped);
     expect(swiped.transition.skipTransition).toHaveBeenCalled();
     const next = info(['antraege', '1'], ['antraege']);
-    onRouteViewTransition(next);
+    run(next);
     expect(next.transition.skipTransition).not.toHaveBeenCalled();
     expect(document.documentElement.dataset['motion']).toBe('pop');
   });
