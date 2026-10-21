@@ -79,6 +79,7 @@ import {
   linkSub,
   linkTitle,
   relativeDays,
+  sheetMove,
   splitUrl,
 } from '../todos.util';
 import { isoDay, weekdayDate } from '@shared/date-format';
@@ -722,12 +723,7 @@ export class TodoCardDetailComponent {
       this.move({ columnId: choice.columnId });
       return;
     }
-    const first = (board: TodoBoard) =>
-      board.cards.find((x) => x.columnId === choice.columnId && x.id !== c.id)?.id ?? null;
-    const go = (board: TodoBoard) => {
-      const top = first(board);
-      this.move(top ? { columnId: choice.columnId, beforeId: top } : { columnId: choice.columnId });
-    };
+    const go = (board: TodoBoard) => this.move(sheetMove(board.cards, c.id, choice.columnId, choice.position));
     const board = this.board();
     if (board && board.id === c.boardId) {
       go(board);
