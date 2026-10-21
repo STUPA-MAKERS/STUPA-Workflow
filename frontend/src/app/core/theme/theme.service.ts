@@ -18,8 +18,8 @@ export const THEME_COLOR: Record<ResolvedTheme, string> = {
 
 /**
  * The manifest per theme. An installed Android app paints its navigation bar with
- * `theme_color` of the manifest (the bottom bar surface, so the two bars meet without a
- * seam) and its splash with `background_color`; the status bar follows the meta tag. A
+ * `theme_color` or `background_color` of the manifest (both the bottom bar surface, so
+ * the two bars meet without a seam); the status bar follows the meta tag. A
  * manifest has no per-scheme variant, so the service links the dark manifest while the
  * dark theme is in effect. The light one keeps the plain URL of `index.html`.
  */
