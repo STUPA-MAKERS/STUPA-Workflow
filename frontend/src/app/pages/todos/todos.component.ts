@@ -64,7 +64,12 @@ import {
 import { TodoCardDetailComponent } from '../../features/todos/card-detail/todo-card-detail.component';
 import { TodoNewDialogComponent } from '../../features/todos/new-dialog/todo-new-dialog.component';
 import { TodoCacheService } from '../../features/todos/todo-cache.service';
-import { TodoTileMenuComponent, type TileMenuRequest } from '../../features/todos/tile-menu/todo-tile-menu.component';
+import {
+  TodoMoveSheetComponent,
+  type MoveChoice,
+  type MoveColumn,
+  type TileMenuRequest,
+} from '../../features/todos/move-sheet/todo-move-sheet.component';
 import {
   TodoTransferDialogComponent,
   type TodoTransferTarget,
@@ -80,6 +85,7 @@ import {
   placeTile,
   removeTile,
   replaceTile,
+  sheetMove,
   sortedColumns,
   type BoardFilter,
 } from '../../features/todos/todos.util';
@@ -130,9 +136,9 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
  * Phone: "Meine To-Dos" (board view) and "Alle" are one list of board sections
  * (`app-todo-board-rows`); the personal board is the first section (`lead`), not the tab
  * board. Nothing drags there. A long press on a tile of a writable board, on these lists
- * and on the tab board, opens the "Verschieben" sheet (`app-todo-tile-menu`): a column
- * moves the card to its end as a drag does, "In anderes Board verschieben" opens the
- * transfer dialog.
+ * and on the tab board, opens the "Verschieben" sheet (`app-todo-move-sheet`, the sheet
+ * of the card detail): a column and its top or end move the card, "In anderes Board
+ * verschieben" opens the transfer dialog.
  *
  * `?card=<id>` opens the card in a drawer over the board (a deep link works the same).
  * A shared link names the card only (`/todos?card=<id>`): the page reads the card and opens
@@ -182,7 +188,7 @@ const DUE_TEXT: Record<BoardFilter['due'], TranslationKey> = {
     TodoCardDetailComponent,
     TodoListViewComponent,
     TodoNewDialogComponent,
-    TodoTileMenuComponent,
+    TodoMoveSheetComponent,
     TodoTransferDialogComponent,
   ],
   // On a phone the board fills the free height too, so its column pages scroll inside;
@@ -1105,16 +1111,24 @@ export class TodosComponent implements OnDestroy {
     this.tileMenuOpen.set(true);
   }
 
+  /** The columns of the sheet, with their counts. */
+  readonly tileColumns = computed<MoveColumn[]>(() =>
+    (this.tileMenu()?.columns ?? []).map((c) => ({ id: c.id, name: c.name, count: c.cardCount })),
+  );
+
   /**
-   * The sheet picked a column: the card goes to its end, as with a drag. The live region
+   * The sheet picked a column and its top or end: the card goes there. The live region
    * says so, the sheet forgets the tile, and the focus goes back to the moved tile.
    */
-  onTileColumn(columnId: Uuid): void {
+  onTileMove(choice: MoveChoice): void {
     const req = this.tileMenu();
     if (!req) return;
+    const { columnId, position } = choice;
     const cardId = req.card.id;
-    if (this.board()?.cards.some((c) => c.id === cardId)) this.moveCard({ cardId, move: { columnId } });
-    else this.rowsView()?.moveTo(cardId, columnId);
+    const board = this.board();
+    if (board?.cards.some((c) => c.id === cardId))
+      this.moveCard({ cardId, move: sheetMove(board.cards, cardId, columnId, position) });
+    else this.rowsView()?.moveTo(cardId, columnId, position);
     const column = req.columns.find((c) => c.id === columnId)?.name ?? '';
     this.tileSaid.set(this.i18n.translate('todos.drag.dropped', { title: req.card.title, column }));
     this.tileMenu.set(null);

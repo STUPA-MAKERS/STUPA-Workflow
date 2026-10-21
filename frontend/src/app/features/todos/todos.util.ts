@@ -328,6 +328,21 @@ export function dropMove(list: readonly TodoCardTile[], index: number, columnId:
   return list[0] ? { columnId, beforeId: list[0].id } : { columnId };
 }
 
+/**
+ * The move of the "Verschieben" sheet: the top of a column names its first other card
+ * (`beforeId`); the end and an empty column need no neighbor.
+ */
+export function sheetMove(
+  cards: readonly TodoCardTile[],
+  cardId: Uuid,
+  columnId: Uuid,
+  position: 'top' | 'bottom',
+): TodoCardMove {
+  if (position === 'bottom') return { columnId };
+  const top = cards.find((c) => c.columnId === columnId && c.id !== cardId);
+  return top ? { columnId, beforeId: top.id } : { columnId };
+}
+
 /** What the tile helpers below read of a board: a board read or a row of "Meine To-Dos". */
 export type TileBoard = Pick<TodoBoard, 'columns' | 'cards'>;
 

@@ -40,7 +40,7 @@ import {
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
-import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
+import type { TileMenuRequest } from '../../../features/todos/move-sheet/todo-move-sheet.component';
 import { TodoCacheService } from '../../../features/todos/todo-cache.service';
 import {
   DROP_ENTER,
@@ -54,6 +54,7 @@ import {
   placeTile,
   removeTile,
   replaceTile,
+  sheetMove,
   sortedColumns,
   type BoardFilter,
 } from '../../../features/todos/todos.util';
@@ -497,9 +498,9 @@ export class TodoBoardRowsComponent implements OnInit {
   }
 
   /** Move a card of a row to the end of a column of its board (the sheet of the phone). */
-  moveTo(cardId: Uuid, columnId: Uuid): void {
+  moveTo(cardId: Uuid, columnId: Uuid, position: 'top' | 'bottom' = 'bottom'): void {
     const board = this.boards().find((b) => b.cards.some((c) => c.id === cardId));
-    if (board) this.move(board.id, cardId, { columnId });
+    if (board) this.move(board.id, cardId, sheetMove(board.cards, cardId, columnId, position));
   }
 
   /** Ask the page for the "Verschieben" sheet of a tile (a long press on the phone). */
