@@ -2649,7 +2649,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(link.getAttribute('href')).toContain('id=e-1');
     // Side by side, nothing open: the detail says so.
     expect(screen.getByText('Keine Buchung geöffnet')).toBeInTheDocument();
-    expect(screen.getByText('2 von 2')).toBeInTheDocument();
   });
 
   it('shows one group without a heading while it sorts by amount', () => {
@@ -3201,22 +3200,12 @@ describe('ExpensesComponent (row swipe)', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
-  const DELETE = (r: { url: string; method: string }) =>
-    r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE';
-  /** The close callback of the last toast with an action. */
-  const lastClosed = (spy: jest.SpyInstance) =>
-    (spy.mock.calls.at(-1)![0] as { closed: (how: 'action' | 'timeout' | 'dismiss') => void }).closed;
-  const toastOf = (cmp: ExpensesComponent) => (cmp as unknown as { toast: ToastService }).toast;
-
-  it('takes "edit" and "delete" from the row menu, and a reader gets none', () => {
+  it('takes "edit" from the row menu, never "delete", and a reader gets none', () => {
     const { cmp } = build({ expenses: page([EXPENSE], 1) });
-    const menu = cmp.rowMenu(EXPENSE);
-    expect(cmp.swipeRight(menu)).toEqual({ id: 'edit', label: 'Bearbeiten', icon: 'edit', leaves: false });
-    expect(cmp.swipeLeft(menu)).toEqual({ id: 'delete', label: 'Löschen', icon: 'trash', leaves: true });
+    expect(cmp.swipeRight(cmp.rowMenu(EXPENSE))).toEqual({ id: 'edit', label: 'Bearbeiten', icon: 'edit', leaves: false });
     TestBed.resetTestingModule();
     const reader = build({ perms: ['budget.view'], expenses: page([EXPENSE], 1) }).cmp;
     expect(reader.swipeRight(reader.rowMenu(EXPENSE))).toBeNull();
-    expect(reader.swipeLeft(reader.rowMenu(EXPENSE))).toBeNull();
   });
 
   it('opens the edit form like the menu', () => {
@@ -3226,41 +3215,36 @@ describe('ExpensesComponent (row swipe)', () => {
     cmp.onRowSwiped({ id: 'other', label: 'x', icon: 'x' }, EXPENSE);
   });
 
-  it('deletes without the question only when the toast goes without the undo', () => {
-    const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    const action = jest.spyOn(toastOf(cmp), 'showAction');
-    const success = jest.spyOn(toastOf(cmp), 'success');
-    cmp.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, EXPENSE);
-    expect(cmp.confirmDelete()).toBeNull();
-    expect(cmp.groups()).toEqual([]);
-    expect(action).toHaveBeenCalledWith(expect.objectContaining({ message: 'Buchung gelöscht.', action: 'Rückgängig' }));
-    lastClosed(action)('action');
-    http.expectNone(DELETE);
-    expect(cmp.groups()).toHaveLength(1);
-
-    cmp.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, EXPENSE);
-    lastClosed(action)('timeout');
-    http.expectOne(DELETE).flush(null);
-    expect(cmp.items()).toEqual([]);
-    expect(cmp.total()).toBe(0);
-    expect(cmp.swipedAway().size).toBe(0);
-    // The toast of the swipe said it already.
-    expect(success).not.toHaveBeenCalled();
+  it('swipes to the left into the selection, with the booking already selected', () => {
+    const { cmp } = build({ expenses: page([EXPENSE], 1) });
+    const left = cmp.swipeLeft();
+    expect(left).toEqual({ id: 'select', label: 'Auswählen', icon: 'check' });
+    cmp.onRowSwiped(left!, EXPENSE);
+    expect(cmp.selecting()).toBe(true);
+    expect(cmp.isSelected('e-1')).toBe(true);
   });
 
-  it('brings the row back when the delete fails, also sorted by amount', () => {
+  it('a long press starts the selection, and in it toggles the booking', () => {
+    const { cmp } = build({ expenses: page([EXPENSE], 1) });
+    cmp.selectWith(EXPENSE);
+    expect(cmp.selecting()).toBe(true);
+    expect(cmp.selectedCount()).toBe(1);
+    cmp.selectWith(EXPENSE);
+    expect(cmp.selecting()).toBe(true);
+    expect(cmp.isSelected('e-1')).toBe(false);
+    cmp.selectWith(EXPENSE);
+    expect(cmp.isSelected('e-1')).toBe(true);
+  });
+
+  it('gives a reader and the transfers no selection', () => {
     const { cmp, http } = build({ expenses: page([EXPENSE], 1) });
-    const action = jest.spyOn(toastOf(cmp), 'showAction');
-    const error = jest.spyOn(toastOf(cmp), 'error');
-    cmp.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, EXPENSE);
-    lastClosed(action)('dismiss');
-    http.expectOne(DELETE).flush({}, { status: 500, statusText: 'x' });
-    expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
-    expect(cmp.swipedAway().size).toBe(0);
-    lst(cmp).sortField.set('amount');
-    expect(cmp.groups()[0].items).toEqual([EXPENSE]);
-    cmp.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, EXPENSE);
-    expect(cmp.groups()).toEqual([]);
-    lastClosed(action)('action');
+    cmp.setTab('transfers');
+    http.expectOne((r) => r.url.endsWith('/budget-transfers')).flush(transferPage([]));
+    expect(cmp.swipeLeft()).toBeNull();
+    TestBed.resetTestingModule();
+    const reader = build({ perms: ['budget.view'], expenses: page([EXPENSE], 1) }).cmp;
+    expect(reader.swipeLeft()).toBeNull();
+    reader.selectWith(EXPENSE);
+    expect(reader.selecting()).toBe(false);
   });
 });

@@ -460,20 +460,16 @@ export class ExpenseDialogsState {
   doDelete(): void {
     const e = this.confirmDelete();
     if (!e || this.list.saving()) return;
-    this.remove(e, { done: () => this.confirmDelete.set(null) });
+    this.remove(e, () => this.confirmDelete.set(null));
   }
 
-  /**
-   * Delete a booking and update the list. The confirmation calls it, and a swipe calls
-   * it without the question after its undo is over; the swipe showed its own toast, so
-   * it passes `quiet`.
-   */
-  remove(e: Expense, opts: { quiet?: boolean; done?: () => void; failed?: () => void } = {}): void {
+  /** Delete a booking and update the list. The confirmation calls it. */
+  private remove(e: Expense, done: () => void): void {
     this.list.saving.set(true);
     this.api.deleteExpense(e.id).subscribe({
       next: () => {
         this.list.saving.set(false);
-        opts.done?.();
+        done();
         if (e.parentExpenseId) {
           // A sub-booking is gone, so refresh the parent panel and the parent amount.
           this.sub.loadSub(e.parentExpenseId);
@@ -483,13 +479,12 @@ export class ExpenseDialogsState {
           this.list.items.update((rows) => rows.filter((x) => x.id !== e.id));
           this.list.total.update((t) => Math.max(0, t - 1));
         }
-        if (!opts.quiet) this.toast.success(this.i18n.translate('expenses.toast.deleted'));
+        this.toast.success(this.i18n.translate('expenses.toast.deleted'));
         this.onDeleted?.(e);
       },
       error: () => {
         this.list.saving.set(false);
         this.toast.error(this.i18n.translate('expenses.toast.failed'));
-        opts.failed?.();
       },
     });
   }
