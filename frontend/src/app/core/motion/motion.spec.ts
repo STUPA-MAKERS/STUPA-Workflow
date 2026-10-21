@@ -1,7 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { Router, type ActivatedRouteSnapshot, type ViewTransitionInfo } from '@angular/router';
 import { markGestureNavigation } from '@stupa-makers/ui-kit';
-import { onRouteViewTransition, routeMotion, routePath, withViewTransition } from './motion';
+import {
+  onRouteViewTransition,
+  routeMotion,
+  routePath,
+  watchUAVisualTransitions,
+  withViewTransition,
+} from './motion';
 
 function snap(...levels: string[][]): ActivatedRouteSnapshot {
   let child: ActivatedRouteSnapshot | null = null;
@@ -127,6 +133,26 @@ describe('onRouteViewTransition', () => {
     run(replaced);
     expect(replaced.transition.skipTransition).toHaveBeenCalled();
     expect(document.documentElement.dataset['motion']).toBeUndefined();
+  });
+
+  it('skips the transition after a back that the browser animated, once', () => {
+    media({ [PHONE]: true });
+    const navigation = new EventTarget();
+    watchUAVisualTransitions({ navigation } as unknown as Window);
+    navigation.dispatchEvent(Object.assign(new Event('navigate'), { hasUAVisualTransition: true }));
+    const animated = info(['antraege', '1'], ['antraege']);
+    run(animated);
+    expect(animated.transition.skipTransition).toHaveBeenCalled();
+    navigation.dispatchEvent(
+      Object.assign(new Event('navigate'), { hasUAVisualTransition: false }),
+    );
+    const next = info(['antraege', '1'], ['antraege']);
+    run(next);
+    expect(next.transition.skipTransition).not.toHaveBeenCalled();
+  });
+
+  it('notes nothing without the Navigation API', () => {
+    expect(() => watchUAVisualTransitions({} as Window)).not.toThrow();
   });
 
   it('skips the pop after a swipe back, once', () => {

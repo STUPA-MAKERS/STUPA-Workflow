@@ -23,6 +23,34 @@ export function withViewTransition(update: () => void): void {
   doc.startViewTransition(update);
 }
 
+type NavigateEvent = Event & { hasUAVisualTransition?: boolean };
+type NavigationApi = EventTarget;
+
+/** A back or forward gesture that the browser animated counts for this long, in ms. */
+const UA_TRANSITION_MS = 1000;
+let uaTransitionAt = -Infinity;
+
+/**
+ * Note each history navigation that the browser animated itself, for example the back
+ * gesture of Android, which slides a screenshot of the whole page (bottom bar included)
+ * and which no page can change. Our own transition must not run a second time on top,
+ * so `onRouteViewTransition` skips the next one. Without the Navigation API nothing is
+ * noted.
+ */
+export function watchUAVisualTransitions(win: Window = window): void {
+  const nav = (win as Window & { navigation?: NavigationApi }).navigation;
+  nav?.addEventListener('navigate', (e) => {
+    if ((e as NavigateEvent).hasUAVisualTransition) uaTransitionAt = performance.now();
+  });
+}
+
+/** True once after a navigation that the browser animated, see `watchUAVisualTransitions`. */
+function takeUATransition(): boolean {
+  const recent = performance.now() - uaTransitionAt < UA_TRANSITION_MS;
+  uaTransitionAt = -Infinity;
+  return recent;
+}
+
 /**
  * The motion of a navigation.
  * - `section`: to another top-level section. The content fades through, the frame stays.
@@ -68,11 +96,12 @@ export function routeMotion(
  * not show, and names the kind on `<html data-motion>` for the styles in `styles.scss`.
  * A navigation that a gesture started (the swipe back of the list/detail layout) has no
  * transition, because the finger already moved the page out; a pop on top would slide
- * the list out a second time.
+ * the list out a second time. The same holds for a back or forward that the browser
+ * animated (`watchUAVisualTransitions`).
  */
 export function onRouteViewTransition({ transition, from, to }: ViewTransitionInfo): void {
   const phone = matchesMedia(MEDIA.phone);
-  const gesture = takeGestureNavigation();
+  const gesture = takeGestureNavigation() || takeUATransition();
   const replace = inject(Router).currentNavigation()?.extras.replaceUrl === true;
   const kind =
     reducedMotion() || gesture
