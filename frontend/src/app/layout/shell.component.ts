@@ -6,6 +6,7 @@ import { AuthService } from '@core/auth/auth.service';
 import { PrefetchService } from '@core/cache/prefetch.service';
 import { SwUpdatePromptComponent } from '@core/pwa/sw-update-prompt.component';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import { KeyboardService } from '@core/pwa/keyboard.service';
 import { MEDIA, mediaQuery, ToastComponent } from '@stupa-makers/ui-kit';
 import { HelpService } from '../features/help/help.service';
 import { ReportDialogComponent } from '../features/help/report-dialog/report-dialog.component';
@@ -89,6 +90,9 @@ export class ShellComponent {
 
   /** The viewport is a phone (<= 768px): bottom bar instead of the rail. */
   readonly phone = mediaQuery(MEDIA.phone);
+
+  /** The on-screen keyboard is open: the bottom bar may step aside (styles.scss). */
+  readonly keyboard = inject(KeyboardService).open;
 
   /** Full-width content from route data `wide`, for example the budget tab with two sidebars. */
   readonly wide = signal(false);

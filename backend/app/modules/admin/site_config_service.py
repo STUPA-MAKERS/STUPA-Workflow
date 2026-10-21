@@ -46,12 +46,15 @@ from app.settings import get_settings
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "STUPA"
 
-# The page background of the design system per theme (``--color-bg`` of the ui-kit
-# tokens, ``THEME_COLOR`` of the frontend ThemeService). An installed Android app paints
-# its status and navigation bar with these manifest colours, and the manifest has no
-# per-scheme variant, so the frontend links ``?scheme=dark`` while the dark theme is in
-# effect.
-MANIFEST_COLORS: dict[str, str] = {"light": "#f6f7f5", "dark": "#101211"}
+# The manifest colour per theme: the surface of the bottom bar (``--color-surface-3`` of
+# the ui-kit tokens). Chrome cannot draw an installed Android app under the system
+# navigation bar and paints that bar with a manifest colour, ``theme_color`` or
+# ``background_color`` depending on the version. Both take the bottom bar surface, so the
+# two bars meet without a seam in every version; the splash screen shows the same colour.
+# The status bar follows the ``theme-color`` meta tag of the page (frontend ThemeService),
+# so it keeps the page background. The manifest has no per-scheme variant, so the
+# frontend links ``?scheme=dark`` while the dark theme is in effect.
+MANIFEST_COLORS: dict[str, str] = {"light": "#e6e9e5", "dark": "#262a27"}
 
 # The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
 _SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png"}
@@ -303,13 +306,12 @@ class SiteConfigService:
         ``scheme``. All other fields are static.
         """
         branding = _branding(await self._active())
-        color = MANIFEST_COLORS[scheme]
         return {
             "name": branding.app_name.strip() or DEFAULT_APP_NAME,
             "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,
             **_MANIFEST_BASE,
-            "theme_color": color,
-            "background_color": color,
+            "theme_color": MANIFEST_COLORS[scheme],
+            "background_color": MANIFEST_COLORS[scheme],
         }
 
 

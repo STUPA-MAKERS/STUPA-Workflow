@@ -86,10 +86,10 @@ describe('touch styles', () => {
     );
   });
 
-  it('hides the bottom bar while a text field outside it has the focus on a touch phone', () => {
+  it('hides the bottom bar while a text field outside it has the focus and the keyboard is open', () => {
     const styles = read('../styles.scss');
     const rule = styles.slice(styles.indexOf('@media (pointer: coarse) {'));
-    expect(rule).toMatch(/\.frame--phone:has\(/);
+    expect(rule).toMatch(/\.frame--phone\.frame--keyboard:has\(/);
     expect(rule).toMatch(/:not\(app-bottom-bar \*\):focus/);
     expect(rule).toMatch(/--app-bottom-inset: 0px;/);
     expect(rule).toMatch(/app-bottom-bar \{\s*display: none;/);
