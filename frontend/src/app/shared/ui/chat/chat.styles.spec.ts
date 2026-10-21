@@ -29,6 +29,12 @@ describe('chat styles', () => {
     expect(other).toMatch(/inset-inline-start: 0;/);
   });
 
+  it('lets the minimum of the phone log yield to a short viewport (open keyboard)', () => {
+    expect(rule(':host(.chat--phone) .chat__log')).toMatch(
+      /min-height: min\(var\(--chat-log-min, 10rem\), 25dvh\);/,
+    );
+  });
+
   it('never scrolls the log sideways', () => {
     expect(rule('.chat__log')).toMatch(/overflow-x: hidden;/);
   });
