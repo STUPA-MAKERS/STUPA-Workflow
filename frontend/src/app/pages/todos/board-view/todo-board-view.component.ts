@@ -36,7 +36,7 @@ import {
   TabsComponent,
 } from '@stupa-makers/ui-kit';
 import { TodoCardTileComponent } from '../../../features/todos/card-tile/todo-card-tile.component';
-import type { TileMenuRequest } from '../../../features/todos/tile-menu/todo-tile-menu.component';
+import type { TileMenuRequest } from '../../../features/todos/move-sheet/todo-move-sheet.component';
 import { DROP_ENTER, dropMove, moveRequest, sortedColumns } from '../../../features/todos/todos.util';
 import { KanbanKeyDrag, type KeyDragPosition } from '../../../features/todos/kanban-key-drag';
 

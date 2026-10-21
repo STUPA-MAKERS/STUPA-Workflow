@@ -7,11 +7,6 @@
   gap: var(--space-3);
   padding-bottom: var(--space-3);
 }
-.ms__sub {
-  margin: calc(-1 * var(--space-2)) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-}
 /* The rows run to the edges of the sheet; the chosen one is a full-width band. */
 .ms__list {
   display: flex;
@@ -37,6 +32,11 @@
   background: var(--color-selected);
   color: var(--color-on-selected);
 }
+/* The other board: below a line, as wide as the rows. */
+.ms__row--transfer {
+  margin-inline: calc(-1 * var(--space-4));
+  border-top: var(--border-width) solid var(--color-border);
+}
 .ms__row:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
@@ -51,12 +51,6 @@
 .ms__count {
   color: var(--color-text-muted);
   font-size: var(--fs-small);
-}
-.ms__cap {
-  margin: var(--space-2) 0 0;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-semibold);
 }
 .ms__foot {
   display: flex;

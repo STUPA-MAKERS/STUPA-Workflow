@@ -173,8 +173,9 @@
     [(open)]="moveOpen"
     [columns]="moveColumns()"
     [current]="card.columnId"
-    [cardTitle]="card.title"
+    [canTransfer]="true"
     (moved)="moveTo($event)"
+    (transfer)="transferOpen.set(true)"
   />
 
   <app-todo-transfer-dialog

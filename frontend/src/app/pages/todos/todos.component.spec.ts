@@ -1511,18 +1511,26 @@ describe('TodosComponent', () => {
       });
 
       it('moves a card of the personal board and of a row with the sheet', async () => {
-        const { cmp, api, harness, settle } = await start('/todos/b-0', { board: personal(), rows: [other()] });
+        const two = personal({
+          cards: [
+            tile({ id: 'p-1', boardId: 'b-0', columnId: 'c-1', title: 'Privat' }),
+            tile({ id: 'p-2', boardId: 'b-0', columnId: 'c-2', title: 'Einkauf' }),
+          ],
+        });
+        const { cmp, api, harness, settle } = await start('/todos/b-0', { board: two, rows: [other()] });
         const cols = personal().columns;
-        cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: cols });
+        cmp.onTileMenu({ card: two.cards[0], boardId: 'b-0', boardKind: 'personal', columns: cols });
         await settle();
         const sheet = screen.getByRole('dialog', { name: 'Verschieben' });
-        expect(sheet).toBeInTheDocument();
-        fireEvent.click(screen.getByRole('button', { name: 'In Arbeit' }));
+        expect(within(sheet).getByRole('radio', { name: /Offen/ })).toHaveAttribute('aria-checked', 'true');
+        expect(within(sheet).getByRole('button', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
+        fireEvent.click(within(sheet).getByRole('radio', { name: /In Arbeit/ }));
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Verschieben' }));
         await settle();
-        expect(api.moveCard).toHaveBeenCalledWith('p-1', { columnId: 'c-2' });
+        expect(api.moveCard).toHaveBeenCalledWith('p-1', { columnId: 'c-2', beforeId: 'p-2' });
         expect(cmp.tileMenuOpen()).toBe(false);
         cmp.onTileMenu({ card: other().cards[0], boardId: 'b-1', boardKind: 'gremium', columns: cols });
-        cmp.onTileColumn('c-3');
+        cmp.onTileMove({ columnId: 'c-3', position: 'bottom' });
         expect(api.moveCard).toHaveBeenLastCalledWith('k-5', { columnId: 'c-3' });
         expect(harness.routeNativeElement).toBeTruthy();
       });
@@ -1531,7 +1539,9 @@ describe('TodosComponent', () => {
         const { cmp, settle, harness } = await start('/todos/b-0', { board: personal(), rows: [other()] });
         cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: personal().columns });
         await settle();
-        fireEvent.click(screen.getByRole('button', { name: 'Wartet' }));
+        const sheet = screen.getByRole('dialog', { name: 'Verschieben' });
+        fireEvent.click(within(sheet).getByRole('radio', { name: /Wartet/ }));
+        fireEvent.click(within(sheet).getByRole('button', { name: 'Verschieben' }));
         await settle();
         harness.detectChanges();
         expect(cmp.tileSaid()).toBe('„Privat“ abgelegt in Wartet.');
@@ -1540,7 +1550,7 @@ describe('TodosComponent', () => {
         expect(document.activeElement).toBe(harness.routeNativeElement!.querySelector('[data-card-id="p-1"]'));
         // An id the sheet does not list still moves, with no column name.
         cmp.onTileMenu({ card: personal().cards[0], boardId: 'b-0', boardKind: 'personal', columns: [] });
-        cmp.onTileColumn('c-9');
+        cmp.onTileMove({ columnId: 'c-9', position: 'top' });
         expect(cmp.tileSaid()).toBe('„Privat“ abgelegt in .');
       });
 
@@ -1588,7 +1598,7 @@ describe('TodosComponent', () => {
         expect(cmp.tileMenuOpen()).toBe(false);
         expect(cmp.tileTransferOpen()).toBe(false);
         expect(cmp.tileMenu()).toBeNull();
-        expect(document.querySelector('app-todo-tile-menu')).toBeNull();
+        expect(document.querySelector('app-todo-move-sheet')).toBeNull();
       });
 
       it('has no link to the board in the head of the personal section', async () => {
@@ -1600,7 +1610,7 @@ describe('TodosComponent', () => {
 
       it('does nothing for a column or a transfer without a tile', async () => {
         const { cmp, api } = await start('/todos/b-0', { board: personal() });
-        cmp.onTileColumn('c-2');
+        cmp.onTileMove({ columnId: 'c-2', position: 'top' });
         cmp.transferTile({ boardId: 'b-1', columnId: 'c-1', boardName: 'Studierendenparlament' });
         expect(api.moveCard).not.toHaveBeenCalled();
         expect(api.transferCard).not.toHaveBeenCalled();
@@ -1683,7 +1693,7 @@ describe('TodosComponent', () => {
     expect(cmp.phoneList()).toBe(false);
     expect(cmp.lead()).toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-todo-board-view')).not.toBeNull();
-    expect(harness.routeNativeElement!.querySelector('app-todo-tile-menu')).toBeNull();
+    expect(harness.routeNativeElement!.querySelector('app-todo-move-sheet')).toBeNull();
     expect(harness.routeNativeElement!.querySelector('.bv__scroll')).toHaveAttribute('appScrollFade', 'y');
   });
 });
