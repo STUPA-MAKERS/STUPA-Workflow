@@ -46,12 +46,16 @@ from app.settings import get_settings
 DEFAULT_APP_NAME = "STUPA Antragsplattform"
 DEFAULT_APP_SHORT_NAME = "STUPA"
 
-# The page background of the design system per theme (``--color-bg`` of the ui-kit
-# tokens, ``THEME_COLOR`` of the frontend ThemeService). An installed Android app paints
-# its status and navigation bar with these manifest colours, and the manifest has no
-# per-scheme variant, so the frontend links ``?scheme=dark`` while the dark theme is in
-# effect.
-MANIFEST_COLORS: dict[str, str] = {"light": "#f6f7f5", "dark": "#101211"}
+# The manifest colours per theme. Chrome paints the navigation bar of an installed
+# Android app with ``theme_color`` of the manifest and cannot draw the page under that
+# bar, so ``theme_color`` is the surface of the bottom bar (``--color-surface-3`` of the
+# ui-kit tokens) and the two bars meet without a seam. The status bar follows the
+# ``theme-color`` meta tag of the page (frontend ThemeService), so it keeps the page
+# background. ``background_color`` is the page background (``--color-bg``), which the
+# splash screen shows. The manifest has no per-scheme variant, so the frontend links
+# ``?scheme=dark`` while the dark theme is in effect.
+MANIFEST_THEME_COLORS: dict[str, str] = {"light": "#e6e9e5", "dark": "#262a27"}
+MANIFEST_BACKGROUND_COLORS: dict[str, str] = {"light": "#f6f7f5", "dark": "#101211"}
 
 # The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
 _SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png"}
@@ -303,13 +307,12 @@ class SiteConfigService:
         ``scheme``. All other fields are static.
         """
         branding = _branding(await self._active())
-        color = MANIFEST_COLORS[scheme]
         return {
             "name": branding.app_name.strip() or DEFAULT_APP_NAME,
             "short_name": branding.app_short_name.strip() or DEFAULT_APP_SHORT_NAME,
             **_MANIFEST_BASE,
-            "theme_color": color,
-            "background_color": color,
+            "theme_color": MANIFEST_THEME_COLORS[scheme],
+            "background_color": MANIFEST_BACKGROUND_COLORS[scheme],
         }
 
 

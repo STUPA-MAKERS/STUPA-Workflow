@@ -18,7 +18,9 @@
     <!-- Browser and PWA bars follow the page background of the theme. ThemeService sets
          both tags to the chosen theme when the user picks one in the app, and links the
          dark manifest (?scheme=dark) in the dark theme, because an installed Android app
-         takes its bar colours from the manifest. -->
+         takes its navigation bar colour from theme_color of the manifest. That colour is the
+         bottom bar surface, because Chrome does not draw an installed app under the
+         navigation bar. -->
     <meta name="theme-color" content="#f6f7f5" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#101211" media="(prefers-color-scheme: dark)" />
     <meta

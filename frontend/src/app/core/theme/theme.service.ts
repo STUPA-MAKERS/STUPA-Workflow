@@ -17,10 +17,11 @@ export const THEME_COLOR: Record<ResolvedTheme, string> = {
 };
 
 /**
- * The manifest per theme. An installed Android app paints its status and navigation bar
- * with `theme_color` and `background_color` of the manifest, and a manifest has no
- * per-scheme variant, so the service links the dark manifest while the dark theme is in
- * effect. The light one keeps the plain URL of `index.html`.
+ * The manifest per theme. An installed Android app paints its navigation bar with
+ * `theme_color` of the manifest (the bottom bar surface, so the two bars meet without a
+ * seam) and its splash with `background_color`; the status bar follows the meta tag. A
+ * manifest has no per-scheme variant, so the service links the dark manifest while the
+ * dark theme is in effect. The light one keeps the plain URL of `index.html`.
  */
 export const MANIFEST_HREF: Record<ResolvedTheme, string> = {
   light: 'manifest.webmanifest',
