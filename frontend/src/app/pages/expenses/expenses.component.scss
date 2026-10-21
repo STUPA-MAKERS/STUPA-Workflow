@@ -44,27 +44,6 @@
   @include swatch.mark(9px);
 }
 
-.exp__bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-height: var(--control-height);
-  min-width: 0;
-}
-/* Equal segments that share the width of the control. */
-.exp__tabs {
-  flex: none;
-}
-.exp__count {
-  margin-inline-start: auto;
-  color: var(--color-text-muted);
-  font-size: var(--fs-small);
-  white-space: nowrap;
-}
-/* "0 von 0" is not true before the first answer: the place stays, the text waits. */
-.exp__count--wait {
-  visibility: hidden;
-}
 /* The row check box sits above the stretched title, so it takes its own click. */
 .exp__rowCheck {
   position: relative;

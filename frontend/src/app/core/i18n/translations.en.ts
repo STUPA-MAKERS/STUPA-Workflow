@@ -226,7 +226,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'expenses.loading': 'Loading bookings …',
   'expenses.loadMore': 'Load more',
   'expenses.empty': 'No bookings found.',
-  'expenses.count': '{count} of {total}',
   'expenses.search': 'Search description …',
   'expenses.kind.expense': 'Expense',
   'expenses.kind.income': 'Income',

@@ -106,29 +106,15 @@
               <ng-container *ngTemplateOutlet="bulkIcons" />
             }
           </app-selection-bar>
-        } @else {
-          <div class="exp__bar">
-            <!-- The transfer list needs `budget.book`: a reader gets no views. -->
-            @if (canManage()) {
-              <app-segmented
-                class="exp__tabs"
-                width="equal"
-                [ariaLabel]="'expenses.views' | t"
-                [options]="tabOptions()"
-                [value]="tab()"
-                (valueChange)="setTab($any($event))"
-              />
-            }
-            <span
-              class="exp__count"
-              [class.exp__count--wait]="tab() === 'transfers' ? transferLoading() : loading()"
-              role="status"
-            >{{
-              tab() === 'transfers'
-                ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
-                : ('expenses.count' | t: { count: items().length, total: total() })
-            }}</span>
-          </div>
+        } @else if (canManage()) {
+          <!-- The transfer list needs `budget.book`: a reader gets no views. -->
+          <app-segmented
+            width="fill"
+            [ariaLabel]="'expenses.views' | t"
+            [options]="tabOptions()"
+            [value]="tab()"
+            (valueChange)="setTab($any($event))"
+          />
         }
         @if (tab() === 'transfers' ? transferReloading() : reloading()) {
           <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>

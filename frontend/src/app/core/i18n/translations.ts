@@ -228,7 +228,6 @@ export const de = {
   'expenses.loading': 'Buchungen werden geladen …',
   'expenses.loadMore': 'Mehr laden',
   'expenses.empty': 'Keine Buchungen gefunden.',
-  'expenses.count': '{count} von {total}',
   'expenses.search': 'Beschreibung suchen …',
   'expenses.kind.expense': 'Ausgabe',
   'expenses.kind.income': 'Einnahme',

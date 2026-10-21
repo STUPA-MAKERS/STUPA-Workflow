@@ -2649,7 +2649,6 @@ describe('ExpensesComponent (list/detail)', () => {
     expect(link.getAttribute('href')).toContain('id=e-1');
     // Side by side, nothing open: the detail says so.
     expect(screen.getByText('Keine Buchung geöffnet')).toBeInTheDocument();
-    expect(screen.getByText('2 von 2')).toBeInTheDocument();
   });
 
   it('shows one group without a heading while it sorts by amount', () => {
