@@ -61,6 +61,7 @@ import { PageHeaderComponent } from '@shared/ui/page-header/page-header.componen
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
 import { MeetingsViewActionsComponent } from '../meetings-view-actions/meetings-view-actions.component';
 import { weekdayName } from '@shared/date-format';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /**
  * The list view of the meeting overview (`/meetings`, board Sitzungen, variant A): a
@@ -82,6 +83,7 @@ import { weekdayName } from '@shared/date-format';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     MeetingsViewActionsComponent,
     RowChevronComponent,
     PageHeaderComponent,

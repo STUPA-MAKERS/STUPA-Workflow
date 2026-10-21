@@ -50,7 +50,13 @@
         </div>
       </app-sticky-bar>
 
-      <div class="tk__scroll" appScrollFade="y">
+      <div
+        class="tk__scroll"
+        appPullRefresh
+        [pullRefreshBusy]="loading()"
+        (appPullRefresh)="refreshList()"
+        appScrollFade="y"
+      >
         @if (error()) {
           <app-note class="tk__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.list.error' | t }}</app-note>
         } @else if (loading()) {

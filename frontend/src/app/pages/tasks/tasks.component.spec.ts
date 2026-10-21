@@ -187,6 +187,14 @@ describe('TasksComponent', () => {
     expect(cmp.selectedId()).toBe('a3');
   });
 
+  it('loads the tasks and the to-dos again on a pull to refresh', async () => {
+    const { cmp, listTasks, mine, settle } = await start('/tasks', [THREE]);
+    cmp.refreshAll();
+    await settle();
+    expect(listTasks).toHaveBeenCalledTimes(2);
+    expect(mine).toHaveBeenCalledTimes(2);
+  });
+
   it('opens the next task when a transition takes the open task out of the list', async () => {
     const { router, pageService, settle, listTasks } = await start('/tasks/a2', [
       THREE,

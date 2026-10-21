@@ -150,7 +150,14 @@
         }
       </app-sticky-bar>
 
-      <div class="apps__scroll" appScrollFade="y" [attr.aria-busy]="reloading() || null">
+      <div
+        class="apps__scroll"
+        appPullRefresh
+        [pullRefreshBusy]="loading() || reloading()"
+        (appPullRefresh)="reload()"
+        appScrollFade="y"
+        [attr.aria-busy]="reloading() || null"
+      >
         @if (error()) {
           <app-note class="apps__loadError" kind="error" icon="alert" role="alert" retryable (retry)="reload()">
             {{ 'applications.list.error' | t }}
@@ -195,6 +202,9 @@
                       [link]="['/applications', row.item.id]"
                       linkQueryParamsHandling="preserve"
                       [selected]="row.item.id === selectedId()"
+                      [swipeRight]="row.swipeRight"
+                      [swipeLeft]="row.swipeLeft"
+                      (swiped)="onRowSwiped(row.item, $event)"
                     >
                       <span sub>
                         @if (row.stateLabel) {

@@ -36,14 +36,21 @@
 <app-page-header
   class="dash__head"
   [flush]="true"
+  [display]="true"
   [title]="'dashboard.greeting' | t: { name: firstName() }"
 />
 
 <!-- "Heute": the live meeting and the next meetings. -->
-<aside class="dash__today" aria-labelledby="dash-today-h">
-  <header class="dash__todayHead">
-    <h2 id="dash-today-h" class="dash__todayH">{{ 'dashboard.today.title' | t }}</h2>
-  </header>
+<aside
+  class="dash__today"
+  [attr.aria-labelledby]="hasToday() ? 'dash-today-h' : null"
+  [attr.aria-label]="hasToday() ? null : ('dashboard.today.title' | t)"
+>
+  @if (hasToday()) {
+    <header class="dash__todayHead">
+      <h2 id="dash-today-h" class="dash__todayH">{{ 'dashboard.today.title' | t }}</h2>
+    </header>
+  }
 
   <div class="dash__todayBody" appScrollFade="y">
     @if (meetingsLoading()) {

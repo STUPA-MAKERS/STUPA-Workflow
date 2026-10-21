@@ -186,13 +186,6 @@
               <!-- F1: the approved amount, the requested one struck through next to it. -->
               <span class="ad__part"><app-amount [amount]="amount(application)" [approved]="approvedAmount(application)" /></span>
             }
-            @if (captureParts(); as parts) {
-              <!-- #11: an application that a member captured on behalf of the applicant
-                   says so at the end of the line, a part may wrap inside. -->
-              @for (part of parts; track $index) {
-                <span class="ad__part ad__capture" data-testid="ad-capture">{{ part }}</span>
-              }
-            }
           </span>
         </p>
 

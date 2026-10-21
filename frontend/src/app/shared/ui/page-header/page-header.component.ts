@@ -1,4 +1,16 @@
-import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  TemplateRef,
+  computed,
+  effect,
+  inject,
+  input,
+  viewChild,
+} from '@angular/core';
+import { ListDetailNav, dockInListDetailBar } from '@stupa-makers/ui-kit';
 import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
 
 /**
@@ -18,16 +30,22 @@ import { BreadcrumbsComponent } from '../../../layout/breadcrumbs.component';
  *   <app-button actions (click)="add()">…</app-button>
  * </app-page-header>
  * ```
+ *
+ * Below the bar of a one-view page (`app-list-detail-bar`, the administration on a
+ * phone) the header has no breadcrumbs: the back arrow of the bar replaces them. The bar
+ * shows the actions of the header and the title in small type; the header keeps the
+ * title for screen readers only.
  */
 @Component({
   selector: 'app-page-header',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [BreadcrumbsComponent],
+  imports: [BreadcrumbsComponent, NgTemplateOutlet],
   host: {
     '[class.ph--flush]': 'flush()',
     '[class.ph--rail]': 'rail()',
     '[class.ph--pane]': 'pane()',
+    '[class.ph--display]': 'display()',
   },
   templateUrl: './page-header.component.html',
   styleUrl: './page-header.component.scss',
@@ -83,6 +101,12 @@ export class PageHeaderComponent {
    */
   readonly pane = input(false);
 
+  /**
+   * Keep the page title size of the wide layout (d2, 28/36) on a phone too, where the
+   * title is otherwise h1 (22/28). The greeting of the dashboard uses it.
+   */
+  readonly display = input(false);
+
   /** The id of the title element, for an `aria-labelledby` of the region it names. */
   readonly titleId = input<string | null>(null);
 
@@ -91,4 +115,27 @@ export class PageHeaderComponent {
    * Verwaltung navigation beside an admin page, whose page has the h1.
    */
   readonly titleTag = input<'h1' | 'p'>('h1');
+
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly nav = inject(ListDetailNav, { optional: true });
+  private readonly actions = viewChild.required<TemplateRef<unknown>>('actions');
+
+  /** The header is on a page below the bar of a one-view page. */
+  protected readonly underBar = computed(() => !!this.nav?.active());
+
+  /** The bar of the one-view page shows the actions of this header. */
+  protected readonly docked = dockInListDetailBar({
+    actions: this.actions,
+    titled: () => !this.pane(),
+    title: () => this.host.nativeElement.querySelector('.ph__title'),
+  });
+
+  constructor() {
+    // A title that changes after the first render (the name of a gremium that loads)
+    // reaches the bar at once, not only on the next scroll.
+    effect(() => {
+      const title = this.title();
+      if (this.docked()) this.nav?.title.set(title);
+    });
+  }
 }

@@ -399,8 +399,3 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
-/* A long intake note wraps inside its part instead of running out of the sheet. */
-.ad__part.ad__capture {
-  white-space: normal;
-  overflow-wrap: anywhere;
-}

@@ -48,6 +48,7 @@ import { groupByMonth, type MonthGroup } from '@shared/group-by-month';
 import { formatMoney } from '@shared/format-money';
 import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { applicationReads } from '../applications/application-reads';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** "Anzeigen": both groups, or one of them. */
 export type TasksShow = 'all' | 'applications' | 'todos';
@@ -115,6 +116,7 @@ interface TaskRow {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     NoteComponent,
     PageHeaderComponent,
     RouterOutlet,
@@ -376,6 +378,12 @@ export class TasksComponent implements OnDestroy {
     const child = this.route.snapshot.firstChild?.paramMap;
     this.selectedId.set(child?.get('id') ?? null);
     this.selectedTodo.set(child?.get('cardId') ?? null);
+  }
+
+  /** Pull to refresh: the tasks and the to-dos load again. */
+  refreshAll(): void {
+    this.load();
+    this.loadTodos();
   }
 
   /** Load the task list again after a failed first load. */

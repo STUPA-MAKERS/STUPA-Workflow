@@ -3,7 +3,7 @@
 :host {
   --layout-header-height: 0px;
   --rail-width: 96px;
-  --bottom-bar-height: 72px;
+  --bottom-bar-height: 64px;
   /* The device insets, as one name each. The installed iOS app has the black-translucent
      status bar (index.html), so the page reaches under it: the top chrome pads by the top
      inset. In landscape the notch and the round corners take the left and the right

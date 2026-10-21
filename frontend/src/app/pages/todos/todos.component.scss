@@ -208,8 +208,15 @@
     bottom: var(--app-bottom-inset, 0px);
   }
   .td__drawer {
+    /* The bar of the card (`app-list-detail-bar`) reaches over the side padding, as it
+       does on a list/detail page. The drawer has no top padding, because the drawer is the
+       scroll container and a sticky element sticks below the top padding of its scroll
+       container: the bar would stop that far below the top edge, and the card would show
+       above it. */
+    --main-pad-top: 0px;
+    --layout-gutter: var(--space-4);
     width: 100vw;
-    padding: var(--space-3) var(--space-4) 0;
+    padding: 0 var(--space-4);
     border-radius: 0;
   }
 }

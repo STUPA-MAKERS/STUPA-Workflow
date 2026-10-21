@@ -85,7 +85,9 @@
   width: 56px;
   height: 32px;
   border-radius: 16px;
-  transition: background-color var(--motion-fast) var(--ease-standard);
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    scale var(--motion-xs) var(--ease-standard);
 }
 @media (hover: hover) {
   .rail__item:hover .rail__ind {
@@ -133,6 +135,10 @@
 }
 .rail__item:active .rail__ind::after {
   background: var(--press-tint);
+}
+/* The pill shrinks like a button while it is pressed; the entry itself keeps its size. */
+.rail__item:active .rail__ind {
+  @include press.press-scale;
 }
 .rail__item:focus-visible,
 .rail__brand:focus-visible {

@@ -68,7 +68,7 @@
     background-color var(--motion-fast) var(--ease-standard),
     scale var(--motion-xs) var(--ease-standard);
   /* A choice is a card that opens: it tints and shrinks a little while pressed. */
-  @include press.press($scale: true);
+  @include press.press($scale: row);
 }
 @media (hover: hover) {
   .home__choice:hover {

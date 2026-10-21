@@ -46,11 +46,6 @@ export interface FrameMode {
   search: boolean;
   /** Show the "Zustand" tiles above the entries. */
   health: boolean;
-  /**
-   * Below wide, every page except the home page shows "Zur Liste" above it, which leads
-   * back to the navigation. Without it the breadcrumbs lead back (the administration).
-   */
-  backLink: boolean;
 }
 
 /** The modes of the frame. A route picks one with `data: { frame: '<key>' }`. */
@@ -63,7 +58,6 @@ export const FRAME_MODES: Readonly<Record<FrameModeKey, FrameMode>> = {
     pages: ADMIN_PAGES,
     search: true,
     health: true,
-    backLink: false,
   },
   account: {
     home: '/account',
@@ -73,6 +67,5 @@ export const FRAME_MODES: Readonly<Record<FrameModeKey, FrameMode>> = {
     pages: ACCOUNT_PAGES,
     search: false,
     health: false,
-    backLink: true,
   },
 };

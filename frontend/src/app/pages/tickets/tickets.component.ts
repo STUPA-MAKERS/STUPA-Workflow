@@ -52,6 +52,7 @@ import { RailStatusService } from '../../layout/rail-status.service';
 import { TicketsPageService } from './tickets-page.service';
 import { KIND_ICON, KIND_LABEL, STATUS_LABEL, reporterRowName, ticketAge } from './tickets.util';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
+import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** The state chip. `open` (the default) shows new and in progress, the closed ones folded. */
 export type TicketStatusFilter = 'open' | TicketStatus | 'all';
@@ -97,6 +98,7 @@ export interface TicketGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,
     RouterOutlet,
@@ -366,6 +368,11 @@ export class TicketsComponent implements OnDestroy {
     if (s === 'open') return ['new', 'in_progress'];
     if (s === 'all') return [];
     return [s];
+  }
+
+  /** Pull to refresh: page 0 loads again, with the closed tickets that show. */
+  protected refreshList(): void {
+    this.reload(true);
   }
 
   /** Load page 0 again after a failed load. */
