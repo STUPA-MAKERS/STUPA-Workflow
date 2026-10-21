@@ -18,7 +18,6 @@ import type {
   Page,
   Principal,
   StateOutWire,
-  VoteListItem,
 } from '@core/api/models';
 
 /** "Now": Tuesday, 29 September 2026, 18:50 local time. */
@@ -93,37 +92,6 @@ const MINE: Page<ApplicationListItemWire> = {
   offset: 0,
 };
 
-function vote(id: string, extra: Partial<VoteListItem> = {}): VoteListItem {
-  return {
-    id,
-    question: `Frage ${id}`,
-    status: 'open',
-    result: null,
-    secret: false,
-    applicationId: null,
-    meetingId: 'm-live',
-    meetingTitle: '34. Sitzung',
-    agendaItemId: 'ag3',
-    agendaPosition: 3,
-    gremiumId: 'g1',
-    gremiumName: 'Studierendenparlament',
-    createdAt: '2026-09-29T16:00:00Z',
-    openedAt: '2026-09-29T16:30:00Z',
-    closedAt: null,
-    closesAt: null,
-    canCast: true,
-    myBallot: { cast: false, choice: null },
-    ...extra,
-  };
-}
-
-const VOTES: Page<VoteListItem> = {
-  items: [vote('v1'), vote('v2', { status: 'closed', result: 'passed', agendaPosition: null })],
-  total: 2,
-  limit: 25,
-  offset: 0,
-};
-
 function meeting(id: string, status: string, extra: Record<string, unknown> = {}): unknown {
   return {
     id,
@@ -169,7 +137,6 @@ type Body = unknown | 'error' | 'pending';
 interface SetupOpts {
   tasks?: Body;
   mine?: Body;
-  votes?: Body;
   timeline?: Body;
   delegations?: Body;
   types?: Body;
@@ -225,14 +192,12 @@ async function setup(principal: Principal, opts: SetupOpts = {}) {
   const requests = {
     tasks: http.expectOne((r) => r.url.endsWith('/api/applications/tasks')),
     mine: http.expectOne((r) => r.url.endsWith('/api/applications')),
-    votes: http.expectOne((r) => r.url.endsWith('/api/votes')),
     timeline: http.expectOne((r) => r.url.endsWith('/api/meetings/timeline')),
     delegations: http.expectOne((r) => r.url.endsWith('/api/delegations')),
     types: http.expectOne((r) => r.url.endsWith('/api/application-types')),
   };
   answer(requests.tasks, opts.tasks ?? TASKS);
   answer(requests.mine, opts.mine ?? MINE);
-  answer(requests.votes, opts.votes ?? VOTES);
   answer(requests.timeline, opts.timeline ?? { items: [], nextCursor: null });
   answer(requests.delegations, opts.delegations ?? []);
   answer(requests.types, opts.types ?? TYPES);
@@ -282,7 +247,6 @@ describe('DashboardComponent', () => {
       const { requests } = await setup(MEMBER, {
         tasks: 'pending',
         mine: 'pending',
-        votes: 'pending',
         timeline: 'pending',
         delegations: 'pending',
         types: 'pending',
@@ -312,8 +276,8 @@ describe('DashboardComponent', () => {
       const { http } = await setup(MEMBER);
       expect(screen.getByRole('tab', { name: 'Offene Aufgaben 1' })).toHaveAttribute('aria-selected', 'true');
       expect(screen.getByRole('tab', { name: 'Meine Anträge 7' })).toBeInTheDocument();
-      // The tab counts the open votes only.
-      expect(screen.getByRole('tab', { name: 'Abstimmungen 1' })).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /Abstimmungen/ })).not.toBeInTheDocument();
+      http.expectNone((r) => r.url.endsWith('/api/votes'));
       const table = screen.getByRole('table');
       expect(within(table).getByText('Wartet')).toBeInTheDocument();
       expect(within(table).getByText('Zuschuss Erstsemester-Party')).toBeInTheDocument();
@@ -365,47 +329,6 @@ describe('DashboardComponent', () => {
       expect(cmp(fixture).tab()).toBe('tasks');
     });
 
-    it('shows the votes with the meeting, the status and the own ballot', async () => {
-      const { fixture } = await setup(TREASURER, {
-        url: '/?tab=votes',
-        votes: {
-          items: [
-            vote('v1', { myBallot: { cast: true, choice: 'yes' } }),
-            vote('v2'),
-            vote('v3', { status: 'closed', result: 'rejected', canCast: false }),
-            vote('v4', { status: 'draft', meetingTitle: null, question: ' ' }),
-            vote('v5', { status: 'cancelled', meetingTitle: '33. Sitzung', agendaPosition: null }),
-            vote('v6', { status: 'closed', kind: 'election', result: 'elected', canCast: false }),
-          ],
-          total: 6,
-          limit: 25,
-          offset: 0,
-        },
-      });
-      const table = screen.getByRole('table');
-      expect(within(table).getByText('Eigener Stand')).toBeInTheDocument();
-      expect(within(table).getAllByText('34. Sitzung · TOP 3')).toHaveLength(4);
-      expect(within(table).getByText('Abgestimmt')).toBeInTheDocument();
-      expect(within(table).getByText('Stimme offen')).toBeInTheDocument();
-      expect(within(table).getByText('33. Sitzung')).toBeInTheDocument();
-      const rows = cmp(fixture).voteRows();
-      expect(rows.map((r: { ballot: string | null }) => r.ballot)).toEqual(['cast', 'pending', null, null, null, null]);
-      // A vote without a meeting names its gremium.
-      expect(rows[3].where).toBe('Studierendenparlament');
-      expect(rows[3].statusKey).toBe('voting.list.status.draft');
-      expect(rows[3].title).toBe('Beschlussfrage');
-      expect(rows[2].statusKey).toBe('vote.result.rejected');
-      // A closed election shows its own result, not a rejection (F2).
-      expect(rows[5].statusKey).toBe('election.status.elected');
-      expect(rows[0].link).toEqual(['/voting', 'v1']);
-      expect(screen.getByRole('link', { name: 'Alle Abstimmungen öffnen' })).toHaveAttribute('href', '/voting');
-    });
-
-    it('hides "Alle Abstimmungen öffnen" from a person without a voting right', async () => {
-      await setup(MEMBER, { url: '/?tab=votes' });
-      expect(screen.queryByRole('link', { name: 'Alle Abstimmungen öffnen' })).not.toBeInTheDocument();
-    });
-
     it('shows a skeleton while the tab loads and an error when it fails', async () => {
       const { fixture, requests } = await setup(MEMBER, { tasks: 'pending' });
       expect(cmp(fixture).tabLoading()).toBe(true);
@@ -418,37 +341,30 @@ describe('DashboardComponent', () => {
     });
 
     it('sends the request of the open tab again on "Erneut versuchen"', async () => {
-      const { fixture, http } = await setup(MEMBER, { url: '/?tab=votes', votes: 'error' });
+      const { fixture, http } = await setup(MEMBER, { url: '/?tab=mine', mine: 'error' });
       fixture.detectChanges();
       screen.getByRole('button', { name: 'Erneut versuchen' }).click();
       fixture.detectChanges();
       expect(cmp(fixture).tabLoading()).toBe(true);
-      http.expectOne((r) => r.url.endsWith('/api/votes')).flush(VOTES);
+      http.expectOne((r) => r.url.endsWith('/api/applications')).flush(MINE);
       fixture.detectChanges();
       expect(cmp(fixture).tabError()).toBe(false);
       expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
     it('counts nothing while every list failed', async () => {
-      const { fixture } = await setup(MEMBER, { tasks: 'error', mine: 'error', votes: 'error' });
+      const { fixture } = await setup(MEMBER, { tasks: 'error', mine: 'error' });
       expect(cmp(fixture).taskRows()).toEqual([]);
       expect(cmp(fixture).mineRows()).toEqual([]);
-      expect(cmp(fixture).voteRows()).toEqual([]);
-      expect(cmp(fixture).tabs().map((t: { count: number | null }) => t.count)).toEqual([null, null, null]);
+      expect(cmp(fixture).tabs().map((t: { count: number | null }) => t.count)).toEqual([null, null]);
     });
 
     it('shows the empty state of each tab', async () => {
-      const { fixture, router } = await setup(MEMBER, {
-        tasks: [],
-        votes: { items: [], total: 0, limit: 25, offset: 0 },
-      });
+      const { fixture } = await setup(MEMBER, { tasks: [] });
       expect(screen.getByText('Nichts zu tun')).toBeInTheDocument();
       expect(cmp(fixture).tabEmpty()).toBe(true);
       // The user has own applications: no card "Antrag stellen".
       expect(screen.queryByRole('heading', { name: 'Antrag stellen' })).not.toBeInTheDocument();
-      await router.navigateByUrl('/?tab=votes');
-      fixture.detectChanges();
-      expect(screen.getByText('Keine Abstimmungen')).toBeInTheDocument();
     });
 
     it('gives a new user the empty tab and the card "Antrag stellen" with the active types', async () => {
@@ -502,16 +418,12 @@ describe('DashboardComponent', () => {
 
     it('shows list rows and fewer of them on a phone, with short tab labels', async () => {
       const many = Array.from({ length: 7 }, (_, i) => item(`t${i}`, { title: `Aufgabe ${i}` }));
-      const { fixture, router } = await setup(MEMBER, { phone: true, tasks: many });
+      const { fixture } = await setup(MEMBER, { phone: true, tasks: many });
       expect(screen.queryByRole('table')).not.toBeInTheDocument();
       expect(cmp(fixture).taskRows()).toHaveLength(5);
       expect(screen.getByRole('tab', { name: 'Aufgaben 7' })).toBeInTheDocument();
       expect(screen.getByRole('tab', { name: 'Anträge 7' })).toBeInTheDocument();
       expect(screen.getByRole('link', { name: 'Aufgabe 0' })).toHaveAttribute('href', '/tasks/t0');
-      await router.navigateByUrl('/?tab=votes');
-      fixture.detectChanges();
-      expect(screen.getByRole('link', { name: 'Frage v1' })).toHaveAttribute('href', '/voting/v1');
-      expect(screen.getByText('Stimme offen')).toBeInTheDocument();
     });
   });
 

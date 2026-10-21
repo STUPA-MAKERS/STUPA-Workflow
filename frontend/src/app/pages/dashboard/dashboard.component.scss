@@ -219,16 +219,6 @@
 .dash__amount {
   white-space: nowrap;
 }
-.dash__ballot {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  color: var(--color-accent-text);
-  white-space: nowrap;
-}
-.dash__ballot--pending {
-  color: var(--color-warning);
-}
 
 /* The note starts at the edge of the filters and the rows. */
 .dash__loadError {
