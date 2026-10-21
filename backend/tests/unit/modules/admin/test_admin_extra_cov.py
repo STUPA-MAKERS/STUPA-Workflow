@@ -414,7 +414,8 @@ async def test_manifest_uses_config_names() -> None:
     assert man["display"] == "standalone"
     assert man["id"] == "/"
     assert "icons" in man
-    assert man["theme_color"] == man["background_color"] == "#f6f7f5"
+    assert man["theme_color"] == "#e6e9e5"
+    assert man["background_color"] == "#f6f7f5"
 
 
 async def test_manifest_has_the_shortcuts_and_opens_links_in_the_running_app() -> None:
@@ -436,7 +437,8 @@ async def test_manifest_dark_scheme_takes_the_dark_bar_colours() -> None:
     active = _scv(1, active=True, branding=Branding().model_dump(by_alias=True))
     db = fake_session(result(active))
     man = await SiteConfigService(db).manifest("dark")
-    assert man["theme_color"] == man["background_color"] == "#101211"
+    assert man["theme_color"] == "#262a27"
+    assert man["background_color"] == "#101211"
 
 
 async def test_manifest_falls_back_to_defaults_when_blank() -> None:
@@ -456,12 +458,13 @@ async def test_manifest_no_active_config_uses_defaults() -> None:
     assert man["short_name"] == DEFAULT_APP_SHORT_NAME
 
 
-async def test_manifest_colours_are_the_light_page_background() -> None:
-    # The design system has one accent and neutral surfaces. The PWA bars take the light
-    # page background (--color-bg), no longer the old brand green #004225.
+async def test_manifest_colours_are_the_bottom_bar_and_the_page_background() -> None:
+    # Android paints the navigation bar of the installed app with theme_color, so it takes
+    # the surface of the bottom bar (--color-surface-3). The splash takes the page
+    # background (--color-bg).
     db = fake_session(result())
     man = await SiteConfigService(db).manifest()
-    assert man["theme_color"] == "#f6f7f5"
+    assert man["theme_color"] == "#e6e9e5"
     assert man["background_color"] == "#f6f7f5"
 
 
