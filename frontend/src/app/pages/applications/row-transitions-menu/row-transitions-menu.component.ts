@@ -16,11 +16,8 @@ import { RowMenuComponent, type RowMenuItem, type RowMenuSection } from '@stupa-
 
 type T = (key: Parameters<I18nService['translate']>[0]) => string;
 
-/**
- * "Öffentliche Links" of a row, or null without the permission. The menu and the swipe of
- * the row both use it, so the two show the same item with the same rule.
- */
-export function rowShareItem(auth: AuthService, t: T): RowMenuItem | null {
+/** "Öffentliche Links" of a row, or null without the permission. */
+function rowShareItem(auth: AuthService, t: T): RowMenuItem | null {
   if (!auth.can('application.share')) return null;
   return { id: 'share', label: t('applications.row.share'), icon: 'link' };
 }
@@ -34,6 +31,15 @@ export function rowArchiveItem(auth: AuthService, t: T, item: ApplicationListIte
     label: t(archived ? 'applications.row.unarchive' : 'applications.row.archive'),
     icon: 'archive',
   };
+}
+
+/**
+ * "Status setzen" of a row, or null without the permission. The menu and the swipe of
+ * the row both use it, so the two show the same item with the same rule.
+ */
+export function rowForceItem(auth: AuthService, t: T): RowMenuItem | null {
+  if (!auth.can('application.force_status')) return null;
+  return { id: 'force', label: t('applications.detail.forceStatus'), icon: 'flow' };
 }
 
 /** What the reader chose in the row menu. The list page carries it out. */
@@ -96,9 +102,8 @@ export class RowTransitionsMenuComponent {
     if (share) actions.push(share);
     const archive = rowArchiveItem(this.auth, t, this.item());
     if (archive) actions.push(archive);
-    if (this.auth.can('application.force_status')) {
-      actions.push({ id: 'force', label: t('applications.detail.forceStatus'), icon: 'flow' });
-    }
+    const force = rowForceItem(this.auth, t);
+    if (force) actions.push(force);
     const danger: RowMenuItem[] = this.auth.can('application.delete')
       ? [{ id: 'delete', label: t('applications.detail.delete'), icon: 'trash', danger: true }]
       : [];

@@ -1,5 +1,4 @@
-import { ToastService } from '@stupa-makers/ui-kit';
-import { deleteAfterUndo, swipeFrom } from './row-swipe';
+import { swipeFrom } from './row-swipe';
 
 describe('swipeFrom', () => {
   const sections = [
@@ -23,35 +22,5 @@ describe('swipeFrom', () => {
     expect(swipeFrom(sections, 'off')).toBeNull();
     expect(swipeFrom(sections, 'bare')).toBeNull();
     expect(swipeFrom([], 'edit')).toBeNull();
-  });
-});
-
-describe('deleteAfterUndo', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
-
-  it('sends the delete when the toast goes without the undo', () => {
-    const toast = new ToastService();
-    const send = jest.fn();
-    const restore = jest.fn();
-    deleteAfterUndo(toast, { message: 'Gelöscht.', undo: 'Rückgängig', send, restore });
-    expect(toast.toasts()[0]).toEqual(expect.objectContaining({ message: 'Gelöscht.', action: 'Rückgängig' }));
-    jest.advanceTimersByTime(6000);
-    expect(send).toHaveBeenCalledTimes(1);
-    expect(restore).not.toHaveBeenCalled();
-    deleteAfterUndo(toast, { message: 'Gelöscht.', undo: 'Rückgängig', send, restore });
-    toast.dismiss(toast.toasts()[0].id);
-    expect(send).toHaveBeenCalledTimes(2);
-  });
-
-  it('restores the row and sends nothing after the undo', () => {
-    const toast = new ToastService();
-    const send = jest.fn();
-    const restore = jest.fn();
-    deleteAfterUndo(toast, { message: 'Gelöscht.', undo: 'Rückgängig', send, restore });
-    toast.act(toast.toasts()[0].id);
-    jest.advanceTimersByTime(6000);
-    expect(restore).toHaveBeenCalledTimes(1);
-    expect(send).not.toHaveBeenCalled();
   });
 });

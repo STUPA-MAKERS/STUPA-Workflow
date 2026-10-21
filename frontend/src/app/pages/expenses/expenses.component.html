@@ -4,52 +4,37 @@
 <div class="exp" [class.exp--split]="split()">
   <app-list-detail [detailOpen]="detailOpen()" (back)="closeDetail()">
     <section list class="ld-pane" aria-labelledby="exp-title">
-      @if (phone() && selecting()) {
-        <!-- Phone: while rows are selected the title row is the bar of the bulk actions
-             (board Fin-Tel-Auswahl). -->
-        <span id="exp-title" class="sr-only">{{ 'expenses.title' | t }}</span>
-        <app-selection-bar
-          inline
-          [count]="selectedCount()"
-          [countLabel]="selectionLabel()"
-          [clearLabel]="'expenses.bulk.stop' | t"
-          (cleared)="stopSelecting()"
-        >
-          <ng-container *ngTemplateOutlet="bulkIcons" />
-        </app-selection-bar>
-      } @else {
-        <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
-          <ng-container ngProjectAs="[actions]">
-            @if (!phone()) {
-              @if (canExport() && tab() === 'bookings') {
-                <app-button
-                  variant="text"
-                  [iconOnly]="true"
-                  [loading]="exporting()"
-                  [ariaLabel]="'expenses.export' | t"
-                  [title]="'expenses.export' | t"
-                  (click)="onExport()"
-                ><app-icon name="download" /></app-button>
-              }
-              @if (tab() === 'bookings') {
-                <app-row-menu
-                  icon="sort"
-                  [label]="'expenses.sort.title' | t"
-                  [sections]="sortSections()"
-                  (selected)="onHeaderMenu($event)"
-                />
-              }
+      <app-page-header [pane]="true" titleId="exp-title" [title]="'expenses.title' | t">
+        <ng-container ngProjectAs="[actions]">
+          @if (!phone()) {
+            @if (canExport() && tab() === 'bookings') {
+              <app-button
+                variant="text"
+                [iconOnly]="true"
+                [loading]="exporting()"
+                [ariaLabel]="'expenses.export' | t"
+                [title]="'expenses.export' | t"
+                (click)="onExport()"
+              ><app-icon name="download" /></app-button>
             }
-            @if (headerMenu().length) {
+            @if (tab() === 'bookings') {
               <app-row-menu
-                [label]="'expenses.moreActions' | t"
-                [sections]="headerMenu()"
+                icon="sort"
+                [label]="'expenses.sort.title' | t"
+                [sections]="sortSections()"
                 (selected)="onHeaderMenu($event)"
               />
             }
-          </ng-container>
-        </app-page-header>
-      }
+          }
+          @if (headerMenu().length) {
+            <app-row-menu
+              [label]="'expenses.moreActions' | t"
+              [sections]="headerMenu()"
+              (selected)="onHeaderMenu($event)"
+            />
+          }
+        </ng-container>
+      </app-page-header>
 
       <!-- The search and the chips never scroll away: one pane at a time they stick to
            the top of the viewport; side by side only the rows below them scroll. -->
@@ -99,9 +84,10 @@
           />
         </div>
 
-        @if (selecting() && tab() === 'bookings' && !phone()) {
-          <!-- Board Fin-Buchungen-Auswahl: the selection bar in the column. One pane at a
-               time it also holds the bulk actions; side by side they are in the sheet. -->
+        @if (selecting() && tab() === 'bookings') {
+          <!-- Board Fin-Buchungen-Auswahl: the selection bar below the filters, so it sticks
+               with them. One pane at a time (and on a phone) it also holds the bulk actions;
+               side by side they are in the sheet. -->
           <app-selection-bar
             inline
             [count]="selectedCount()"
@@ -120,29 +106,15 @@
               <ng-container *ngTemplateOutlet="bulkIcons" />
             }
           </app-selection-bar>
-        } @else {
-          <div class="exp__bar">
-            <!-- The transfer list needs `budget.book`: a reader gets no views. -->
-            @if (canManage()) {
-              <app-segmented
-                class="exp__tabs"
-                width="equal"
-                [ariaLabel]="'expenses.views' | t"
-                [options]="tabOptions()"
-                [value]="tab()"
-                (valueChange)="setTab($any($event))"
-              />
-            }
-            <span
-              class="exp__count"
-              [class.exp__count--wait]="tab() === 'transfers' ? transferLoading() : loading()"
-              role="status"
-            >{{
-              tab() === 'transfers'
-                ? ('expenses.count' | t: { count: transferItems().length, total: transferTotal() })
-                : ('expenses.count' | t: { count: items().length, total: total() })
-            }}</span>
-          </div>
+        } @else if (canManage()) {
+          <!-- The transfer list needs `budget.book`: a reader gets no views. -->
+          <app-segmented
+            width="fill"
+            [ariaLabel]="'expenses.views' | t"
+            [options]="tabOptions()"
+            [value]="tab()"
+            (valueChange)="setTab($any($event))"
+          />
         }
         @if (tab() === 'transfers' ? transferReloading() : reloading()) {
           <span class="skel-progress skel-progress--foot" aria-hidden="true"></span>
@@ -271,7 +243,10 @@
                       linkQueryParamsHandling="merge"
                       [selected]="!selecting() && e.id === selectedId()"
                       [swipeRight]="selecting() ? null : swipeRight(rowMenu(e))"
-                      [swipeLeft]="selecting() ? null : swipeLeft(rowMenu(e))"
+                      [swipeLeft]="selecting() ? null : swipeLeft()"
+                      appLongPress
+                      [appLongPressOff]="!canManage() || tab() !== 'bookings'"
+                      (appLongPress)="selectWith(e)"
                       (activate)="onRowActivate(e)"
                       (swiped)="onRowSwiped($event, e)"
                     >

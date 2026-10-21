@@ -1247,10 +1247,10 @@ describe('ApplicationsListComponent', () => {
     const lastClosed = (spy: jest.SpyInstance) =>
       (spy.mock.calls.at(-1)![0] as { closed: (how: 'action' | 'timeout' | 'dismiss') => void }).closed;
 
-    it('takes share and archive from the row menu, with its labels and permissions', async () => {
+    it('takes "Status setzen" and archive from the row menu, with its labels and permissions', async () => {
       const { cmp, harness } = await start();
       const [first, , third] = cmp.rows();
-      expect(first.swipeRight).toEqual({ id: 'share', label: 'Öffentliche Links', icon: 'link' });
+      expect(first.swipeRight).toEqual({ id: 'force', label: 'Status setzen', icon: 'flow' });
       expect(first.swipeLeft).toEqual({ id: 'archive', label: 'Archivieren', icon: 'archive', leaves: true });
       expect(third.swipeLeft?.label).toBe('Aus Archiv holen');
       const plates = harness.fixture.nativeElement.querySelectorAll('.li-sw__plate--right');
@@ -1265,13 +1265,13 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.rows()[0].swipeLeft).toBeNull();
     });
 
-    it('opens the share links like the menu', async () => {
+    it('opens "Status setzen" like the menu', async () => {
       const { cmp, http, harness } = await start();
       cmp.onRowSwiped(cmp.items()[1], cmp.rows()[1].swipeRight!);
       harness.detectChanges();
-      expect(cmp.shareFor()).toBe('app-2');
-      expect(cmp.shareOpen()).toBe(true);
-      http.expectOne((r) => r.url === '/api/applications/app-2/shares').flush([]);
+      expect(cmp.forceFor()?.id).toBe('app-2');
+      expect(cmp.forceOpen()).toBe(true);
+      http.expectOne((r) => r.url === '/api/applications/app-2/flow-states').flush([]);
     });
 
     it('archives at once, keeps the row out, and the undo brings it back', async () => {

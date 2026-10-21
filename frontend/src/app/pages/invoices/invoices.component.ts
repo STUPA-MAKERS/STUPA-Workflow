@@ -54,7 +54,7 @@ import {
   PageHeaderComponent,
   invoiceStatus,
 } from '@shared/ui';
-import { deleteAfterUndo, swipeFrom } from '@shared/row-swipe';
+import { swipeFrom } from '@shared/row-swipe';
 import { PageFrameService } from '../../layout/page-frame.service';
 import {
   BudgetTreeApi,
@@ -965,15 +965,9 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     return swipeFrom(menu, 'paid', this.filterParams().status === 'open');
   }
 
-  /** The swipe to the left: "Löschen" of the row menu. */
-  swipeLeft(menu: readonly RowMenuSection[]): RowSwipeAction | null {
-    return swipeFrom(menu, 'delete', true);
-  }
-
   /** A swipe of a phone carried out an item of the row menu. */
   onRowSwiped(action: RowSwipeAction, i: Invoice): void {
     if (action.id === 'paid') this.swipePaid(i, action.leaves === true);
-    else if (action.id === 'delete') this.swipeDelete(i);
   }
 
   /**
@@ -1015,30 +1009,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
         this.setSwipedAway(i.id, false);
         this.toast.error(this.failureText(err));
       },
-    });
-  }
-
-  /** Delete without the question: the row goes now, the request when the undo is over. */
-  private swipeDelete(i: Invoice): void {
-    this.setSwipedAway(i.id, true);
-    deleteAfterUndo(this.toast, {
-      message: this.i18n.translate('invoices.toast.deleted'),
-      undo: this.i18n.translate('action.undo'),
-      restore: () => this.setSwipedAway(i.id, false),
-      send: () =>
-        this.api.deleteInvoice(i.id).subscribe({
-          next: () => {
-            this.items.update((list) => list.filter((x) => x.id !== i.id));
-            this.total.update((t) => Math.max(0, t - 1));
-            this.setSwipedAway(i.id, false);
-            if (i.id === this.selectedId()) this.closeDetail();
-            this.reload();
-          },
-          error: () => {
-            this.setSwipedAway(i.id, false);
-            this.toast.error(this.i18n.translate('invoices.toast.failed'));
-          },
-        }),
     });
   }
 

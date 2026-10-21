@@ -1605,16 +1605,15 @@ describe('InvoicesComponent (row swipe)', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
   const PATCH = (r: { url: string; method: string }) => r.url.endsWith('/api/invoices/i-1') && r.method === 'PATCH';
-  const DELETE = (r: { url: string; method: string }) => r.url.endsWith('/api/invoices/i-1') && r.method === 'DELETE';
   /** The close callback of the last toast with an action. */
   const lastClosed = (spy: jest.SpyInstance) =>
     (spy.mock.calls.at(-1)![0] as { closed: (how: 'action' | 'timeout' | 'dismiss') => void }).closed;
 
-  it('takes "paid" and "delete" from the row menu; a paid invoice and a reader get less', async () => {
+  it('takes "paid" from the row menu, never "delete"; a paid invoice and a reader get less', async () => {
     const { c, container } = await setup({ queryParams: { seg: 'inbox' } });
     const menu = c.rowMenu(inv());
     expect(c.swipeRight(menu)).toEqual({ id: 'paid', label: 'Als bezahlt markieren', icon: 'check', leaves: true });
-    expect(c.swipeLeft(menu)).toEqual({ id: 'delete', label: 'Löschen', icon: 'trash', leaves: true });
+    expect(container.querySelector('.li-sw__plate--left')).toBeNull();
     expect(container.querySelector('.li-sw__plate--right')?.textContent).toContain('Als bezahlt markieren');
     expect(c.swipeRight(c.rowMenu(inv({ status: 'paid' })))).toBeNull();
     c.segment.set('all');
@@ -1625,7 +1624,6 @@ describe('InvoicesComponent (row swipe)', () => {
     const { c } = await setup({ canManage: false });
     const none = c.rowMenu(inv());
     expect(c.swipeRight(none)).toBeNull();
-    expect(c.swipeLeft(none)).toBeNull();
   });
 
   it('marks paid at once, and the undo sets the invoice open again', async () => {
@@ -1668,40 +1666,5 @@ describe('InvoicesComponent (row swipe)', () => {
     lastInvoicesReq(http).flush(page([inv({ status: 'paid' })]));
     expect(error).toHaveBeenCalledTimes(2);
     expect(c.swipedAway().size).toBe(0);
-  });
-
-  it('deletes without the question only when the toast goes without the undo', async () => {
-    const { c, http, toast } = await setup();
-    const action = jest.spyOn(toast, 'showAction');
-    c.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, c.items()[0]);
-    expect(c.confirmDelete()).toBeNull();
-    expect(c.groups()).toEqual([]);
-    expect(action).toHaveBeenCalledWith(expect.objectContaining({ message: 'Rechnung gelöscht.' }));
-    // The undo: the row comes back, nothing goes to the server.
-    lastClosed(action)('action');
-    http.expectNone(DELETE);
-    expect(c.groups()).toHaveLength(1);
-
-    c.selectedId.set('i-1');
-    const close = jest.spyOn(c, 'closeDetail').mockImplementation(() => undefined);
-    c.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, c.items()[0]);
-    lastClosed(action)('timeout');
-    http.expectOne(DELETE).flush(null);
-    lastInvoicesReq(http).flush(page([]));
-    expect(c.items()).toEqual([]);
-    expect(c.total()).toBe(0);
-    expect(close).toHaveBeenCalled();
-  });
-
-  it('brings the row back when the delete fails', async () => {
-    const { c, http, toast } = await setup();
-    const action = jest.spyOn(toast, 'showAction');
-    const error = jest.spyOn(toast, 'error');
-    c.onRowSwiped({ id: 'delete', label: 'x', icon: 'trash', leaves: true }, c.items()[0]);
-    c.onRowSwiped({ id: 'other', label: 'x', icon: 'x' }, c.items()[0]);
-    lastClosed(action)('dismiss');
-    http.expectOne(DELETE).flush({}, { status: 500, statusText: 'x' });
-    expect(error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
-    expect(c.groups()).toHaveLength(1);
   });
 });
