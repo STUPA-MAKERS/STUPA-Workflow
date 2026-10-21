@@ -1,4 +1,5 @@
-import type { ActivatedRouteSnapshot, ViewTransitionInfo } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, type ActivatedRouteSnapshot, type ViewTransitionInfo } from '@angular/router';
 import { MEDIA, matchesMedia, takeGestureNavigation } from '@stupa-makers/ui-kit';
 
 /** True when the person asks the system for reduced motion. */
@@ -29,6 +30,11 @@ export function withViewTransition(update: () => void): void {
  *   page slides in from the end, or the old one slides out to it.
  * - `none`: everything else (a row on a desktop list, a filter in the query). No
  *   transition, so a list does not blink when a row opens.
+ *
+ * A navigation that replaces the history entry (`replaceUrl`) is never a push or a pop:
+ * it is no step forward or back, but the page that completes its own address, for
+ * example `/todos` that opens the default board at `/todos/<id>`. A slide there would
+ * follow the fade of the section entry and move the page a second time.
  */
 export type RouteMotion = 'section' | 'push' | 'pop' | 'none';
 
@@ -47,16 +53,18 @@ export function routeMotion(
   from: readonly string[],
   to: readonly string[],
   phone: boolean,
+  replace = false,
 ): RouteMotion {
   if ((from[0] ?? '') !== (to[0] ?? '')) return 'section';
-  if (!phone) return 'none';
+  if (!phone || replace) return 'none';
   if (startsWith(to, from)) return 'push';
   if (startsWith(from, to)) return 'pop';
   return 'none';
 }
 
 /**
- * The `onViewTransitionCreated` hook of the router. It skips the transitions that must
+ * The `onViewTransitionCreated` hook of the router, which runs it in an injection
+ * context. It skips the transitions that must
  * not show, and names the kind on `<html data-motion>` for the styles in `styles.scss`.
  * A navigation that a gesture started (the swipe back of the list/detail layout) has no
  * transition, because the finger already moved the page out; a pop on top would slide
@@ -65,8 +73,11 @@ export function routeMotion(
 export function onRouteViewTransition({ transition, from, to }: ViewTransitionInfo): void {
   const phone = matchesMedia(MEDIA.phone);
   const gesture = takeGestureNavigation();
+  const replace = inject(Router).currentNavigation()?.extras.replaceUrl === true;
   const kind =
-    reducedMotion() || gesture ? 'none' : routeMotion(routePath(from), routePath(to), phone);
+    reducedMotion() || gesture
+      ? 'none'
+      : routeMotion(routePath(from), routePath(to), phone, replace);
   if (kind === 'none') {
     transition.skipTransition();
     return;
