@@ -12,8 +12,19 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.modules.applications.decision import DecisionIn
-from app.modules.voting.schemas import ElectionResultOut, MyBallot, VoteKind
-from app.shared.config_schemas import ELECTION_MAX_CANDIDATES, ElectionConfig, Quorum
+from app.modules.voting.schemas import (
+    ElectionResultOut,
+    MyBallot,
+    PollIn,
+    PollResultOut,
+    VoteKind,
+)
+from app.shared.config_schemas import (
+    ELECTION_MAX_CANDIDATES,
+    ElectionConfig,
+    PollConfig,
+    Quorum,
+)
 
 MeetingStatus = Literal["planned", "live", "closed"]
 # #17: admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
@@ -171,6 +182,9 @@ class MeetingVoteOut(_CamelModel):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
+    # A poll with its mode and options, and its counts once closed or revealed.
+    poll: PollConfig | None = None
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
 class CurrentAgendaItemOut(_CamelModel):
@@ -498,6 +512,10 @@ class MeetingVoteOpenBody(_CamelModel):
     # F1: the decision proposal (approved amount, conditions). Only an application
     # agenda item takes it (422 `decision_not_allowed` otherwise).
     proposal: DecisionIn | None = None
+    # A poll (``kind = poll``): the mode and the options as the lead types them. The
+    # server gives the option ids. ``question`` is required, ``options`` and
+    # ``majorityRule`` do not apply, and a poll has no quorum.
+    poll: PollIn | None = None
     # Prepare the question only: the vote stays a draft and does not open.
     draft: bool = False
 
@@ -505,6 +523,10 @@ class MeetingVoteOpenBody(_CamelModel):
     def _min_options(self) -> MeetingVoteOpenBody:
         if len(self.options) < 2:
             raise ValueError("at least two options are required")
+        if (self.kind == "poll") != (self.poll is not None):
+            raise ValueError("a poll (kind poll) takes its options in poll, and only a poll")
+        if self.kind == "poll" and not (self.question or "").strip():
+            raise ValueError("a poll needs its question")
         if self.kind == "election":
             if not (self.question or "").strip():
                 raise ValueError("an election needs the name of the ballot (question)")

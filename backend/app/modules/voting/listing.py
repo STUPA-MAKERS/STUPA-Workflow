@@ -31,7 +31,7 @@ from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.voting.election import own_ballot
 from app.modules.voting.models import Ballot, Vote, VotedMarker
-from app.modules.voting.schemas import MyBallot, VoteListItem, VoteStatus
+from app.modules.voting.schemas import MyBallot, VoteKind, VoteListItem, VoteStatus
 from app.search import escape_like
 from app.shared.config_schemas import VoteConfig
 from app.shared.paging import Page
@@ -110,6 +110,7 @@ async def list_votes(
     statuses: Sequence[VoteStatus] | None = None,
     gremium_id: UUID | None = None,
     q: str | None = None,
+    kind: VoteKind | None = None,
     limit: int,
     offset: int,
 ) -> Page[VoteListItem]:
@@ -118,6 +119,7 @@ async def list_votes(
     ``statuses`` defaults to ``DEFAULT_STATUSES``. ``gremium_id`` keeps the votes of
     one gremium (the gremium of the meeting, else the group of the vote). ``q``
     searches the question and the meeting title (substring, case-insensitive).
+    ``kind`` keeps the motions, the elections or the polls.
     """
     wanted = list(dict.fromkeys(statuses or DEFAULT_STATUSES))
     where = [
@@ -127,6 +129,8 @@ async def list_votes(
     ]
     if gremium_id is not None:
         where.append(_gremium_text() == str(gremium_id))
+    if kind is not None:
+        where.append(Vote.kind == kind)
     base = (
         select(Vote, Meeting.title, Meeting.gremium_id)
         .outerjoin(Meeting, Meeting.id == Vote.meeting_id)

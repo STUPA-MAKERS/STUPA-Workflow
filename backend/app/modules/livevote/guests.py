@@ -63,7 +63,7 @@ from app.modules.livevote.public_schemas import (
 from app.modules.livevote.schemas import JoinLinkOut, MeetingGuestOut, QrMatrixOut
 from app.modules.voting.models import Vote
 from app.modules.voting.schemas import BallotAccepted
-from app.modules.voting.service import VotingService, guest_voter_sub
+from app.modules.voting.service import Choice, VotingService, guest_voter_sub
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import (
     ConflictError,
@@ -845,7 +845,7 @@ class GuestService:
         code: str,
         token: str | None,
         vote_id: UUID,
-        choice: str | list[str],
+        choice: Choice,
         *,
         voting: VotingService,
         now: datetime,
@@ -1033,6 +1033,8 @@ class GuestService:
                         if view.election_result is not None
                         else None
                     ),
+                    poll=view.poll,
+                    pollResult=view.poll_result,
                 )
             )
         return out

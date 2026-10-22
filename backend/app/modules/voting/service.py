@@ -25,7 +25,7 @@ free group key (an old row) admits nobody: the call gets 403.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import cast
 from uuid import UUID
@@ -50,20 +50,23 @@ from app.modules.flow.dispatch import ActionDispatcher, NullActionDispatcher
 from app.modules.flow.service import FlowService, StagedFire
 from app.modules.protocol.models import ProtocolVoteRef
 from app.modules.voting import election as election_mod
+from app.modules.voting import poll as poll_mod
 from app.modules.voting import tally as tally_mod
 from app.modules.voting.models import Ballot, SecretBallot, Vote, VotedMarker
 from app.modules.voting.schemas import (
     BallotAccepted,
     MyBallot,
+    PollResultOut,
     TallyOut,
     VoteClosed,
     VoteCreate,
     VoteCreateInternal,
+    VoteKind,
     VoteListItem,
     VoteOut,
     VoteStatus,
 )
-from app.shared.config_schemas import ElectionConfig, VoteConfig
+from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import DEFAULT_LIMIT, Page
 
@@ -81,6 +84,11 @@ def vote_gremium_mismatch_error() -> ConflictError:
         "The Gremium of this vote does not decide the current vote of the application.",
         code=VOTE_GREMIUM_MISMATCH,
     )
+
+
+# The ballot of any vote kind: an option, a list of ids, or the answers of a date poll.
+Choice = str | list[str] | Mapping[str, str]
+
 # The voter key of a guest of a public meeting (#17): ``guest:<meeting_guest.id>``. A
 # guest is not a principal, so the key never collides with an OIDC ``sub``.
 GUEST_VOTER_PREFIX = "guest:"
@@ -638,6 +646,10 @@ class VotingService:
             # F2: the election tally counts ballots, not votes, and has no leader.
             ev = await self._election_outcome(vote, eligible)
             counts, voted, quorum_met, lead = ev.display_counts(), ev.ballots, ev.quorum_met, None
+        elif poll_mod.is_poll(vote):
+            # A poll only counts: no quorum, no leader.
+            pv = await self._poll_outcome(vote)
+            counts, voted, quorum_met, lead = pv.display_counts(), pv.ballots, True, None
         members: int | None = None
         guests: int | None = None
         # Query the present denominator only when it changes the reveal decision, that
@@ -675,7 +687,13 @@ class VotingService:
             presentGuests=guests,
         )
 
-    def _to_out(self, vote: Vote, config: VoteConfig, tally_out: TallyOut) -> VoteOut:
+    def _to_out(
+        self,
+        vote: Vote,
+        config: VoteConfig,
+        tally_out: TallyOut,
+        poll_live: PollResultOut | None = None,
+    ) -> VoteOut:
         return VoteOut(
             id=vote.id,
             applicationId=vote.application_id,
@@ -697,6 +715,7 @@ class VotingService:
             guestsVote=config.guests_vote,
             proposal=DecisionIn.from_stored(getattr(vote, "proposal", None)),
             **election_mod.election_fields(vote),
+            **poll_mod.poll_fields(vote, poll_live),
         )
 
     @staticmethod
@@ -724,6 +743,12 @@ class VotingService:
         config = election_mod.election_config(vote)
         choices = await self._choices(vote, config.as_vote_config())
         return election_mod.outcome_of(config, choices, eligible, getattr(vote, "round", 1) or 1)
+
+    async def _poll_outcome(self, vote: Vote) -> tally_mod.PollOutcome:
+        """Tally a poll from its stored ballots."""
+        config = poll_mod.poll_config(vote)
+        choices = await self._choices(vote, config.as_vote_config())
+        return tally_mod.tally_poll(choices, config)
 
     async def create(
         self, application_id: UUID, payload: VoteCreate, principal: Principal
@@ -850,6 +875,7 @@ class VotingService:
         meeting_id: UUID | None = None,
         agenda_item_id: UUID | None = None,
         planned_ok: bool = False,
+        actor: str | None = None,
     ) -> VoteOut:
         """Create a draft vote from a server-side payload.
 
@@ -861,7 +887,8 @@ class VotingService:
 
         A meeting vote locks the meeting row and needs a ``live`` meeting that still
         has the agenda item (see ``_lock_live_meeting``). ``planned_ok`` also accepts
-        a ``planned`` meeting, for a vote that is prepared before the start.
+        a ``planned`` meeting, for a vote that is prepared before the start. A poll
+        writes ``poll_created`` for ``actor``.
 
         A decision proposal (F1) needs an application, and its amount must fit the
         requested amount.
@@ -883,7 +910,11 @@ class VotingService:
         if application_id is not None:
             self._check_proposal(await self._get_application(application_id), payload.proposal)
         return await self._insert(
-            application_id, payload, meeting_id=meeting_id, agenda_item_id=agenda_item_id
+            application_id,
+            payload,
+            meeting_id=meeting_id,
+            agenda_item_id=agenda_item_id,
+            actor=actor,
         )
 
     async def _insert(
@@ -894,17 +925,25 @@ class VotingService:
         meeting_id: UUID | None = None,
         agenda_item_id: UUID | None = None,
         vote_id: UUID | None = None,
+        actor: str | None = None,
     ) -> VoteOut:
         """Write the draft vote and return it with an empty tally.
 
-        ``vote_id`` presets the id (a runoff links its parent in the same commit).
+        ``vote_id`` presets the id (a runoff links its parent in the same commit). A
+        poll writes ``poll_created`` for ``actor``.
         """
         election = payload.config if isinstance(payload.config, ElectionConfig) else None
+        poll = payload.config if isinstance(payload.config, PollConfig) else None
+        kind: VoteKind = "motion"
+        if election is not None:
+            kind = "election"
+        elif poll is not None:
+            kind = "poll"
         # A preset id only when given: an explicit None would bypass the server default.
         preset = {"id": vote_id} if vote_id is not None else {}
         vote = Vote(
             **preset,
-            kind="election" if election is not None else "motion",
+            kind=kind,
             parent_vote_id=payload.parent_vote_id,
             round=payload.round,
             application_id=application_id,
@@ -913,9 +952,9 @@ class VotingService:
             eligible_group=str(payload.eligible_group),
             question=payload.question,
             config=(
-                election.model_dump(mode="json", by_alias=True)
-                if election is not None
-                else payload.config.model_dump(by_alias=True)
+                payload.config.model_dump(by_alias=True)
+                if election is None and poll is None
+                else payload.config.model_dump(mode="json", by_alias=True)
             ),
             eligible_count=payload.eligible_count,
             opens_state_id=payload.opens_state_id,
@@ -926,12 +965,23 @@ class VotingService:
         )
         self.session.add(vote)
         await self.session.flush()
+        if poll is not None:
+            await audit_record(
+                self.session,
+                actor=actor,
+                action=AuditAction.POLL_CREATED,
+                target_type="vote",
+                target_id=str(vote.id),
+                data=poll_mod.audit_data(vote, poll),
+            )
         await self.session.commit()
-        config: VoteConfig = (
-            election.as_vote_config()
-            if election is not None
-            else cast(VoteConfig, payload.config)
-        )
+        config: VoteConfig
+        if election is not None:
+            config = election.as_vote_config()
+        elif poll is not None:
+            config = poll.as_vote_config()
+        else:
+            config = cast(VoteConfig, payload.config)
         empty = {opt: 0 for opt in config.options}
         return self._to_out(
             vote, config, await self._tally_out(vote, config, empty, vote.eligible_count or 0)
@@ -977,19 +1027,24 @@ class VotingService:
             raise ConflictError(f"vote is {vote.status}, cannot open.", code="conflict")
         if await self.vote_gremium_mismatch(vote):
             raise vote_gremium_mismatch_error()
+        # A poll of a Gremium opens only with its end at least one hour ahead.
+        await poll_mod.PollService(self).check_open(vote, now)
         config = self._config(vote)
         if eligible_count is not None:
             vote.eligible_count = eligible_count
         vote.opens_at = now
         vote.status = "open"
+        # #17: a vote with guests has no quorum; the log keeps that rule.
+        data: dict[str, object] = {**self._audit_refs(vote), "guestsVote": config.guests_vote}
+        if poll_mod.is_poll(vote):
+            data["kind"] = poll_mod.POLL
         await audit_record(
             self.session,
             actor=actor,
             action=AuditAction.VOTE_OPEN,
             target_type="vote",
             target_id=str(vote.id),
-            # #17: a vote with guests has no quorum; the log keeps that rule.
-            data={**self._audit_refs(vote), "guestsVote": config.guests_vote},
+            data=data,
         )
         await self.session.flush()
         await self.session.commit()
@@ -1002,7 +1057,7 @@ class VotingService:
         self,
         vote_id: UUID,
         principal: Principal,
-        choice: str | list[str],
+        choice: Choice,
         *,
         now: datetime,
         as_delegation: bool = False,
@@ -1073,15 +1128,22 @@ class VotingService:
         return await self._cast_open(vote.id, voter_sub, stored)
 
     @staticmethod
-    def _stored_choice(vote: Vote, config: VoteConfig, choice: str | list[str]) -> str:
+    def _stored_choice(vote: Vote, config: VoteConfig, choice: Choice) -> str:
         """Check a ballot against the vote and return its stored form.
 
-        A motion takes one configured option. An election (F2) takes its own ballot
-        shape (``election.stored_choice``).
+        A motion takes one configured option. An election (F2) and a poll take their
+        own ballot shape (``election.stored_choice``, ``poll.stored_choice``).
 
         Raises:
             ValidationProblem: The choice does not fit the vote (422).
         """
+        if poll_mod.is_poll(vote):
+            return poll_mod.stored_choice(poll_mod.poll_config(vote), choice)
+        if isinstance(choice, Mapping):
+            raise ValidationProblem(
+                "Unknown vote option.",
+                errors=[{"field": "choice", "msg": "not in vote options"}],
+            )
         if election_mod.is_election(vote):
             return election_mod.stored_choice(election_mod.election_config(vote), choice)
         if not isinstance(choice, str) or choice not in config.options:
@@ -1092,7 +1154,7 @@ class VotingService:
         return choice
 
     async def cast_guest(
-        self, vote_id: UUID, guest_id: UUID, choice: str | list[str], *, now: datetime
+        self, vote_id: UUID, guest_id: UUID, choice: Choice, *, now: datetime
     ) -> BallotAccepted:
         """Cast the ballot of an admitted guest of a public meeting (#17).
 
@@ -1497,6 +1559,7 @@ class VotingService:
         statuses: Sequence[VoteStatus] | None = None,
         gremium_id: UUID | None = None,
         q: str | None = None,
+        kind: VoteKind | None = None,
         limit: int = DEFAULT_LIMIT,
         offset: int = 0,
     ) -> Page[VoteListItem]:
@@ -1513,6 +1576,7 @@ class VotingService:
             statuses=statuses,
             gremium_id=gremium_id,
             q=q,
+            kind=kind,
             limit=limit,
             offset=offset,
         )
@@ -1528,6 +1592,10 @@ class VotingService:
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         tally_out = await self._tally_out(vote, config, counts, vote.eligible_count or 0)
+        poll_live: PollResultOut | None = None
+        if poll_mod.is_poll(vote) and vote.status == "open" and tally_out.revealed:
+            # A revealed open poll shows its running counts (and the Vielleicht answers).
+            poll_live = poll_mod.result_of(await self._poll_outcome(vote))
         if vote.status == "closed" and vote.result is not None:
             # The column stores text. The values come from tally.result(), a Literal.
             stored_result = cast("tally_mod.VoteResult", vote.result)
@@ -1537,7 +1605,7 @@ class VotingService:
                     "failed_reason": tally_mod.failed_reason(stored_result, tally_out.quorum_met),
                 }
             )
-        return self._to_out(vote, config, tally_out)
+        return self._to_out(vote, config, tally_out, poll_live)
 
     async def cancel(
         self, vote_id: UUID, *, now: datetime | None = None, actor: str | None = None
@@ -1738,6 +1806,8 @@ class VotingService:
             raise ConflictError(f"vote is {vote.status}, cannot close.", code="conflict")
         if election_mod.is_election(vote):
             return await self._close_election(vote, principal, now=now)
+        if poll_mod.is_poll(vote):
+            return await self._close_poll(vote, principal, now=now)
         config = self._config(vote)
         counts = await self._aggregate(vote, config)
         eligible = vote.eligible_count or 0
@@ -1955,6 +2025,66 @@ class VotingService:
             closedAt=closed_at,
             kind="election",
             electionResult=result,
+        )
+
+    async def _close_poll(
+        self, vote: Vote, principal: Principal, *, now: datetime | None
+    ) -> VoteClosed:
+        """Close a locked, open poll: count, store ``poll_result``, keep ``result`` NULL.
+
+        A poll has no quorum and no majority, so a close never fails on the count and
+        fires no flow branch. A meeting poll fixes the attendance, as a vote does. The
+        audit entry holds aggregates only.
+        """
+        config = self._config(vote)
+        outcome = await self._poll_outcome(vote)
+        eligible = vote.eligible_count or 0
+        closed_at = now or datetime.now(UTC)
+        if vote.meeting_id is not None:
+            members = await self._present_count(vote)
+            guests = await self._guest_attendance(vote, config)
+            vote.present_members = members
+            vote.present_guests = guests
+            if config.guests_vote:
+                eligible = members + guests
+                vote.eligible_count = eligible
+        result = poll_mod.result_of(outcome)
+        vote.status = "closed"
+        vote.result = None
+        vote.closed_at = closed_at
+        vote.poll_result = poll_mod.dump_result(result)
+        await audit_record(
+            self.session,
+            actor=principal.sub,
+            action=AuditAction.VOTE_CLOSE,
+            target_type="vote",
+            target_id=str(vote.id),
+            # Aggregates and option ids only, never a voter.
+            data={
+                **self._audit_refs(vote),
+                "kind": poll_mod.POLL,
+                "counts": outcome.display_counts(),
+                "ballots": outcome.ballots,
+            },
+        )
+        await self.session.commit()
+        tally_out = TallyOut(
+            counts=outcome.display_counts(),
+            eligible=eligible,
+            voted=outcome.ballots,
+            quorumMet=True,
+            presentMembers=vote.present_members if vote.meeting_id is not None else None,
+            presentGuests=vote.present_guests if vote.meeting_id is not None else None,
+        )
+        return VoteClosed(
+            id=vote.id,
+            meetingId=vote.meeting_id,
+            applicationId=None,
+            result=None,
+            tally=tally_out,
+            closedAt=closed_at,
+            kind="poll",
+            pollResult=result,
         )
 
     async def _stage_branch(

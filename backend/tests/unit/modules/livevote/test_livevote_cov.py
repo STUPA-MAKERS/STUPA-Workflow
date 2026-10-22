@@ -2390,9 +2390,10 @@ class _FakeVotingService:
         self._vote = SimpleNamespace(id=uuid4(), meeting_id=None)
 
     async def create_internal(  # noqa: ANN201
-        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False  # noqa: ANN001
+        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False, actor=None  # noqa: ANN001, E501
     ):
         self.created.append((application_id, meeting_id, agenda_item_id))
+        self.actor = actor
         self.planned_ok = planned_ok
         self.last_payload = payload
         return self._vote
