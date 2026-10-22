@@ -137,8 +137,10 @@ async def send_poll_mail(
 ) -> bool:
     """Send ``poll_started`` (every eligible member) or ``poll_reminder`` (no answer yet).
 
+    Each member gets an own mail with an own idempotency key (kind, vote, member).
+
     Returns:
-        True when a mail was enqueued.
+        True when at least one mail was enqueued.
     """
     if vote.meeting_id is not None or vote.kind != "poll":
         return False
@@ -147,25 +149,32 @@ async def send_poll_mail(
     if reminder:
         answered = await _answered(session, vote.id)
         members = [(sub, email) for sub, email in members if sub not in answered]
-    recipients = sorted({email for _, email in members})
-    if not recipients:
+    if not members:
         return False
     gremium_name = await session.scalar(select(Gremium.name).where(Gremium.id == gremium_id))
     key = POLL_REMINDER_KEY if reminder else POLL_STARTED_KEY
-    return await NotificationService(session, queue=queue, settings=settings).send_kind_mail(
-        recipients,
-        kind=key,
-        template_key=key,
-        builtin_subject=POLL_REMINDER_SUBJECT if reminder else POLL_STARTED_SUBJECT,
-        builtin_body=POLL_REMINDER_BODY if reminder else POLL_STARTED_BODY,
-        context={
-            "question": vote.question or "",
-            "gremiumName": gremium_name or "",
-            "closesAt": _end_text(vote.closes_at, settings),
-        },
-        idempotency_parts=(key, str(vote.id)),
-        link=vote_link(settings, vote.id),
-    )
+    context: dict[str, object] = {
+        "question": vote.question or "",
+        "gremiumName": gremium_name or "",
+        "closesAt": _end_text(vote.closes_at, settings),
+    }
+    service = NotificationService(session, queue=queue, settings=settings)
+    sent = False
+    # One mail per member: a shared To: line would show every recipient who has not
+    # answered yet, which a secret poll must not reveal.
+    for sub, email in members:
+        if await service.send_kind_mail(
+            [email],
+            kind=key,
+            template_key=key,
+            builtin_subject=POLL_REMINDER_SUBJECT if reminder else POLL_STARTED_SUBJECT,
+            builtin_body=POLL_REMINDER_BODY if reminder else POLL_STARTED_BODY,
+            context=context,
+            idempotency_parts=(key, str(vote.id), sub),
+            link=vote_link(settings, vote.id),
+        ):
+            sent = True
+    return sent
 
 
 async def notify_poll_started(

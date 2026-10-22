@@ -91,15 +91,19 @@ async def test_start_mail_goes_to_every_voter(mails: type[_Mails]) -> None:
         reminder=False,
     )
     assert sent is True
-    [call] = mails.calls
-    assert call["recipients"] == ["a@example.org", "b@example.org"]
+    # One mail per member: no recipient sees the others.
+    assert [c["recipients"] for c in mails.calls] == [["a@example.org"], ["b@example.org"]]
+    assert [c["idempotency_parts"] for c in mails.calls] == [
+        ("poll_started", str(vote.id), "a"),
+        ("poll_started", str(vote.id), "b"),
+    ]
+    call = mails.calls[0]
     assert call["kind"] == "poll_started"
     assert call["context"] == {
         "question": "Wohin?",
         "gremiumName": "StuPa",
         "closesAt": "30.10.2026, 12:00",
     }
-    assert call["idempotency_parts"] == ("poll_started", str(vote.id))
     assert call["builtin_subject"] is polls.POLL_STARTED_SUBJECT
 
 
@@ -117,6 +121,7 @@ async def test_reminder_skips_the_members_who_answered(mails: type[_Mails]) -> N
     assert sent is True
     [call] = mails.calls
     assert call["recipients"] == ["b@example.org"]
+    assert call["idempotency_parts"] == ("poll_reminder", str(vote.id), "b")
     assert call["kind"] == "poll_reminder"
     assert call["context"]["question"] == ""
     assert call["context"]["gremiumName"] == ""
@@ -134,6 +139,21 @@ async def test_reminder_without_anybody_left_sends_nothing(mails: type[_Mails]) 
     )
     assert sent is False
     assert mails.calls == []
+
+
+async def test_no_mail_when_every_member_opted_out(mails: type[_Mails]) -> None:
+    mails.result = False
+    session = ScriptedSession(execute=[_members()], scalar=["StuPa"])
+    sent = await polls.send_poll_mail(
+        session,  # type: ignore[arg-type]
+        queue=None,
+        settings=SETTINGS,
+        vote=_poll(),
+        now=NOW,
+        reminder=False,
+    )
+    assert sent is False
+    assert len(mails.calls) == 2
 
 
 @pytest.mark.parametrize("over", [{"meeting_id": uuid4()}, {"kind": "motion"}])
@@ -179,7 +199,7 @@ async def test_notify_started_sends_for_an_open_poll(mails: type[_Mails]) -> Non
         sessionmaker=_Maker(session),  # type: ignore[arg-type]
     )
     assert sent is True
-    assert len(mails.calls) == 1
+    assert len(mails.calls) == 2
 
 
 @pytest.mark.parametrize("status", ["draft", None])
