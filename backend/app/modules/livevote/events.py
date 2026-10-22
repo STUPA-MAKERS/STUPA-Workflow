@@ -1,10 +1,10 @@
 """WebSocket message schemas for live voting.
 
 The models from server to client are `meeting_state`, `vote_opened`,
-`vote_tally`, `vote_closed` and `error`. The models from client to server are
-`cast` and `subscribe`. Every message is JSON of the form `{"type": …, …}` with
-`type` as the discriminator. These models are the single source of the
-WebSocket contract.
+`vote_tally`, `vote_closed`, `body_draft` and `error`. The models from client to
+server are `cast`, `subscribe` and `body_draft`. Every message is JSON of the
+form `{"type": …, …}` with `type` as the discriminator. These models are the
+single source of the WebSocket contract.
 
 Secrecy rules: `vote_tally` and `vote_closed` carry aggregates only. They never
 carry voter identities. While a secret vote is open, the live feed must not
@@ -20,7 +20,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
 
 from app.modules.livevote.schemas import GuestsMode, MeetingGuestOut
 from app.modules.voting.schemas import ElectionResultOut, VoteKind, VoteResultValue
@@ -249,6 +249,20 @@ class GuestStatusEvent(_CamelModel):
     reason: GuestEventReason | None = None
 
 
+class BodyDraftEvent(_CamelModel):
+    """The text of an agenda item while the protokollant types it (not saved yet).
+
+    Only the voter channel passes it on. The beamer filter and the guest channel drop
+    it. The next `meeting_state` re-read brings the saved text, which replaces the
+    draft. ``seq`` rises per editor session, so a client drops an older frame.
+    """
+
+    type: Literal["body_draft"] = "body_draft"
+    agenda_item_id: UUID = Field(alias="agendaItemId")
+    body: str
+    seq: NonNegativeInt
+
+
 class ErrorEvent(_CamelModel):
     """A WebSocket error, for example `not_eligible`, `read_only` or `not_open`."""
 
@@ -276,3 +290,16 @@ class SubscribeMessage(_CamelModel):
     """Request the current state, which keeps a reconnect consistent."""
 
     type: Literal["subscribe"]
+
+
+class BodyDraftMessage(_CamelModel):
+    """The protokollant sends the text of the open agenda item while typing.
+
+    The server checks the protokollant of the live meeting, the agenda item and the
+    size, then publishes a `body_draft` event. It writes nothing to the database.
+    """
+
+    type: Literal["body_draft"]
+    agenda_item_id: UUID = Field(alias="agendaItemId")
+    body: str
+    seq: NonNegativeInt
