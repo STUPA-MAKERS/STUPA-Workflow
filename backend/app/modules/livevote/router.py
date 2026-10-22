@@ -33,6 +33,7 @@ from app.modules.livevote.locks import InMemoryLocker, Locker
 from app.modules.livevote.schemas import (
     AgendaAddBody,
     AgendaBodyBody,
+    AgendaDoneBody,
     AgendaItemOut,
     AgendaReorderBody,
     AssignableApplicationOut,
@@ -917,16 +918,8 @@ async def set_agenda_body(
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
-    if (
-        payload.body is not None
-        and meeting.status == "live"
-        and meeting.protokollant_id is not None
-        and not meeting.is_protokollant
-    ):
-        raise ForbiddenError(
-            "only the protokollant writes the minutes of a live meeting",
-            code="not_protokollant",
-        )
+    if payload.body is not None:
+        _assert_live_minutes_writer(meeting)
     items = await agenda.set_body(
         meeting_id,
         item_id,
@@ -938,6 +931,57 @@ async def set_agenda_body(
     # Tell the live followers about the changed agenda-item text.
     await service.broadcast_state(meeting_id, principal)
     return items
+
+
+@router.put(
+    "/meetings/{meeting_id}/agenda/{item_id}/done",
+    response_model=list[AgendaItemOut],
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def set_agenda_done(
+    meeting_id: UUID,
+    item_id: UUID,
+    payload: AgendaDoneBody,
+    agenda: AgendaDep,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> list[AgendaItemOut]:
+    """Set or remove the done mark of an agenda item ("TOP abhaken").
+
+    The gate is the gate of the item text: ``canWrite``, and in a live meeting with a
+    protokollant only the protokollant (403 ``not_protokollant``). A closed meeting
+    whose protocol is no longer a draft answers 409 ``protocol_locked``. Writes
+    ``agenda_item_done`` or ``agenda_item_reopened`` and sends ``meeting_state``.
+    """
+    meeting = await service.get(meeting_id, principal)
+    if not meeting.can_write:
+        raise ForbiddenError("not allowed to edit the agenda")
+    _assert_live_minutes_writer(meeting)
+    items = await agenda.set_done(meeting_id, item_id, done=payload.done, actor=principal.sub)
+    await service.broadcast_state(meeting_id, principal)
+    return items
+
+
+def _assert_live_minutes_writer(meeting: MeetingOut) -> None:
+    """Refuse a minutes write of a live meeting by anybody but its protokollant.
+
+    The item text and the done mark follow this rule. Two writers in one text
+    overwrite each other, and a reader with ``canWrite`` (the meeting lead) once saved
+    the stale text of its own view.
+
+    Raises:
+        ForbiddenError: The meeting is live, has a protokollant, and the caller is
+            not the protokollant (``not_protokollant``).
+    """
+    if (
+        meeting.status == "live"
+        and meeting.protokollant_id is not None
+        and not meeting.is_protokollant
+    ):
+        raise ForbiddenError(
+            "only the protokollant writes the minutes of a live meeting",
+            code="not_protokollant",
+        )
 
 
 # Public meeting with a QR code (#17): the routes of the meeting lead.

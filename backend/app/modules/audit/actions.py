@@ -48,6 +48,10 @@ class AuditAction(StrEnum):
     AGENDA_ITEM_UPDATE = "agenda_item_update"
     AGENDA_ITEM_REMOVE = "agenda_item_remove"
     AGENDA_REORDER = "agenda_reorder"
+    # The done mark of an agenda item set or removed ("TOP abhaken"). ``data`` carries
+    # the agenda item id and, for an item of the move to the next item, ``via: next``.
+    AGENDA_ITEM_DONE = "agenda_item_done"
+    AGENDA_ITEM_REOPENED = "agenda_item_reopened"
     # Attendance set or reset by the meeting lead (F12, Z2). ``data`` carries the
     # principal id and the status before and after the change. It never carries the
     # note, because the reason of an excuse is personal data. The own report of a

@@ -87,6 +87,8 @@ class GuestAgendaItem(_CamelModel):
     non_public: bool = Field(alias="nonPublic")
     # The protocol excerpt (draft) of a public item. Always None for a non-public one.
     body: str | None = None
+    # The done mark of a public item ("TOP abhaken"). Always False for a non-public one.
+    done: bool = False
 
 
 class GuestTally(_CamelModel):

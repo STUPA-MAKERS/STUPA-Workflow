@@ -23,6 +23,7 @@ from sqlalchemy import select
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.principal import Principal
+from app.modules.livevote.agenda_service import AgendaService
 from app.modules.livevote.guests import GuestEvents, GuestService
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.open_window import check_open
@@ -143,6 +144,10 @@ class LifecycleOps(HandoverOps):
         the same transaction, then sends ``vote_cancelled`` after the commit. A status
         change or a planning change writes ``meeting_update`` (F12).
 
+        ``completeAgendaItemId`` sets the done mark of the item that the room leaves,
+        in the same transaction as the move ("Nächster TOP"). It needs the gate of the
+        done mark (``can_mark_done``, 403) and an item of this meeting (404).
+
         Z3: the start opens the first keeper period, and the close ends the running
         one. A forward move of the current agenda item starts a planned handover. A
         new protokollant of a live meeting is a handover ``now``. Each handover writes
@@ -204,6 +209,12 @@ class LifecycleOps(HandoverOps):
                 raise NotFoundError(
                     f"agenda item {payload.current_agenda_item_id} not found in this meeting"
                 )
+        # "Nächster TOP": the item that the room leaves gets its done mark. The caller
+        # needs the gate of the done mark, and the item must belong to this meeting.
+        if payload.complete_agenda_item_id is not None and not await self.can_mark_done(
+            meeting, principal
+        ):
+            raise ForbiddenError("not allowed to mark this agenda item as done")
 
         # The status runs only forward (F9, O13): planned to live, live to closed. A
         # repeat of the current status is a no-op. ``closed`` is terminal, and a
@@ -259,6 +270,14 @@ class LifecycleOps(HandoverOps):
                 meeting, old_item, payload.current_agenda_item_id, principal.sub, now
             ):
                 handed_over = True
+        if payload.complete_agenda_item_id is not None:
+            await AgendaService(self.session).set_done_in_tx(
+                meeting,
+                payload.complete_agenda_item_id,
+                done=True,
+                actor=principal.sub,
+                via="next",
+            )
         if payload.title is not None:
             meeting.title = payload.title
         if "date" in payload.model_fields_set:

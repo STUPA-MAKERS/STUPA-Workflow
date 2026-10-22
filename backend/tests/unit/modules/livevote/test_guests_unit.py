@@ -561,9 +561,16 @@ async def test_vote_is_public() -> None:
 async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.MonkeyPatch) -> None:
     app_id = uuid4()
     items = [
-        SimpleNamespace(id=uuid4(), application_id=app_id, title=None, non_public=False, body="A"),
         SimpleNamespace(
-            id=uuid4(), application_id=None, title="Personal", non_public=True, body="secret"
+            id=uuid4(), application_id=app_id, title=None, non_public=False, body="A", done_at=NOW
+        ),
+        SimpleNamespace(
+            id=uuid4(),
+            application_id=None,
+            title="Personal",
+            non_public=True,
+            body="secret",
+            done_at=NOW,
         ),
     ]
     config = VoteConfig.model_validate(
@@ -614,6 +621,8 @@ async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.Monkey
         ("Zuschuss", "application", "A"),
         ("Personal", "freetext", None),
     ]
+    # The done mark of a public item shows; a non-public item hides it.
+    assert [a.done for a in me.view.agenda] == [True, False]
     assert me.view.present_members == 2 and me.view.admitted_guests == 1
     [gv] = me.view.votes
     assert gv.can_cast is True and gv.guests_vote is True
@@ -623,7 +632,9 @@ async def test_admitted_view_of_an_election_carries_no_account_ids(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """F2: a guest sees the candidate names, never a principal id or the lead's sub."""
-    item = SimpleNamespace(id=uuid4(), application_id=None, title="Wahl", non_public=False, body="")
+    item = SimpleNamespace(
+        id=uuid4(), application_id=None, title="Wahl", non_public=False, body="", done_at=None
+    )
     election = ElectionConfig.model_validate(
         {
             "seats": 1,
@@ -688,7 +699,9 @@ async def test_admitted_view_of_an_election_carries_no_account_ids(
 
 async def test_view_without_public_items() -> None:
     items = [
-        SimpleNamespace(id=uuid4(), application_id=None, title="NÖ", non_public=True, body="x")
+        SimpleNamespace(
+            id=uuid4(), application_id=None, title="NÖ", non_public=True, body="x", done_at=None
+        )
     ]
     admitted = guest(status="admitted")
     session = db(result(admitted), result(meeting()), result(*items), result(), scalars=[0, "FS"])
@@ -700,7 +713,12 @@ async def test_view_of_a_planned_meeting_shows_no_prepared_text() -> None:
     """The minute-taker can prepare the text before the start; guests read it only live."""
     items = [
         SimpleNamespace(
-            id=uuid4(), application_id=None, title="Bericht", non_public=False, body="Notiz"
+            id=uuid4(),
+            application_id=None,
+            title="Bericht",
+            non_public=False,
+            body="Notiz",
+            done_at=None,
         )
     ]
     admitted = guest(status="admitted")

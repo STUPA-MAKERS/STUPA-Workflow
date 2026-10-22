@@ -942,6 +942,7 @@ class GuestService:
                 # Never the text of a non-public item, and no text before the start:
                 # the minute-taker can prepare the text of a planned meeting.
                 body=None if item.non_public or meeting.status == "planned" else item.body,
+                done=item.done_at is not None and not item.non_public,
             )
             for position, item in enumerate(items, start=1)
         ]

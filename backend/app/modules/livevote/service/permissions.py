@@ -96,6 +96,19 @@ class PermissionOps(MeetingServiceBase):
             meeting, principal
         )
 
+    async def can_mark_done(self, meeting: Meeting, principal: Principal) -> bool:
+        """Check who sets the done mark of an agenda item: the writer of its text.
+
+        This is the gate of the agenda-item text (`set_agenda_body`): `can_write`, and
+        in a live meeting with a protokollant only the protokollant. The protocol state
+        (O22) is a separate check of the agenda service.
+        """
+        if not await self.can_write(meeting, principal):
+            return False
+        if meeting.status == "live" and meeting.protokollant_id is not None:
+            return await self._is_protokollant(meeting, principal)
+        return True
+
     async def can_run_votes(self, meeting: Meeting, principal: Principal) -> bool:
         """Check who opens and closes the votes of a meeting: the protokollant only.
 
