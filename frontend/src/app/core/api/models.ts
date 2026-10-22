@@ -389,6 +389,8 @@ export interface AgendaItem {
   position: number;
   /** Non-public. The public protocol PDF redacts this agenda item. */
   nonPublic?: boolean;
+  /** The done mark ("TOP abhaken"): the time of the tick, or `null`. Set by hand only. */
+  doneAt?: string | null;
   stateLabel?: I18nMap | null;
   /** F1: the requested amount of the application, for the decision proposal. */
   amount?: string | null;
@@ -1449,6 +1451,11 @@ export interface MeetingPatchBody {
   activeApplicationId?: Uuid | null;
   /** The agenda item the room handles now. `null` clears it. Protokollant or session lead. */
   currentAgendaItemId?: Uuid | null;
+  /**
+   * "Nächster TOP": the item that the room leaves. The server ticks it in the same
+   * request. Only together with `currentAgendaItemId`.
+   */
+  completeAgendaItemId?: Uuid;
   /** New title (1 to 200 characters). Planned or live only: a closed meeting gives 409. */
   title?: string;
   /** Planned meeting date (`YYYY-MM-DD`). Use it to schedule a planned meeting. */
@@ -1773,6 +1780,8 @@ export interface GuestAgendaItem {
   kind: 'application' | 'freetext';
   nonPublic: boolean;
   body: string | null;
+  /** The done mark ("TOP abhaken"). Always `false` for a non-public item. */
+  done: boolean;
 }
 
 /** One vote of a public item, as an admitted guest sees it. */

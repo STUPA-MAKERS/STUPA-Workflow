@@ -34,6 +34,7 @@ async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []
   const startRename = jest.fn();
   const cancelRename = jest.fn();
   const renameTop = jest.fn();
+  const doneChange = jest.fn();
   const view = await render(TopSheetComponent, {
     inputs: {
       meeting: meeting(),
@@ -46,11 +47,11 @@ async function setup(over: Partial<Inputs> = {}, extraProviders: Provider[] = []
       revision: 0,
       ...over,
     },
-    on: { bodyChange, finalize, startRename, cancelRename, renameTop },
+    on: { bodyChange, finalize, startRename, cancelRename, renameTop, doneChange },
     providers: [provideRouter([]), NO_LINKED_TODOS, ...extraProviders],
   });
   await renderDeferred(view.fixture);
-  return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop };
+  return { ...view, bodyChange, finalize, startRename, cancelRename, renameTop, doneChange };
 }
 
 function editorOf(view: Awaited<ReturnType<typeof setup>>): MarkdownEditorComponent {
@@ -77,6 +78,30 @@ describe('TopSheetComponent', () => {
     expect(screen.getByText('Gespeichert')).toBeInTheDocument();
     expect(screen.getByText('Entwurf')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Antrag öffnen/ })).toBeNull();
+  });
+
+  it('ticks the open item with "Erledigt" and removes the tick with the same toggle', async () => {
+    const { doneChange, fixture } = await setup();
+    const button = screen.getByRole('button', { name: 'Erledigt' });
+    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button.querySelector('svg[data-icon="check"]')).not.toBeNull();
+    await userEvent.click(button);
+    expect(doneChange).toHaveBeenCalledWith({ item: AGENDA[0], done: true });
+    const ticked = { ...AGENDA[0], doneAt: '2026-10-15T16:30:00Z' };
+    fixture.componentRef.setInput('top', ticked);
+    fixture.detectChanges();
+    expect(screen.getByRole('button', { name: 'Erledigt' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+    expect(doneChange).toHaveBeenLastCalledWith({ item: ticked, done: false });
+  });
+
+  it('offers no "Erledigt" to a reader or in the participant view', async () => {
+    const { fixture } = await setup({ editable: false });
+    expect(screen.queryByRole('button', { name: 'Erledigt' })).toBeNull();
+    fixture.componentRef.setInput('editable', true);
+    fixture.componentRef.setInput('follow', true);
+    fixture.detectChanges();
+    expect(screen.queryByRole('button', { name: 'Erledigt' })).toBeNull();
   });
 
   it('opens the application in a new tab and shows its state and the NÖ flag', async () => {

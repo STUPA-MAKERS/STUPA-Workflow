@@ -115,7 +115,7 @@ export class GuestViewComponent {
       let sub = '';
       if (item.nonPublic) sub = this.i18n.translate('guests.view.membersOnly');
       else if (item.kind === 'application') sub = this.i18n.translate('guests.view.application');
-      return { item, done: item.position < this.currentPos(), now, sub };
+      return { item, done: item.done, now, sub };
     }),
   );
 

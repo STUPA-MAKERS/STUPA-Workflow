@@ -977,6 +977,14 @@ describe('ApiClient', () => {
     req.flush([]);
   });
 
+  it('sets the done mark of an agenda item', () => {
+    api.setAgendaDone('m-1', 'ag-1', true).subscribe();
+    const req = http.expectOne('/api/meetings/m-1/agenda/ag-1/done');
+    expect(req.request.method).toBe('PUT');
+    expect(req.request.body).toEqual({ done: true });
+    req.flush([]);
+  });
+
   it('reorders the agenda', () => {
     api.reorderAgenda('m-1', ['ag-2', 'ag-1']).subscribe();
     const req = http.expectOne('/api/meetings/m-1/agenda/order');

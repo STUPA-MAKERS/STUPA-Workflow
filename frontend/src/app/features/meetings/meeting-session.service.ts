@@ -199,12 +199,22 @@ export class MeetingSessionService implements OnDestroy {
    * item does not move the beamer and the followers. Only a live meeting
    * has a "now": the server refuses it for a closed meeting, and a planned meeting
    * must not start with an item that a click during the preparation set.
+   *
+   * "Nächster TOP" names the item that the room leaves (`completeItemId`): the server
+   * ticks it in the same request. A click on an item ticks nothing.
    */
-  setCurrentTop(itemId: Uuid): void {
+  setCurrentTop(itemId: Uuid, completeItemId: Uuid | null = null): void {
     const m = this.meeting();
     if (!m || !m.isProtokollant || m.status !== 'live' || m.currentAgendaItemId === itemId) return;
-    this.api.patchMeeting(m.id, { currentAgendaItemId: itemId }).subscribe({
-      next: (updated) => this.meeting.set(updated),
+    const body: MeetingPatchBody = completeItemId
+      ? { currentAgendaItemId: itemId, completeAgendaItemId: completeItemId }
+      : { currentAgendaItemId: itemId };
+    this.api.patchMeeting(m.id, body).subscribe({
+      next: (updated) => {
+        this.meeting.set(updated);
+        // The tick is on the agenda, not on the meeting: read the agenda again.
+        if (completeItemId) this.agendaSvc.load(m.id, updated.currentAgendaItemId);
+      },
       error: () => this.toast.error(this.i18n.translate('meetings.toast.actionFailed')),
     });
   }

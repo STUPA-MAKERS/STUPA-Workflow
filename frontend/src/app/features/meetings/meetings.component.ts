@@ -353,6 +353,19 @@ export class MeetingsComponent {
     this.session.setCurrentTop(id);
   }
 
+  /** "Nächster TOP": open the next TOP, move the room and tick the TOP it leaves. */
+  jumpNext(id: Uuid, from: Uuid): void {
+    this.selectTop(id);
+    this.session.setCurrentTop(id, from);
+  }
+
+  /** Set or remove the done mark of a TOP ("TOP abhaken"). */
+  setDone(item: AgendaItem, done: boolean): void {
+    const m = this.meeting();
+    if (!m) return;
+    this.agendaSvc.setDone(m.id, item.id, done);
+  }
+
   /** Save the text of an item. Only a writer of the minutes saves (`canEditProtocol`). */
   onTopBodyChange(itemId: Uuid, body: string): void {
     const m = this.meeting();

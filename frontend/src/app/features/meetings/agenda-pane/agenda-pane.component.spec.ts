@@ -15,7 +15,7 @@ import { AgendaPaneComponent } from './agenda-pane.component';
 
 const OUTPUTS = [
   'pick', 'add', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'move',
-  'remove',
+  'remove', 'setDone',
 ] as const;
 
 /** Whether each row may be lifted, in agenda order. */
@@ -40,6 +40,7 @@ interface Inputs {
   savingAgenda: boolean;
   renamingTopId: string | null;
   renameDraft: string;
+  canTick: boolean;
 }
 
 async function setup(over: Partial<Inputs> = {}, canTodo?: boolean) {
@@ -108,14 +109,33 @@ describe('AgendaPaneComponent', () => {
     expect(screen.getByText('Noch keine Anträge auf der Tagesordnung.')).toBeInTheDocument();
   });
 
-  it('marks the item that runs now and the items before it as handled (O19)', async () => {
-    const { container } = await setup({ meeting: meeting({ currentAgendaItemId: 't-2' }) });
+  it('marks the item that runs now and only the ticked items as done', async () => {
+    const agenda = [AGENDA[0], AGENDA[1], { ...AGENDA[2], doneAt: '2026-10-15T16:30:00Z' }];
+    const { container } = await setup({ meeting: meeting({ currentAgendaItemId: 't-2' }), agenda });
     const rows = screen.getAllByRole('listitem');
-    expect(rows[0]).toHaveClass('ap__row--done');
-    expect(within(rows[0]).getByText('behandelt')).toBeInTheDocument();
+    // An item before "now" without a tick is not done.
+    expect(rows[0]).not.toHaveClass('ap__row--done');
+    expect(within(rows[0]).queryByText('behandelt')).toBeNull();
     expect(within(rows[1]).getByText('jetzt')).toBeInTheDocument();
-    expect(rows[2]).not.toHaveClass('ap__row--done');
+    expect(rows[2]).toHaveClass('ap__row--done');
+    expect(within(rows[2]).getByText('behandelt')).toBeInTheDocument();
     expect(container.querySelector('app-top-badge.tb--now')?.closest('li')).toBe(rows[1]);
+    expect(container.querySelector('app-top-badge.tb--done')?.closest('li')).toBe(rows[2]);
+  });
+
+  it('shows the tick of the item that runs now as done', async () => {
+    const agenda = [AGENDA[0], { ...AGENDA[1], doneAt: '2026-10-15T16:30:00Z' }, AGENDA[2]];
+    const { container } = await setup({ meeting: meeting({ currentAgendaItemId: 't-2' }), agenda });
+    const rows = screen.getAllByRole('listitem');
+    expect(rows[1]).toHaveClass('ap__row--done');
+    expect(within(rows[1]).getByText('behandelt')).toBeInTheDocument();
+    expect(container.querySelector('app-top-badge.tb--now')).toBeNull();
+  });
+
+  it.each(['planned', 'closed'] as const)('shows a tick in a %s meeting', async (status) => {
+    const agenda = [{ ...AGENDA[0], doneAt: '2026-10-15T16:30:00Z' }, AGENDA[1], AGENDA[2]];
+    await setup({ meeting: meeting({ status }), agenda });
+    expect(screen.getAllByRole('listitem')[0]).toHaveClass('ap__row--done');
   });
 
   it('marks no item as handled or now in a planned meeting, also with a stale id', async () => {
@@ -277,6 +297,26 @@ describe('AgendaPaneComponent', () => {
     it('has no menu once the protocol is locked or without write access', async () => {
       await setup({ locked: true });
       expect(screen.queryByRole('button', { name: /Aktionen für/ })).toBeNull();
+    });
+
+    it('ticks an item with the first entry of the menu, and removes the tick', async () => {
+      const agenda = [AGENDA[0], { ...AGENDA[1], doneAt: '2026-10-15T16:30:00Z' }, AGENDA[2]];
+      const { on } = await setup({ agenda, canTick: true }, true);
+      let menu = await openMenu(0);
+      const first = within(menu).getAllByRole('menuitem')[0];
+      expect(first).toHaveAccessibleName('Als erledigt markieren');
+      expect(first.querySelector('svg[data-icon="check"]')).not.toBeNull();
+      await userEvent.click(first);
+      expect(on.setDone).toHaveBeenCalledWith({ item: agenda[0], done: true });
+      menu = await openMenu(1);
+      await userEvent.click(within(menu).getByRole('menuitem', { name: 'Nicht mehr erledigt' }));
+      expect(on.setDone).toHaveBeenCalledWith({ item: agenda[1], done: false });
+    });
+
+    it('offers no tick without the right to write the minutes', async () => {
+      await setup({ canTick: false });
+      const menu = await openMenu(0);
+      expect(within(menu).queryByRole('menuitem', { name: 'Als erledigt markieren' })).toBeNull();
     });
 
     it('has no menu for a reader', async () => {
