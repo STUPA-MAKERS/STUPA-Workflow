@@ -89,11 +89,13 @@
   <app-empty-state shape="agenda" rows="3" [heading]="'meetings.agenda.empty' | t" />
 }
 
+<!-- Both dialogs live in the body: the scroll fade of the agenda would clip them. -->
 @if (todoOpen()) {
-  <app-todo-new-dialog [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
+  <app-todo-new-dialog appBodyPortal [(open)]="todoOpen" [gremiumId]="meeting().gremiumId" [initialLinks]="todoLinks()" (created)="onTodoCreated($event)" />
 }
 
 <app-confirm-dialog
+  appBodyPortal
   [open]="removing() !== null"
   [title]="'meetings.agenda.removeTitle' | t"
   [body]="'meetings.agenda.removeConfirm' | t: { title: removing() ? title(removing()!) : '' }"

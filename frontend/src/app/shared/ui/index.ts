@@ -29,6 +29,7 @@ export type {
   ChatVisibility,
 } from './chat/chat.models';
 export { FabComponent } from './fab/fab.component';
+export { BodyPortalDirective } from './body-portal/body-portal.directive';
 export { PullRefreshDirective, rubberBand } from './pull-refresh/pull-refresh.directive';
 export { HistoryComponent } from './history/history.component';
 export { ImageThumbComponent, inlineUrl, isThumbImage } from './image-thumb/image-thumb.component';
