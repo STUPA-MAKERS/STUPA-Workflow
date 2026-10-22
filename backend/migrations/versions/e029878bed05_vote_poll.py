@@ -15,7 +15,7 @@ The downgrade deletes the poll rows (their ballots cascade), restores the old ki
 CHECK and drops the columns.
 
 Revision ID: e029878bed05
-Revises: 43dd9c193645
+Revises: 7efbaae8cf7b
 Create Date: 2026-10-22 10:00:00.000000
 """
 
@@ -26,7 +26,7 @@ from collections.abc import Sequence
 from alembic import op
 
 revision: str = "e029878bed05"
-down_revision: str | None = "43dd9c193645"
+down_revision: str | None = "7efbaae8cf7b"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
