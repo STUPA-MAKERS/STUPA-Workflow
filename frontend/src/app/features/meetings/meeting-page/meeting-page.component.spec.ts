@@ -32,7 +32,7 @@ const OUTPUTS = [
   'deleteMeeting', 'toggleBeamer', 'attendanceChange', 'attendanceReset', 'addTop',
   'removeFromAgenda', 'startRename', 'cancelRename', 'renameTop', 'setNonPublic', 'moveTop',
   'setProtokollant', 'pickHandover', 'cancelHandover',
-  'attendanceConflictResolved',
+  'attendanceConflictResolved', 'nextTop', 'setDone',
 ] as const;
 
 type Inputs = {
@@ -454,10 +454,14 @@ describe('MeetingPageComponent', () => {
 
     it('steps through the agenda from the dock', async () => {
       const { on } = await setup({ top: AGENDA[1], topIndex: 1 });
+      // The step forward names the item that the room leaves, so the server ticks it.
       await userEvent.click(screen.getByRole('button', { name: 'Nächster TOP' }));
-      expect(on.selectTop).toHaveBeenCalledWith('t-3');
+      expect(on.nextTop).toHaveBeenCalledWith({ id: 't-3', from: 't-2' });
+      expect(on.selectTop).not.toHaveBeenCalled();
+      // The step back ticks nothing.
       await userEvent.click(screen.getByRole('button', { name: 'Vorheriger TOP' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-1');
+      expect(on.nextTop).toHaveBeenCalledTimes(1);
       expect(screen.getByText('1 Wörter')).toBeInTheDocument();
     });
 
@@ -471,6 +475,30 @@ describe('MeetingPageComponent', () => {
       fixture.detectChanges();
       fixture.componentInstance.step(-1);
       expect(on.selectTop).not.toHaveBeenCalled();
+      fixture.componentRef.setInput('top', AGENDA[2]);
+      fixture.componentRef.setInput('topIndex', 2);
+      fixture.detectChanges();
+      fixture.componentInstance.step(1);
+      expect(on.nextTop).not.toHaveBeenCalled();
+    });
+
+    it('ticks the open item from the sheet and from the agenda', async () => {
+      const { on } = await setup({}, [MEDIA.wide]);
+      await userEvent.click(screen.getByRole('button', { name: 'Erledigt' }));
+      expect(on.setDone).toHaveBeenCalledWith({ item: AGENDA[0], done: true });
+      const rows = screen.getAllByRole('listitem');
+      await userEvent.click(within(rows[1]).getByRole('button', { name: /Aktionen für/ }));
+      await userEvent.click(await screen.findByRole('menuitem', { name: 'Als erledigt markieren' }));
+      expect(on.setDone).toHaveBeenCalledWith({ item: AGENDA[1], done: true });
+    });
+
+    it('offers no tick to a writer who does not keep the minutes of a live meeting', async () => {
+      await setup({ canEdit: false }, [MEDIA.wide]);
+      expect(screen.queryByRole('button', { name: 'Erledigt' })).toBeNull();
+      const rows = screen.getAllByRole('listitem');
+      await userEvent.click(within(rows[1]).getByRole('button', { name: /Aktionen für/ }));
+      await screen.findByRole('menu');
+      expect(screen.queryByRole('menuitem', { name: 'Als erledigt markieren' })).toBeNull();
     });
 
     it('passes the edits of the sheet on and makes the editor read-only for a reader', async () => {

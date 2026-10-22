@@ -173,6 +173,11 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     # A non-public item becomes a placeholder in the public protocol PDF. The
     # numbering of the agenda items stays the same.
     non_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
+    # The done mark. A person sets it by hand ("TOP abhaken"), or the move to the next
+    # item sets it for the item that the room leaves. NULL means "not done".
+    # `done_by` holds the `sub` of the person who set it.
+    done_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    done_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("meeting_id", "application_id", name="uq_agenda_meeting_application"),

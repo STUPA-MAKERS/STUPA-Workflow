@@ -880,6 +880,13 @@ export class ApiClient {
     });
   }
 
+  /** PUT /meetings/{id}/agenda/{itemId}/done — set or remove the done mark of an item. */
+  setAgendaDone(meetingId: Uuid, itemId: Uuid, done: boolean): Observable<AgendaItem[]> {
+    return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}/done`, {
+      done,
+    });
+  }
+
   /** PUT /meetings/{id}/agenda/order — order items in the supplied sequence. */
   reorderAgenda(meetingId: Uuid, itemIds: Uuid[]): Observable<AgendaItem[]> {
     return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/order`, {

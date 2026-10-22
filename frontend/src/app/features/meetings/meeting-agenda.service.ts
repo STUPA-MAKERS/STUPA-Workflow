@@ -166,6 +166,24 @@ export class MeetingAgendaService implements OnDestroy {
   }
 
   /**
+   * Set or remove the done mark of a TOP ("TOP abhaken"). The server allows it to the
+   * writer of the minutes and sends the agenda back.
+   */
+  setDone(meetingId: Uuid, itemId: Uuid, done: boolean): void {
+    this.savingAgenda.set(true);
+    this.api.setAgendaDone(meetingId, itemId, done).subscribe({
+      next: (rows) => {
+        this.savingAgenda.set(false);
+        this.setRows(rows);
+      },
+      error: (err: unknown) => {
+        this.savingAgenda.set(false);
+        this.failed(err);
+      },
+    });
+  }
+
+  /**
    * Move the item at `from` to `to` (0-based) and save the new order. The list changes
    * at once; a refused save reloads the agenda.
    */

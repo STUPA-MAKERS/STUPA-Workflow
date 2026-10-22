@@ -47,6 +47,18 @@
           <h1 class="ts__title" [title]="t.title || ('meetings.agenda.untitled' | t)">{{ t.title || ('meetings.agenda.untitled' | t) }}</h1>
         }
       </div>
+      @if (editable() && !follow()) {
+        <app-button
+          class="ts__done"
+          variant="outlined"
+          size="sm"
+          [ariaPressed]="!!t.doneAt"
+          (click)="doneChange.emit({ item: t, done: !t.doneAt })"
+        >
+          <app-icon name="check" />
+          {{ 'meetings.agenda.done' | t }}
+        </app-button>
+      }
       @if (t.applicationId) {
         <a class="ts__open" [routerLink]="['/applications', t.applicationId]" target="_blank" rel="noopener">
           {{ 'meetings.agenda.openApplication' | t }}

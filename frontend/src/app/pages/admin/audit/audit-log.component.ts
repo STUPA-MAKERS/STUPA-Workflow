@@ -120,6 +120,8 @@ export const AUDIT_ACTIONS = [
   'agenda_item_update',
   'agenda_item_remove',
   'agenda_reorder',
+  'agenda_item_done',
+  'agenda_item_reopened',
   // Attendance set or reset by the meeting lead (F12). They mirror ATTENDANCE_* in actions.py.
   'attendance_set',
   'attendance_reset',

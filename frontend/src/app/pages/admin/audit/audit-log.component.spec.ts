@@ -139,6 +139,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'agenda_item_update',
   'agenda_item_remove',
   'agenda_reorder',
+  'agenda_item_done',
+  'agenda_item_reopened',
   'attendance_set',
   'attendance_reset',
   'application_delete',

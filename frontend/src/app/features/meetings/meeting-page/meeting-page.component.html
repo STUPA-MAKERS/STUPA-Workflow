@@ -166,6 +166,7 @@
         (startRename)="startRename.emit($event)"
         (cancelRename)="cancelRename.emit()"
         (renameTop)="renameTop.emit($event)"
+        (doneChange)="setDone.emit($event)"
       />
     }
   </div>
@@ -229,12 +230,14 @@
     [savingAgenda]="savingAgenda()"
     [renamingTopId]="renamingTopId()"
     [(renameDraft)]="renameDraft"
+    [canTick]="editable()"
     (pick)="jump($event)"
     (add)="addTop.emit()"
     (startRename)="startRename.emit($event)"
     (cancelRename)="cancelRename.emit()"
     (renameTop)="renameTop.emit($event)"
     (setNonPublic)="setNonPublic.emit($event)"
+    (setDone)="setDone.emit($event)"
     (move)="moveTop.emit($event)"
     (remove)="removeFromAgenda.emit($event)"
   />

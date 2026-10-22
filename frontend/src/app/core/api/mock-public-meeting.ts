@@ -168,8 +168,8 @@ function head(code: string, over: Partial<PublicMeetingHead> = {}): PublicMeetin
 }
 
 const AGENDA: GuestAgendaItem[] = [
-  { id: 'pa-1', position: 1, title: 'Begrüßung und Beschlussfähigkeit', kind: 'freetext', nonPublic: false, body: 'Die Sitzungsleitung eröffnet die Sitzung um 18:15. 19 von 23 Mitgliedern sind anwesend.' },
-  { id: 'pa-2', position: 2, title: 'Protokoll der 6. Sitzung', kind: 'freetext', nonPublic: false, body: 'Das Protokoll der 6. Sitzung wird ohne Änderungen genehmigt.' },
+  { id: 'pa-1', position: 1, title: 'Begrüßung und Beschlussfähigkeit', kind: 'freetext', nonPublic: false, body: 'Die Sitzungsleitung eröffnet die Sitzung um 18:15. 19 von 23 Mitgliedern sind anwesend.', done: true },
+  { id: 'pa-2', position: 2, title: 'Protokoll der 6. Sitzung', kind: 'freetext', nonPublic: false, body: 'Das Protokoll der 6. Sitzung wird ohne Änderungen genehmigt.', done: true },
   {
     id: 'pa-3',
     position: 3,
@@ -177,11 +177,12 @@ const AGENDA: GuestAgendaItem[] = [
     kind: 'application',
     nonPublic: false,
     body: 'Malte Krüger (Erstsemester-Tutorium, Gast) stellt den Antrag vor: Fahrt nach Bad Urach vom 30.10. bis 01.11., 48 Teilnehmende, beantragt werden 1.440 €.\n\n**Rückfragen**\n\n- Eigenanteil: 35 € pro Person, Ermäßigung über den Sozialfonds möglich.\n- Die Unterkunft ist barrierefrei; zwei Plätze sind dafür reserviert.\n\nFinn Berger (Gast) fragt nach dem Busunternehmen; es gilt das günstigste von drei Angeboten.',
+    done: false,
   },
-  { id: 'pa-4', position: 4, title: 'Lerncafé: Snacks und Getränke WS 26/27', kind: 'application', nonPublic: false, body: null },
-  { id: 'pa-5', position: 5, title: 'Wahl der Kassenprüfung', kind: 'freetext', nonPublic: false, body: null },
-  { id: 'pa-6', position: 6, title: 'Personalangelegenheit Tutorium', kind: 'freetext', nonPublic: true, body: null },
-  { id: 'pa-7', position: 7, title: 'Verschiedenes', kind: 'freetext', nonPublic: false, body: null },
+  { id: 'pa-4', position: 4, title: 'Lerncafé: Snacks und Getränke WS 26/27', kind: 'application', nonPublic: false, body: null, done: false },
+  { id: 'pa-5', position: 5, title: 'Wahl der Kassenprüfung', kind: 'freetext', nonPublic: false, body: null, done: false },
+  { id: 'pa-6', position: 6, title: 'Personalangelegenheit Tutorium', kind: 'freetext', nonPublic: true, body: null, done: false },
+  { id: 'pa-7', position: 7, title: 'Verschiedenes', kind: 'freetext', nonPublic: false, body: null, done: false },
 ];
 
 const Q3 = 'Soll der Antrag „Zuschuss Erstsemesterfahrt Informatik“ wie beschrieben gefördert werden?';

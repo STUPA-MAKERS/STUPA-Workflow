@@ -146,6 +146,8 @@ export class MeetingPageComponent {
   /** Leave the session page for the meeting list. */
   readonly back = output<void>();
   readonly selectTop = output<Uuid>();
+  /** "Nächster TOP": the next item, and the item that the room leaves (the server ticks it). */
+  readonly nextTop = output<{ id: Uuid; from: Uuid }>();
   readonly bodyChange = output<{ itemId: Uuid; body: string }>();
   readonly castVote = output<{ voteId: Uuid; choice: string }>();
   readonly voteOpen = output<Uuid>();
@@ -172,6 +174,8 @@ export class MeetingPageComponent {
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
+  /** Set or remove the done mark of an item ("TOP abhaken"). */
+  readonly setDone = output<{ item: AgendaItem; done: boolean }>();
   readonly moveTop = output<AgendaMove>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
@@ -408,11 +412,21 @@ export class MeetingPageComponent {
     return this.choices()[voteId] ?? null;
   }
 
-  /** Move to the previous (-1) or the next (+1) agenda item. */
+  /**
+   * Move to the previous (-1) or the next (+1) agenda item. The step forward also ticks
+   * the item that the room leaves ("Nächster TOP"); the step back ticks nothing.
+   */
   step(delta: -1 | 1): void {
-    if (this.topIndex() < 0) return;
+    const from = this.agenda()[this.topIndex()];
+    if (!from) return;
     const next = this.agenda()[this.topIndex() + delta];
-    if (next) this.jump(next.id);
+    if (!next) return;
+    if (delta === 1) {
+      this.open();
+      this.nextTop.emit({ id: next.id, from: from.id });
+    } else {
+      this.jump(next.id);
+    }
   }
 
   /**
@@ -420,10 +434,15 @@ export class MeetingPageComponent {
    * A planned meeting has no "now": a pick there opens the item to prepare it.
    */
   jump(id: Uuid): void {
+    this.open();
+    this.selectTop.emit(id);
+  }
+
+  /** Close the panels and show the sheet of the item that opens. */
+  private open(): void {
     if (this.meeting().status === 'planned') this.prepItem.set(true);
     this.panel.set('none');
     this.agendaOpen.set(false);
-    this.selectTop.emit(id);
   }
 
   /** Append the result of a closed vote to the text of the open item. */

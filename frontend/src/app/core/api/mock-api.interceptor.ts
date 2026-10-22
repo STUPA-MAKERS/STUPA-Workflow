@@ -1303,6 +1303,8 @@ interface MockAgendaItem {
   body?: string | null;
   position: number;
   nonPublic?: boolean;
+  /** The done mark ("TOP abhaken"), or `null`. */
+  doneAt?: string | null;
   stateLabel?: Record<string, string> | null;
   /** F1: the requested amount of an application item, for the decision proposal. */
   amount?: string | null;
@@ -1316,6 +1318,7 @@ let MOCK_AGENDA: MockAgendaItem[] = [
     title: 'Begrüßung und Beschlussfähigkeit',
     body: 'Die Sitzungsleitung eröffnet die Sitzung. 12 von 15 Mitgliedern sind anwesend; das Gremium ist beschlussfähig.',
     position: 0,
+    doneAt: '2026-06-08T18:05:00Z',
   },
   {
     id: 'ag-s2',
@@ -1323,6 +1326,7 @@ let MOCK_AGENDA: MockAgendaItem[] = [
     title: 'Genehmigung der Tagesordnung',
     body: 'Die Tagesordnung wird ohne Änderungen genehmigt.',
     position: 1,
+    doneAt: '2026-06-08T18:10:00Z',
   },
   {
     id: 'ag-s3',
@@ -1425,6 +1429,15 @@ function closedMockId(p: string): string | null {
   if (meeting) return meeting[1];
   const protocol = CLOSED_MOCK_PROTOCOL.exec(p);
   return protocol ? `d0000000-0000-0000-0000-0000000001${protocol[1]}` : null;
+}
+
+/** Set or remove the done mark of an item of the live mock agenda. A repeat keeps the first time. */
+function mockSetDone(itemId: string, done: boolean): void {
+  MOCK_AGENDA = MOCK_AGENDA.map((a) => {
+    if (a.id !== itemId) return a;
+    if (!done) return { ...a, doneAt: null };
+    return { ...a, doneAt: a.doneAt ?? new Date().toISOString() };
+  });
 }
 
 /** The 1-based number of an agenda item of the live mock meeting, or `null`. */
@@ -1944,6 +1957,11 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
       MOCK_AGENDA = ids.map((id, i) => ({ ...(byId.get(id) as MockAgendaItem), position: i }));
       return ok([...MOCK_AGENDA]);
     }
+    const done = /\/meetings\/[^/]+\/agenda\/([^/]+)\/done$/.exec(p);
+    if (done) {
+      mockSetDone(done[1], (req.body as { done?: boolean } | null)?.done === true);
+      return ok([...MOCK_AGENDA]);
+    }
     const att = /\/meetings\/[^/]+\/attendance\/([^/]+)$/.exec(p);
     if (att) {
       const body = (req.body as { status?: string; note?: string | null } | null) ?? {};
@@ -2194,10 +2212,12 @@ export const mockApiInterceptor: HttpInterceptorFn = (req, next) => {
   }
 
   if (req.method === 'PATCH' && /\/meetings\/[^/]+$/.test(p)) {
-    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; date?: string | null; startTime?: string | null; endTime?: string | null; protokollantId?: string | null; publicJoin?: boolean; guestsMode?: 'vote' | 'watch' } | null) ?? {};
+    const body = (req.body as { status?: MeetingOutWire['status']; activeApplicationId?: string; currentAgendaItemId?: string | null; completeAgendaItemId?: string; date?: string | null; startTime?: string | null; endTime?: string | null; protokollantId?: string | null; publicJoin?: boolean; guestsMode?: 'vote' | 'watch' } | null) ?? {};
     if (body.currentAgendaItemId !== undefined) {
       mockStartPlannedHandover(MOCK_MEETING.currentAgendaItemId, body.currentAgendaItemId);
     }
+    // "Nächster TOP": the item that the room leaves gets its done mark.
+    if (body.completeAgendaItemId) mockSetDone(body.completeAgendaItemId, true);
     MOCK_MEETING = {
       ...MOCK_MEETING,
       status: body.status ?? MOCK_MEETING.status,

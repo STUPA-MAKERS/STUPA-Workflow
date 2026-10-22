@@ -67,6 +67,10 @@ class MeetingPatch(_CamelModel):
     # The agenda item the room handles now. ``null`` clears it. Needs
     # ``canManageVotes``: the protokollant or the session lead.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
+    # The item that the room leaves on a move to the next item ("Nächster TOP"). The
+    # server sets its done mark in the same transaction. It needs
+    # ``currentAgendaItemId`` in the same patch and the gate of the done mark.
+    complete_agenda_item_id: UUID | None = Field(default=None, alias="completeAgendaItemId")
     status: MeetingStatus | None = None
     # A new title. Needs ``canManage``, like the date and the time. A closed meeting
     # keeps its title (409), because the sent protocol names the meeting.
@@ -87,6 +91,11 @@ class MeetingPatch(_CamelModel):
     def _at_least_one(self) -> MeetingPatch:
         if "title" in self.model_fields_set and self.title is None:
             raise ValueError("title must not be null")
+        if (
+            self.complete_agenda_item_id is not None
+            and "current_agenda_item_id" not in self.model_fields_set
+        ):
+            raise ValueError("completeAgendaItemId needs currentAgendaItemId")
         managed = {
             "title",
             "date",
@@ -415,6 +424,8 @@ class AgendaItemOut(_CamelModel):
     position: int = 0
     # The public protocol PDF redacts a non-public agenda item.
     non_public: bool = Field(default=False, alias="nonPublic")
+    # The time of the done mark ("TOP abhaken"). None for an item that is not done.
+    done_at: _datetime | None = Field(default=None, alias="doneAt")
     # Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
     # The requested amount of the application (F1: the decision proposal of the vote
@@ -566,6 +577,12 @@ class AgendaBodyBody(_CamelModel):
     body: str | None = None
     title: str | None = Field(default=None, min_length=1)
     non_public: bool | None = Field(default=None, alias="nonPublic")
+
+
+class AgendaDoneBody(_CamelModel):
+    """``PUT …/agenda/{itemId}/done`` — set or remove the done mark of an item."""
+
+    done: bool
 
 
 class AgendaReorderBody(_CamelModel):

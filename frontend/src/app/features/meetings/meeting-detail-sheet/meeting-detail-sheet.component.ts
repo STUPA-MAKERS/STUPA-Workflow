@@ -57,7 +57,7 @@ interface AgendaRow {
   item: AgendaItem;
   number: number;
   title: string;
-  /** "behandelt" (before the current item) or "Jetzt" (the current item). */
+  /** "behandelt" (a ticked item) or "Jetzt" (the current item of a live meeting). */
   mark: 'done' | 'now' | null;
 }
 
@@ -71,7 +71,7 @@ interface AgendaRow {
  * meeting, `canManage`, not on a phone) and "Protokollführung festlegen" (a planned
  * meeting without one). Edit and delete sit only here (`canManage`), not on the rows.
  *
- * Body: the agenda (done and current items marked, "nicht öffentlich"), the progress of a
+ * Body: the agenda (ticked and current items marked, "nicht öffentlich"), the progress of a
  * live meeting and the turnout of its open vote, the attendance counts, the delegations
  * and the protocol state. The sheet reads the agenda, the roster, the delegations and the
  * protocol of the meeting with the existing endpoints, quietly, each time the meeting
@@ -177,13 +177,14 @@ export class MeetingDetailSheetComponent {
   readonly agendaRows = computed<AgendaRow[]>(() => {
     const agenda = this.data()?.agenda ?? [];
     const m = this.meeting();
-    const currentIndex = agenda.findIndex((a) => a.id === m.currentAgendaItemId);
-    const marks = m.status === 'live' && currentIndex >= 0;
+    // Only a stored tick marks an item as done ("TOP abhaken"), in any state of the
+    // meeting. Only a live meeting has a "now".
+    const nowId = m.status === 'live' ? m.currentAgendaItemId : null;
     return agenda.map((item, index) => ({
       item,
       number: index + 1,
       title: item.title?.trim() || this.i18n.translate('meetings.agenda.untitled'),
-      mark: !marks ? null : index < currentIndex ? 'done' : index === currentIndex ? 'now' : null,
+      mark: item.doneAt ? 'done' : nowId && item.id === nowId ? 'now' : null,
     }));
   });
 
