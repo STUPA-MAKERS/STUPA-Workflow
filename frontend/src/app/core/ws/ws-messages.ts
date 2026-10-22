@@ -79,6 +79,17 @@ export interface VoteCancelledMsg {
   type: 'vote_cancelled';
   voteId: string;
 }
+/**
+ * The text of an agenda item while the protokollant types it, before the autosave. The
+ * voter channel carries it; the beamer and the guests never get it. `seq` rises per
+ * editor session, so a viewer drops an older frame.
+ */
+export interface BodyDraftMsg {
+  type: 'body_draft';
+  agendaItemId: string;
+  body: string;
+  seq: number;
+}
 export interface ErrorMsg {
   type: 'error';
   code: string;
@@ -129,11 +140,13 @@ export type ServerMessage =
   | VoteLotDrawnMsg
   | VoteCancelledMsg
   | ViewersMsg
+  | BodyDraftMsg
   | ErrorMsg;
 
 export type ClientMessage =
   | { type: 'cast'; voteId: string; choice: string | string[]; asDelegation?: boolean }
-  | { type: 'subscribe' };
+  | { type: 'subscribe' }
+  | BodyDraftMsg;
 
 // ------------------------------------------------------------------ to-do boards (`/api/ws/todos`)
 

@@ -5,6 +5,7 @@ import { USE_MOCK_API } from '@core/api/api.config';
 import type { Meeting, Protocol } from '@core/api/models';
 import { AuthService } from '@core/auth/auth.service';
 import { WsService } from '@core/ws/ws.service';
+import { EMPTY } from 'rxjs';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingSessionService } from './meeting-session.service';
@@ -318,5 +319,123 @@ describe('MeetingSessionService', () => {
     expect(session.meeting()?.title).toBe('Lesung 2');
     expect(session.meeting()?.votes[0]).toEqual(expect.objectContaining({ id: 'v-1', voted: 3 }));
     http.verify();
+  });
+});
+
+describe('MeetingSessionService live body draft', () => {
+  type Sent = { type: string; agendaItemId?: string; body?: string; seq?: number };
+  function live(over: Partial<Meeting> = {}) {
+    const ctx = setup();
+    const sent: Sent[] = [];
+    ctx.session['channel'] = {
+      messages$: EMPTY,
+      send: (msg: Sent) => sent.push(msg),
+      close: () => undefined,
+    } as never;
+    ctx.session.meeting.set(M({ status: 'live', isProtokollant: true, ...over }));
+    return { ...ctx, sent };
+  }
+
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('sends at most one draft per 300 ms, and the last text always goes out', () => {
+    const { session, sent } = live();
+    session.sendBodyDraft('t-1', 'a');
+    expect(sent).toEqual([{ type: 'body_draft', agendaItemId: 't-1', body: 'a', seq: expect.any(Number) }]);
+    const first = sent[0].seq!;
+    jest.advanceTimersByTime(100);
+    session.sendBodyDraft('t-1', 'ab');
+    jest.advanceTimersByTime(100);
+    session.sendBodyDraft('t-1', 'abc');
+    expect(sent).toHaveLength(1);
+    jest.advanceTimersByTime(100);
+    expect(sent).toHaveLength(2);
+    expect(sent[1]).toEqual({ type: 'body_draft', agendaItemId: 't-1', body: 'abc', seq: first + 1 });
+    // After a pause the next change goes out at once.
+    jest.advanceTimersByTime(1000);
+    session.sendBodyDraft('t-1', 'abcd');
+    expect(sent.map((s) => s.body)).toEqual(['a', 'abc', 'abcd']);
+    expect(sent[2].seq).toBe(first + 2);
+  });
+
+  it('sends the waiting text of an item before the text of the next item', () => {
+    const { session, sent } = live();
+    session.sendBodyDraft('t-1', 'a');
+    session.sendBodyDraft('t-1', 'ab');
+    session.sendBodyDraft('t-2', 'x');
+    expect(sent.map((s) => [s.agendaItemId, s.body])).toEqual([['t-1', 'a'], ['t-1', 'ab']]);
+    jest.advanceTimersByTime(300);
+    expect(sent.map((s) => [s.agendaItemId, s.body])).toEqual([['t-1', 'a'], ['t-1', 'ab'], ['t-2', 'x']]);
+  });
+
+  it('sends only as the protokollant of a live meeting with a channel', () => {
+    const { session, sent } = live();
+    for (const over of [{ isProtokollant: false }, { status: 'planned' as const }, { status: 'closed' as const }]) {
+      session.meeting.set(M({ status: 'live', isProtokollant: true, ...over }));
+      session.sendBodyDraft('t-1', 'a');
+    }
+    session.meeting.set(M({ status: 'live', isProtokollant: true }));
+    session['channel'] = null;
+    session.sendBodyDraft('t-1', 'a');
+    session.meeting.set(null);
+    session.sendBodyDraft('t-1', 'a');
+    expect(sent).toEqual([]);
+  });
+
+  it('drops the waiting draft when the page goes away', () => {
+    const { session, sent } = live();
+    session.sendBodyDraft('t-1', 'a');
+    session.sendBodyDraft('t-1', 'ab');
+    session.ngOnDestroy();
+    jest.advanceTimersByTime(1000);
+    // Nothing waits: a flush sends nothing.
+    session['flushDraft']();
+    expect(sent.map((s) => s.body)).toEqual(['a']);
+    // A new channel (another meeting) drops a waiting draft too.
+    session.sendBodyDraft('t-1', 'b');
+    session.sendBodyDraft('t-1', 'bc');
+    session['connectLive']('m-1');
+    jest.advanceTimersByTime(1000);
+    expect(sent.map((s) => s.body)).toEqual(['a', 'b']);
+  });
+
+  const draft = (seq: number, body: string, agendaItemId = 't-1') =>
+    ({ type: 'body_draft', agendaItemId, body, seq }) as const;
+
+  it('shows the draft to a viewer and drops an older frame', () => {
+    const { http, session } = setup();
+    const agenda = TestBed.inject(MeetingAgendaService);
+    session.meeting.set(M({ status: 'live', canWrite: false, isProtokollant: false }));
+    agenda.agenda.set([{ id: 't-1', body: 'alt' }, { id: 't-2', body: 'B' }] as never);
+    session['onLive'](draft(5, 'neu'));
+    expect(agenda.agenda().map((a) => a.body)).toEqual(['neu', 'B']);
+    session['onLive'](draft(4, 'älter'));
+    expect(agenda.agenda()[0].body).toBe('neu');
+    session['onLive'](draft(5, 'gleich'));
+    session['onLive'](draft(7, 'neuer'));
+    expect(agenda.agenda()[0].body).toBe('neuer');
+    // The sequence counts per item.
+    session['onLive'](draft(1, 'B2', 't-2'));
+    expect(agenda.agenda()[1].body).toBe('B2');
+    // A meeting state reads the agenda again: the read wins, and a new sequence starts.
+    session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null });
+    http.expectOne('/api/meetings/m-1/agenda').flush([{ id: 't-1', body: 'gespeichert' }, { id: 't-2', body: 'B' }]);
+    expect(agenda.agenda()[0].body).toBe('gespeichert');
+    session['onLive'](draft(1, 'neue Sitzung'));
+    expect(agenda.agenda()[0].body).toBe('neue Sitzung');
+    http.match(() => true).forEach((r) => r.flush({ ...M({ status: 'live' }), createdAt: 'x' }));
+  });
+
+  it('never applies a draft on the client of the protokollant or in an editable editor', () => {
+    const { session } = setup();
+    const agenda = TestBed.inject(MeetingAgendaService);
+    agenda.agenda.set([{ id: 't-1', body: 'eigen' }] as never);
+    session.meeting.set(M({ status: 'live', isProtokollant: true }));
+    session['onLive'](draft(1, 'fremd'));
+    // A writer of a live meeting without a protokollant edits the text itself.
+    session.meeting.set(M({ status: 'live', protokollantId: null, canWrite: true, isProtokollant: false }));
+    session['onLive'](draft(2, 'fremd'));
+    expect(agenda.agenda()[0].body).toBe('eigen');
   });
 });

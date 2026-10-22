@@ -549,6 +549,12 @@ class AgendaAddBody(_CamelModel):
         return self
 
 
+# The longest Markdown text of one agenda item that a live draft frame carries
+# (`body_draft`). It is the cap of the protocol Markdown (`ProtocolPatch.markdown`),
+# because the item texts go into that protocol. The REST route sets no cap of its own.
+AGENDA_BODY_MAX = 512_000
+
+
 class AgendaBodyBody(_CamelModel):
     """``PATCH …/agenda/{itemId}`` — set the markdown body or the title of an item.
 
