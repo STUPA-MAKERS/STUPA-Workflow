@@ -92,6 +92,30 @@ async def test_scope_reader_of_applications_reads_every_standalone_vote(
     assert "eligible_group IN" not in sql
 
 
+async def test_scope_application_reader_does_not_read_gremium_polls(
+    scope: dict[str, Any],
+) -> None:
+    reader = Principal(sub="r", permissions={"application.read"})
+    sql = _sql(await listing.read_scope(fake_session(), reader))
+    # The standalone application votes, never a poll of a Gremium.
+    assert "vote.kind != %(kind_1)s" in sql
+
+
+async def test_scope_admin_reads_every_standalone_vote_and_poll(scope: dict[str, Any]) -> None:
+    sql = _sql(await listing.read_scope(fake_session(), Principal(sub="a", roles=["admin"])))
+    assert "vote.meeting_id IS NULL" in sql
+    assert "vote.kind" not in sql
+
+
+async def test_scope_application_reader_with_a_gremium_key_reads_its_polls(
+    scope: dict[str, Any],
+) -> None:
+    reader = Principal(sub="r", permissions={"application.read"}, groups={vote_group_key(GID)})
+    sql = _sql(await listing.read_scope(fake_session(), reader))
+    assert "vote.kind != %(kind_1)s" in sql
+    assert "eligible_group IN" in sql
+
+
 async def test_scope_all_meetings_for_view_all(scope: dict[str, Any]) -> None:
     scope["visible"] = None
     clause = await listing.read_scope(

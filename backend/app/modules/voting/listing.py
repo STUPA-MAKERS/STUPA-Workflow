@@ -25,7 +25,7 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, Text, and_, case, false, func, or_, select, true
 from sqlalchemy import cast as sql_cast
 
-from app.modules.admin.gremium_roles import gremium_ids_for
+from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.admin.models import Gremium
 from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
@@ -68,8 +68,13 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
             Vote.meeting_id.is_not(None),
             or_(Meeting.gremium_id.in_(visible), Vote.meeting_id.in_(delegated)),
         )
-    if principal.has("application.read") or principal.has("application.read_all"):
+    if admin_bypass(principal, "application.read"):
         return or_(meeting_ok, Vote.meeting_id.is_(None))
+    # A poll of a Gremium is no application vote: the global application rights do
+    # not reach it, only the Gremium clause below.
+    global_ok: ColumnElement[bool] = false()
+    if principal.has("application.read") or principal.has("application.read_all"):
+        global_ok = and_(Vote.meeting_id.is_(None), Vote.kind != "poll")
     # The eligible voter: `resolve_principal` writes `vote:<gremium>` for a gremium role
     # with `vote.cast`. The manager: `vote.manage` or `session.manage`, scope-capped.
     keys = {
@@ -84,7 +89,7 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
         if keys
         else false()
     )
-    return or_(meeting_ok, standalone_ok)
+    return or_(meeting_ok, global_ok, standalone_ok)
 
 
 def _search_clause(q: str | None) -> ColumnElement[bool]:

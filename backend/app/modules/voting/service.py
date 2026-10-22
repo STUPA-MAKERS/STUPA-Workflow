@@ -1318,6 +1318,10 @@ class VotingService:
         The admin role reaches this through `Principal.has`, not through a
         `principal.roles` read: `has` is where the OAuth scope cap applies.
 
+        A poll of a Gremium (``kind = poll``, no meeting) is not an application vote,
+        so the global application rights do not reach it: only an eligible voter, a
+        manager in its Gremium and the admin role (``admin_bypass``) read it.
+
         Raises:
             ForbiddenError: The principal cannot view this vote.
         """
@@ -1326,7 +1330,14 @@ class VotingService:
 
             await MeetingService(self.session).assert_can_read(vote.meeting_id, principal)
             return
-        if principal.has("application.read") or principal.has("application.read_all"):
+        if poll_mod.is_poll(vote):
+            # A poll of a Gremium is no application vote: the global application
+            # rights do not reach it. Only the admin role passes globally.
+            from app.modules.admin.gremium_roles import admin_bypass
+
+            if admin_bypass(principal, "application.read"):
+                return
+        elif principal.has("application.read") or principal.has("application.read_all"):
             return
         if self._may_cast(principal, vote.eligible_group):
             return
@@ -1504,12 +1515,32 @@ class VotingService:
             raise ForbiddenError("not allowed to manage this vote")
 
     async def can_manage(self, vote: Vote, principal: Principal) -> bool:
-        """Like ``can_manage_group`` but for an already-loaded vote."""
+        """Like ``can_manage_group`` but for an already-loaded vote.
+
+        A poll of a Gremium (no meeting) takes the right that creates it
+        (``PollService.can_create``: ``vote.manage`` or the admin role), so
+        ``session.manage`` alone cannot edit, open, close, cancel or delete a poll
+        that it cannot create.
+        """
+        if poll_mod.is_poll(vote) and vote.meeting_id is None:
+            gremium_id = await self._vote_gremium_id(
+                meeting_id=None, eligible_group=vote.eligible_group
+            )
+            if gremium_id is None:
+                from app.modules.admin.gremium_roles import admin_bypass
+
+                return admin_bypass(principal, "vote.manage")
+            return await poll_mod.PollService(self).can_create(gremium_id, principal)
         return await self.can_manage_group(vote.eligible_group, vote.meeting_id, principal)
 
     async def assert_can_manage(self, vote: Vote, principal: Principal) -> None:
-        """Like ``assert_can_manage_group`` but for an already-loaded vote."""
-        await self.assert_can_manage_group(vote.eligible_group, vote.meeting_id, principal)
+        """Like ``assert_can_manage_group`` but for an already-loaded vote (``can_manage``).
+
+        Raises:
+            ForbiddenError: The principal cannot manage this vote.
+        """
+        if not await self.can_manage(vote, principal):
+            raise ForbiddenError("not allowed to manage this vote")
 
     async def meeting_id_of(self, vote_id: UUID) -> UUID | None:
         """Return the meeting of the vote, or None for a vote without a meeting."""
