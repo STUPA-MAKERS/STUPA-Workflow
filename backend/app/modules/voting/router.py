@@ -3,7 +3,7 @@
 * ``POST /api/applications/{id}/votes`` - create a vote. Manage right in the gremium.
 * ``POST /api/votes/{id}/open``         - open a vote. Manage right, protokollant (meeting).
 * ``POST /api/votes/{id}/close``        - close -> result -> flow. As for the open.
-* ``POST /api/votes/{id}/cancel``       - cancel an open vote. Manage right.
+* ``POST /api/votes/{id}/cancel``       - cancel an open vote. Manage right (meeting: protokollant).
 * ``DELETE /api/votes/{id}``            - delete a draft vote. Manage right.
 * ``POST /api/votes/{id}/ballot``       - cast a vote. Roster of the vote, human only.
 * ``GET  /api/votes/{id}``              - vote state + tally (secret: only counts).
@@ -184,9 +184,10 @@ async def cancel_vote(
     The vote moves from ``open`` to ``cancelled``. It gets no result and fires no
     branch. The application stays in the ``vote`` state. This is the escape hatch when
     the vote does not reach the quorum, because ``close`` is then blocked.
-    Gremium-scoped manage right.
+    Gremium-scoped manage right. A meeting vote also needs the protokollant of the
+    meeting, as open and close do: the cancel ends the vote of the room.
     """
-    await service.assert_can_manage_vote(vote_id, principal)
+    await service.assert_can_run_vote(vote_id, principal)
     vote = await service.cancel(vote_id, now=datetime.now(UTC), actor=principal.sub)
     await publisher.vote_cancelled(vote)
     return vote

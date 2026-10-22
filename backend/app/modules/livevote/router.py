@@ -909,10 +909,24 @@ async def set_agenda_body(
     closed meeting whose protocol is still a draft (O22): the minute-taker can write
     the minutes before the start. A rename needs a planned or live meeting (O25). The
     service answers 409 otherwise.
+
+    In a live meeting with a protokollant only the protokollant writes the body (403
+    ``not_protokollant``). Two writers in one text overwrite each other, and a reader
+    with ``canWrite`` (the meeting lead) once saved the stale text of its own view.
     """
     meeting = await service.get(meeting_id, principal)
     if not meeting.can_write:
         raise ForbiddenError("not allowed to edit the agenda")
+    if (
+        payload.body is not None
+        and meeting.status == "live"
+        and meeting.protokollant_id is not None
+        and not meeting.is_protokollant
+    ):
+        raise ForbiddenError(
+            "only the protokollant writes the minutes of a live meeting",
+            code="not_protokollant",
+        )
     items = await agenda.set_body(
         meeting_id,
         item_id,
