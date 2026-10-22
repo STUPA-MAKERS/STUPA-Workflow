@@ -353,11 +353,16 @@ export class MeetingsComponent {
     this.session.setCurrentTop(id);
   }
 
-  /** Save the text of an item. Only a writer of the minutes saves (`canEditProtocol`). */
+  /**
+   * Save the text of an item and send it live to the viewers. Only a writer of the
+   * minutes saves (`canEditProtocol`).
+   */
   onTopBodyChange(itemId: Uuid, body: string): void {
     const m = this.meeting();
     if (!m || !this.canEditProtocol()) return;
     this.agendaSvc.onTopBodyChange(m.id, itemId, body);
+    // The viewers see the text before the autosave (protokollant of a live meeting only).
+    this.session.sendBodyDraft(itemId, body);
   }
 
   flushPendingBody(): void {

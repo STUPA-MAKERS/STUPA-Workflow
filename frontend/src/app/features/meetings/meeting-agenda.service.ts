@@ -221,6 +221,20 @@ export class MeetingAgendaService implements OnDestroy {
     }, AUTOSAVE_DELAY_MS);
   }
 
+  /**
+   * Show the live draft of the protokollant (`body_draft`) as the text of an item.
+   *
+   * Only the display changes; nothing is saved. A text that this tab typed and the server
+   * does not hold yet stays, because it is newer than any draft of another person. The
+   * next read of the agenda replaces the draft with the saved text.
+   */
+  applyDraft(itemId: Uuid, body: string): void {
+    if (this.localBody?.itemId === itemId || this.pendingBody?.itemId === itemId) return;
+    this.agenda.update((items) =>
+      items.map((a) => (a.id === itemId && a.body !== body ? { ...a, body } : a)),
+    );
+  }
+
   /** Run a pending autosave at once on a TOP switch so that no edit is lost. */
   flushPendingBody(meetingId: Uuid | null): void {
     if (this.bodyTimer === null || this.pendingBody === null) return;

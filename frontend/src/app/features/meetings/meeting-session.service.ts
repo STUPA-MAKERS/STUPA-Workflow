@@ -26,7 +26,7 @@ import type {
   Uuid,
 } from '@core/api/models';
 import { WsService, type MeetingChannel } from '@core/ws/ws.service';
-import type { ServerMessage } from '@core/ws/ws-messages';
+import type { BodyDraftMsg, ServerMessage } from '@core/ws/ws-messages';
 import { ToastService } from '@stupa-makers/ui-kit';
 import { MeetingAgendaService } from './meeting-agenda.service';
 import { MeetingGuestsService } from './meeting-guests.service';
@@ -37,6 +37,9 @@ import {
   liveOpenedVote,
 } from './meetings-display.util';
 import { problemCode, problemDetail } from '@core/api/problem';
+
+/** The shortest time between two live drafts of the protokollant. */
+const DRAFT_INTERVAL_MS = 300;
 
 /**
  * State and actions of the loaded meeting (detail route): meeting control,
@@ -101,6 +104,18 @@ export class MeetingSessionService implements OnDestroy {
   private channel: MeetingChannel | null = null;
   /** Counts the vote events of the live channel, so a slower read cannot undo one. */
   private voteEvents = 0;
+  /**
+   * The sequence number of the next live draft. It starts at the clock time of the
+   * editor session and rises per frame, so the drafts of a reloaded page stay above the
+   * drafts of the page before it.
+   */
+  private draftSeq = Date.now();
+  /** The time of the last sent draft, and the draft that waits for the throttle. */
+  private draftSentAt = 0;
+  private draftTimer: ReturnType<typeof setTimeout> | null = null;
+  private draftPending: { itemId: Uuid; body: string } | null = null;
+  /** The highest draft sequence number seen per agenda item (viewer side). */
+  private readonly draftSeen = new Map<Uuid, number>();
 
   // Permission flags, per meeting where loaded. The backend checks them per Gremium.
   /** The admin manages the meetings of every Gremium. Everybody else manages per
@@ -159,6 +174,7 @@ export class MeetingSessionService implements OnDestroy {
   );
 
   ngOnDestroy(): void {
+    this.clearDraft();
     this.channel?.close();
     if (this.renderPollTimer !== null) clearTimeout(this.renderPollTimer);
   }
@@ -658,8 +674,71 @@ export class MeetingSessionService implements OnDestroy {
     this.loadAttendance(meetingId);
   }
 
+  /**
+   * Send the text of the open item to the viewers while the protokollant types.
+   *
+   * Only the protokollant of a live meeting sends. At most one frame goes out per
+   * `DRAFT_INTERVAL_MS`: a change inside the interval waits, and the last text always
+   * goes out at the end of the interval. The autosave stays the only save; the server
+   * passes the draft on without a write.
+   */
+  sendBodyDraft(itemId: Uuid, body: string): void {
+    const m = this.meeting();
+    if (!m || m.status !== 'live' || !m.isProtokollant || !this.channel) return;
+    // A wait for another item goes out first, so the last text of each item goes out.
+    if (this.draftPending && this.draftPending.itemId !== itemId) this.flushDraft();
+    this.draftPending = { itemId, body };
+    if (this.draftTimer !== null) return;
+    const wait = this.draftSentAt + DRAFT_INTERVAL_MS - Date.now();
+    if (wait <= 0) {
+      this.flushDraft();
+      return;
+    }
+    this.draftTimer = setTimeout(() => this.flushDraft(), wait);
+  }
+
+  /** Send the waiting draft now. */
+  private flushDraft(): void {
+    if (this.draftTimer !== null) clearTimeout(this.draftTimer);
+    this.draftTimer = null;
+    const draft = this.draftPending;
+    this.draftPending = null;
+    if (!draft) return;
+    this.draftSentAt = Date.now();
+    this.channel?.send({
+      type: 'body_draft',
+      agendaItemId: draft.itemId,
+      body: draft.body,
+      seq: this.draftSeq++,
+    });
+  }
+
+  /** Drop the waiting draft, for example when the channel goes away. */
+  private clearDraft(): void {
+    if (this.draftTimer !== null) clearTimeout(this.draftTimer);
+    this.draftTimer = null;
+    this.draftPending = null;
+  }
+
+  /**
+   * Show a live draft of the protokollant (viewer side).
+   *
+   * The own client of the protokollant and an editable editor never take a draft. A
+   * frame with a lower sequence number than the last one of its item is old and goes
+   * away.
+   */
+  private applyBodyDraft(m: Meeting, msg: BodyDraftMsg): void {
+    if (m.isProtokollant || this.canEditProtocol()) return;
+    const last = this.draftSeen.get(msg.agendaItemId);
+    if (last !== undefined && msg.seq < last) return;
+    this.draftSeen.set(msg.agendaItemId, msg.seq);
+    this.agendaSvc.applyDraft(msg.agendaItemId, msg.body);
+  }
+
   private connectLive(meetingId: Uuid): void {
     this.viewers.set([]); // drop the state of the previous meeting
+    this.clearDraft();
+    this.draftSeen.clear();
     // Mock mode (FE dev and test harness) has no WS server. Skip the live channel.
     if (this.useMock) return;
     this.channel?.close();
@@ -683,7 +762,9 @@ export class MeetingSessionService implements OnDestroy {
           currentAgendaItemId,
         });
         // TOP bodies can change without a vote. Reload the agenda so live
-        // followers see the current protocol state.
+        // followers see the current protocol state. The read replaces the live
+        // drafts, and the next keeper (a handover) starts a new draft sequence.
+        this.draftSeen.clear();
         this.agendaSvc.load(m.id, currentAgendaItemId);
         // The room moved on: everybody but the protokollant follows the minutes. A
         // look at another item lasts until the next move.
@@ -781,6 +862,9 @@ export class MeetingSessionService implements OnDestroy {
         break;
       case 'viewers':
         this.viewers.set(msg.viewers);
+        break;
+      case 'body_draft':
+        this.applyBodyDraft(m, msg);
         break;
       default:
         break;

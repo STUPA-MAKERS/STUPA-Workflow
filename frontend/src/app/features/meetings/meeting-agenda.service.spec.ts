@@ -52,6 +52,27 @@ describe('MeetingAgendaService — text of the minute-taker', () => {
 
   const body = (): string | null | undefined => svc.agenda()[0]?.body;
 
+  it('shows a live draft, but never over a text that this tab has not saved yet', () => {
+    svc.applyDraft('t-1', 'Entwurf');
+    expect(body()).toBe('Entwurf');
+    const same = svc.agenda();
+    svc.applyDraft('t-1', 'Entwurf');
+    expect(svc.agenda()[0]).toBe(same[0]);
+    svc.applyDraft('t-9', 'anderes');
+    expect(svc.agenda()).toHaveLength(1);
+    // A text that waits for the autosave stays.
+    svc.onTopBodyChange('m-1', 't-1', 'Eigener Text');
+    svc.applyDraft('t-1', 'Entwurf 2');
+    expect(body()).toBe('Eigener Text');
+    // The save runs, but the server has not confirmed it: the text stays too.
+    jest.advanceTimersByTime(1000);
+    svc.applyDraft('t-1', 'Entwurf 3');
+    expect(body()).toBe('Eigener Text');
+    saves[0].next([item('Eigener Text')]);
+    svc.applyDraft('t-1', 'Entwurf 4');
+    expect(body()).toBe('Entwurf 4');
+  });
+
   it('keeps the newer local text when an older read of the agenda arrives', () => {
     svc.onTopBodyChange('m-1', 't-1', 'Erster Satz.');
     jest.advanceTimersByTime(1000);
