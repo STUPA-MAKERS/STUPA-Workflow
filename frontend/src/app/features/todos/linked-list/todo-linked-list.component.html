@@ -12,7 +12,7 @@
         <li class="tl__row" [class.tl__row--done]="card.isDone">
           <app-icon class="tl__icon" [name]="card.isDone ? 'circleok' : 'circle'" [size]="18" />
           <span class="tl__text">
-            <a class="tl__link" routerLink="/todos" [queryParams]="{ card: card.id }">{{ card.title }}</a>
+            <a class="tl__link" routerLink="/todos" [queryParams]="{ card: card.id }" [state]="{ cardReturn: true }">{{ card.title }}</a>
             <span class="tl__sub">{{ sub(card) }}</span>
           </span>
           @if (card.assignees.length) {
