@@ -171,6 +171,25 @@ async def test_draft_over_the_size_limit_gets_too_large() -> None:
 
 
 @pytest.mark.asyncio
+async def test_draft_size_counts_utf8_bytes_not_characters() -> None:
+    """A multi-byte text under the limit in characters but over it in bytes is refused."""
+    body = "€" * (AGENDA_BODY_MAX // 3 + 1)  # 3 bytes each
+    assert len(body) <= AGENDA_BODY_MAX
+    conn, session, broker = _conn()
+    await conn._handle_body_draft(_frame(body=body))
+    assert _sent(conn) == [{"type": "error", "code": "too_large"}]
+    assert session.statements == []
+    assert broker.published == []
+
+
+@pytest.mark.asyncio
+async def test_draft_of_multibyte_text_at_the_byte_limit_passes() -> None:
+    conn, _session, broker = _conn(1, 1)
+    await conn._handle_body_draft(_frame(body="ä" * (AGENDA_BODY_MAX // 2)))
+    assert len(broker.published) == 1
+
+
+@pytest.mark.asyncio
 async def test_draft_at_the_size_limit_passes() -> None:
     conn, _session, broker = _conn(1, 1)
     await conn._handle_body_draft(_frame(body="x" * AGENDA_BODY_MAX))

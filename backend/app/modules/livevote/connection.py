@@ -17,7 +17,7 @@ beamer gets `read_only`.
 Body draft: while the protokollant of a live meeting types the text of an agenda
 item, the client sends `body_draft` frames. The handler checks the sender against
 the current protokollant on every frame (so a handover takes effect at once), the
-agenda item against the meeting and the size against `AGENDA_BODY_MAX`. It then
+agenda item against the meeting and the UTF-8 size against `AGENDA_BODY_MAX`. It then
 publishes the frame on the meeting channel. It writes nothing to the database and
 no audit entry. More than `_DRAFT_MAX_PER_SECOND` drafts in one second are dropped
 without an answer, and the drafts do not take tokens of the general throttle, so
@@ -333,7 +333,9 @@ class LiveVoteConnection:
         except ValidationError:
             await self._send_error("invalid_message")
             return
-        if len(msg.body) > AGENDA_BODY_MAX:
+        # The cap counts UTF-8 bytes, not characters: a character can take up to 4
+        # bytes, and the frame travels as bytes to every viewer.
+        if len(msg.body.encode("utf-8", "surrogatepass")) > AGENDA_BODY_MAX:
             await self._send_error("too_large")
             return
         try:
