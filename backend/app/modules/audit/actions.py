@@ -142,6 +142,12 @@ class AuditAction(StrEnum):
     # F2: the platform drew the lot of an election tie. ``data`` carries the
     # candidate ids of the draw (``among``, ``seats``, ``drawn``), never a voter.
     VOTE_LOT_DRAWN = "vote_lot_drawn"
+    # Polls ("Umfrage"): a poll was created (a meeting poll or a poll of a Gremium),
+    # or its question, options or end changed before the first answer. ``data`` carries
+    # id references, the mode and the number of options. The open, the close and the
+    # cancel of a poll write VOTE_OPEN, VOTE_CLOSE and VOTE_CANCEL with ``kind: poll``.
+    POLL_CREATED = "poll_created"
+    POLL_UPDATED = "poll_updated"
     # Public meeting with a QR code (#17). The meeting lead is the actor. ``data``
     # carries id references and counts only, NEVER the name of a guest: the chain is
     # append-only, so a name in it could never be deleted. A guest ballot writes

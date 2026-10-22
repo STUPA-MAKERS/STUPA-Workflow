@@ -48,6 +48,15 @@
               filled
             />
           }
+          <app-filter-select
+            class="vl__chip"
+            [label]="'voting.list.filter.kind' | t"
+            [options]="kindOptions()"
+            [value]="kindFilter()"
+            (valueChange)="setKind($event)"
+            [text]="kindChipLabel()"
+            filled
+          />
           @if (activeFilterCount() > 0) {
             <app-button variant="text" size="sm" (click)="reset()">
               {{ 'voting.list.filter.reset' | t }}
@@ -157,6 +166,10 @@
           </p>
         }
       </div>
+
+      @if (canCreatePoll()) {
+        <app-fab [label]="'poll.new.fab' | t" [contained]="split()" (activate)="pollDialog.set(true)" />
+      }
     </section>
 
     <div detail class="vl__detail">
@@ -164,3 +177,13 @@
     </div>
   </app-list-detail>
 </div>
+
+<!-- The dialog exists only while it is open: it reads the Gremien when it starts. -->
+@if (pollDialog()) {
+  <app-new-poll-dialog
+    [open]="true"
+    [gremiumId]="gremiumId()"
+    (closed)="pollDialog.set(false)"
+    (created)="onPollCreated($event)"
+  />
+}

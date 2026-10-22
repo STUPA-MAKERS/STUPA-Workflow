@@ -104,6 +104,16 @@ _REASONS: dict[str, dict[str, str]] = {
         "en": "You are receiving this email because a to-do that you are responsible "
         "for is due tomorrow.",
     },
+    "poll_started": {
+        "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium abstimmen dürfen.",
+        "en": "You are receiving this email because you vote in this committee.",
+    },
+    "poll_reminder": {
+        "de": "Sie erhalten diese E-Mail, weil Sie in diesem Gremium abstimmen dürfen "
+        "und noch nicht geantwortet haben.",
+        "en": "You are receiving this email because you vote in this committee and "
+        "have not answered yet.",
+    },
     "mention": {
         "de": "Sie erhalten diese E-Mail, weil Sie erwähnt wurden.",
         "en": "You are receiving this email because you were mentioned.",

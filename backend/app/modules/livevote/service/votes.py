@@ -21,9 +21,10 @@ from app.modules.livevote.schemas import MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
 from app.modules.voting.election import election_config, election_fields, is_election, own_ballot
 from app.modules.voting.models import Ballot, Vote, VotedMarker
+from app.modules.voting.poll import is_poll, poll_config, poll_fields, result_of
 from app.modules.voting.schemas import MyBallot
 from app.modules.voting.service import open_tally_revealed
-from app.modules.voting.tally import ElectionOutcome, tally_election
+from app.modules.voting.tally import ElectionOutcome, PollOutcome, tally_election, tally_poll
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import ValidationProblem
 
@@ -56,6 +57,8 @@ class VoteReadOps(MeetingServiceBase):
         tallies = await self._vote_tallies(rows)
         # F2: an election counts ballots and candidates (`tally_election`).
         elections = await self._election_tallies([v for v in rows if is_election(v)])
+        # A poll only counts (`tally_poll`).
+        polls = await self._poll_tallies([v for v in rows if is_poll(v)])
         present_by_meeting = await self._present_by_meeting(meeting_ids)
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
         # #17: a vote with guests counts the guests who voted and left since then too.
@@ -97,6 +100,9 @@ class VoteReadOps(MeetingServiceBase):
             if ev is not None:
                 counts, leading, voted = ev.display_counts(), None, ev.ballots
                 reason = "quorum" if v.status == "closed" and not ev.quorum_met else None
+            pv = polls.get(v.id)
+            if pv is not None:
+                counts, leading, voted, reason = pv.display_counts(), None, pv.ballots, None
             members: int | None
             guests: int | None
             if v.status in ("closed", "cancelled"):
@@ -153,9 +159,30 @@ class VoteReadOps(MeetingServiceBase):
                     presentGuests=guests,
                     proposal=DecisionIn.from_stored(getattr(v, "proposal", None)),
                     **election_fields(v),
+                    **poll_fields(
+                        v,
+                        result_of(pv) if pv is not None and revealed else None,
+                    ),
                 )
             )
         return out
+
+    async def _poll_tallies(self, votes: Sequence[Vote]) -> dict[UUID, PollOutcome]:
+        """Tally the polls of the reload path, one query per ballot table."""
+        if not votes:
+            return {}
+        from app.modules.voting.models import SecretBallot
+
+        ids = [v.id for v in votes]
+        choices: dict[UUID, list[str | None]] = {}
+        for model in (Ballot, SecretBallot):
+            for vid, choice in (
+                await self.session.execute(
+                    select(model.vote_id, model.choice).where(model.vote_id.in_(ids))
+                )
+            ).all():
+                choices.setdefault(vid, []).append(choice)
+        return {v.id: tally_poll(choices.get(v.id, []), poll_config(v)) for v in votes}
 
     async def _election_tallies(
         self, votes: Sequence[Vote]

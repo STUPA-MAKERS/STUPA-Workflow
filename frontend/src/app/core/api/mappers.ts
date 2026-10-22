@@ -274,10 +274,13 @@ export function mapMeetingVote(wire: MeetingVoteOutWire): MeetingVote {
 }
 
 /**
- * The election fields of a vote (F2). A motion gets none, so a motion keeps its
- * former shape.
+ * The election fields of a vote (F2), or the poll fields of a poll. A motion gets
+ * none, so a motion keeps its former shape.
  */
 export function electionFields(wire: ElectionFields): ElectionFields {
+  if (wire.kind === 'poll') {
+    return { kind: 'poll', poll: wire.poll ?? null, pollResult: wire.pollResult ?? null };
+  }
   if (wire.kind !== 'election') return {};
   return {
     kind: 'election',

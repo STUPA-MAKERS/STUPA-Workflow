@@ -21,7 +21,7 @@ import { prefetchDetails } from '@core/cache/detail-prefetch';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
-import type { Meeting, Uuid, VoteListItem, VoteStatus } from '@core/api/models';
+import type { Meeting, Uuid, Vote, VoteKind, VoteListItem, VoteStatus } from '@core/api/models';
 import {
   ButtonComponent,
   EmptyStateComponent,
@@ -47,15 +47,22 @@ import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
 import { VotingPageService } from './voting-page.service';
 import { closedStatus } from '../election.util';
+import { pollStatus } from '../poll.util';
+import { NewPollDialogComponent } from '../new-poll-dialog/new-poll-dialog.component';
+import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { RowChevronComponent } from '@shared/ui/row-chevron/row-chevron.component';
-import { clock, dayMonthYear } from '@shared/date-format';
+import { clock, dayMonthYear, weekdayDate } from '@shared/date-format';
 import { formatMoment } from '@core/i18n/localized-date.pipe';
 import { groupByMonth } from '@shared/group-by-month';
 import { PullRefreshDirective } from '@shared/ui/pull-refresh/pull-refresh.directive';
 
 /** The status chip: the server default, the open votes, the ended votes, the drafts. */
 export type VoteStatusFilter = '' | 'open' | 'ended' | 'draft';
+
+/** The kind chip: every kind, the motions, the elections, the polls. */
+export type VoteKindFilter = '' | VoteKind;
+const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 
 const STATUS_QUERY: Record<Exclude<VoteStatusFilter, ''>, VoteStatus[]> = {
   open: ['open'],
@@ -130,6 +137,8 @@ export interface VoteGroup {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    FabComponent,
+    NewPollDialogComponent,
     PullRefreshDirective,
     RowChevronComponent,
     NoteComponent,
@@ -200,9 +209,31 @@ export class VotingComponent implements OnDestroy {
   });
   readonly statusFilter = signal<VoteStatusFilter>('');
   readonly gremiumId = signal('');
+  readonly kindFilter = signal<VoteKindFilter>('');
   readonly activeFilterCount = computed(
-    () => (this.q() ? 1 : 0) + (this.statusFilter() ? 1 : 0) + (this.gremiumId() ? 1 : 0),
+    () =>
+      (this.q() ? 1 : 0) +
+      (this.statusFilter() ? 1 : 0) +
+      (this.gremiumId() ? 1 : 0) +
+      (this.kindFilter() ? 1 : 0),
   );
+
+  /** "Neue Umfrage": the person holds `vote.manage` in at least one Gremium. */
+  readonly canCreatePoll = computed(() => this.auth.canInAnyGremium('vote.manage'));
+  /** The dialog "Neue Umfrage" is open. */
+  readonly pollDialog = signal(false);
+
+  /** "Art": Alle, Beschluss, Wahl, Umfrage. */
+  readonly kindOptions = computed<FilterSelectOption[]>(() => [
+    { value: '', label: this.i18n.translate('voting.list.filter.all') },
+    ...KINDS.map((k) => ({ value: k, label: this.i18n.translate(`meetings.vote.kind.${k}`) })),
+  ]);
+  readonly kindChipLabel = computed(() => {
+    const value = this.kindFilter();
+    if (!value) return this.i18n.translate('voting.list.filter.kind');
+    const kind = this.kindOptions().find((o) => o.value === value)?.label ?? value;
+    return this.i18n.translate('voting.list.filter.kindValue', { kind });
+  });
 
   /** A manager sees the drafts of the votes. */
   private readonly canManage = computed(
@@ -374,9 +405,20 @@ export class VotingComponent implements OnDestroy {
     this.navigate({ gremium: value || null });
   }
 
+  setKind(value: string): void {
+    this.navigate({ kind: value || null });
+  }
+
   reset(): void {
     this.search.sync('');
-    this.navigate({ q: null, status: null, gremium: null });
+    this.navigate({ q: null, status: null, gremium: null, kind: null });
+  }
+
+  /** The new poll exists: the list follows and the detail shows it. */
+  onPollCreated(vote: Vote): void {
+    this.pollDialog.set(false);
+    this.refresh();
+    this.openRow(vote.id);
   }
 
   private readFilters(pm: ParamMap): void {
@@ -388,6 +430,8 @@ export class VotingComponent implements OnDestroy {
     const known = status in STATUS_QUERY && (status !== 'draft' || this.canManage());
     this.statusFilter.set(known ? (status as VoteStatusFilter) : '');
     this.gremiumId.set(pm.get('gremium') ?? '');
+    const kind = pm.get('kind') ?? '';
+    this.kindFilter.set((KINDS as readonly string[]).includes(kind) ? (kind as VoteKind) : '');
   }
 
   private navigate(queryParams: Record<string, string | null>): void {
@@ -436,6 +480,7 @@ export class VotingComponent implements OnDestroy {
         status: status ? STATUS_QUERY[status] : undefined,
         gremiumId: this.gremiumId() || undefined,
         q: this.q() || undefined,
+        kind: this.kindFilter() || undefined,
         limit,
         offset,
       })
@@ -579,8 +624,12 @@ export class VotingComponent implements OnDestroy {
 
   private toRow(item: VoteListItem): VoteRow {
     const ended = item.status === 'closed' || item.status === 'cancelled';
+    const poll = item.kind === 'poll';
     const status =
-      item.status === 'closed' && item.result ? closedStatus(item.kind, item.result) : this.statusOf(item.status);
+      (poll ? pollStatus(item.status) : null) ??
+      (item.status === 'closed' && item.result
+        ? closedStatus(item.kind, item.result)
+        : this.statusOf(item.status));
     // The row names its meeting; a vote without one names no gremium either.
     let where: string | null = null;
     if (item.meetingTitle) {
@@ -592,10 +641,17 @@ export class VotingComponent implements OnDestroy {
               n: item.agendaPosition,
             });
     }
+    // A poll of a Gremium names its Gremium and, until it ends, its end: "STUPA · bis
+    // Fr, 30.10., 12:00".
+    if (poll && !item.meetingId && item.gremiumName) {
+      const until =
+        !ended && item.closesAt ? this.i18n.translate('voting.list.until', { time: this.endOf(item.closesAt) }) : null;
+      where = until ? `${item.gremiumName} · ${until}` : item.gremiumName;
+    }
     let ballot: VoteRow['ballot'] = null;
     if (item.myBallot.cast) ballot = 'cast';
     else if (item.status === 'open' && item.canCast) ballot = 'pending';
-    const [when, whenTitle] = this.whenOf(item);
+    const [when, whenTitle] = this.whenOf(item, poll && !item.meetingId);
     return {
       item,
       createdAt: (ended ? (item.closedAt ?? item.openedAt) : item.openedAt) ?? item.createdAt,
@@ -608,6 +664,11 @@ export class VotingComponent implements OnDestroy {
     };
   }
 
+  /** "Fr, 30.10., 12:00": the end of a poll of a Gremium. */
+  private endOf(at: string): string {
+    return weekdayDate(at, this.i18n.formatLocale(), { year: false, time: true });
+  }
+
   private statusOf(status: VoteStatus): StatusView {
     if (status === 'draft') return { kind: 'neutral', key: 'voting.list.status.draft' };
     return meetingVoteStatus(status);
@@ -618,11 +679,13 @@ export class VotingComponent implements OnDestroy {
    * <start>". Ended: the day it ended. Draft: the day it was made. A time of today shows
    * only the clock.
    */
-  private whenOf(item: VoteListItem): [string | null, string | null] {
+  private whenOf(item: VoteListItem, endInWhere = false): [string | null, string | null] {
     let key: TranslationKey | null = null;
     let at: string | null = null;
     if (item.status === 'open') {
-      if (item.closesAt) {
+      // A poll of a Gremium names its end in the line below the title: the time is
+      // its start.
+      if (item.closesAt && !endInWhere) {
         key = 'voting.list.until';
         at = item.closesAt;
       } else if (item.openedAt) {

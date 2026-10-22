@@ -63,10 +63,11 @@ from app.modules.livevote.vote_open import (
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.modules.todos.live import publish_pings, todo_broker
 from app.modules.todos.service import TodoService
+from app.modules.voting.poll import build_config as build_poll_config
 from app.modules.voting.schemas import VoteCreateInternal
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
-from app.shared.config_schemas import ElectionConfig, VoteConfig
+from app.shared.config_schemas import ElectionConfig, PollConfig, VoteConfig
 from app.shared.errors import (
     ConflictError,
     ForbiddenError,
@@ -630,6 +631,13 @@ async def open_meeting_vote(
             code="election_on_application_item",
             errors=[{"field": "kind", "msg": "an application agenda item"}],
         )
+    if payload.poll is not None and item.application_id is not None:
+        # A poll only counts: it never decides an application.
+        raise ValidationProblem(
+            "A poll belongs to a free-text agenda item.",
+            code="poll_on_application_item",
+            errors=[{"field": "kind", "msg": "an application agenda item"}],
+        )
     # F2: guests vote in an election only when the lead switches them on.
     guests_vote = (
         payload.guests_vote
@@ -659,10 +667,11 @@ async def open_meeting_vote(
         }
     )
     # Gremium quorum default: without an explicit percent, the vote inherits the
-    # percent quorum configured on the Gremium. A vote with guests has no quorum.
+    # percent quorum configured on the Gremium. A vote with guests and a poll have no
+    # quorum.
     quorum_percent = (
         None
-        if guests_vote
+        if guests_vote or payload.poll is not None
         else payload.quorum_percent
         if payload.quorum_percent is not None
         else await service.gremium_quorum_percent(meeting.gremium_id)
@@ -673,11 +682,15 @@ async def open_meeting_vote(
         await service.assert_candidates_exist(
             [c.principal_id for c in payload.candidates if c.principal_id is not None]
         )
-    config: VoteConfig | ElectionConfig = (
-        ElectionConfig.model_validate(config_data)
-        if election
-        else VoteConfig.model_validate(config_data)
-    )
+    config: VoteConfig | ElectionConfig | PollConfig
+    if payload.poll is not None:
+        config = build_poll_config(
+            payload.poll, secret=bool(payload.secret), guests_vote=guests_vote
+        )
+    elif election:
+        config = ElectionConfig.model_validate(config_data)
+    else:
+        config = VoteConfig.model_validate(config_data)
     eligible = await eligible_count(service, meeting, guests_vote=guests_vote)
     create = VoteCreateInternal(
         config=config,
@@ -692,6 +705,7 @@ async def open_meeting_vote(
         meeting_id=meeting_id,
         agenda_item_id=item.id,
         planned_ok=payload.draft,
+        actor=principal.sub,
     )
     if payload.draft:
         # The other managers of the meeting see the prepared question at once.

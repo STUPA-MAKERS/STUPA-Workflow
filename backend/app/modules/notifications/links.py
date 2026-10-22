@@ -1,7 +1,7 @@
 """Deep links from a mail to the element that it refers to.
 
 Every mail carries one absolute link to its element: the application, the task, the
-meeting, the protocol, the ticket, the to-do or the admin page. The service puts the
+meeting, the protocol, the ticket, the to-do, the poll or the admin page. The service puts the
 URL into the template context as ``link``. When the rendered text does not contain the
 URL, the service adds one labelled line to the text and one button to the HTML
 layout. A DB override that does not use ``{{ link }}`` therefore still gets the link.
@@ -31,7 +31,9 @@ from uuid import UUID
 from app.settings import Settings
 
 #: The element that a link opens. It selects the label of the line and the button.
-LinkTarget = Literal["application", "task", "meeting", "protocol", "privacy", "ticket", "todo"]
+LinkTarget = Literal[
+    "application", "task", "meeting", "protocol", "privacy", "ticket", "todo", "poll"
+]
 
 _LABELS: dict[str, dict[str, str]] = {
     "application": {"de": "Antrag öffnen", "en": "Open the application"},
@@ -41,6 +43,7 @@ _LABELS: dict[str, dict[str, str]] = {
     "privacy": {"de": "Löschanträge öffnen", "en": "Open the erasure requests"},
     "ticket": {"de": "Ticket öffnen", "en": "Open the ticket"},
     "todo": {"de": "To-Do öffnen", "en": "Open the to-do"},
+    "poll": {"de": "Umfrage öffnen", "en": "Open the poll"},
 }
 
 
@@ -128,3 +131,8 @@ def todo_link(settings: Settings, card_id: UUID | str) -> MailLink:
     card moves to another board.
     """
     return MailLink(f"{_base(settings)}/todos?card={card_id}", "todo")
+
+
+def vote_link(settings: Settings, vote_id: UUID | str) -> MailLink:
+    """Return the link to a poll on the page "Abstimmungen" (``/voting/{id}``)."""
+    return MailLink(f"{_base(settings)}/voting/{vote_id}", "poll")

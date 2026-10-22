@@ -23,6 +23,9 @@ idempotent steps:
 6. To-do reminders. `process_todo_due` (`worker/todos.py`) sends `todo_due` for the
    open cards due tomorrow. A failure of this step is logged and does not stop the
    cycle.
+7. Poll reminders. `process_poll_reminders` (`worker/polls.py`) sends `poll_reminder`
+   24 h before the end of a poll of a Gremium. A failure of this step is logged and
+   does not stop the cycle.
 
 An unconfirmed guest application (`email_confirmed_at IS NULL`) rests in the flow. The
 reminder, deadline-action and auto-transition scans skip it. The magic-link verify
@@ -69,6 +72,7 @@ from app.modules.voting.schemas import VoteClosed
 from app.modules.voting.service import VotingService
 from app.settings import Settings, load_settings
 from app.shared.errors import ConflictError, NotFoundError
+from worker.polls import process_poll_reminders
 from worker.todos import process_todo_due
 
 logger = logging.getLogger("app.deadlines")
@@ -152,10 +156,20 @@ async def process_deadlines(ctx: dict[str, Any]) -> str:
     advanced = await _process_auto_transitions(ctx)
     discarded = await _discard_unconfirmed(ctx, now, settings)
     todos = await _process_todo_due(ctx, now)
+    polls = await _process_poll_reminders(ctx, now)
     return (
         f"reminders={reminded} actions={fired} votes={closed} "
-        f"auto={advanced} discarded={discarded} todos={todos}"
+        f"auto={advanced} discarded={discarded} todos={todos} polls={polls}"
     )
+
+
+async def _process_poll_reminders(ctx: dict[str, Any], now: datetime) -> int:
+    """Run the poll reminder; a failure costs only this step."""
+    try:
+        return await process_poll_reminders(ctx, now)
+    except Exception:  # noqa: BLE001 - the other steps of the cycle must still count
+        logger.exception("poll reminders failed")
+        return 0
 
 
 async def _process_todo_due(ctx: dict[str, Any], now: datetime) -> int:

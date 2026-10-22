@@ -36,7 +36,7 @@
             [subtitle]="phoneSubtitle()"
             [subtitleLink]="phoneSubtitleLink()"
           >
-            @if (canDelete()) {
+            @if (hasMenu()) {
               <app-row-menu [sections]="menu()" (selected)="onMenu($event.id)" />
             }
           </app-vote-phone-header>
@@ -63,7 +63,7 @@
             (castFailed)="onCastFailed($event)"
             (changed)="onElectionChanged()"
           >
-            @if (!phone() && (beamerLink() || canDelete())) {
+            @if (!phone() && (beamerLink() || hasMenu())) {
               <span vpnActions class="vc__actions">
                 @if (beamerLink()) {
                   <app-button variant="tonal" size="sm" (click)="goBeamer()">
@@ -71,9 +71,9 @@
                     {{ 'voting.live.toBeamer' | t }}
                   </app-button>
                 }
-                @if (canDelete()) {
+                @if (hasMenu()) {
                   <!-- Only a draft with no ballots and no meeting can be deleted. An open
-                       vote is cancelled instead. -->
+                       vote is cancelled instead. A poll of a Gremium starts and ends here. -->
                   <app-row-menu
                     [label]="'voting.cast.menu' | t"
                     [sections]="menu()"

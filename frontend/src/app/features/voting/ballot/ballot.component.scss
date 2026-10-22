@@ -311,3 +311,32 @@
   width: 20px;
   height: 20px;
 }
+
+/* A date poll: the date, then Ja, Vielleicht and Nein in three equal buttons; a line
+   between the dates. */
+.ballot__dates {
+  display: flex;
+  flex-direction: column;
+}
+.ballot__date {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.ballot__date:first-child {
+  padding-top: 0;
+}
+.ballot__dateLabel {
+  font-weight: var(--fw-semibold);
+  overflow-wrap: anywhere;
+}
+.ballot__answers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+.ballot__answer {
+  min-width: 0;
+}

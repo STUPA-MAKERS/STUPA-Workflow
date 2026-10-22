@@ -9,7 +9,7 @@
  *    the editor reaches the output. Angular also sanitizes the `innerHTML`.
  */
 
-import type { MeetingVote } from '@core/api/models';
+import type { MeetingVote, PollConfig, PollOption } from '@core/api/models';
 import { escapeHtml, markdownToSafeHtml } from '@shared/markdown/markdown.util';
 
 export { escapeHtml };
@@ -71,6 +71,7 @@ function countOf(text: string, part: string): number {
  * own head line, as in the backend `build_election_snippet`.
  */
 export function voteSnippetQuestion(vote: MeetingVote): string {
+  if (vote.kind === 'poll') return vote.question?.trim() || 'Umfrage';
   if (vote.kind === 'election') {
     const head = vote.question?.trim() || 'Wahlgang';
     const round = vote.round ?? 1;
@@ -87,6 +88,7 @@ export function voteSnippetQuestion(vote: MeetingVote): string {
  */
 export function voteSnippet(vote: MeetingVote): string {
   if (vote.kind === 'election' && vote.election) return electionSnippet(vote);
+  if (vote.kind === 'poll' && vote.poll) return pollSnippet(vote, vote.poll);
   const lines = [voteSnippetHead(vote)];
   const counts = Object.entries(vote.counts ?? {});
   if (counts.length) {
@@ -135,6 +137,78 @@ export function electionSnippet(vote: MeetingVote): string {
     lines.push(`> Stichwahl (${round + 1}. Wahlgang) um ${result.runoff.seats} Posten: ${who}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * The protocol callout of a poll, the same text as the backend `build_poll_snippet`
+ * writes: the kind line ("Umfrage · Einzelwahl", "Terminumfrage") and, once closed, one
+ * line per option (highest first; a date poll "3 (+2)" = Ja and Vielleicht), the
+ * abstentions, the options with the most votes and the number of answers. A poll lists
+ * counts only, never a name.
+ */
+export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
+  const lines = [voteSnippetHead(vote), `> ${pollMeta(poll)}`];
+  const result = vote.pollResult;
+  if (!result) return lines.join('\n');
+  const date = poll.mode === 'date';
+  const labels = new Map(poll.options.map((o) => [o.id, pollSnippetLabel(o)]));
+  const known = result.order.filter((id) => labels.has(id));
+  const order = known.length ? known : [...labels.keys()];
+  const top = new Set(result.top);
+  for (const id of order) {
+    const count = result.counts[id] ?? 0;
+    const text = date ? `${count} (+${result.maybe?.[id] ?? 0})` : `${count}`;
+    lines.push(`> ${oneLine(labels.get(id) ?? id)}: ${text}`);
+  }
+  if (!date) lines.push(`> Enthaltungen: ${result.abstentions}`);
+  else lines.push('> Zahl = Ja, (+n) = Vielleicht');
+  const best = order.filter((id) => top.has(id)).map((id) => oneLine(labels.get(id) ?? id));
+  if (best.length) lines.push(`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`);
+  lines.push(`> ${result.ballots} Antworten · Meinungsbild, kein Beschluss`);
+  return lines.join('\n');
+}
+
+/** The kind line of a poll callout, as the backend `poll_meta` writes it. */
+function pollMeta(poll: PollConfig): string {
+  if (poll.mode === 'date') return 'Terminumfrage';
+  if (poll.mode === 'single') return 'Umfrage · Einzelwahl';
+  return poll.maxChoices != null
+    ? `Umfrage · Mehrfachwahl, höchstens ${poll.maxChoices}`
+    : 'Umfrage · Mehrfachwahl';
+}
+
+const SNIPPET_TZ = 'Europe/Berlin';
+const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** "Di, 3.11. · 18:00–20:00" in the time zone of the protocol, as the backend writes it. */
+function pollSnippetLabel(option: PollOption): string {
+  if (!option.start) return option.label ?? option.id;
+  const part = (iso: string): Record<string, string> =>
+    Object.fromEntries(
+      new Intl.DateTimeFormat('en-GB', {
+        timeZone: SNIPPET_TZ,
+        weekday: 'short',
+        day: 'numeric',
+        month: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+      })
+        .formatToParts(new Date(iso))
+        .map((p) => [p.type, p.value]),
+    );
+  const s = part(option.start);
+  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(s['weekday'] ?? '');
+  let text = `${WEEKDAYS[day] ?? ''}, ${Number(s['day'])}.${Number(s['month'])}. · ${s['hour']}:${s['minute']}`;
+  if (option.end) {
+    const e = part(option.end);
+    text += `–${e['hour']}:${e['minute']}`;
+  }
+  return text;
+}
+
+function oneLine(text: string): string {
+  return text.replace(/\r\n|\r|\n/g, ' ');
 }
 
 /**

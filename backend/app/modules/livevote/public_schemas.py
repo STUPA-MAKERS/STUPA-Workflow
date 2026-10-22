@@ -17,9 +17,15 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.livevote.schemas import GuestsMode, GuestStatus, MeetingStatus, clean_guest_name
-from app.modules.voting.schemas import ElectionResultOut, MyBallot, VoteKind, VoteResultValue
+from app.modules.voting.schemas import (
+    ElectionResultOut,
+    MyBallot,
+    PollResultOut,
+    VoteKind,
+    VoteResultValue,
+)
 from app.shared.altcha import AltchaSolutionStr
-from app.shared.config_schemas import ElectionConfig, Quorum
+from app.shared.config_schemas import DateAnswer, ElectionConfig, PollConfig, Quorum
 
 
 class _CamelModel(BaseModel):
@@ -47,15 +53,19 @@ class GuestBallotBody(_CamelModel):
     model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
     # A motion takes one option; an election with several candidates the list of the
-    # chosen candidate ids (F2, at most 50 ids).
+    # chosen candidate ids (F2, at most 50 ids); a poll the chosen option ids, or one
+    # answer per date (at most 20).
     choice: (
         Annotated[str, Field(max_length=100)]
         | Annotated[list[Annotated[str, Field(max_length=100)]], Field(max_length=50)]
+        | Annotated[dict[Annotated[str, Field(max_length=16)], DateAnswer], Field(max_length=20)]
     )
 
     @field_validator("choice")
     @classmethod
-    def _non_empty_option(cls, v: str | list[str]) -> str | list[str]:
+    def _non_empty_option(
+        cls, v: str | list[str] | dict[str, DateAnswer]
+    ) -> str | list[str] | dict[str, DateAnswer]:
         if isinstance(v, str) and not v:
             raise ValueError("choice must not be empty")
         return v
@@ -124,6 +134,9 @@ class GuestVote(_CamelModel):
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
+    # A poll with its mode and options, and its counts once closed or revealed.
+    poll: PollConfig | None = None
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
 class GuestView(_CamelModel):

@@ -448,6 +448,63 @@ def build_election_snippet(view: ElectionSnippet, *, public: bool = False) -> st
     return "\n".join(lines)
 
 
+@dataclass(frozen=True, slots=True)
+class PollLine:
+    """One option of a poll snippet: its label, its votes and the top mark.
+
+    A date poll counts the Ja answers in ``count`` and the Vielleicht answers in
+    ``maybe``.
+    """
+
+    label: str
+    count: int
+    maybe: int | None = None
+    top: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class PollSnippet:
+    """The protocol view of one poll, built from its config and its stored result."""
+
+    question: str
+    # "Umfrage · Einzelwahl", "Umfrage · Mehrfachwahl, höchstens 2", "Terminumfrage".
+    meta: str
+    lines: list[PollLine] = field(default_factory=list)
+    # None for a date poll: it has no abstention.
+    abstentions: int | None = 0
+    ballots: int = 0
+    date: bool = False
+    closed: bool = True
+
+
+def build_poll_snippet(view: PollSnippet) -> str:
+    """Render a poll as a protocol callout (`> [!abstimmung]`).
+
+    The snippet holds the question, the kind of the poll and, once closed, one line
+    per option with its votes (highest first; a date poll as „3 (+2)“ = Ja and
+    Vielleicht), the abstentions, the options with the most votes and the number of
+    answers. Each option has its own line, so a label such as „Ja“ never forms the
+    Ja/Nein/Enthaltung line that the renderer turns into a tally box. A poll lists
+    counts only, never a name, in both variants.
+    """
+    lines = [f"> [!abstimmung] **{_md_escape(view.question)}**", f"> {view.meta}"]
+    if not view.closed:
+        return "\n".join(lines)
+    for line in view.lines:
+        count = f"{line.count} (+{line.maybe})" if line.maybe is not None else str(line.count)
+        lines.append(f"> {_md_escape(line.label)}: {count}")
+    if view.abstentions is not None:
+        lines.append(f"> Enthaltungen: {view.abstentions}")
+    if view.date:
+        lines.append("> Zahl = Ja, (+n) = Vielleicht")
+    top = [_md_escape(line.label) for line in view.lines if line.top]
+    if top:
+        lead = "Bester Termin" if view.date else "Meiste Stimmen"
+        lines.append(f"> {lead}: {', '.join(top)}")
+    lines.append(f"> {view.ballots} Antworten · Meinungsbild, kein Beschluss")
+    return "\n".join(lines)
+
+
 def replace_vote_blocks(body: str, pairs: list[tuple[str, str]]) -> str:
     """Replace the callout of each vote in `body` with its other form.
 
