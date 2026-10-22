@@ -70,11 +70,10 @@
     </div>
   }
 
-  @if (v.status === 'open' && canManage()) {
+  <!-- Close and cancel follow the minutes: only the protokollant ends a vote. -->
+  @if (v.status === 'open' && canManage() && canRun()) {
     <div class="vc__actions">
-      @if (canRun()) {
-        <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
-      }
+      <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
       <app-button variant="text" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
     </div>
   }

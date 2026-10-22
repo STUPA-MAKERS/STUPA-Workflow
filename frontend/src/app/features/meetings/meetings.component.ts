@@ -353,9 +353,10 @@ export class MeetingsComponent {
     this.session.setCurrentTop(id);
   }
 
+  /** Save the text of an item. Only a writer of the minutes saves (`canEditProtocol`). */
   onTopBodyChange(itemId: Uuid, body: string): void {
     const m = this.meeting();
-    if (!m) return;
+    if (!m || !this.canEditProtocol()) return;
     this.agendaSvc.onTopBodyChange(m.id, itemId, body);
   }
 

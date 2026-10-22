@@ -164,6 +164,12 @@ describe('TopSheetComponent', () => {
     expect(view.bodyChange).toHaveBeenCalledWith({ itemId: 't-1', body: 'Neu.' });
   });
 
+  it('passes no change of a reader on, also when the editor emits one', async () => {
+    const view = await setup({ editable: false });
+    editorOf(view).valueChange.emit('Alter Text');
+    expect(view.bodyChange).not.toHaveBeenCalled();
+  });
+
   describe('view of the text', () => {
     it('switches to the Markdown source and back', async () => {
       const view = await setup({ top: { ...AGENDA[0], body: '**Hallo**' } });

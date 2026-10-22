@@ -243,6 +243,20 @@ describe('MeetingFollowViewComponent', () => {
       expect(within(dock).queryByRole('button', { name: 'Zurück zu Jetzt' })).toBeNull();
     });
 
+    it('follows the room again when the room moves on', async () => {
+      const view = await setup();
+      view.context();
+      await userEvent.click(screen.getByRole('button', { name: /Antrag Kulturfestival/ }));
+      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      // A new state with the same item keeps the look at another item.
+      view.fixture.componentRef.setInput('meeting', member());
+      view.fixture.detectChanges();
+      expect(screen.getByRole('heading', { level: 1, name: 'Antrag Kulturfestival' })).toBeInTheDocument();
+      view.fixture.componentRef.setInput('meeting', member({ currentAgendaItemId: 't-1' }));
+      view.fixture.detectChanges();
+      expect(screen.getByRole('heading', { level: 1, name: 'Begrüßung' })).toBeInTheDocument();
+    });
+
     it('shows the open vote with the two-step ballot of the own row and the represented row', async () => {
       const open = vote({ id: 'v-1', agendaItemId: 't-2', voted: 14, present: 19 });
       const { context, voteReads, http } = await setup({ meeting: member({ votes: [open] }) });

@@ -1,3 +1,4 @@
+import { Location } from '@angular/common';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
@@ -37,6 +38,8 @@ class QuietCache extends TodoCacheService {
 }
 
 interface Opts {
+  /** The navigation state of the entry, as a link of another page sets it. */
+  state?: Record<string, unknown>;
   boards?: TodoBoardSummary[];
   boardsFail?: boolean;
   board?: TodoBoard;
@@ -111,7 +114,14 @@ async function start(url: string, opts: Opts = {}) {
     gremien: (opts.gremien ?? ['g-1', 'g-2']).map((id) => ({ id, name: id, slug: id })),
   });
   const harness = await RouterTestingHarness.create();
-  const cmp = await harness.navigateByUrl(url, TodosComponent);
+  let cmp: TodosComponent;
+  if (opts.state) {
+    await TestBed.inject(Router).navigateByUrl(url, { state: opts.state });
+    harness.detectChanges();
+    cmp = harness.routeDebugElement!.componentInstance as TodosComponent;
+  } else {
+    cmp = await harness.navigateByUrl(url, TodosComponent);
+  }
   harness.detectChanges();
   const router = TestBed.inject(Router);
   const settle = async () => {
@@ -889,6 +899,21 @@ describe('TodosComponent', () => {
     drawer.focus();
     fireEvent.keyDown(drawer, { key: 'Tab' });
     expect(document.activeElement).toBe(focusable[0]);
+  });
+
+  it('closes a card that a link of another page opened back to that page', async () => {
+    const { cmp, router, settle } = await start('/todos/b-1?card=k-1', { state: { cardReturn: true } });
+    const back = jest.spyOn(TestBed.inject(Location), 'back').mockImplementation(() => undefined);
+    cmp.closeCard();
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(router.url).toBe('/todos/b-1?card=k-1');
+    // Any other card closes to the board.
+    cmp.openCard('k-2');
+    await settle();
+    cmp.closeCard();
+    await settle();
+    expect(back).toHaveBeenCalledTimes(1);
+    expect(router.url).toBe('/todos/b-1');
   });
 
   it('keeps the focus in a drawer without focusable items and closes via the scrim', async () => {
