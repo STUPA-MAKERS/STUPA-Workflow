@@ -197,7 +197,7 @@
             [disabled]="!editable()"
             [imageUpload]="editable() ? imageUpload : null"
             [placeholder]="'meetings.protocol.placeholder' | t"
-            (valueChange)="bodyChange.emit({ itemId: t.id, body: $event })"
+            (valueChange)="onEditorChange(t, $event)"
           />
         } @placeholder {
           <div class="ts__editor ts__editor--wait" aria-hidden="true">

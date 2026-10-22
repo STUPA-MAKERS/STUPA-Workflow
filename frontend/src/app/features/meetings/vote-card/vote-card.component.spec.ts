@@ -122,10 +122,11 @@ describe('VoteCardComponent', () => {
       expect(container.querySelectorAll('.vc__actions app-button')).toHaveLength(2);
     });
 
-    it('lets a lead who does not keep the minutes cancel, but not close', async () => {
-      await setup({ canRun: false });
+    it('lets a lead who does not keep the minutes neither close nor cancel', async () => {
+      const { container } = await setup({ canRun: false });
       expect(screen.queryByRole('button', { name: 'Abstimmung schließen' })).toBeNull();
-      expect(screen.getByRole('button', { name: 'Abstimmung abbrechen' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Abstimmung abbrechen' })).toBeNull();
+      expect(container.querySelector('.vc__actions')).toBeNull();
     });
 
     it('offers no vote control without the vote right', async () => {

@@ -263,4 +263,60 @@ describe('MeetingSessionService', () => {
     session['onLive']({ type: 'vote_lot_drawn', voteId: 'v-2', result: 'elected', electionResult: drawn });
     expect(vote('v-2')).toEqual(expect.objectContaining({ result: 'elected', electionResult: drawn }));
   });
+  it('moves a viewer to the item of the room, but not the protokollant', () => {
+    const { http, session } = setup();
+    const agenda = TestBed.inject(MeetingAgendaService);
+    const rows = [{ id: 't-1' }, { id: 't-2' }, { id: 't-3' }] as never;
+    const flushReads = () =>
+      http.match(() => true).forEach((r) => r.flush(r.request.url.endsWith('/agenda') ? rows : { ...M({ status: 'live' }), createdAt: 'x' }));
+    session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-1', isProtokollant: false }));
+    agenda.agenda.set(rows);
+    agenda.selectedTopId.set('t-3'); // the viewer looks at another item
+    session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-2' });
+    expect(agenda.selectedTopId()).toBe('t-2');
+    flushReads();
+    // Without a move the look at another item stays.
+    session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-2', isProtokollant: false }));
+    agenda.selectedTopId.set('t-3');
+    session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-2' });
+    expect(agenda.selectedTopId()).toBe('t-3');
+    flushReads();
+    // The protokollant moved the room: the own selection stays.
+    session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-2', isProtokollant: true }));
+    agenda.selectedTopId.set('t-1');
+    session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-3' });
+    expect(agenda.selectedTopId()).toBe('t-1');
+    flushReads();
+  });
+
+  it('does not let a read that predates a vote event undo it', () => {
+    const { http, session } = setup();
+    const open = { id: 'v-1', status: 'open', agendaItemId: 't-1' } as Meeting['votes'][number];
+    session.meeting.set(M({ status: 'live', currentAgendaItemId: 't-1' }));
+    session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null, currentAgendaItemId: 't-1' });
+    // The vote opens while the read of the meeting runs.
+    session['onLive']({ type: 'vote_opened', voteId: 'v-1', applicationId: null, agendaItemId: 't-1', options: [], closesAt: null });
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', votes: [] }), createdAt: 'x' });
+    expect(session.meeting()?.votes.map((v) => v.id)).toEqual(['v-1']);
+    // The second read is after the event and is taken.
+    http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', title: 'Neu', votes: [open] }), createdAt: 'x' });
+    expect(session.meeting()?.title).toBe('Neu');
+    expect(session.meeting()?.votes).toEqual([expect.objectContaining(open)]);
+    http.verify();
+  });
+
+  it('keeps the votes of the events when every read is older', () => {
+    const { http, session } = setup();
+    session.meeting.set(M({ status: 'live', votes: [{ id: 'v-1', status: 'open' } as Meeting['votes'][number]] }));
+    session['onLive']({ type: 'meeting_state', status: 'live', activeApplicationId: null });
+    http.expectOne('/api/meetings/m-1/agenda').flush([]);
+    for (let i = 0; i < 3; i++) {
+      session['onLive']({ type: 'vote_tally', voteId: 'v-1', counts: { yes: i + 1 }, eligible: 5, quorumMet: true, leading: 'yes', cast: i + 1 });
+      http.expectOne('/api/meetings/m-1').flush({ ...M({ status: 'live', title: `Lesung ${i}`, votes: [] }), createdAt: 'x' });
+    }
+    expect(session.meeting()?.title).toBe('Lesung 2');
+    expect(session.meeting()?.votes[0]).toEqual(expect.objectContaining({ id: 'v-1', voted: 3 }));
+    http.verify();
+  });
 });

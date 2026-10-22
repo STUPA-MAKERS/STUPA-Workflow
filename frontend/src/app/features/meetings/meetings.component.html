@@ -130,8 +130,8 @@
                 } @else {
                   @if (m.isProtokollant) {
                     <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
+                    <app-button variant="text" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                   }
-                  <app-button variant="text" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                 }
               </div>
             }

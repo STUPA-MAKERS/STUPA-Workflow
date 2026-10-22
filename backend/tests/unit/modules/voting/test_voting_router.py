@@ -274,6 +274,18 @@ def test_cancel_ok_broadcasts(
     assert fake_service.cancel_actor == "p"
 
 
+def test_cancel_meeting_vote_needs_protokollant_403(
+    app: FastAPI, client: TestClient, fake_service: _FakeService
+) -> None:
+    # The cancel of a meeting vote follows the minutes, as open and close do: a manager
+    # who does not keep the protocol gets 403 and the vote stays open.
+    fake_service.meeting_id = uuid4()
+    fake_service.not_keeper = True
+    _as_manager(app)
+    assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
+    assert not hasattr(fake_service, "cancel_actor")
+
+
 # ballot: the gremium `vote.cast`. The service checks the group.
 def test_ballot_requires_auth_401(client: TestClient) -> None:
     r = client.post(f"/api/votes/{uuid4()}/ballot", json={"choice": "yes"})
