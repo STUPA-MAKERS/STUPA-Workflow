@@ -279,8 +279,8 @@ def test_cancel_meeting_vote_needs_protokollant_403(
 ) -> None:
     # The cancel of a meeting vote follows the minutes, as open and close do: a manager
     # who does not keep the protocol gets 403 and the vote stays open.
-    fake_service.meeting_id = uuid4()
-    fake_service.not_keeper = True
+    fake_service.meeting_id = uuid4()  # type: ignore[attr-defined]
+    fake_service.not_keeper = True  # type: ignore[attr-defined]
     _as_manager(app)
     assert client.post(f"/api/votes/{uuid4()}/cancel").status_code == 403
     assert not hasattr(fake_service, "cancel_actor")
