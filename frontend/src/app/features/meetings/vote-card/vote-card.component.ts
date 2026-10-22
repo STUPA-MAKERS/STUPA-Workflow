@@ -22,6 +22,8 @@ import {
 import { ElectionResultComponent } from '../../voting/election-result/election-result.component';
 import { electionCaption, electionOf, electionStatus } from '../../voting/election.util';
 import { VoteProgressComponent } from '../../voting/vote-progress/vote-progress.component';
+import { PollResultComponent } from '../../voting/poll-result/poll-result.component';
+import { pollCaption, pollOf, pollStatus } from '../../voting/poll.util';
 import {
   countEntries,
   guestComposition,
@@ -48,6 +50,9 @@ import { problemDetail } from '@core/api/problem';
  *
  * A personnel election (F2) shows the election ballot (candidates, abstention) and,
  * once closed, the bars per candidate with the runoff and lot actions of the manager.
+ *
+ * A poll ("Umfrage") shows the poll ballot and, once revealed or closed, the counts per
+ * option. It has no result: it is an opinion, not a decision.
  */
 @Component({
   selector: 'app-vote-card',
@@ -59,6 +64,7 @@ import { problemDetail } from '@core/api/problem';
     ButtonComponent,
     ElectionResultComponent,
     IconComponent,
+    PollResultComponent,
     VoteProgressComponent,
     StatusTextComponent,
   ],
@@ -107,8 +113,15 @@ export class VoteCardComponent {
 
   /** The personnel election of the vote (F2), or `null` for a motion. */
   protected readonly election = computed(() => electionOf(this.vote()));
-  /** "Wahl · 2 Posten" or "Stichwahl (2. Wahlgang) · 1 Posten". */
+  /** The poll of the vote, or `null`. */
+  protected readonly poll = computed(() => pollOf(this.vote()));
+  /**
+   * "Wahl · 2 Posten" or "Stichwahl (2. Wahlgang) · 1 Posten"; a poll: "Umfrage ·
+   * Einzelwahl" and so on.
+   */
   protected readonly electionCap = computed(() => {
+    const poll = this.poll();
+    if (poll) return pollCaption(poll, (k, p) => this.i18n.translate(k, p));
     const el = this.election();
     return el ? electionCaption(el, this.vote().round, (k, p) => this.i18n.translate(k, p)) : null;
   });
@@ -125,15 +138,20 @@ export class VoteCardComponent {
     this.toast.error(detail ? `${base}: ${detail}` : base);
   }
 
-  protected readonly status = computed<StatusView>(() => meetingVoteStatus(this.vote().status));
-  /** The caption of the card: "Abstimmung offen", "… geschlossen" and so on. */
-  protected readonly capKey = computed(
-    () => `meetings.vote.card.${this.vote().status}` as TranslationKey,
-  );
+  protected readonly status = computed<StatusView>(() => {
+    const status = this.vote().status;
+    return (this.poll() ? pollStatus(status) : null) ?? meetingVoteStatus(status);
+  });
+  /** The caption of the card: "Abstimmung offen", "… geschlossen", "Umfrage offen" and so on. */
+  protected readonly capKey = computed(() => {
+    const status = this.vote().status;
+    if (this.poll() && (status === 'open' || status === 'closed')) return this.status().key;
+    return `meetings.vote.card.${status}` as TranslationKey;
+  });
   /** The result of a closed vote. A tie is a rejection (O18). */
   protected readonly result = computed<StatusView | null>(() => {
     const v = this.vote();
-    if (v.status !== 'closed') return null;
+    if (v.status !== 'closed' || this.poll()) return null;
     if (this.election()) return electionStatus(v.result);
     return voteResultStatus(v.result === 'passed' ? 'passed' : 'rejected');
   });
@@ -151,7 +169,7 @@ export class VoteCardComponent {
   /** The closed result of a vote with guests: present, cast, majority of the cast votes. */
   protected readonly guestResult = computed(() => {
     const v = this.vote();
-    if (!v.guestsVote || v.status !== 'closed') return null;
+    if (!v.guestsVote || v.status !== 'closed' || this.poll()) return null;
     const cast = Object.values(v.counts ?? {}).reduce((a, b) => a + b, 0);
     const members = v.presentMembers ?? null;
     const guests = v.presentGuests ?? null;

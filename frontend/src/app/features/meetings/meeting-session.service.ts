@@ -723,6 +723,7 @@ export class MeetingSessionService implements OnDestroy {
             ...(msg.kind === 'election'
               ? { kind: msg.kind, election: msg.election ?? known.election, round: msg.round ?? 1 }
               : {}),
+            ...(msg.kind === 'poll' ? { kind: msg.kind, poll: msg.poll ?? known.poll } : {}),
           });
         } else {
           // A vote opened live that did not exist at load time (follower).
@@ -766,6 +767,7 @@ export class MeetingSessionService implements OnDestroy {
           failedReason: msg.failedReason ?? null,
           closedAt: closedAtOf(m, msg.voteId),
           ...(msg.electionResult ? { electionResult: msg.electionResult } : {}),
+          ...(msg.pollResult ? { pollResult: msg.pollResult } : {}),
         });
         break;
       case 'vote_lot_drawn':

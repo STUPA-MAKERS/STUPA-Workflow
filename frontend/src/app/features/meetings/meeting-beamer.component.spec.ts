@@ -35,6 +35,40 @@ async function setup(inputs: {
 }
 
 describe('MeetingBeamerComponent', () => {
+  describe('a poll', () => {
+    const poll = {
+      mode: 'single' as const,
+      options: [
+        { id: 'o1', label: 'Ulm' },
+        { id: 'o2', label: 'Tübingen' },
+      ],
+      secret: false,
+    };
+
+    it('names the kind of the poll while it runs, without a quorum', async () => {
+      await setup({ vote: vote({ poll, question: 'Wohin?' }) });
+      expect(screen.getByText('Umfrage · Einzelwahl · offene Abstimmung')).toBeInTheDocument();
+      expect(screen.queryByText(/Quorum/)).toBeNull();
+    });
+
+    it('shows the counts after the close and no decision', async () => {
+      await setup({
+        vote: vote({
+          poll,
+          status: 'closed',
+          counts: { o1: 3, o2: 1, abstain: 0 },
+          voted: 4,
+          pollResult: { counts: { o1: 3, o2: 1 }, abstentions: 0, ballots: 4, order: ['o1', 'o2'], top: ['o1'] },
+        }),
+      });
+      expect(screen.getAllByText('Umfrage beendet').length).toBeGreaterThan(0);
+      expect(screen.getByText('Meiste Stimmen: Ulm')).toBeInTheDocument();
+      expect(screen.getByText('4 von 19 haben geantwortet · Meinungsbild, kein Beschluss')).toBeInTheDocument();
+      expect(screen.queryByText('Angenommen')).toBeNull();
+      expect(screen.queryByText('Abgelehnt')).toBeNull();
+    });
+  });
+
   it('shows the item of the room and no vote while idle', async () => {
     await setup({ vote: null });
     expect(screen.getByText('Jetzt')).toBeInTheDocument();

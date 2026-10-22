@@ -30,7 +30,15 @@
     <app-vote-progress size="fat" [voted]="v.voted" [total]="v.present" [secret]="!!v.secret" [hidden]="!showCounts()" />
   }
 
-  @if (showCounts() && election(); as el) {
+  @if (showCounts() && poll(); as p) {
+    <app-poll-result
+      [poll]="p"
+      [result]="v.pollResult ?? null"
+      [counts]="v.counts ?? {}"
+      [answered]="v.pollResult?.ballots ?? v.voted"
+      [total]="v.present"
+    />
+  } @else if (showCounts() && election(); as el) {
     <app-election-result
       [election]="el"
       [result]="v.status === 'closed' ? v.result : null"
@@ -51,7 +59,18 @@
     </dl>
   }
 
-  @if (v.status === 'open' && canVote() && election(); as el) {
+  @if (v.status === 'open' && canVote() && poll(); as p) {
+    <app-ballot
+      [voteId]="v.id"
+      [options]="options()"
+      [secret]="!!v.secret"
+      [own]="v.myBallot ?? notCast"
+      [caster]="caster"
+      [compact]="true"
+      [poll]="p"
+      (castFailed)="onBallotFailed($event)"
+    />
+  } @else if (v.status === 'open' && canVote() && election(); as el) {
     <app-ballot
       [voteId]="v.id"
       [options]="options()"
