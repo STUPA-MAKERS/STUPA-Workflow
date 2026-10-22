@@ -1,0 +1,23 @@
+@use '../../../shared/ui/dialog-form' as df;
+
+@include df.host;
+
+.npd {
+  @include df.form;
+}
+.npd__switchLabel {
+  @include df.switch-label;
+}
+/* "Endet am" and "Uhrzeit" side by side. */
+.npd__end {
+  display: flex;
+  gap: var(--space-2);
+}
+.npd__date {
+  flex: 3 1 0;
+  min-width: 0;
+}
+.npd__time {
+  flex: 2 1 0;
+  min-width: 0;
+}

@@ -240,6 +240,96 @@ describe('VotingComponent', () => {
     });
   });
 
+  describe('polls', () => {
+    it('reads "Umfrage offen" and "Umfrage beendet"; a Gremium poll names its Gremium and its end', async () => {
+      await start('/voting', {
+        pages: [
+          page([
+            item('p1', {
+              kind: 'poll',
+              applicationId: null,
+              gremiumName: 'STUPA',
+              closesAt: '2026-10-30T11:00:00Z',
+              openedAt: today(9, 5),
+            }),
+            item('p2', {
+              kind: 'poll',
+              status: 'closed',
+              result: null,
+              meetingId: 'm1',
+              meetingTitle: '34. Sitzung',
+              agendaPosition: 2,
+              closedAt: '2026-09-12T16:00:00Z',
+            }),
+          ]),
+        ],
+      });
+      expect(screen.getByText('Umfrage offen')).toBeInTheDocument();
+      expect(screen.getByText('Umfrage beendet')).toBeInTheDocument();
+      // The poll is no decision: no "Abgelehnt" for its empty result.
+      expect(screen.queryByText('Abgelehnt')).not.toBeInTheDocument();
+      expect(screen.getByText(/^STUPA · bis Fr, 30\.10\., \d\d:00$/)).toBeInTheDocument();
+      // The end is in the line below the title, so the time is the start.
+      expect(screen.getByText('seit 09:05')).toBeInTheDocument();
+      expect(screen.getByText('TOP 2 · 34. Sitzung')).toBeInTheDocument();
+      expect(screen.getByText('Stimme offen')).toBeInTheDocument();
+    });
+
+    it('an ended Gremium poll names only its Gremium', async () => {
+      await start('/voting', {
+        pages: [
+          page([
+            item('p1', {
+              kind: 'poll',
+              status: 'closed',
+              gremiumName: 'STUPA',
+              closesAt: '2026-09-30T11:00:00Z',
+              closedAt: '2026-09-30T11:00:00Z',
+            }),
+          ]),
+        ],
+      });
+      expect(screen.getByText('STUPA')).toBeInTheDocument();
+    });
+
+    it('filters by kind through the URL ("Art")', async () => {
+      const { cmp, listVotes, router } = await start('/voting?kind=poll');
+      expect(cmp.kindFilter()).toBe('poll');
+      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ kind: 'poll' }));
+      expect(cmp.activeFilterCount()).toBe(1);
+      expect(cmp.kindChipLabel()).toBe('Art: Umfrage');
+      expect(cmp.kindOptions().map((o) => o.label)).toEqual(['Alle', 'Beschluss', 'Wahl', 'Umfrage']);
+      const navigate = jest.spyOn(router, 'navigate');
+      cmp.setKind('election');
+      expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { kind: 'election' } }));
+      cmp.setKind('');
+      expect(navigate).toHaveBeenLastCalledWith([], expect.objectContaining({ queryParams: { kind: null } }));
+    });
+
+    it('ignores an unknown kind and labels the empty chip "Art"', async () => {
+      const { cmp, listVotes } = await start('/voting?kind=lottery');
+      expect(cmp.kindFilter()).toBe('');
+      expect(cmp.kindChipLabel()).toBe('Art');
+      expect(listVotes).toHaveBeenCalledWith(expect.objectContaining({ kind: undefined }));
+    });
+
+    it('offers "Neue Umfrage" only with vote.manage and opens the new poll', async () => {
+      const member = await start('/voting');
+      expect(member.cmp.canCreatePoll()).toBe(false);
+      expect(screen.queryByRole('button', { name: 'Neue Umfrage' })).toBeNull();
+      TestBed.resetTestingModule();
+      const manager = await start('/voting', { manager: true });
+      expect(screen.getByRole('button', { name: 'Neue Umfrage' })).toBeInTheDocument();
+      const navigate = jest.spyOn(manager.router, 'navigate');
+      manager.listVotes.mockClear();
+      manager.cmp.pollDialog.set(false);
+      manager.cmp.onPollCreated({ id: 'p9' } as never);
+      expect(manager.cmp.pollDialog()).toBe(false);
+      expect(manager.listVotes).toHaveBeenCalled();
+      expect(navigate).toHaveBeenCalledWith(['/voting', 'p9'], expect.anything());
+    });
+  });
+
   describe('states', () => {
     it('shows an error, not an empty list, when the request fails', async () => {
       await start('/voting', { listError: true });
@@ -379,7 +469,7 @@ describe('VotingComponent', () => {
       cmp.reset();
       expect(navigate).toHaveBeenLastCalledWith(
         [],
-        expect.objectContaining({ queryParams: { q: null, status: null, gremium: null } }),
+        expect.objectContaining({ queryParams: { q: null, status: null, gremium: null, kind: null } }),
       );
       expect(cmp.search.text()).toBe('');
     });
@@ -802,7 +892,7 @@ describe('VotingComponent', () => {
     const navigate = jest.spyOn(router, 'navigate');
     cmp.reset();
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({
-      queryParams: { q: null, status: null, gremium: null },
+      queryParams: { q: null, status: null, gremium: null, kind: null },
     }));
   });
 

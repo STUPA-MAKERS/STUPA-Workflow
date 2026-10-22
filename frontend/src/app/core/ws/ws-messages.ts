@@ -1,11 +1,14 @@
 /** Live-vote WebSocket protocol. */
 
 import type {
+  DateAnswer,
   ElectionConfig,
   ElectionResult,
   GuestStatus,
   GuestsMode,
   MeetingGuest,
+  PollConfig,
+  PollResult,
   VoteKind,
   VoteResult,
 } from '../api/models';
@@ -38,6 +41,8 @@ export interface VoteOpenedMsg {
   kind?: VoteKind;
   election?: ElectionConfig | null;
   round?: number;
+  /** A poll carries its mode and options. */
+  poll?: PollConfig | null;
 }
 export interface VoteTallyMsg {
   type: 'vote_tally';
@@ -55,17 +60,22 @@ export interface VoteTallyMsg {
   presentGuests?: number | null;
   guestsVote?: boolean;
   kind?: VoteKind;
+  /** A poll: the counts with the order, once revealed. */
+  pollResult?: PollResult | null;
 }
 export interface VoteClosedMsg {
   type: 'vote_closed';
   voteId: string;
-  result: string;
+  /** `null` for a poll: a poll only counts. */
+  result: string | null;
   counts: Record<string, number>;
   /** Rejection reason: `quorum` for a missed quorum, `majority` for a missed majority. */
   failedReason?: 'quorum' | 'majority' | null;
   kind?: VoteKind;
   /** The result of a personnel election (F2). */
   electionResult?: ElectionResult | null;
+  /** The counts of a poll. */
+  pollResult?: PollResult | null;
 }
 /** The lot of a tied election was drawn (F2): the room and the beamer show it. */
 export interface VoteLotDrawnMsg {
@@ -132,7 +142,12 @@ export type ServerMessage =
   | ErrorMsg;
 
 export type ClientMessage =
-  | { type: 'cast'; voteId: string; choice: string | string[]; asDelegation?: boolean }
+  | {
+      type: 'cast';
+      voteId: string;
+      choice: string | string[] | Record<string, DateAnswer>;
+      asDelegation?: boolean;
+    }
   | { type: 'subscribe' };
 
 // ------------------------------------------------------------------ to-do boards (`/api/ws/todos`)

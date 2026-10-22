@@ -1,0 +1,35 @@
+@if (topLine(); as line) {
+  <p class="bars__status">
+    <app-status-text class="bars__result" kind="accent">{{ line }}</app-status-text>
+  </p>
+}
+<ul class="bars" [attr.aria-label]="'voting.bars.label' | t: { cast: answered() }">
+  @for (bar of bars(); track bar.id) {
+    <li class="bars__row" [class.pr__row--abstain]="bar.id === 'abstain'">
+      <div class="bars__line">
+        <span class="bars__label">
+          {{ bar.label }}
+          @if (bar.top) {
+            <span class="pr__tag">{{ (date() ? 'poll.tag.bestDate' : 'poll.tag.most') | t }}</span>
+          }
+        </span>
+        <span class="bars__count mono">{{ bar.count }}</span>
+        @if (bar.maybe !== null) {
+          <span class="bars__pct mono">(+{{ bar.maybe }})</span>
+        } @else {
+          <span class="bars__pct mono">{{ pct(bar) }} %</span>
+        }
+      </div>
+      <app-seg-bar
+        [size]="variant() === 'beamer' ? 'xl' : 'normal'"
+        [segments]="[{ value: bar.count, tone: tone(bar) }]"
+        [total]="base()"
+        [label]="barLabel(bar)"
+      />
+    </li>
+  }
+</ul>
+@if (date()) {
+  <p class="pr__foot">{{ 'poll.result.dateCaption' | t }}</p>
+}
+<p class="pr__foot">{{ footer() }}</p>

@@ -1020,8 +1020,67 @@ export type VoteStatus = 'draft' | 'open' | 'closed' | 'cancelled';
  *  `elected`, `runoff` (a runoff decides the open seats), `tie` (the lot decides) or
  *  `rejected` (quorum missed, or nobody elected). */
 export type VoteResult = 'passed' | 'rejected' | 'tie' | 'elected' | 'runoff';
-/** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election (F2). */
-export type VoteKind = 'motion' | 'election';
+/** `motion`: a decision (Ja/Nein/Enthaltung). `election`: a personnel election (F2).
+ *  `poll`: a poll ("Umfrage") that only counts the answers. */
+export type VoteKind = 'motion' | 'election' | 'poll';
+
+/** `single`: one option or an abstention. `multi`: 0 to `maxChoices` options.
+ *  `date`: Ja/Vielleicht/Nein for every date. */
+export type PollMode = 'single' | 'multi' | 'date';
+/** The answer of a date poll for one date. */
+export type DateAnswer = 'yes' | 'maybe' | 'no';
+
+/** One option of a poll: a text (`label`), or a date with a start and an optional end.
+ *  The server gives the ids (`o1`..`on`). */
+export interface PollOption {
+  id: string;
+  label?: string | null;
+  start?: IsoDateTime | null;
+  end?: IsoDateTime | null;
+}
+
+/** The config of a poll (`PollConfig`). */
+export interface PollConfig {
+  mode: PollMode;
+  options: PollOption[];
+  /** A multi poll: the most options of one ballot. `null` = every option. */
+  maxChoices?: number | null;
+  secret: boolean;
+  guestsVote?: boolean;
+}
+
+/** The counts of a poll (`PollResultOut`): stored at the close, live once revealed. */
+export interface PollResult {
+  /** Votes per option id. A date poll counts the Ja answers here. */
+  counts: Record<string, number>;
+  /** A date poll: the Vielleicht answers per option id. */
+  maybe?: Record<string, number> | null;
+  abstentions: number;
+  ballots: number;
+  /** The option ids, highest first. */
+  order: string[];
+  /** The options with the most votes (every tied one); empty without a vote. */
+  top: string[];
+}
+
+/** The body of a new poll (`PollIn`): the options as the creator types them. */
+export interface PollIn {
+  mode: PollMode;
+  options: { label?: string; start?: IsoDateTime; end?: IsoDateTime }[];
+  maxChoices?: number | null;
+}
+
+/** `POST /votes`: a poll of a Gremium, without a meeting. */
+export interface PollCreateBody extends PollIn {
+  kind: 'poll';
+  eligibleGroup: Uuid;
+  question: string;
+  secret: boolean;
+  /** The planned end, at least one hour ahead. */
+  closesAt: IsoDateTime;
+  /** Keep the poll a draft; otherwise it opens at once. */
+  draft: boolean;
+}
 
 /** One candidate of a personnel election. The server gives the ids (`c1`..`cn`). */
 export interface ElectionCandidate {
@@ -1080,7 +1139,8 @@ export interface ElectionResult {
   lot?: ElectionLot | null;
 }
 
-/** The election fields of a vote (F2). A motion has `kind: 'motion'` and no others. */
+/** The election fields of a vote (F2) and the poll fields. A motion has
+ *  `kind: 'motion'` and no others. */
 export interface ElectionFields {
   kind?: VoteKind;
   election?: ElectionConfig | null;
@@ -1089,6 +1149,10 @@ export interface ElectionFields {
   parentVoteId?: Uuid | null;
   /** 1 for the first round, 2 for the first runoff. */
   round?: number;
+  /** A poll: its mode and options. */
+  poll?: PollConfig | null;
+  /** A poll: the counts once closed, or while open once revealed. */
+  pollResult?: PollResult | null;
 }
 
 /** Quorum threshold. */
@@ -1121,8 +1185,11 @@ export interface VoteConfig {
 export interface MyBallot {
   cast: boolean;
   choice: string | null;
-  /** The chosen candidate ids of an open election ballot (F2). */
+  /** The chosen candidate ids of an open election ballot (F2), or the chosen option
+   *  ids of an open single or multi poll. */
   choices?: string[] | null;
+  /** The answers of an open date poll ballot. */
+  answers?: Record<string, DateAnswer> | null;
 }
 
 /**
@@ -1244,9 +1311,15 @@ export interface VoteListQuery {
   status?: VoteStatus[];
   gremiumId?: Uuid;
   q?: string;
+  /** Only the motions, the elections or the polls. */
+  kind?: VoteKind;
   limit?: number;
   offset?: number;
 }
+
+/** A ballot: one option, the chosen ids of an election or a poll (`[]` = abstention),
+ *  or the answer per date of a date poll. */
+export type BallotChoice = string | readonly string[] | Readonly<Record<string, DateAnswer>>;
 
 /** Response to an accepted ballot. POST /api/votes/{id}/ballot. A ballot never
  *  changes after the cast: a second cast gives 409 `already_voted`. */
@@ -1264,10 +1337,12 @@ export interface VoteClosed {
   id: Uuid;
   meetingId?: Uuid | null;
   applicationId?: Uuid | null;
-  result: VoteResult;
+  /** `null` for a poll: a poll only counts. */
+  result: VoteResult | null;
   tally: Tally;
   kind?: VoteKind;
   electionResult?: ElectionResult | null;
+  pollResult?: PollResult | null;
   closedAt?: IsoDateTime | null;
   firedTransitionId?: Uuid | null;
   newStateId?: Uuid | null;

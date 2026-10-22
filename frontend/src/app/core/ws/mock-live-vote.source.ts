@@ -107,8 +107,14 @@ export class MockLiveVoteSource implements LiveVoteSource {
           subject.next({ ...vote, replay: true });
           emitTally();
         } else if (msg.type === 'cast' && !beamer) {
-          // An election ballot (F2) is a list; the mock counts its first pick.
-          const choice = typeof msg.choice === 'string' ? msg.choice : (msg.choice[0] ?? 'abstain');
+          // An election ballot (F2) is a list; the mock counts its first pick. A date
+          // poll ballot (an object) counts as an abstention.
+          const choice =
+            typeof msg.choice === 'string'
+              ? msg.choice
+              : Array.isArray(msg.choice)
+                ? (msg.choice[0] ?? 'abstain')
+                : 'abstain';
           bump(choice);
         }
       },
