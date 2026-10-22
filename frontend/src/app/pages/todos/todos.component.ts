@@ -1,4 +1,5 @@
 import { CdkScrollable } from '@angular/cdk/scrolling';
+import { Location } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   ChangeDetectionStrategy,
@@ -209,6 +210,20 @@ export class TodosComponent implements OnDestroy {
   private readonly injector = inject(Injector);
   private readonly live = inject(TodoLiveService);
   private readonly cache = inject(TodoCacheService);
+  private readonly location = inject(Location);
+  /**
+   * The card that a link on another page opened (a meeting item, an application, a
+   * ticket: `TodoLinkedListComponent` sets `cardReturn` in the navigation state). Its
+   * close goes back to that page, not to the board behind the card. Any other card
+   * that opens later closes to the board as before.
+   */
+  private returnCard: string | null = (
+    (this.router.getCurrentNavigation()?.extras.state ?? this.location.getState()) as {
+      cardReturn?: boolean;
+    } | null
+  )?.cardReturn
+    ? this.route.snapshot.queryParamMap.get('card')
+    : null;
 
   readonly phone = mediaQuery(MEDIA.phone);
 
@@ -952,6 +967,11 @@ export class TodosComponent implements OnDestroy {
 
   closeCard(): void {
     const id = this.cardId();
+    if (id && id === this.returnCard) {
+      this.returnCard = null;
+      this.location.back();
+      return;
+    }
     void this.router.navigate([], { relativeTo: this.route, queryParams: { card: null }, queryParamsHandling: 'merge' });
     if (id) {
       afterNextRender(

@@ -360,6 +360,12 @@ export class TopSheetComponent {
     this.editor()?.tableCommand(item.id as MarkdownTableCommand);
   }
 
+  /** An edit in the formatted editor. A reader changes nothing, also when the editor emits. */
+  protected onEditorChange(t: AgendaItem, value: string): void {
+    if (!this.editable()) return;
+    this.bodyChange.emit({ itemId: t.id, body: value });
+  }
+
   /** An edit of the Markdown source. A reader changes nothing. */
   protected onRawInput(t: AgendaItem, value: string): void {
     if (!this.editable()) return;

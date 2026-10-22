@@ -263,13 +263,13 @@ describe('MeetingsComponent', () => {
     http.verify();
   });
 
-  it('offers no open or close to a lead who does not keep the minutes', async () => {
+  it('offers no open, close or cancel to a lead who does not keep the minutes', async () => {
     const { http } = await setup();
     flushLoad(http);
     expect(await screen.findByText('Antrag A')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Abstimmung öffnen/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /Abstimmung schließen/i })).toBeNull();
-    expect(screen.getByRole('button', { name: /Abstimmung abbrechen/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Abstimmung abbrechen/i })).toBeNull();
   });
 
   it('opens a planned vote via the API', async () => {
@@ -1011,6 +1011,22 @@ describe('MeetingsComponent — methods', () => {
         http.expectOne('/api/meetings/m-1/agenda/t-1').flush(null, { status: 500, statusText: 'e' });
         expect(cmp.saveState()).toBe('error');
         expect(services(fixture).agenda.savingTop()).toBe(false);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('saves no body of a reader of a live meeting with another protokollant', async () => {
+      jest.useFakeTimers();
+      try {
+        const { cmp, http, fixture } = await loaded();
+        services(fixture).session.meeting.update((m) =>
+          m ? { ...m, status: 'live', protokollantId: 'pr-9', isProtokollant: false } : m,
+        );
+        cmp.onTopBodyChange('t-1', 'Alter Text');
+        jest.advanceTimersByTime(1000);
+        http.expectNone('/api/meetings/m-1/agenda/t-1');
+        expect(cmp.saveState()).toBe('idle');
       } finally {
         jest.useRealTimers();
       }

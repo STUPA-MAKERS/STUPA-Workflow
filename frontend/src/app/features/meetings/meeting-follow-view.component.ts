@@ -6,6 +6,7 @@ import {
   effect,
   inject,
   input,
+  linkedSignal,
   output,
   signal,
 } from '@angular/core';
@@ -69,7 +70,8 @@ const EXCERPT_LENGTH = 160;
  * of the dock, and behind "Alle Mitglieder anzeigen" before the start and on a phone.
  *
  * The view follows the room: until the member opens another item, the sheet shows the
- * item that the room handles. Below the wide layout the agenda opens as a sheet, the
+ * item that the room handles, and the next move of the room ends the look at another
+ * item. Below the wide layout the agenda opens as a sheet, the
  * vote card is a strip above the text (board Schmal-Teilnahme) and the delegation sits
  * in the dock. On a phone the page shows the item, the vote card, a protocol excerpt
  * with "Ganzen TOP lesen", then the attendance and the delegation.
@@ -116,8 +118,16 @@ export class MeetingFollowViewComponent {
   protected readonly phone = mediaQuery(MEDIA.phone);
   protected readonly wide = mediaQuery(MEDIA.wide);
 
-  /** The item the member opened. `null`: follow the room. */
-  protected readonly selectedId = signal<Uuid | null>(null);
+  /** The item of the room. A computed, so a new state with the same item changes nothing. */
+  private readonly roomItem = computed(() => this.meeting().currentAgendaItemId);
+  /**
+   * The item the member opened. `null`: follow the room. When the room moves on, the
+   * view follows again: a look at another item lasts until the next move.
+   */
+  protected readonly selectedId = linkedSignal<Uuid | null, Uuid | null>({
+    source: this.roomItem,
+    computation: () => null,
+  });
   protected readonly agendaOpen = signal(false);
   protected readonly attendanceOpen = signal(false);
   /** The sheet with the attendance of all members. */

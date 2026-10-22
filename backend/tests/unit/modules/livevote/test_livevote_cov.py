@@ -2795,6 +2795,40 @@ def test_set_agenda_body_ok_broadcasts(app: FastAPI, client: TestClient, fakes) 
     assert fakes["meeting"].broadcasts == 1
 
 
+@pytest.mark.parametrize(
+    ("status", "keeper", "is_keeper", "body", "code"),
+    [
+        ("live", True, False, {"body": "x"}, 403),
+        ("live", True, False, {"title": "Rename"}, 200),
+        ("live", True, True, {"body": "x"}, 200),
+        ("live", False, False, {"body": "x"}, 200),
+        ("planned", True, False, {"body": "x"}, 200),
+        ("closed", True, False, {"body": "x"}, 200),
+    ],
+)
+def test_set_agenda_body_live_only_the_protokollant_writes(
+    app: FastAPI,
+    client: TestClient,
+    fakes,
+    status: str,
+    keeper: bool,
+    is_keeper: bool,
+    body: dict[str, str],
+    code: int,
+) -> None:
+    # A live meeting with a protokollant: the lead keeps the agenda but not the text.
+    out = _meeting_out(status=status, can_write=True, is_protokollant=is_keeper)
+    fakes["meeting"]._meeting_out = out.model_copy(
+        update={"protokollant_id": uuid4() if keeper else None}
+    )
+    _login(app)
+    r = client.patch(f"/api/meetings/{uuid4()}/agenda/{uuid4()}", json=body)
+    assert r.status_code == code
+    if code == 403:
+        assert r.json()["code"] == "not_protokollant"
+        assert "set_body" not in fakes["agenda"].calls
+
+
 def test_open_vote_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
     fakes["meeting"]._meeting_out = _meeting_out(can_manage_votes=False)
     _login(app)

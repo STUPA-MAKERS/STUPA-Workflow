@@ -99,6 +99,8 @@ export class MeetingSessionService implements OnDestroy {
   readonly myChoices = signal<Record<string, string>>({});
 
   private channel: MeetingChannel | null = null;
+  /** Counts the vote events of the live channel, so a slower read cannot undo one. */
+  private voteEvents = 0;
 
   // Permission flags, per meeting where loaded. The backend checks them per Gremium.
   /** The admin manages the meetings of every Gremium. Everybody else manages per
@@ -683,6 +685,11 @@ export class MeetingSessionService implements OnDestroy {
         // TOP bodies can change without a vote. Reload the agenda so live
         // followers see the current protocol state.
         this.agendaSvc.load(m.id, currentAgendaItemId);
+        // The room moved on: everybody but the protokollant follows the minutes. A
+        // look at another item lasts until the next move.
+        if (currentAgendaItemId && currentAgendaItemId !== m.currentAgendaItemId && !m.isProtokollant) {
+          this.agendaSvc.selectTop(m.id, currentAgendaItemId);
+        }
         // The event carries no rights. A handover (or the start of a planned
         // handover on a TOP move) moves canWrite, canManageVotes and the keeper
         // data, so read the meeting again.
@@ -703,6 +710,7 @@ export class MeetingSessionService implements OnDestroy {
         break;
       }
       case 'vote_opened': {
+        this.voteEvents++;
         const known = m.votes.find((v) => v.id === msg.voteId);
         if (known) {
           this.patchVote(msg.voteId, {
@@ -723,6 +731,7 @@ export class MeetingSessionService implements OnDestroy {
         break;
       }
       case 'vote_tally':
+        this.voteEvents++;
         this.patchVote(msg.voteId, {
           counts: msg.counts,
           leading: msg.leading,
@@ -749,6 +758,7 @@ export class MeetingSessionService implements OnDestroy {
         });
         break;
       case 'vote_closed':
+        this.voteEvents++;
         this.patchVote(msg.voteId, {
           status: 'closed',
           result: msg.result,
@@ -759,9 +769,11 @@ export class MeetingSessionService implements OnDestroy {
         });
         break;
       case 'vote_lot_drawn':
+        this.voteEvents++;
         this.patchVote(msg.voteId, { result: msg.result, electionResult: msg.electionResult });
         break;
       case 'vote_cancelled':
+        this.voteEvents++;
         this.patchVote(msg.voteId, {
           status: 'cancelled',
           closedAt: closedAtOf(m, msg.voteId),
@@ -783,10 +795,23 @@ export class MeetingSessionService implements OnDestroy {
    * When the viewer can write now but has no protocol loaded yet, the method
    * loads it.
    */
-  private reloadAfterState(meetingId: Uuid): void {
+  private reloadAfterState(meetingId: Uuid, attempt = 0): void {
+    const events = this.voteEvents;
     this.api.getMeeting(meetingId, { quiet: true }).subscribe({
-      next: (updated) => {
-        if (this.meeting()?.id !== updated.id) return; // the user opened another meeting
+      next: (read) => {
+        const current = this.meeting();
+        if (current?.id !== read.id) return; // the user opened another meeting
+        // A vote event came while the read ran: the read may predate it and would undo
+        // it (an opened vote vanished, a closed one opened again). Read once more; a
+        // busy vote keeps the votes of the events after three reads.
+        let updated = read;
+        if (this.voteEvents !== events) {
+          if (attempt < 2) {
+            this.reloadAfterState(meetingId, attempt + 1);
+            return;
+          }
+          updated = { ...read, votes: current.votes };
+        }
         this.meeting.set(updated);
         if (updated.protocolId && !this.protocol() && (this.canWrite() || this.canViewAll())) {
           this.refreshProtocol();

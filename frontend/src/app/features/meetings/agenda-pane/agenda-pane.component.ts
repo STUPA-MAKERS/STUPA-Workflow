@@ -32,6 +32,7 @@ import {
   TodoNewDialogComponent,
   type NewTodoLink,
 } from '../../todos/new-dialog/todo-new-dialog.component';
+import { BodyPortalDirective } from '@shared/ui/body-portal/body-portal.directive';
 import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { TopBadgeComponent } from '../top-badge/top-badge.component';
 
@@ -92,6 +93,7 @@ export interface AgendaMove {
     ListItemComponent,
     RowMenuComponent,
     TodoNewDialogComponent,
+    BodyPortalDirective,
   ],
   templateUrl: './agenda-pane.component.html',
   styleUrl: './agenda-pane.component.scss',
