@@ -62,7 +62,7 @@ describe('MeetingBeamerComponent', () => {
         }),
       });
       expect(screen.getAllByText('Umfrage beendet').length).toBeGreaterThan(0);
-      expect(screen.getByText('Meiste Stimmen: Ulm')).toBeInTheDocument();
+      expect(screen.queryByText(/Meiste Stimmen/)).toBeNull();
       expect(screen.getByText('4 von 19 haben geantwortet')).toBeInTheDocument();
       expect(screen.queryByText('Angenommen')).toBeNull();
       expect(screen.queryByText('Abgelehnt')).toBeNull();
