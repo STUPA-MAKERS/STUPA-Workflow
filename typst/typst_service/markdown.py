@@ -179,7 +179,7 @@ def _election(lines: list[str]) -> Node | None:
 _POLL_META_RE: Final = re.compile(r"^(?:Umfrage\s+·\s+.+|Terminumfrage)$")
 _POLL_ROW_RE: Final = re.compile(r"^(.*\S):\s*(\d+)(?:\s*\(\+(\d+)\))?$")
 _POLL_TOP_RE: Final = re.compile(r"^(?:Meiste Stimmen|Bester Termin):\s*(.*)$")
-_POLL_BALLOTS_RE: Final = re.compile(r"^\d+ Antworten\b")
+_POLL_BALLOTS_RE: Final = re.compile(r"^(\d+) Antwort(?:en)?\b")
 _POLL_LEGEND: Final = "Zahl = Ja, (+n) = Vielleicht"
 
 
@@ -215,7 +215,7 @@ def _poll(lines: list[str]) -> Node | None:
     closed, one `Label: n` line per option, highest first. A date poll writes
     `Label: n (+m)`, where n counts Ja and m counts Vielleicht, and the legend line
     for that. Then come `Enthaltungen: n`, the options with the most votes
-    (`Meiste Stimmen: …` or `Bester Termin: …`) and `n Antworten · …`. An open poll
+    (`Meiste Stimmen: …` or `Bester Termin: …`) and `n Antworten` (`1 Antwort`). An open poll
     has the kind line only. The editor reads the same lines (`parsePoll` of the
     ui-kit).
     """
@@ -233,8 +233,10 @@ def _poll(lines: list[str]) -> Node | None:
         row_match = _POLL_ROW_RE.match(line)
         if top_match:
             top = top_match.group(1).strip()
-        elif row_match is None and _POLL_BALLOTS_RE.match(line):
-            footer = line
+        elif row_match is None and (ballots := _POLL_BALLOTS_RE.match(line)):
+            # The footer comes from the number, so the rest of an old stored line drops.
+            n = int(ballots.group(1))
+            footer = f"{n} {'Antwort' if n == 1 else 'Antworten'}"
         elif line == _POLL_LEGEND:
             continue
         elif row_match and row_match.group(1) == "Enthaltungen" and not row_match.group(3):

@@ -164,12 +164,12 @@ export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
   else lines.push('> Zahl = Ja, (+n) = Vielleicht');
   const best = order.filter((id) => top.has(id)).map((id) => oneLine(labels.get(id) ?? id));
   if (best.length) lines.push(`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`);
-  lines.push(`> ${result.ballots} Antworten`);
+  lines.push(`> ${result.ballots} ${result.ballots === 1 ? 'Antwort' : 'Antworten'}`);
   return lines.join('\n');
 }
 
 /** The kind line of a poll callout, as the backend `poll_meta` writes it. */
-function pollMeta(poll: PollConfig): string {
+export function pollMeta(poll: PollConfig): string {
   if (poll.mode === 'date') return 'Terminumfrage';
   if (poll.mode === 'single') return 'Umfrage · Einzelwahl';
   return poll.maxChoices != null

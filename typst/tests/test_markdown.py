@@ -408,3 +408,14 @@ def test_image_assets_maps_only_image_names() -> None:
     assert image_assets([IMG_ASSET, "a1-logo.png", other, f"img-{IMG_ID}.svg"]) == {
         IMG_ID: IMG_ASSET
     }
+
+
+def test_poll_footer_comes_from_the_number_of_answers() -> None:
+    for stored, footer in (
+        ("1 Antworten · Meinungsbild, kein Beschluss", "1 Antwort"),
+        ("1 Antwort", "1 Antwort"),
+        ("17 Antworten · Meinungsbild, kein Beschluss", "17 Antworten"),
+    ):
+        (vote,) = conv(f"> [!abstimmung] **Q**\n> Umfrage · Einzelwahl\n> A: 1\n> {stored}")
+        poll = cast("dict[str, object]", vote["poll"])
+        assert poll["footer"] == footer

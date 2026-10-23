@@ -72,6 +72,25 @@ describe('voteResultResolver', () => {
     expect(resolve('Vorsitz (2. Wahlgang)')).not.toBeNull();
   });
 
+  it('tells two polls with one question apart by the kind line of the card', () => {
+    const base = { ...closed, kind: 'poll' as const, question: 'Test für TOP', result: null };
+    const multi = {
+      ...base,
+      id: 'p-multi',
+      poll: { mode: 'multi', maxChoices: 2, options: [], secret: false },
+    } as unknown as typeof closed;
+    const date = {
+      ...base,
+      id: 'p-date',
+      poll: { mode: 'date', maxChoices: null, options: [], secret: false },
+    } as unknown as typeof closed;
+    const resolve = voteResultResolver([date, multi], t, 'de');
+    expect(resolve('Test für TOP', ['Terminumfrage'])?.caption).toMatch(/^Terminumfrage/);
+    expect(resolve('Test für TOP', ['Umfrage · Mehrfachwahl, höchstens 2'])?.caption).toMatch(/Mehrfachwahl/);
+    // Without a matching kind line the last vote wins.
+    expect(resolve('Test für TOP')?.caption).toMatch(/Mehrfachwahl/);
+  });
+
   it('normalizes the text of a question', () => {
     expect(normalizeQuestion(' **A\\_b**  `c` ')).toBe('a_b c');
   });
