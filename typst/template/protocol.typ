@@ -291,8 +291,71 @@
   })
 }
 
+// A poll (Umfrage) as a ranking, drawn like the election: one row per option
+// in the order of the snippet (best first), a bar scaled to the best count
+// and a star on the options with the most votes. A poll is no decision, so
+// the box is navy blue, never green or red. A date poll stacks Ja (solid) and
+// Vielleicht (light) in one bar and prints "Ja + Vielleicht"; a swatch legend
+// replaces the legend line of the snippet. An open poll has no rows and shows
+// the question and its kind only.
+#let poll-box(n) = {
+  let p = n.poll
+  let color = palette.navyblue
+  let muted = palette.gray
+  let date = p.kind == "date"
+  let light = tint(color, 35%)
+  let star = text(font: icon-font, size: 0.8em, fill: color, "\u{f005}")
+  let mark = if date [bester Termin] else [meiste Stimmen]
+  colored-box(color: color, inset: box-inset + (bottom: 8.5pt), {
+    if n.lines.len() > 0 { block(n.lines.map(inline).join(linebreak())) }
+    text(size: size.small, fill: muted, p.meta)
+    if p.rows.len() > 0 {
+      v(6pt)
+      let total(r) = r.count + if r.maybe == none { 0 } else { r.maybe }
+      let best = calc.max(1, ..p.rows.map(total))
+      let bar(r) = {
+        let solid = if r.top { color } else { tint(palette.gray, 55%) }
+        let soft = if r.top { light } else { tint(palette.gray, 25%) }
+        box(width: 100%, height: 5pt, radius: 2.5pt, fill: white, clip: true, stack(
+          dir: ltr,
+          box(width: r.count / best * 100%, height: 100%, fill: solid),
+          if r.maybe != none and r.maybe > 0 { box(width: r.maybe / best * 100%, height: 100%, fill: soft) },
+        ))
+      }
+      let cells = ()
+      for r in p.rows {
+        let count = if r.maybe != none [#r.count + #r.maybe] else [#r.count]
+        cells.push(if r.top { strong(r.label) } else { r.label })
+        cells.push(bar(r))
+        cells.push(align(right, if r.top { strong(count) } else { count }))
+        cells.push(if r.top { box(text(size: size.small, fill: color, hyphenate: false)[#star #mark]) } else [])
+      }
+      if p.abstentions != none {
+        cells.push(text(fill: muted, "Enthaltungen"))
+        cells.push([])
+        cells.push(align(right, text(fill: muted, str(p.abstentions))))
+        cells.push([])
+      }
+      grid(
+        columns: (auto, 1fr, auto, auto),
+        column-gutter: 10pt,
+        row-gutter: 6pt,
+        align: horizon,
+        ..cells,
+      )
+      if date {
+        let swatch(c) = box(width: 8pt, height: 5pt, radius: 1.5pt, fill: c)
+        block(above: 7pt, text(size: size.small, fill: muted)[#swatch(color) Ja #h(10pt) #swatch(light) Vielleicht])
+      }
+    }
+    for note in p.notes { block(above: 6pt, note) }
+    if p.footer != none { block(above: 7pt, text(size: size.small, fill: muted, p.footer)) }
+  })
+}
+
 #let tally(n) = {
   if n.at("election", default: none) != none { return election-box(n) }
+  if n.at("poll", default: none) != none { return poll-box(n) }
   // The cell labels have no descender, so TeX sets the cells lower than a
   // box with running text.
   let cell(label, count, color, icon) = colored-box(color: color, icon: icon, inset: box-inset + (bottom: 11.5pt))[*#label:* #count]
