@@ -85,7 +85,7 @@ def test_snippet_of_a_closed_single_poll() -> None:
         "> Nein: 1",
         "> Enthaltungen: 1",
         "> Meiste Stimmen: Ja, Café *Mitte*",
-        "> 10 Antworten · Meinungsbild, kein Beschluss",
+        "> 10 Antworten",
     ]
     # The public variant is the same: a poll never lists names.
     assert _snippet(_view(_SINGLE, _RESULT), "x", public=True) == text
@@ -107,7 +107,7 @@ def test_snippet_of_a_closed_date_poll() -> None:
         "> Mi, 4.11. · 18:00: 3 (+0)",
         "> Zahl = Ja, (+n) = Vielleicht",
         "> Bester Termin: Di, 3.11. · 18:00–20:00",
-        "> 5 Antworten · Meinungsbild, kein Beschluss",
+        "> 5 Antworten",
     ]
 
 
@@ -128,7 +128,7 @@ def test_snippet_without_votes_names_no_top_and_keeps_the_option_order() -> None
     assert [line.count for line in view.lines] == [0, 0, 0]
     text = build_poll_snippet(view)
     assert "Meiste Stimmen" not in text
-    assert "> 0 Antworten · Meinungsbild, kein Beschluss" in text
+    assert "> 0 Antworten" in text
 
 
 def test_poll_meta_of_every_mode() -> None:
@@ -147,7 +147,7 @@ def test_option_label() -> None:
 
 def test_build_snippet_of_a_bare_view() -> None:
     view = PollSnippet(question="Q", meta="Umfrage · Einzelwahl", lines=[PollLine("A", 1)])
-    assert build_poll_snippet(view).endswith("> 0 Antworten · Meinungsbild, kein Beschluss")
+    assert build_poll_snippet(view).endswith("> 0 Antworten")
 
 
 async def test_public_assembly_lists_no_poll_as_a_decision(

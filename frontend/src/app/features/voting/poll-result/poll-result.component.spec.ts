@@ -56,7 +56,7 @@ describe('PollResultComponent', () => {
     expect(screen.getByText('Meiste Stimmen: Pizza, Salat')).toBeInTheDocument();
     expect(screen.getAllByText('40 %', { exact: false })).toHaveLength(2);
     expect(
-      screen.getByText('10 von 12 haben geantwortet · Meinungsbild, kein Beschluss'),
+      screen.getByText('10 von 12 haben geantwortet'),
     ).toBeInTheDocument();
     expect(screen.queryByText('Zahl = Ja, (+n) = Vielleicht')).toBeNull();
     expect(await runAxe(container)).toHaveNoViolations();

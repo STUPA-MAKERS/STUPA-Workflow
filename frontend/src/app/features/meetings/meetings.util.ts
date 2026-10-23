@@ -164,7 +164,7 @@ export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
   else lines.push('> Zahl = Ja, (+n) = Vielleicht');
   const best = order.filter((id) => top.has(id)).map((id) => oneLine(labels.get(id) ?? id));
   if (best.length) lines.push(`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`);
-  lines.push(`> ${result.ballots} Antworten · Meinungsbild, kein Beschluss`);
+  lines.push(`> ${result.ballots} Antworten`);
   return lines.join('\n');
 }
 

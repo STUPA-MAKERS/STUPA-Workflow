@@ -1179,7 +1179,7 @@ export const de = {
   'poll.tag.most': 'meiste Stimmen',
   'poll.tag.bestDate': 'bester Termin',
   'poll.result.dateCaption': 'Zahl = Ja, (+n) = Vielleicht',
-  'poll.result.footer': '{n} von {m} haben geantwortet · Meinungsbild, kein Beschluss',
+  'poll.result.footer': '{n} von {m} haben geantwortet',
   'poll.result.dateRow': '{option}: {yes} Ja, {maybe} Vielleicht',
   'poll.ballot.counter': '{n} von höchstens {m} gewählt',
   'poll.ballot.submitDate': 'Antworten abgeben',

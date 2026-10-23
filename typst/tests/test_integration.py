@@ -128,11 +128,11 @@ def test_poll_renders_as_a_ranking(tmp_path: Path) -> None:
         "> [!abstimmung] **Wohin?**\n> Umfrage · Einzelwahl\n"
         "> Freiburg: 7\n> Konstanz: 7\n> Tübingen: 2\n> Enthaltungen: 1\n"
         "> Meiste Stimmen: Freiburg, Konstanz\n"
-        "> 17 Antworten · Meinungsbild, kein Beschluss\n\n"
+        "> 17 Antworten\n\n"
         "> [!abstimmung] **Wann?**\n> Terminumfrage\n"
         "> Mi, 4.11. · 17:00–19:00: 6 (+3)\n> Di, 3.11. · 18:00–20:00: 5 (+2)\n"
         "> Zahl = Ja, (+n) = Vielleicht\n> Bester Termin: Mi, 4.11. · 17:00–19:00\n"
-        "> 10 Antworten · Meinungsbild, kein Beschluss\n\n"
+        "> 10 Antworten\n\n"
         "> [!abstimmung] **Offen?**\n> Umfrage · Mehrfachwahl, höchstens 2\n"
     )
     lines = [line[3] for line in _lines(_render(source, None), tmp_path)]
