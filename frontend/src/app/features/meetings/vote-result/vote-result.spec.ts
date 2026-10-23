@@ -91,6 +91,26 @@ describe('voteResultResolver', () => {
     expect(resolve('Test für TOP')?.caption).toMatch(/Mehrfachwahl/);
   });
 
+  it('tells an election from a poll with the same question by its kind line', () => {
+    const base = { ...closed, question: 'Test für TOP', result: null };
+    const election = {
+      ...base,
+      id: 'e-1',
+      kind: 'election' as const,
+      result: 'elected',
+      election: { seats: 2, candidates: [], secret: false },
+    } as unknown as typeof closed;
+    const poll = {
+      ...base,
+      id: 'p-multi',
+      kind: 'poll' as const,
+      poll: { mode: 'multi', maxChoices: 2, options: [], secret: false },
+    } as unknown as typeof closed;
+    const resolve = voteResultResolver([election, poll], t, 'de');
+    expect(resolve('Test für TOP', ['Wahl · 2 Posten'])?.caption).toMatch(/^Wahl/);
+    expect(resolve('Test für TOP', ['Umfrage · Mehrfachwahl, höchstens 2'])?.caption).toMatch(/^Umfrage/);
+  });
+
   it('normalizes the text of a question', () => {
     expect(normalizeQuestion(' **A\\_b**  `c` ')).toBe('a_b c');
   });
