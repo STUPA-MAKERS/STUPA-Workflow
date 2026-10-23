@@ -20,7 +20,6 @@ import {
   pollOf,
   pollOptionLabel,
   pollStatus,
-  pollTopLine,
   type PollDraft,
 } from './poll.util';
 
@@ -104,7 +103,6 @@ describe('poll.util', () => {
       ['o2', 0, false],
       ['abstain', 3, false],
     ]);
-    expect(pollTopLine(TEXT, bars, t)).toBe('Meiste Stimmen: Pizza');
     const dates = pollBars(
       DATE,
       { counts: { o1: 1 }, abstentions: 0, ballots: 1, order: ['o1'], top: ['o1'] },
@@ -113,8 +111,6 @@ describe('poll.util', () => {
       t,
     );
     expect(dates.map((b) => b.maybe)).toEqual([0]);
-    expect(pollTopLine(DATE, dates, t)).toMatch(/^Bester Termin: Di, 3\.11\./);
-    expect(pollTopLine(DATE, [], t)).toBeNull();
   });
 
   describe('the editor draft', () => {

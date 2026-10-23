@@ -5,7 +5,7 @@ import type {
   VoteCalloutInfo,
   VoteCalloutResolver,
 } from '@stupa-makers/ui-kit/markdown-editor';
-import { pollMeta, voteSnippetQuestion } from '../meetings.util';
+import { electionMeta, pollMeta, voteSnippetQuestion } from '../meetings.util';
 import { electionCaption, electionStatus } from '../../voting/election.util';
 import { pollCaption } from '../../voting/poll.util';
 import { clock } from '@shared/date-format';
@@ -118,11 +118,18 @@ export function voteResultResolver(
   }
   return (question, lines) => {
     const found = byQuestion.get(normalizeQuestion(question)) ?? [];
-    // Two votes can share a question. A poll card names its kind in its first line, so
-    // the poll of that kind wins; otherwise the last vote wins.
+    // Two votes can share a question. A poll or election card names its kind in its
+    // first line, so the vote of that kind wins; otherwise the last vote wins.
     const kind = lines?.[0]?.trim();
     const last = [...found].reverse();
-    const vote = last.find((v) => v.kind === 'poll' && !!v.poll && pollMeta(v.poll) === kind) ?? last[0];
+    const vote = last.find((v) => kind != null && kindLine(v) === kind) ?? last[0];
     return vote ? voteResultInfo(vote, t, locale) : null;
   };
+}
+
+/** The kind line that the snippet of a vote writes under its head, if it has one. */
+function kindLine(vote: MeetingVote): string | null {
+  if (vote.kind === 'poll' && vote.poll) return pollMeta(vote.poll);
+  if (vote.kind === 'election' && vote.election) return electionMeta(vote);
+  return null;
 }

@@ -55,9 +55,6 @@
   margin: var(--space-3) 10px;
   background: var(--color-border);
 }
-.sd__vr--end {
-  margin-inline: 6px;
-}
 .sd__mid {
   display: flex;
   flex: 0 1 auto;
@@ -138,12 +135,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.sd__words {
-  flex: none;
-  font-size: var(--fs-small);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
 
 /* The minute-taker menu above the dock: the menu surface of the app (surface 3). */
 .sd__backdrop {
@@ -182,12 +173,6 @@
   .sd {
     flex-wrap: wrap;
     row-gap: var(--space-1);
-  }
-  .sd__words {
-    display: none;
-  }
-  .sd__vr--end {
-    display: none;
   }
 }
 

@@ -1,15 +1,4 @@
-/* The tag of a top option and the footer lines of a poll result. */
-.pr__tag {
-  display: inline-block;
-  margin-inline-start: var(--space-2);
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-sm, 4px);
-  background: var(--color-accent-container);
-  color: var(--color-accent-text);
-  font-size: var(--fs-small);
-  font-weight: var(--fw-medium);
-  vertical-align: middle;
-}
+/* The abstentions and the footer lines of a poll result. */
 .pr__row--abstain .bars__label {
   color: var(--color-text-muted);
   font-weight: var(--fw-regular, 400);
@@ -21,9 +10,6 @@
 }
 
 :host(.bars--beamer) {
-  .pr__tag {
-    font-size: 1.125rem;
-  }
   .pr__foot {
     font-size: 1.25rem;
   }

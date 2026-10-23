@@ -398,11 +398,6 @@ export class MeetingPageComponent {
     return v.myBallot?.cast ? this.i18n.translate('meetings.dock.voteCast') : null;
   });
 
-  protected readonly wordCount = computed(() => {
-    const body = this.top()?.body?.trim() ?? '';
-    return body ? body.split(/\s+/).length : 0;
-  });
-
   /** The result of a closed vote is in the text of the open item. */
   protected inText(vote: MeetingVote): boolean {
     return this.inTextIds().has(vote.id);
