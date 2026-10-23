@@ -65,7 +65,7 @@ describe('poll snippet (same text as the backend build_poll_snippet)', () => {
       '> Nein: 1',
       '> Enthaltungen: 1',
       '> Meiste Stimmen: Ja, Café Mitte',
-      '> 10 Antworten · Meinungsbild, kein Beschluss',
+      '> 10 Antworten',
     ]);
   });
 
@@ -87,7 +87,7 @@ describe('poll snippet (same text as the backend build_poll_snippet)', () => {
       '> Mi, 4.11. · 18:00: 3 (+0)',
       '> Zahl = Ja, (+n) = Vielleicht',
       '> Bester Termin: Di, 3.11. · 18:00–20:00',
-      '> 5 Antworten · Meinungsbild, kein Beschluss',
+      '> 5 Antworten',
     ]);
   });
 
@@ -103,7 +103,7 @@ describe('poll snippet (same text as the backend build_poll_snippet)', () => {
     });
     expect(text).toContain('> Umfrage · Mehrfachwahl\n> Ja: 0\n> Nein: 0');
     expect(text).not.toContain('Meiste Stimmen');
-    expect(text.endsWith('> 0 Antworten · Meinungsbild, kein Beschluss')).toBe(true);
+    expect(text.endsWith('> 0 Antworten')).toBe(true);
   });
 });
 

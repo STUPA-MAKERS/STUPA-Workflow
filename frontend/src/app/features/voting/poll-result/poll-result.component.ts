@@ -11,7 +11,7 @@ import { POLL_ABSTAIN, type PollBar, pollBars, pollTopLine } from '../poll.util'
  * top option gets the tag "meiste Stimmen". A date poll counts Ja and Vielleicht per
  * date ("3 (+2)", sorted by Ja, then by Ja plus Vielleicht), tags "bester Termin" and
  * explains the numbers ("Zahl = Ja, (+n) = Vielleicht"). The footer counts the answers:
- * "n von m haben geantwortet · Meinungsbild, kein Beschluss". A poll lists counts only,
+ * "n von m haben geantwortet". A poll lists counts only,
  * never a name.
  */
 @Component({

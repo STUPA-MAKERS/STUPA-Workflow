@@ -1149,7 +1149,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'poll.tag.most': 'most votes',
   'poll.tag.bestDate': 'best date',
   'poll.result.dateCaption': 'Number = Yes, (+n) = Maybe',
-  'poll.result.footer': '{n} of {m} answered · Opinion poll, no decision',
+  'poll.result.footer': '{n} of {m} answered',
   'poll.result.dateRow': '{option}: {yes} yes, {maybe} maybe',
   'poll.ballot.counter': '{n} of at most {m} chosen',
   'poll.ballot.submitDate': 'Submit answers',

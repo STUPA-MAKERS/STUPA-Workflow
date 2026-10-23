@@ -148,6 +148,87 @@ def test_single_candidate_and_motion_have_no_ranking() -> None:
     assert "election" not in motion
 
 
+def test_poll_reads_options_abstentions_top_and_footer() -> None:
+    (vote,) = conv(
+        "> [!abstimmung] **Wohin geht der Ausflug?**\n> Umfrage · Einzelwahl\n"
+        "> Freiburg: 7\n> Konstanz: 4\n> Tübingen: 2\n> Enthaltungen: 1\n"
+        "> Meiste Stimmen: Freiburg\n> 14 Antworten"
+    )
+    assert vote["counts"] is False
+    assert "election" not in vote
+    # Only the question stays a body line; the template draws the options.
+    assert [texts(line) for line in vote["lines"]] == ["Wohin geht der Ausflug?"]  # pyright: ignore[reportGeneralTypeIssues]
+    assert vote["poll"] == {
+        "kind": "single",
+        "meta": "Umfrage · Einzelwahl",
+        "rows": [
+            {"label": "Freiburg", "count": 7, "maybe": None, "top": True},
+            {"label": "Konstanz", "count": 4, "maybe": None, "top": False},
+            {"label": "Tübingen", "count": 2, "maybe": None, "top": False},
+        ],
+        "abstentions": 1,
+        "footer": "14 Antworten",
+        "notes": [],
+    }
+
+
+def test_poll_with_several_top_options_marks_each() -> None:
+    (vote,) = conv(
+        "> [!abstimmung] **Q**\n> Umfrage · Mehrfachwahl, höchstens 2\n"
+        "> Ja: 5\n> Nein, danke: 5\n> Nein: 1\n> Enthaltungen: 0\n"
+        "> Meiste Stimmen: Ja, Nein, danke\n> 6 Antworten"
+    )
+    # "Ja: 5" and "Nein: 1" are two lines, so they form no tally line.
+    assert vote["counts"] is False
+    poll = cast("dict[str, object]", vote["poll"])
+    assert poll["kind"] == "multi"
+    rows = cast("list[dict[str, object]]", poll["rows"])
+    assert [(r["label"], r["top"]) for r in rows] == [
+        ("Ja", True),
+        ("Nein, danke", True),
+        ("Nein", False),
+    ]
+
+
+def test_date_poll_reads_ja_and_vielleicht_and_drops_the_legend() -> None:
+    (vote,) = conv(
+        "> [!abstimmung] **Wann?**\n> Terminumfrage\n"
+        "> Mi, 4.11. · 17:00–19:00: 6 (+3)\n> Di, 3.11. · 18:00–20:00: 5 (+2)\n"
+        "> Zahl = Ja, (+n) = Vielleicht\n> Bester Termin: Mi, 4.11. · 17:00–19:00\n"
+        "> 10 Antworten"
+    )
+    poll = cast("dict[str, object]", vote["poll"])
+    assert poll["kind"] == "date"
+    assert poll["rows"] == [
+        {"label": "Mi, 4.11. · 17:00–19:00", "count": 6, "maybe": 3, "top": True},
+        {"label": "Di, 3.11. · 18:00–20:00", "count": 5, "maybe": 2, "top": False},
+    ]
+    assert poll["abstentions"] is None
+    assert poll["notes"] == []
+
+
+def test_open_poll_has_the_kind_only() -> None:
+    (vote,) = conv("> [!abstimmung] **Q**\n> Umfrage · Mehrfachwahl")
+    assert vote["poll"] == {
+        "kind": "multi",
+        "meta": "Umfrage · Mehrfachwahl",
+        "rows": [],
+        "abstentions": None,
+        "footer": None,
+        "notes": [],
+    }
+
+
+def test_vote_without_a_poll_kind_is_no_poll() -> None:
+    plain, motion = conv(
+        "> [!abstimmung] **A**\n> Umfrage zur Mensa\n> Freiburg: 7\n\n"
+        "> [!abstimmung] **B**\n> Umfrage · Einzelwahl\n> ja: 3, nein: 1, enthaltung: 0"
+    )
+    assert "poll" not in plain
+    assert "poll" not in motion
+    assert motion["counts"] is True
+
+
 def test_signature_callout() -> None:
     (sig,) = conv("> [!unterschriften] Sitzungsleitung: A. Muster\n> Vorstand:")
     assert sig == {

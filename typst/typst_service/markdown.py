@@ -14,7 +14,9 @@ builder (`backend/app/modules/protocol/markdown.py`):
 * Callouts: the GitHub kinds (`> [!NOTE]`, `> [!TIP]`, ...) and the protocol
   kinds `> [!beschluss]`, `> [!abstimmung]`, `> [!aufgabe]`, `> [!frist]`
   and `> [!unterschriften]`. A vote callout carries a tally line such as
-  `ja: 12, nein: 3, enthaltung: 2`.
+  `ja: 12, nein: 3, enthaltung: 2`. A vote callout without a tally line can
+  hold a personnel election or a poll (Umfrage), which the template draws as a
+  ranking.
 * Inline shortcodes: `{{time 18:30}}`, `{{vote ja=1 nein=2 enthaltung=0}}`,
   `{{count anwesend}}` and a bare frontmatter field such as `{{anwesend}}`.
 * TeX math: `$...$` in a line, and a paragraph that is one `$$...$$` block.
@@ -32,6 +34,7 @@ builder (`backend/app/modules/protocol/markdown.py`):
 
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Final, cast
@@ -169,6 +172,93 @@ def _election(lines: list[str]) -> Node | None:
         "elected": [] if rows else elected,
         "others": others,
         "lot": lot,
+        "notes": notes,
+    }
+
+
+_POLL_META_RE: Final = re.compile(r"^(?:Umfrage\s+·\s+.+|Terminumfrage)$")
+_POLL_ROW_RE: Final = re.compile(r"^(.*\S):\s*(\d+)(?:\s*\(\+(\d+)\))?$")
+_POLL_TOP_RE: Final = re.compile(r"^(?:Meiste Stimmen|Bester Termin):\s*(.*)$")
+_POLL_BALLOTS_RE: Final = re.compile(r"^\d+ Antworten\b")
+_POLL_LEGEND: Final = "Zahl = Ja, (+n) = Vielleicht"
+
+
+def _top_labels(top: str, labels: list[str]) -> set[str]:
+    """Split the list `top` (`A, B`) into the option labels that it names.
+
+    A label can hold ", " itself (a date such as `Di, 3.11. · 18:00–20:00`), so a
+    split at every comma is wrong. The function finds a sequence of known labels
+    that joins to `top`, and tries the longer label first at each place.
+    """
+    ordered = sorted(set(labels), key=len, reverse=True)
+
+    # The cache keeps the search linear in the places of `top`, whatever the labels.
+    @functools.cache
+    def split(rest: str) -> list[str] | None:
+        for label in ordered:
+            if rest == label:
+                return [label]
+            if rest.startswith(label + ", "):
+                tail = split(rest[len(label) + 2 :])
+                if tail is not None:
+                    return [label, *tail]
+        return None
+
+    return set(split(top) or []) if top else set()
+
+
+def _poll(lines: list[str]) -> Node | None:
+    """Read a poll (Umfrage) from the lines after the question.
+
+    The backend (`build_poll_snippet`) writes the kind (`Umfrage · Einzelwahl`,
+    `Umfrage · Mehrfachwahl, höchstens 2` or `Terminumfrage`) and, once the poll is
+    closed, one `Label: n` line per option, highest first. A date poll writes
+    `Label: n (+m)`, where n counts Ja and m counts Vielleicht, and the legend line
+    for that. Then come `Enthaltungen: n`, the options with the most votes
+    (`Meiste Stimmen: …` or `Bester Termin: …`) and `n Antworten · …`. An open poll
+    has the kind line only. The editor reads the same lines (`parsePoll` of the
+    ui-kit).
+    """
+    if not lines or _POLL_META_RE.match(lines[0]) is None:
+        return None
+    meta = lines[0]
+    date = meta == "Terminumfrage"
+    rows: list[dict[str, object]] = []
+    abstentions: int | None = None
+    top = ""
+    footer: str | None = None
+    notes: list[str] = []
+    for line in lines[1:]:
+        top_match = _POLL_TOP_RE.match(line)
+        row_match = _POLL_ROW_RE.match(line)
+        if top_match:
+            top = top_match.group(1).strip()
+        elif row_match is None and _POLL_BALLOTS_RE.match(line):
+            footer = line
+        elif line == _POLL_LEGEND:
+            continue
+        elif row_match and row_match.group(1) == "Enthaltungen" and not row_match.group(3):
+            abstentions = int(row_match.group(2))
+        elif row_match and (row_match.group(3) is not None) == date:
+            maybe = row_match.group(3)
+            rows.append(
+                {
+                    "label": row_match.group(1),
+                    "count": int(row_match.group(2)),
+                    "maybe": int(maybe) if maybe is not None else None,
+                }
+            )
+        else:
+            notes.append(line)
+    best = _top_labels(top, [str(row["label"]) for row in rows])
+    for row in rows:
+        row["top"] = row["label"] in best
+    return {
+        "kind": "date" if date else "multi" if "Mehrfachwahl" in meta else "single",
+        "meta": meta,
+        "rows": rows,
+        "abstentions": abstentions,
+        "footer": footer,
         "notes": notes,
     }
 
@@ -668,7 +758,8 @@ class _Converter:
         A callout without a tally line, such as the election of several candidates,
         has no Ja/Nein/Enthaltung counts. `counts` is then false, and the template
         draws the body without the three boxes. An election also gets `election`
-        (see `_election`), and the template draws its ranking.
+        (see `_election`), and the template draws its ranking. A poll gets `poll`
+        (see `_poll`), and the template draws its options the same way.
         """
         lines = self._callout_lines(kids)
         texts = ["".join(_plain(n) for n in line) for line in lines]
@@ -693,10 +784,15 @@ class _Converter:
             "counts": bool(tally),
             "lines": body,
         }
-        election = None if tally else _election([t.strip() for t in texts[1:] if t.strip()])
+        rest = [t.strip() for t in texts[1:] if t.strip()]
+        election = None if tally else _election(rest)
+        poll = None if tally or election is not None else _poll(rest)
         if election is not None:
             # The template draws the ranking; only the question stays a body line.
             node["election"] = election
+            node["lines"] = body[:1]
+        elif poll is not None:
+            node["poll"] = poll
             node["lines"] = body[:1]
         return node
 
