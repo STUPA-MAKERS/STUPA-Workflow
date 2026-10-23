@@ -183,6 +183,8 @@ describe('VoteCardComponent', () => {
       await setup({ vote: closed, canInsert: true, inProtocol: true });
       expect(screen.getByText('Im Protokoll')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
+      // The folded card leaves the result to the text.
+      expect(screen.queryByText('Angenommen')).toBeNull();
     });
 
     it('names a rejection, also a tie (O18), and a missed quorum', async () => {

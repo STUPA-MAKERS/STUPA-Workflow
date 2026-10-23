@@ -3,13 +3,13 @@ import type { PollConfig, PollResult } from '@core/api/models';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { Translate } from '@core/i18n/translations';
-import { SegBarComponent, type SegTone, StatusTextComponent } from '@stupa-makers/ui-kit';
-import { POLL_ABSTAIN, type PollBar, pollBars, pollTopLine } from '../poll.util';
+import { SegBarComponent, type SegTone } from '@stupa-makers/ui-kit';
+import { POLL_ABSTAIN, type PollBar, pollBars } from '../poll.util';
 
 /**
  * The result of a poll ("Umfrage"): the options by votes, highest first. Every tied
- * top option gets the tag "meiste Stimmen". A date poll counts Ja and Vielleicht per
- * date ("3 (+2)", sorted by Ja, then by Ja plus Vielleicht), tags "bester Termin" and
+ * top option gets the filled bar. A date poll counts Ja and Vielleicht per
+ * date ("3 (+2)", sorted by Ja, then by Ja plus Vielleicht) and
  * explains the numbers ("Zahl = Ja, (+n) = Vielleicht"). The footer counts the answers:
  * "n von m haben geantwortet". A poll lists counts only,
  * never a name.
@@ -18,7 +18,7 @@ import { POLL_ABSTAIN, type PollBar, pollBars, pollTopLine } from '../poll.util'
   selector: 'app-poll-result',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [SegBarComponent, StatusTextComponent, TranslatePipe],
+  imports: [SegBarComponent, TranslatePipe],
   host: {
     '[class.bars--beamer]': "variant() === 'beamer'",
   },
@@ -44,8 +44,6 @@ export class PollResultComponent {
   protected readonly bars = computed<PollBar[]>(() =>
     pollBars(this.poll(), this.result(), this.counts(), this.i18n.formatLocale(), this.t),
   );
-  /** "Meiste Stimmen: A, B" or "Bester Termin: …", or `null` without a vote. */
-  protected readonly topLine = computed(() => pollTopLine(this.poll(), this.bars(), this.t));
   /** The base of the bars: the ballots of a date poll, else every vote and abstention. */
   protected readonly base = computed(() => {
     if (this.date()) return Math.max(this.result()?.ballots ?? 0, this.answered());

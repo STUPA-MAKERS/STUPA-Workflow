@@ -155,7 +155,7 @@ export interface PollBar {
   count: number;
   /** A date poll: the Vielleicht answers. `null` otherwise. */
   maybe: number | null;
-  /** "meiste Stimmen" / "bester Termin". */
+  /** One of the options with the most votes (several on a tie). */
   top: boolean;
 }
 
@@ -198,14 +198,6 @@ export function pollBars(
 function topOf(order: readonly string[], counts: Readonly<Record<string, number>>): string[] {
   const most = Math.max(0, ...order.map((id) => counts[id] ?? 0));
   return most > 0 ? order.filter((id) => (counts[id] ?? 0) === most) : [];
-}
-
-/** "Meiste Stimmen: A, B" or "Bester Termin: Di, 03.11. · 18:00", or `null` (no vote). */
-export function pollTopLine(poll: PollConfig, bars: readonly PollBar[], t: Translate): string | null {
-  const names = bars.filter((b) => b.top).map((b) => b.label);
-  if (names.length === 0) return null;
-  const key = poll.mode === 'date' ? 'poll.result.bestDate' : 'poll.result.most';
-  return t(key, { names: names.join(', ') });
 }
 
 // ------------------------------------------------------------------ the editor

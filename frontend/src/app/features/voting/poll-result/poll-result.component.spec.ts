@@ -38,7 +38,7 @@ function rows(): string[] {
 }
 
 describe('PollResultComponent', () => {
-  it('lists the options highest first and tags every tied top option', async () => {
+  it('lists the options highest first and fills the bar of every tied top option', async () => {
     const result: PollResult = {
       counts: { o1: 4, o2: 1, o3: 4 },
       abstentions: 1,
@@ -47,13 +47,8 @@ describe('PollResultComponent', () => {
       top: ['o1', 'o3'],
     };
     const { container } = await setup({ poll: SINGLE, result, answered: 10, total: 12 });
-    expect(rows()).toEqual([
-      'Pizza meiste Stimmen',
-      'Salat meiste Stimmen',
-      'Pasta',
-      'Enthaltungen',
-    ]);
-    expect(screen.getByText('Meiste Stimmen: Pizza, Salat')).toBeInTheDocument();
+    expect(rows()).toEqual(['Pizza', 'Salat', 'Pasta', 'Enthaltungen']);
+    expect(screen.queryByText(/Meiste Stimmen/i)).toBeNull();
     expect(screen.getAllByText('40 %', { exact: false })).toHaveLength(2);
     expect(
       screen.getByText('10 von 12 haben geantwortet'),
@@ -62,7 +57,7 @@ describe('PollResultComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
-  it('a date poll shows "3 (+2)", tags the best date and explains the numbers', async () => {
+  it('a date poll shows "3 (+2)" and explains the numbers', async () => {
     const result: PollResult = {
       counts: { o1: 3, o2: 3, o3: 0 },
       maybe: { o1: 2 },
@@ -75,18 +70,17 @@ describe('PollResultComponent', () => {
     const first = screen.getAllByRole('listitem')[0]!;
     expect(first.querySelector('.bars__count')!.textContent!.trim()).toBe('3');
     expect(first.querySelector('.bars__pct')!.textContent!.trim()).toBe('(+2)');
-    expect(rows()[0]).toMatch(/Di, 3\.11\..*bester Termin$/);
-    expect(rows()[1]).not.toMatch(/bester Termin/);
+    expect(rows()[0]).toMatch(/^Di, 3\.11\./);
+    expect(screen.queryByText(/bester Termin/i)).toBeNull();
     // A date poll has no abstention row.
     expect(rows()).toHaveLength(3);
     expect(screen.getByText('Zahl = Ja, (+n) = Vielleicht')).toBeInTheDocument();
-    expect(screen.getByText(/^Bester Termin: /)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /: 3 Ja, 2 Vielleicht/ })).toBeInTheDocument();
   });
 
   it('without a stored result ranks the revealed counts and names no top without a vote', async () => {
     const { fixture } = await setup({ poll: SINGLE, counts: { o2: 2, o3: 1, abstain: 1 } });
-    expect(rows()).toEqual(['Pasta meiste Stimmen', 'Salat', 'Pizza', 'Enthaltungen']);
+    expect(rows()).toEqual(['Pasta', 'Salat', 'Pizza', 'Enthaltungen']);
     fixture.componentRef.setInput('counts', {});
     fixture.detectChanges();
     expect(rows()).toEqual(['Pizza', 'Pasta', 'Salat', 'Enthaltungen']);

@@ -108,10 +108,7 @@ export function electionSnippet(vote: MeetingVote): string {
   const election = vote.election;
   const result = vote.electionResult ?? null;
   const round = vote.round ?? 1;
-  const lines = [voteSnippetHead(vote)];
-  let meta = `Wahl · ${election?.seats ?? 1} Posten`;
-  if (round > 1) meta += ` · Stichwahl (${round}. Wahlgang)`;
-  lines.push(`> ${meta}`);
+  const lines = [voteSnippetHead(vote), `> ${electionMeta(vote)}`];
   if (!election || !result) return lines.join('\n');
   const names = new Map(election.candidates.map((c) => [c.id, c.name]));
   const yesNo = typeof result.yes === 'number' && typeof result.no === 'number';
@@ -167,6 +164,13 @@ export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
   if (best.length) lines.push(`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`);
   lines.push(`> ${result.ballots} ${result.ballots === 1 ? 'Antwort' : 'Antworten'}`);
   return lines.join('\n');
+}
+
+/** The kind line of an election callout: "Wahl · 2 Posten", a runoff names its round. */
+export function electionMeta(vote: MeetingVote): string {
+  const round = vote.round ?? 1;
+  const meta = `Wahl · ${vote.election?.seats ?? 1} Posten`;
+  return round > 1 ? `${meta} · Stichwahl (${round}. Wahlgang)` : meta;
 }
 
 /** The kind line of a poll callout, as the backend `poll_meta` writes it. */

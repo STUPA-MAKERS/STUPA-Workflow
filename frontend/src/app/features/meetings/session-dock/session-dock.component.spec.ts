@@ -18,7 +18,6 @@ interface Inputs {
   agenda: AgendaItem[];
   topIndex: number;
   attendance: Attendance[];
-  wordCount: number;
   myVote: string | null;
   panel: DockPanel;
 }
@@ -43,7 +42,6 @@ async function setup(over: Partial<Inputs> = {}, media: string[] = []) {
       agenda: AGENDA,
       topIndex: 0,
       attendance: ATTENDANCE,
-      wordCount: 12,
       myVote: null,
       panel: 'none',
       ...over,
@@ -70,16 +68,15 @@ describe('SessionDockComponent', () => {
       expect(on.step).toHaveBeenCalledWith(-1);
     });
 
-    it('shows no position and no word count while no item is open', async () => {
+    it('shows no position while no item is open', async () => {
       await setup({ topIndex: -1 });
       expect(screen.getByText('—')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Nächster TOP' })).toBeDisabled();
-      expect(screen.queryByText(/Wörter/)).toBeNull();
     });
 
-    it('counts the words of the open item and shows the own ballot', async () => {
+    it('shows the own ballot and no word count', async () => {
       await setup({ myVote: 'Ja' });
-      expect(screen.getByText('12 Wörter')).toBeInTheDocument();
+      expect(screen.queryByText(/Wörter/)).toBeNull();
       expect(screen.getByText('Deine Stimme', { exact: false })).toHaveTextContent('Deine Stimme: Ja');
     });
 
@@ -217,7 +214,6 @@ describe('SessionDockComponent', () => {
       expect(screen.getByText('Noch nicht eröffnet')).toBeInTheDocument();
       expect(screen.getByText('3 TOPs vorbereitet')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
-      expect(screen.queryByText(/Wörter/)).toBeNull();
     });
 
     it('marks a missing minute-taker and opens the picker', async () => {
@@ -315,7 +311,6 @@ describe('SessionDockComponent', () => {
       expect(screen.getByText(/^Geschlossen um \d\d:12$/)).toBeInTheDocument();
       expect(screen.getByText('3 TOPs')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Nächster TOP' })).toBeNull();
-      expect(screen.queryByText(/Wörter/)).toBeNull();
     });
 
     it('names every minute-taker once, locked, and keeps the attendance', async () => {

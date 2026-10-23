@@ -152,7 +152,7 @@ describe('poll in the meeting', () => {
       await card(poll());
       expect(screen.getByText('Umfrage beendet')).toBeInTheDocument();
       expect(screen.getByText('Umfrage · Einzelwahl')).toBeInTheDocument();
-      expect(screen.getByText('Meiste Stimmen: Ja, Café Mitte')).toBeInTheDocument();
+      expect(screen.queryByText(/Meiste Stimmen/)).toBeNull();
       expect(screen.queryByText('Abgelehnt')).toBeNull();
       expect(screen.queryByText('Angenommen')).toBeNull();
     });
