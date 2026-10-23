@@ -107,14 +107,14 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('0 %')).toBeInTheDocument();
     });
 
-    it('closes and cancels; the close is the danger action, the cancel a text action', async () => {
+    it('closes and cancels; close and cancel are both danger actions', async () => {
       const { on, container } = await setup();
       const close = screen.getByRole('button', { name: 'Abstimmung schließen' });
       expect(close).toHaveClass('btn--danger');
       await userEvent.click(close);
       expect(on.close).toHaveBeenCalledWith('v-1');
       const cancel = screen.getByRole('button', { name: 'Abstimmung abbrechen' });
-      expect(cancel).toHaveClass('btn--text');
+      expect(cancel).toHaveClass('btn--danger');
       await userEvent.click(cancel);
       expect(on.cancel).toHaveBeenCalledWith('v-1');
       // An open vote is part of the record: no delete.
