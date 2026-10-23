@@ -163,3 +163,10 @@ async def test_public_assembly_lists_no_poll_as_a_decision(
     md = await _service(session)._assemble_from_agenda(MID, public=True, tops=tops)
     assert "> Meiste Stimmen: Ja, Café *Mitte*" in md
     assert tops[0].decisions == []
+
+
+def test_build_snippet_writes_one_answer_in_the_singular() -> None:
+    view = PollSnippet(
+        question="Q", meta="Umfrage · Einzelwahl", lines=[PollLine("A", 1)], ballots=1
+    )
+    assert build_poll_snippet(view).endswith("> 1 Antwort")

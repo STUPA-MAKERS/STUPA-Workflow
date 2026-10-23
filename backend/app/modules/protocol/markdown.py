@@ -501,7 +501,7 @@ def build_poll_snippet(view: PollSnippet) -> str:
     if top:
         lead = "Bester Termin" if view.date else "Meiste Stimmen"
         lines.append(f"> {lead}: {', '.join(top)}")
-    lines.append(f"> {view.ballots} Antworten")
+    lines.append(f"> {view.ballots} {'Antwort' if view.ballots == 1 else 'Antworten'}")
     return "\n".join(lines)
 
 

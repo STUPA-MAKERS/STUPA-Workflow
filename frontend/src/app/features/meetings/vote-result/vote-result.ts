@@ -5,7 +5,7 @@ import type {
   VoteCalloutInfo,
   VoteCalloutResolver,
 } from '@stupa-makers/ui-kit/markdown-editor';
-import { voteSnippetQuestion } from '../meetings.util';
+import { pollMeta, voteSnippetQuestion } from '../meetings.util';
 import { electionCaption, electionStatus } from '../../voting/election.util';
 import { pollCaption } from '../../voting/poll.util';
 import { clock } from '@shared/date-format';
@@ -107,16 +107,22 @@ export function voteResultResolver(
   t: Translate,
   locale: string,
 ): VoteCalloutResolver {
-  const byQuestion = new Map<string, MeetingVote>();
+  const byQuestion = new Map<string, MeetingVote[]>();
   for (const v of votes) {
     if (v.status !== 'closed') continue;
     if (v.kind !== 'election' && v.kind !== 'poll' && !(v.question?.trim() || v.title?.trim())) continue;
     // A runoff names its round in the head, so the two rounds of an election
     // keep apart (see `voteSnippetQuestion`).
-    byQuestion.set(normalizeQuestion(voteSnippetQuestion(v)), v);
+    const key = normalizeQuestion(voteSnippetQuestion(v));
+    byQuestion.set(key, [...(byQuestion.get(key) ?? []), v]);
   }
-  return (question) => {
-    const vote = byQuestion.get(normalizeQuestion(question));
+  return (question, lines) => {
+    const found = byQuestion.get(normalizeQuestion(question)) ?? [];
+    // Two votes can share a question. A poll card names its kind in its first line, so
+    // the poll of that kind wins; otherwise the last vote wins.
+    const kind = lines?.[0]?.trim();
+    const last = [...found].reverse();
+    const vote = last.find((v) => v.kind === 'poll' && !!v.poll && pollMeta(v.poll) === kind) ?? last[0];
     return vote ? voteResultInfo(vote, t, locale) : null;
   };
 }
