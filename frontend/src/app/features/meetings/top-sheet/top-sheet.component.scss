@@ -313,25 +313,34 @@
     font-size: var(--fs-h2);
   }
   .ts__bar {
+    row-gap: 0;
     padding-inline: 0 var(--space-4);
   }
-  /* The format buttons take the first row. "Erledigt", the save state and the view
-     switch take the second, on the edges of the text. */
-  .ts__tools {
+  /* The format buttons and the save state take the first row. "Erledigt" and the view
+     switch take the second, on the edges of the text: the three do not fit in one row
+     of a phone, and a save state between them pushed the switch to a third row. A
+     line break of full width (the pseudo element) separates the rows. */
+  .ts__bar::after {
+    content: '';
     flex-basis: 100%;
+    order: 1;
+    height: 0;
+  }
+  .ts__tools {
+    flex: 1 1 auto;
   }
   .ts__bar .ts__spacer {
     display: none;
   }
+  .ts__done,
+  .ts__mode {
+    order: 2;
+    margin-top: var(--space-2);
+  }
   .ts__done {
-    order: 1;
     margin-inline-start: var(--space-4);
   }
-  .ts__save {
-    order: 2;
-  }
   .ts__mode {
-    order: 3;
     margin-inline-start: auto;
   }
   .ts__rule {

@@ -201,10 +201,16 @@
   .sd__chips {
     flex: 1 1 100%;
   }
+  /* The attendance chip keeps its full text; the keeper chip takes the rest of the row
+     and shortens its name. A centred chip narrower than its content would push the icon
+     out over its start edge. */
   .sd__chip {
-    flex: 1 1 0;
+    flex: 0 0 auto;
     justify-content: center;
     padding: 0 var(--space-3);
+  }
+  .sd__chip:has(.sd__chipText) {
+    flex: 1 1 0;
   }
 }
 

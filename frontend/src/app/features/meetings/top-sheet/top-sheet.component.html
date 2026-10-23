@@ -132,16 +132,6 @@
             >
               <app-icon name="image" [size]="20" />
             </button>
-            @if (inTable()) {
-              <app-row-menu
-                class="ts__tableMenu"
-                icon="table"
-                align="start"
-                [label]="'meetings.editor.tableMenu' | t"
-                [sections]="tableMenu()"
-                (selected)="onTableMenu($event)"
-              />
-            }
           </div>
         }
         <span class="ts__spacer"></span>
