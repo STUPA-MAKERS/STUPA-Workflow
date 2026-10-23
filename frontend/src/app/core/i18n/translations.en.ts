@@ -1493,7 +1493,6 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'voting.ballot.confirmCount': 'Cast votes ({count})',
   'voting.ballot.confirmProxyCount': 'Cast for {name} ({count})',
   'voting.ballot.confirmNames': '{label}: {names}',
-  'voting.ballot.final': 'You cannot change the vote afterwards.',
   'voting.ballot.thanks': 'Thank you! Your vote: {choice}',
   'voting.ballot.thanksSecret': 'Thank you! Your vote is cast.',
   'voting.ballot.locked': 'You cannot change the vote.',

@@ -202,11 +202,6 @@ export class VotePanelComponent {
     }),
   );
 
-  /** The fixed line while the counts are hidden (the strip has no progress block). */
-  protected readonly hiddenKey = computed<TranslationKey>(() =>
-    this.secret() ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
-  );
-
   /** The ballot shows while the vote is open and the person holds a ballot. */
   protected readonly showBallot = computed(
     () => this.isOpen() && (this.own() !== null || !!this.proxyName()),

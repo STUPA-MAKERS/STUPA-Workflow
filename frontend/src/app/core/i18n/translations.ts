@@ -1526,7 +1526,6 @@ export const de = {
   'voting.ballot.confirmCount': 'Stimmen abgeben ({count})',
   'voting.ballot.confirmProxyCount': 'Für {name} abgeben ({count})',
   'voting.ballot.confirmNames': '{label}: {names}',
-  'voting.ballot.final': 'Die Stimme lässt sich danach nicht ändern.',
   'voting.ballot.thanks': 'Danke! Deine Stimme: {choice}',
   'voting.ballot.thanksSecret': 'Danke! Deine Stimme ist abgegeben.',
   'voting.ballot.locked': 'Eine Änderung der Stimme ist nicht möglich.',

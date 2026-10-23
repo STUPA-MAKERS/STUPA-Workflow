@@ -87,9 +87,7 @@ describe('VotePanelComponent', () => {
       vote: vote({ secret: true, quorum: { type: 'count', value: 12 }, majorityRule: 'absolute' }),
     });
     expect(screen.getByText('Absolute Mehrheit · Quorum 12 · geheime Abstimmung')).toBeInTheDocument();
-    expect(
-      screen.getByText('Geheime Abstimmung: Das Ergebnis zeigt sich nach dem Schließen.'),
-    ).toBeInTheDocument();
+    expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
   });
 
   it('reads the rule and a percent quorum from the config', async () => {

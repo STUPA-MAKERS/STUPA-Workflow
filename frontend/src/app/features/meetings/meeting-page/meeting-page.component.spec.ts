@@ -178,8 +178,8 @@ describe('MeetingPageComponent', () => {
       const blocked = screen.getByRole('button', { name: 'Sitzung schließen' });
       expect(blocked).toBeDisabled();
       expect(blocked).toHaveAttribute('title', 'Erst die offene Abstimmung schließen oder abbrechen.');
-      // The reason is also visible text: a disabled button takes no focus and no touch.
-      expect(screen.getByText('Erst die offene Abstimmung schließen oder abbrechen.', { selector: '.mp__blocked' })).toBeVisible();
+      // No line beside the button: the reason is its tooltip only.
+      expect(screen.queryByText('Erst die offene Abstimmung schließen oder abbrechen.')).toBeNull();
       await userEvent.click(blocked);
       expect(on.closeSession).toHaveBeenCalledTimes(1);
     });

@@ -49,7 +49,7 @@ describe('BallotComponent · poll', () => {
       const { caster, castDone, container } = await setup(DATE_POLL);
       const user = userEvent.setup();
       expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
-      const first = row(/03\.11\./);
+      const first = row(/ 3\.11\./);
       expect(first.getAllByRole('radio').map((b) => b.textContent?.trim())).toEqual([
         'Ja',
         'Vielleicht',
@@ -62,7 +62,7 @@ describe('BallotComponent · poll', () => {
       expect(submit).toBeDisabled();
       // A second click changes the answer before the cast.
       await user.click(first.getByRole('radio', { name: 'Vielleicht' }));
-      await user.click(row(/04\.11\./).getByRole('radio', { name: 'Nein' }));
+      await user.click(row(/ 4\.11\./).getByRole('radio', { name: 'Nein' }));
       expect(submit).toBeEnabled();
       expect(await runAxe(container)).toHaveNoViolations();
 
@@ -71,7 +71,7 @@ describe('BallotComponent · poll', () => {
       expect(castDone).toHaveBeenCalled();
       // The answer never changes after the cast: the rows lock and keep the answers.
       for (const b of screen.getAllByRole('radio')) expect(b).toBeDisabled();
-      expect(row(/03\.11\./).getByRole('radio', { name: 'Vielleicht' })).toHaveAttribute(
+      expect(row(/ 3\.11\./).getByRole('radio', { name: 'Vielleicht' })).toHaveAttribute(
         'aria-checked',
         'true',
       );
@@ -81,7 +81,7 @@ describe('BallotComponent · poll', () => {
     it('shows the cast answers of an open poll, none of a secret one', async () => {
       const own: MyBallot = { cast: true, choice: null, answers: { o1: 'yes', o2: 'no' } };
       await setup(DATE_POLL, { own });
-      expect(row(/03\.11\./).getByRole('radio', { name: 'Ja' })).toHaveAttribute('aria-checked', 'true');
+      expect(row(/ 3\.11\./).getByRole('radio', { name: 'Ja' })).toHaveAttribute('aria-checked', 'true');
       expect(screen.queryByRole('button', { name: 'Antworten abgeben' })).toBeNull();
     });
 

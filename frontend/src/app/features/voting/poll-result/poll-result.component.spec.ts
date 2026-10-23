@@ -75,7 +75,7 @@ describe('PollResultComponent', () => {
     const first = screen.getAllByRole('listitem')[0]!;
     expect(first.querySelector('.bars__count')!.textContent!.trim()).toBe('3');
     expect(first.querySelector('.bars__pct')!.textContent!.trim()).toBe('(+2)');
-    expect(rows()[0]).toMatch(/03\.11\..*bester Termin$/);
+    expect(rows()[0]).toMatch(/Di, 3\.11\..*bester Termin$/);
     expect(rows()[1]).not.toMatch(/bester Termin/);
     // A date poll has no abstention row.
     expect(rows()).toHaveLength(3);

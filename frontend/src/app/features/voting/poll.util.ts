@@ -11,7 +11,6 @@ import type {
   VoteStatus,
 } from '@core/api/models';
 import type { Translate } from '@core/i18n/translations';
-import { clock, dayMonth, weekdayName } from '@shared/date-format';
 import type { StatusView } from '@shared/status-kind.util';
 
 /** The bounds of the server (`PollConfig`). */
@@ -49,14 +48,48 @@ export function pollAsElection(poll: PollConfig): ElectionConfig {
   };
 }
 
-/** "Di, 03.11. · 18:00–20:00": the label of a date option in the local time zone. */
+/** The time zone of the meetings. A date option shows in it, as the protocol writes it. */
+export const POLL_TZ = 'Europe/Berlin';
+const WEEKDAYS_DE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+
+/** The parts of an instant in the time zone of the meetings. */
+function berlinParts(iso: IsoDateTime): Record<string, string> {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', {
+      timeZone: POLL_TZ,
+      weekday: 'short',
+      day: 'numeric',
+      month: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date(iso))
+      .map((p) => [p.type, p.value]),
+  );
+}
+
+/**
+ * "Di, 3.11. · 18:00–20:00": the label of a date option in the time zone of the meetings.
+ * The protocol snippet (`pollSnippet`) and the backend write the same text, so a card and
+ * the protocol show the same date. A locale other than German names the weekday in it.
+ */
 export function dateOptionLabel(
   start: IsoDateTime,
   end: IsoDateTime | null | undefined,
   locale: string,
 ): string {
-  const head = `${weekdayName(start, locale)}, ${dayMonth(start, locale)} · ${clock(start, locale)}`;
-  return end ? `${head}–${clock(end, locale)}` : head;
+  const s = berlinParts(start);
+  const index = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(s['weekday'] ?? '');
+  const weekday = locale.startsWith('de')
+    ? (WEEKDAYS_DE[index] ?? '')
+    : new Intl.DateTimeFormat(locale, { timeZone: POLL_TZ, weekday: 'short' }).format(new Date(start));
+  let text = `${weekday}, ${Number(s['day'])}.${Number(s['month'])}. · ${s['hour']}:${s['minute']}`;
+  if (end) {
+    const e = berlinParts(end);
+    text += `–${e['hour']}:${e['minute']}`;
+  }
+  return text;
 }
 
 /** The label of a poll option: its text, or its date. */
@@ -236,9 +269,17 @@ export function pollInOf(draft: PollDraft): PollIn {
   };
 }
 
-/** The label of a date option in the editor list. */
+/**
+ * The label of a date option in the editor list: the day and the times as typed, in the
+ * form of `dateOptionLabel`.
+ */
 export function draftDateLabel(o: PollOptionDraft, locale: string): string {
   const start = localMoment(o.date, o.start);
   if (!start) return o.date;
-  return dateOptionLabel(start, o.end ? localMoment(o.date, o.end) : null, locale);
+  const day = new Date(`${o.date}T12:00:00Z`);
+  const weekday = locale.startsWith('de')
+    ? (WEEKDAYS_DE[day.getUTCDay()] ?? '')
+    : new Intl.DateTimeFormat(locale, { timeZone: 'UTC', weekday: 'short' }).format(day);
+  const head = `${weekday}, ${day.getUTCDate()}.${day.getUTCMonth() + 1}. · ${o.start}`;
+  return o.end ? `${head}–${o.end}` : head;
 }

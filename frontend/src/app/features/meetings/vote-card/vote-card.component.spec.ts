@@ -66,8 +66,8 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('3 von 4 Anwesenden haben abgestimmt')).toBeInTheDocument();
       expect(screen.getByText('75 %')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: '3 von 4 Anwesenden haben abgestimmt' })).toBeInTheDocument();
-      // No interim tally for the lead: the fixed text instead of the counts.
-      expect(screen.getByText('Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.')).toBeInTheDocument();
+      // No interim tally for the lead, and no line that explains it.
+      expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
       expect(screen.queryByRole('definition')).toBeNull();
     });
 
@@ -82,7 +82,7 @@ describe('VoteCardComponent', () => {
     it('names the hidden result of a secret vote and a percentage quorum', async () => {
       await setup({ vote: vote({ secret: true, quorum: { type: 'percent', value: 50 } }) });
       expect(screen.getByText(/geheime Abstimmung · Quorum 50 %/)).toBeInTheDocument();
-      expect(screen.getByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeInTheDocument();
+      expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
     });
 
     it('names a secret vote that another manager opened live, before the next read', async () => {
@@ -98,7 +98,7 @@ describe('VoteCardComponent', () => {
         }),
       });
       expect(screen.getByText(/^geheime Abstimmung · seit \d\d:\d\d$/)).toBeInTheDocument();
-      expect(screen.getByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeInTheDocument();
+      expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
       expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
     });
 

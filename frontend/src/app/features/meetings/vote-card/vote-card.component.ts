@@ -180,9 +180,13 @@ export class VoteCardComponent {
     };
   });
 
+  /** A closed vote whose result is in the text: the card keeps its head, the text has the counts. */
+  protected readonly folded = computed(() => this.vote().status === 'closed' && this.inProtocol());
+
   /** The counts are visible: after the close, or once every present member voted. */
   protected readonly showCounts = computed(() => {
     const v = this.vote();
+    if (this.folded()) return false;
     return v.counts !== null && (v.status === 'closed' || v.revealed);
   });
 

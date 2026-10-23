@@ -347,3 +347,29 @@
     padding: var(--space-2) var(--space-2) var(--space-2) var(--space-1);
   }
 }
+
+/* The full text on the phone: the item already has its head above, so the card shows
+   only the text. */
+.fv__fullTop ::ng-deep .ts__head,
+.fv__fullTop ::ng-deep .ts__keepers,
+.fv__fullTop ::ng-deep .ts__rule {
+  display: none;
+}
+/* The protocol of the item is a box like the attendance below it: caption, text, the
+   button that opens the rest. The full text grows in the same box. */
+.fv__excerpt {
+  gap: 10px;
+  padding: var(--space-4) 18px;
+  border-radius: var(--radius-xl);
+  background: var(--color-surface-1);
+}
+.fv__excerptText:not(.fv__muted) {
+  color: var(--color-text);
+}
+.fv__fullTop ::ng-deep .ts {
+  border-radius: 0;
+  background: transparent;
+}
+.fv__fullTop ::ng-deep .ts__editor {
+  padding: 0;
+}

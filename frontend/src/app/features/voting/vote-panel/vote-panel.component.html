@@ -55,8 +55,6 @@
     [voted]="v.tally.voted ?? 0"
     [total]="turnoutTotal()"
     [basis]="basis()"
-    [secret]="secret()"
-    [hidden]="!showBars()"
   />
 }
 
@@ -79,16 +77,12 @@
   />
 }
 
-@if (layout() === 'strip' && isOpen() && !showBars()) {
-  <p class="vpn__summary">{{ hiddenKey() | t }}</p>
-} @else if (layout() !== 'phone' && layout() !== 'strip' && isOpen()) {
+@if (layout() !== 'phone' && layout() !== 'strip' && isOpen()) {
   <hr class="vpn__hr" />
   <app-vote-progress
     [voted]="v.tally.voted ?? 0"
     [total]="turnoutTotal()"
     [basis]="basis()"
-    [secret]="secret()"
-    [hidden]="!showBars()"
   />
 }
 

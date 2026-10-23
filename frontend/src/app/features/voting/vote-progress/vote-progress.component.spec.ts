@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/angular';
 import { VoteProgressComponent } from './vote-progress.component';
 
 async function setup(
-  inputs: Partial<{ voted: number; total: number; basis: 'present' | 'eligible'; secret: boolean; hidden: boolean; size: 'normal' | 'fat' }>,
+  inputs: Partial<{ voted: number; total: number; basis: 'present' | 'eligible'; size: 'normal' | 'fat' }>,
 ) {
   return render(VoteProgressComponent, { inputs: { voted: 14, total: 19, ...inputs } });
 }
@@ -15,24 +15,10 @@ describe('VoteProgressComponent', () => {
     expect(screen.getByRole('img', { name: '14 von 19 Anwesenden haben abgestimmt' })).toBeInTheDocument();
   });
 
-  it('shows no tally while the vote runs, only the fixed line', async () => {
+  it('shows no tally and no line about it while the vote runs', async () => {
     await setup({});
-    expect(
-      screen.getByText('Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.'),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Ja|Nein|Enthaltung/)).not.toBeInTheDocument();
-  });
-
-  it('names the close for a secret vote', async () => {
-    await setup({ secret: true });
-    expect(
-      screen.getByText('Geheime Abstimmung: Das Ergebnis zeigt sich nach dem Schließen.'),
-    ).toBeInTheDocument();
-  });
-
-  it('drops the line once the server revealed the counts', async () => {
-    await setup({ hidden: false });
     expect(screen.queryByText(/Zwischenstand/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Ja|Nein|Enthaltung/)).not.toBeInTheDocument();
   });
 
   it('counts a vote without a meeting against the eligible voters', async () => {

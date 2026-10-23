@@ -130,10 +130,6 @@
     <div class="ballot__spacer" aria-hidden="true" [style.height.px]="barHeight()"></div>
   }
   <div #bar class="ballot__bar">
-    <p class="ballot__lock">
-      <app-icon name="lock" [size]="13" />
-      {{ 'voting.ballot.final' | t }}
-    </p>
     <app-button
       variant="fill"
       [size]="compact() ? 'md' : 'lg'"
