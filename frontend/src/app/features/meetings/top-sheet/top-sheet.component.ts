@@ -13,6 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { RouterLink } from '@angular/router';
@@ -25,6 +26,8 @@ import {
   EmptyStateComponent,
   IconComponent,
   type IconName,
+  MEDIA,
+  mediaQuery,
   NoteComponent,
   RowMenuComponent,
   type RowMenuItem,
@@ -127,6 +130,7 @@ function altOf(file: File): string {
     ButtonComponent,
     EmptyStateComponent,
     FormsModule,
+    NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     IconComponent,
@@ -190,8 +194,19 @@ export class TopSheetComponent {
   readonly startRename = output<AgendaItem>();
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();
-  /** "Erledigt" in the head: set or remove the done mark of the open item. */
+  /** "Erledigt" in the bar: set or remove the done mark of the open item. */
   readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
+
+  private readonly phone = mediaQuery(MEDIA.phone);
+
+  /**
+   * The save state sits in the footer of a live protocol, so the bar keeps one row. A
+   * phone keeps it in the bar: there the footer is at the end of the text.
+   */
+  protected readonly saveInFoot = computed(() => {
+    const m = this.meeting();
+    return !!this.protocol() && m.status !== 'closed' && !this.follow() && !this.phone();
+  });
 
   protected readonly tools = TOOLS;
 

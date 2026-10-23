@@ -24,7 +24,7 @@
   flex: none;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-5) var(--space-4) var(--space-2) 28px;
+  padding: var(--space-5) 28px var(--space-2);
 }
 .ts__done {
   flex: none;
@@ -129,9 +129,11 @@
   flex: none;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-2) 2px;
+  gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-5) 10px;
+  /* The glyph of the first tool sits on the edge of the text: 28px minus the inset of
+     the glyph in its 40px button. Every control on the right ends on that edge too. */
+  padding: 0 28px 10px 14px;
 }
 .ts__tools {
   display: flex;
@@ -178,7 +180,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding-inline-end: var(--space-2);
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
@@ -216,6 +217,13 @@
 .ts__editor ::ng-deep .mde__host .ProseMirror {
   min-height: 16rem;
   line-height: 1.7;
+}
+/* A paragraph keeps the gap of a list, so a blank line in the text shows as one. */
+.ts__editor ::ng-deep .mde__host .ProseMirror > p {
+  margin: var(--space-2) 0;
+}
+.ts__editor ::ng-deep .mde__host .ProseMirror > p:first-child {
+  margin-top: 0;
 }
 /* A read-only text (a final protocol, a reader) is a text to read: full contrast, as on
    the boards. The missing format bar already says that nobody types here. */
@@ -286,7 +294,7 @@
 /* Phone: the title may take two lines, and the gutters shrink. */
 @include bp.phone {
   .ts__head {
-    padding: var(--space-4) var(--space-2) var(--space-2) var(--space-4);
+    padding: var(--space-4) var(--space-4) var(--space-2);
   }
   .ts__title {
     display: -webkit-box;
@@ -305,12 +313,26 @@
     font-size: var(--fs-h2);
   }
   .ts__bar {
-    padding-inline: var(--space-2);
+    padding-inline: 0 var(--space-4);
   }
-  /* The format buttons and the save state take the first row, the view switch the second. */
-  .ts__mode {
+  /* The format buttons take the first row. "Erledigt", the save state and the view
+     switch take the second, on the edges of the text. */
+  .ts__tools {
+    flex-basis: 100%;
+  }
+  .ts__bar .ts__spacer {
+    display: none;
+  }
+  .ts__done {
     order: 1;
-    margin-inline: var(--space-2) 0;
+    margin-inline-start: var(--space-4);
+  }
+  .ts__save {
+    order: 2;
+  }
+  .ts__mode {
+    order: 3;
+    margin-inline-start: auto;
   }
   .ts__rule {
     margin-inline: var(--space-4);
@@ -330,7 +352,6 @@
 /* The switch between the formatted text and its Markdown source. */
 .ts__mode {
   flex: none;
-  margin-inline-end: var(--space-3);
 }
 
 /* The Markdown source: the same type size and inset as the formatted text, so the text
