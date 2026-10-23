@@ -2,7 +2,7 @@
 <section class="vc" [attr.aria-label]="v.question || ('meetings.vote.untitled' | t)">
   <div class="vc__status">
     <app-status-text class="vc__cap" [kind]="status().kind">{{ capKey() | t }}</app-status-text>
-    @if (result(); as r) {
+    @if (!folded() && result(); as r) {
       <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
     }
   </div>
@@ -13,7 +13,7 @@
   @if (meta() && !folded()) {
     <p class="vc__meta">{{ meta() }}</p>
   }
-  @if (v.result === 'rejected' && v.failedReason === 'quorum') {
+  @if (!folded() && v.result === 'rejected' && v.failedReason === 'quorum') {
     <p class="vc__fail">{{ 'vote.failedQuorum' | t }}</p>
   }
 
