@@ -82,16 +82,6 @@
 .mp__beamer {
   flex: none;
 }
-/* Why the close is disabled, beside the button. */
-.mp__blocked {
-  flex: 0 1 13rem;
-  min-width: 8rem;
-  font-size: var(--fs-small);
-  line-height: 1.125rem;
-  color: var(--color-text-muted);
-  text-align: end;
-}
-
 /* ------------------------------------------------------------------ body */
 .mp__body {
   display: flex;

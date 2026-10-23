@@ -66,8 +66,10 @@ describe('poll.util', () => {
   });
 
   it('labels the options, the captions, the status and the picks', () => {
-    expect(dateOptionLabel('2026-11-04T16:00:00Z', null, 'de-DE')).toMatch(/^Mi, 04\.11\. · \d\d:00$/);
-    expect(pollOptionLabel(DATE.options[0]!, 'de-DE')).toMatch(/^Di, 03\.11\. · \d\d:00–\d\d:00$/);
+    // A date shows in the time zone of the meetings, whatever the device: 16:00 UTC is 17:00 in Berlin.
+    expect(dateOptionLabel('2026-11-04T16:00:00Z', null, 'de-DE')).toBe('Mi, 4.11. · 17:00');
+    expect(dateOptionLabel('2026-11-04T16:00:00Z', null, 'en')).toBe('Wed, 4.11. · 17:00');
+    expect(pollOptionLabel(DATE.options[0]!, 'de-DE')).toMatch(/^Di, 3\.11\. · \d\d:00–\d\d:00$/);
     expect(pollLabelOf(TEXT, 'o1', 'de-DE')).toBe('Pizza');
     expect(pollLabelOf(null, 'o9', 'de-DE')).toBe('o9');
     expect(pollCaption(DATE, t)).toBe('Terminumfrage');
@@ -111,7 +113,7 @@ describe('poll.util', () => {
       t,
     );
     expect(dates.map((b) => b.maybe)).toEqual([0]);
-    expect(pollTopLine(DATE, dates, t)).toMatch(/^Bester Termin: Di, 03\.11\./);
+    expect(pollTopLine(DATE, dates, t)).toMatch(/^Bester Termin: Di, 3\.11\./);
     expect(pollTopLine(DATE, [], t)).toBeNull();
   });
 
@@ -157,8 +159,8 @@ describe('poll.util', () => {
     });
 
     it('labels a date of the list', () => {
-      expect(draftDateLabel(date(1, '2026-11-03', '18:00', '20:00'), 'de-DE')).toBe('Di, 03.11. · 18:00–20:00');
-      expect(draftDateLabel(date(2, '2026-11-03', '18:00'), 'de-DE')).toBe('Di, 03.11. · 18:00');
+      expect(draftDateLabel(date(1, '2026-11-03', '18:00', '20:00'), 'de-DE')).toBe('Di, 3.11. · 18:00–20:00');
+      expect(draftDateLabel(date(2, '2026-11-03', '18:00'), 'de-DE')).toBe('Di, 3.11. · 18:00');
       expect(draftDateLabel(date(3, '2026-11-03', ''), 'de-DE')).toBe('2026-11-03');
     });
   });

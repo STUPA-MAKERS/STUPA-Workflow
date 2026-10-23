@@ -56,7 +56,7 @@ describe('BallotComponent', () => {
     expect(caster).not.toHaveBeenCalled();
     expect(choice('Ja')).toHaveAttribute('aria-pressed', 'true');
     expect(confirmButton()).toHaveTextContent('Stimme abgeben: Ja');
-    expect(screen.getByText('Die Stimme lässt sich danach nicht ändern.')).toBeInTheDocument();
+    expect(screen.queryByText('Die Stimme lässt sich danach nicht ändern.')).not.toBeInTheDocument();
 
     await user.click(choice('Nein'));
     expect(confirmButton()).toHaveTextContent('Stimme abgeben: Nein');

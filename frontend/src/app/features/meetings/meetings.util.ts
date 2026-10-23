@@ -11,6 +11,7 @@
 
 import type { MeetingVote, PollConfig, PollOption } from '@core/api/models';
 import { escapeHtml, markdownToSafeHtml } from '@shared/markdown/markdown.util';
+import { dateOptionLabel } from '../voting/poll.util';
 
 export { escapeHtml };
 
@@ -177,34 +178,10 @@ export function pollMeta(poll: PollConfig): string {
     : 'Umfrage · Mehrfachwahl';
 }
 
-const SNIPPET_TZ = 'Europe/Berlin';
-const WEEKDAYS = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
-
 /** "Di, 3.11. · 18:00–20:00" in the time zone of the protocol, as the backend writes it. */
 function pollSnippetLabel(option: PollOption): string {
   if (!option.start) return option.label ?? option.id;
-  const part = (iso: string): Record<string, string> =>
-    Object.fromEntries(
-      new Intl.DateTimeFormat('en-GB', {
-        timeZone: SNIPPET_TZ,
-        weekday: 'short',
-        day: 'numeric',
-        month: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hourCycle: 'h23',
-      })
-        .formatToParts(new Date(iso))
-        .map((p) => [p.type, p.value]),
-    );
-  const s = part(option.start);
-  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(s['weekday'] ?? '');
-  let text = `${WEEKDAYS[day] ?? ''}, ${Number(s['day'])}.${Number(s['month'])}. · ${s['hour']}:${s['minute']}`;
-  if (option.end) {
-    const e = part(option.end);
-    text += `–${e['hour']}:${e['minute']}`;
-  }
-  return text;
+  return dateOptionLabel(option.start, option.end, 'de');
 }
 
 function oneLine(text: string): string {
