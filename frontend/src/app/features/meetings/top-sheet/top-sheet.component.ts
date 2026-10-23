@@ -29,9 +29,6 @@ import {
   MEDIA,
   mediaQuery,
   NoteComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
   type StatusKind,
@@ -42,7 +39,6 @@ import {
   MarkdownEditorComponent,
   type MarkdownFormat,
   type MarkdownImageUploader,
-  type MarkdownTableCommand,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { MediaApiService } from '@shared/markdown/media-api.service';
 import {
@@ -76,15 +72,6 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'bold', icon: 'bold', label: 'meetings.editor.bold' },
   { format: 'italic', icon: 'italic', label: 'meetings.editor.italic' },
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
-];
-
-/** The items of the table menu, in the order of the menu. */
-const TABLE_ITEMS: readonly { id: MarkdownTableCommand; label: TranslationKey; icon: IconName; danger?: boolean }[] = [
-  { id: 'addRowAfter', label: 'meetings.editor.addRow', icon: 'plus' },
-  { id: 'addColumnAfter', label: 'meetings.editor.addColumn', icon: 'plus' },
-  { id: 'deleteRow', label: 'meetings.editor.deleteRow', icon: 'minus' },
-  { id: 'deleteColumn', label: 'meetings.editor.deleteColumn', icon: 'minus' },
-  { id: 'deleteTable', label: 'meetings.editor.deleteTable', icon: 'trash', danger: true },
 ];
 
 /** The file name without its extension, as the alt text of an uploaded image. */
@@ -137,7 +124,6 @@ function altOf(file: File): string {
     MarkdownEditorComponent,
     MarkdownImageUploadDirective,
     NoteComponent,
-    RowMenuComponent,
     ProtocolBarComponent,
     SegmentedComponent,
     StatusTextComponent,
@@ -304,26 +290,6 @@ export class TopSheetComponent {
     }
   };
 
-  /** The cursor of the formatted view is in a table. */
-  protected readonly inTable = computed(
-    () => this.mode() !== 'raw' && (this.editor()?.inTable() ?? false),
-  );
-
-  /** The table menu: rows, columns and the whole table. */
-  protected readonly tableMenu = computed<RowMenuSection[]>(() => {
-    this.i18n.locale();
-    return [
-      {
-        items: TABLE_ITEMS.map((item) => ({
-          id: item.id,
-          icon: item.icon,
-          danger: item.danger,
-          label: this.i18n.translate(item.label),
-        })),
-      },
-    ];
-  });
-
   /** The formats at the cursor. The Markdown source shows none as pressed. */
   protected readonly activeFormats = computed(() =>
     this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
@@ -375,11 +341,6 @@ export class TopSheetComponent {
       return;
     }
     this.rawUpload()?.pick();
-  }
-
-  /** An item of the table menu. */
-  protected onTableMenu(item: RowMenuItem): void {
-    this.editor()?.tableCommand(item.id as MarkdownTableCommand);
   }
 
   /** An edit in the formatted editor. A reader changes nothing, also when the editor emits. */

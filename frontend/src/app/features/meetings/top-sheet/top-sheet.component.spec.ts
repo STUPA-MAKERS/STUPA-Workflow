@@ -142,24 +142,15 @@ describe('TopSheetComponent', () => {
     expect(screen.getByRole('button', { name: 'Fett' })).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('inserts a table and an image from the bar and edits the table from its menu', async () => {
+  it('inserts a table and an image from the bar', async () => {
     const view = await setup();
     const editor = editorOf(view);
     const table = jest.spyOn(editor, 'insertTable');
     const pick = jest.spyOn(editor, 'pickImage').mockImplementation(() => undefined);
-    const command = jest.spyOn(editor, 'tableCommand');
     await userEvent.click(screen.getByRole('button', { name: 'Tabelle einfügen' }));
     expect(table).toHaveBeenCalled();
     await userEvent.click(screen.getByRole('button', { name: 'Bild einfügen' }));
     expect(pick).toHaveBeenCalled();
-    editor.inTable.set(true);
-    view.fixture.detectChanges();
-    await userEvent.click(screen.getByRole('button', { name: 'Tabelle bearbeiten' }));
-    await userEvent.click(screen.getByRole('menuitem', { name: 'Zeile einfügen' }));
-    expect(command).toHaveBeenCalledWith('addRowAfter');
-    editor.inTable.set(false);
-    view.fixture.detectChanges();
-    expect(screen.queryByRole('button', { name: 'Tabelle bearbeiten' })).toBeNull();
   });
 
   it('uploads an image of the editor through the media service and reports an error', async () => {
