@@ -121,9 +121,8 @@ export function voteResultResolver(
     // Two votes can share a question. A poll card names its kind in its first line, so
     // the poll of that kind wins; otherwise the last vote wins.
     const kind = lines?.[0]?.trim();
-    const vote =
-      found.findLast((v) => v.kind === 'poll' && !!v.poll && pollMeta(v.poll) === kind) ??
-      found.at(-1);
+    const last = [...found].reverse();
+    const vote = last.find((v) => v.kind === 'poll' && !!v.poll && pollMeta(v.poll) === kind) ?? last[0];
     return vote ? voteResultInfo(vote, t, locale) : null;
   };
 }
