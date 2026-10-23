@@ -462,14 +462,12 @@ describe('MeetingPageComponent', () => {
       await userEvent.click(screen.getByRole('button', { name: 'Vorheriger TOP' }));
       expect(on.selectTop).toHaveBeenCalledWith('t-1');
       expect(on.nextTop).toHaveBeenCalledTimes(1);
-      expect(screen.getByText('1 Wörter')).toBeInTheDocument();
     });
 
-    it('steps nowhere without an open item and counts no words', async () => {
+    it('steps nowhere without an open item', async () => {
       const { fixture, on } = await setup({ top: null, topIndex: -1 });
       fixture.componentInstance.step(1);
       expect(on.selectTop).not.toHaveBeenCalled();
-      expect(screen.queryByText(/Wörter/)).toBeNull();
       fixture.componentRef.setInput('top', AGENDA[0]);
       fixture.componentRef.setInput('topIndex', 0);
       fixture.detectChanges();

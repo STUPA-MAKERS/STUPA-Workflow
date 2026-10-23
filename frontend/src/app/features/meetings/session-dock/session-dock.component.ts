@@ -80,7 +80,6 @@ export class SessionDockComponent {
   /** The 0-based index of the item open in the sheet, or -1. */
   readonly topIndex = input.required<number>();
   readonly attendance = input.required<Attendance[]>();
-  readonly wordCount = input(0);
   /** The own ballot of the open vote ("Ja", "abgegeben"), or `null`. */
   readonly myVote = input<string | null>(null);
   readonly panel = model<DockPanel>('none');

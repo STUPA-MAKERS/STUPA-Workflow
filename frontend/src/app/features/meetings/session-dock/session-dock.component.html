@@ -68,11 +68,6 @@
       <ng-container [ngTemplateOutlet]="presentChip" />
     }
   </div>
-
-  @if (m.status === 'live' && topIndex() >= 0) {
-    <span class="sd__vr sd__vr--end" aria-hidden="true"></span>
-    <span class="sd__words mono">{{ 'meetings.dock.words' | t: { n: wordCount() } }}</span>
-  }
 </div>
 
 <ng-template #presentChip>
