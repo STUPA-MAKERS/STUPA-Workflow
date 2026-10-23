@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Literal
 
-from app.shared.config_schemas import ElectionConfig, Quorum, VoteConfig
+from app.shared.config_schemas import ElectionConfig, PollConfig, Quorum, VoteConfig
 
 YES = "yes"
 NO = "no"
@@ -321,3 +321,95 @@ def draw_lot(
         pool.remove(pick)
         drawn.append(pick)
     return drawn
+
+
+# ------------------------------------------------------------------- polls
+#
+# A poll ballot of a single or a multi poll holds the chosen option ids as a JSON list
+# (``[]`` = abstention), as an election ballot does. A date poll ballot holds a JSON
+# object with one answer per option id: ``yes``, ``maybe`` or ``no``. A poll only
+# counts: no quorum, no majority, no tie break.
+
+
+def encode_poll_answers(answers: Mapping[str, str]) -> str:
+    """Return the stored form of a date poll ballot (a JSON object, sorted keys)."""
+    return json.dumps(dict(answers), separators=(",", ":"), sort_keys=True)
+
+
+def decode_poll_answers(raw: str | None) -> dict[str, str] | None:
+    """Read a stored date poll ballot. A value that is not an object of texts gives None."""
+    if raw is None:
+        return None
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(value, dict) or not all(isinstance(v, str) for v in value.values()):
+        return None
+    return {str(k): v for k, v in value.items()}
+
+
+@dataclass(frozen=True, slots=True)
+class PollOutcome:
+    """Derived result of a poll tally, with no I/O."""
+
+    # Votes per option id. A date poll counts the Ja answers here.
+    counts: dict[str, int]
+    # A date poll: the Vielleicht answers per option id. None for the other modes.
+    maybe: dict[str, int] | None
+    # Ballots without an option (single and multi only).
+    abstentions: int
+    # Cast ballots (turnout).
+    ballots: int
+    # The option ids, highest first. Equal options keep the order of the creator.
+    order: tuple[str, ...]
+    # The options with the most votes ("meiste Stimmen", "bester Termin"): every tied
+    # option, none while no option has a vote.
+    top: tuple[str, ...]
+
+    def display_counts(self) -> dict[str, int]:
+        """Return the counts for the tally card: per option, plus ``abstain`` (no date)."""
+        if self.maybe is not None:
+            return dict(self.counts)
+        return {**self.counts, ABSTAIN: self.abstentions}
+
+
+def tally_poll(choices: Iterable[str | None], config: PollConfig) -> PollOutcome:
+    """Count a poll.
+
+    Every stored ballot counts as one ballot. An unknown option id, a repeated id, a
+    pick beyond the limit and an unknown answer do not count (the cast path refuses
+    them anyway). A single or multi poll ranks by votes; a date poll ranks by the Ja
+    answers, then by Ja plus Vielleicht.
+    """
+    raw = list(choices)
+    known = config.option_ids
+    counts = dict.fromkeys(known, 0)
+    if config.mode == "date":
+        maybe = dict.fromkeys(known, 0)
+        for item in raw:
+            for oid, answer in (decode_poll_answers(item) or {}).items():
+                if oid in counts and answer == YES:
+                    counts[oid] += 1
+                elif oid in maybe and answer == "maybe":
+                    maybe[oid] += 1
+
+        def key(oid: str) -> tuple[int, int]:
+            return (counts[oid], counts[oid] + maybe[oid])
+
+        order = tuple(sorted(known, key=lambda oid: (-key(oid)[0], -key(oid)[1])))
+        best = key(order[0])
+        top = tuple(oid for oid in order if key(oid) == best) if best[1] > 0 else ()
+        return PollOutcome(counts, maybe, 0, len(raw), order, top)
+    abstentions = 0
+    for item in raw:
+        picks = [c for c in dict.fromkeys(decode_election_choice(item) or []) if c in counts]
+        picks = picks[: config.choice_limit]
+        for oid in picks:
+            counts[oid] += 1
+        if not picks:
+            abstentions += 1
+    order = tuple(sorted(known, key=lambda oid: -counts[oid]))
+    most = counts[order[0]]
+    top = tuple(oid for oid in order if counts[oid] == most) if most > 0 else ()
+    return PollOutcome(counts, None, abstentions, len(raw), order, top)

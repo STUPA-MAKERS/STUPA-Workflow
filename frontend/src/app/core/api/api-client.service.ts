@@ -97,11 +97,14 @@ import type {
   TransitionResult,
   Uuid,
   VersionOutWire,
+  PollCreateBody,
+  PollIn,
   Vote,
   VoteClosed,
   VoteKind,
   VoteListItem,
   VoteListQuery,
+  BallotChoice,
   BallotResult,
 } from './models';
 
@@ -612,6 +615,7 @@ export class ApiClient {
     for (const status of query.status ?? []) params = params.append('status', status);
     if (query.gremiumId) params = params.set('gremiumId', query.gremiumId);
     if (query.q) params = params.set('q', query.q);
+    if (query.kind) params = params.set('kind', query.kind);
     if (query.limit !== undefined) params = params.set('limit', String(query.limit));
     if (query.offset !== undefined) params = params.set('offset', String(query.offset));
     return this.http.get<Page<VoteListItem>>(`${this.base}/votes`, {
@@ -626,13 +630,22 @@ export class ApiClient {
    * A ballot never changes after the cast. A second cast gives 409 with the code
    * `already_voted`. Another 409 means that the vote is not open. 403 = not
    * eligible. The components evaluate the status. A personnel election with several
-   * candidates takes the list of the chosen candidate ids (`[]` = full abstention).
+   * candidates takes the list of the chosen candidate ids (`[]` = full abstention). A
+   * single or multi poll takes the chosen option ids, a date poll one answer per date.
    */
-  castBallot(id: Uuid, choice: string | readonly string[], asDelegation = false): Observable<BallotResult> {
+  castBallot(id: Uuid, choice: BallotChoice, asDelegation = false): Observable<BallotResult> {
     return this.http.post<BallotResult>(`${this.base}/votes/${id}/ballot`, {
       choice,
       asDelegation,
     });
+  }
+
+  /**
+   * POST /votes — create a poll of a Gremium, without a meeting (gremium `vote.manage`).
+   * Without `draft` it opens at once and the members get the mail `poll_started`.
+   */
+  createPoll(body: PollCreateBody): Observable<Vote> {
+    return this.http.post<Vote>(`${this.base}/votes`, body);
   }
 
   /** POST /meetings — create a meeting (gremium `session.manage`, or admin). */
@@ -880,6 +893,13 @@ export class ApiClient {
     });
   }
 
+  /** PUT /meetings/{id}/agenda/{itemId}/done — set or remove the done mark of an item. */
+  setAgendaDone(meetingId: Uuid, itemId: Uuid, done: boolean): Observable<AgendaItem[]> {
+    return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/${itemId}/done`, {
+      done,
+    });
+  }
+
   /** PUT /meetings/{id}/agenda/order — order items in the supplied sequence. */
   reorderAgenda(meetingId: Uuid, itemIds: Uuid[]): Observable<AgendaItem[]> {
     return this.http.put<AgendaItem[]>(`${this.base}/meetings/${meetingId}/agenda/order`, {
@@ -910,6 +930,8 @@ export class ApiClient {
       kind?: VoteKind;
       seats?: number;
       candidates?: { name: string; principalId?: Uuid | null }[];
+      /** `poll` opens a poll on a free-text item: its mode and options. */
+      poll?: PollIn;
       /** Prepare the question only; it opens later. */
       draft?: boolean;
     },
@@ -1021,7 +1043,7 @@ export class ApiClient {
   }
 
   /** POST /public/meetings/{code}/votes/{voteId}/ballot — the ballot of an admitted guest. */
-  castGuestBallot(code: string, voteId: Uuid, choice: string | readonly string[]): Observable<BallotResult> {
+  castGuestBallot(code: string, voteId: Uuid, choice: BallotChoice): Observable<BallotResult> {
     return this.http.post<BallotResult>(
       `${this.base}/public/meetings/${code}/votes/${voteId}/ballot`,
       { choice },

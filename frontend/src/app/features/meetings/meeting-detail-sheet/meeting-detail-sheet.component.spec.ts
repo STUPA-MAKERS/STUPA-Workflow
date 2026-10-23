@@ -96,9 +96,9 @@ describe('MeetingDetailSheetComponent', () => {
     expect(fixture.nativeElement.querySelector('.ms')).toHaveClass('ms--split');
   });
 
-  it('marks the done and the current agenda items and names the non-public one', async () => {
+  it('marks the ticked and the current agenda items and names the non-public one', async () => {
     const { http, fixture } = await setup();
-    flush(http);
+    flush(http, 'm-1', { agenda: [{ ...AGENDA[0], doneAt: '2026-10-15T16:10:00Z' }, AGENDA[1], AGENDA[2]] });
     fixture.detectChanges();
     const rows = within(screen.getAllByRole('list')[0]).getAllByRole('listitem');
     expect(rows).toHaveLength(3);
@@ -113,6 +113,16 @@ describe('MeetingDetailSheetComponent', () => {
     expect(rows[1].querySelector('.ms__topSub')).toBeNull();
     expect(screen.queryByText(/Freitext/)).toBeNull();
     expect(screen.getByText('3 TOPs')).toBeInTheDocument();
+  });
+
+  it('marks only a stored tick as done, not every item before the current one', async () => {
+    const { http, fixture } = await setup({ meeting: { ...LIVE, currentAgendaItemId: 't-3' } });
+    flush(http, 'm-1', { agenda: [AGENDA[0], { ...AGENDA[1], doneAt: '2026-10-15T16:20:00Z' }, AGENDA[2]] });
+    fixture.detectChanges();
+    const rows = within(screen.getAllByRole('list')[0]).getAllByRole('listitem');
+    expect(within(rows[0]).queryByText('behandelt')).toBeNull();
+    expect(within(rows[1]).getByText('behandelt')).toBeInTheDocument();
+    expect(within(rows[2]).getByText('Jetzt')).toBeInTheDocument();
   });
 
   it('gives a non-public free-text item only its marker as the sub line', async () => {
@@ -236,8 +246,9 @@ describe('MeetingDetailSheetComponent', () => {
     fixture.detectChanges();
     expect(screen.getByText('18:04–21:40')).toBeInTheDocument();
     expect(screen.getByText('Protokoll: Mara Keller')).toBeInTheDocument();
-    // A closed meeting marks no item.
+    // A closed meeting has no "now", and no item has a tick.
     expect(screen.queryByText('behandelt')).toBeNull();
+    expect(screen.queryByText('Jetzt')).toBeNull();
     expect(screen.queryByRole('button', { name: /Beamer-Ansicht/ })).toBeNull();
     expect(screen.getByText('Final')).toBeInTheDocument();
     const pdf = screen.getByRole('link', { name: 'Öffnen' });

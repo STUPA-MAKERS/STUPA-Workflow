@@ -131,6 +131,7 @@ export function liveOpenedVote(
     ...(msg.kind === 'election'
       ? { kind: msg.kind, election: msg.election ?? null, round: msg.round ?? 1 }
       : {}),
+    ...(msg.kind === 'poll' ? { kind: msg.kind, poll: msg.poll ?? null } : {}),
   };
 }
 
@@ -226,10 +227,15 @@ export function voteRulesParts(vote: VoteRules, t: Translate, options: VoteRules
 
 /**
  * The rules line of a vote card: "Einfache Mehrheit · offene Abstimmung · Quorum 12 ·
- * seit 18:48" ({@link voteRulesParts}, then the time of the open or the end).
+ * seit 18:48" ({@link voteRulesParts}, then the time of the open or the end). A poll
+ * shows only its secrecy and the time.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
-  const parts = voteRulesParts(vote, translate);
+  // A poll has no majority and no quorum: only the secrecy applies.
+  const parts =
+    vote.kind === 'poll'
+      ? voteRulesParts({ secret: vote.secret }, translate)
+      : voteRulesParts(vote, translate);
   if (vote.status === 'open') {
     const since = clock(vote.openedAt, toFormatLocale(i18nLocale));
     if (since) parts.push(translate('meetings.vote.since', { time: since }));

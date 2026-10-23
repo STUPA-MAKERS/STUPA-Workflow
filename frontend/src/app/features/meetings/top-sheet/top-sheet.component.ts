@@ -21,6 +21,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
+  ButtonComponent,
   EmptyStateComponent,
   IconComponent,
   type IconName,
@@ -104,6 +105,9 @@ function altOf(file: File): string {
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
  * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
  *
+ * A writer of the minutes (`editable`) ticks the open item with "Erledigt" right of the
+ * title, a toggle that also removes the tick ("TOP abhaken").
+ *
  * The participant view (`follow`) reads the same sheet without a protocol of its own.
  *
  * A switch in the format bar shows the text formatted or as its Markdown source. The
@@ -120,6 +124,7 @@ function altOf(file: File): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     EmptyStateComponent,
     FormsModule,
     RouterLink,
@@ -185,6 +190,8 @@ export class TopSheetComponent {
   readonly startRename = output<AgendaItem>();
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();
+  /** "Erledigt" in the head: set or remove the done mark of the open item. */
+  readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
 
   protected readonly tools = TOOLS;
 

@@ -23,6 +23,7 @@ from app.modules.notifications import (
     captured,
     comments,
     mentions,
+    polls,
     privacy,
     tickets,
     todos,
@@ -307,6 +308,20 @@ TEMPLATE_CATALOGUE: tuple[MailTemplateSpec, ...] = (
         tickets.TICKET_MESSAGE_SUBJECT,
         tickets.TICKET_MESSAGE_BODY,
         tickets.TICKET_MESSAGE_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        polls.POLL_STARTED_KEY,
+        polls.POLL_STARTED_KEY,
+        polls.POLL_STARTED_SUBJECT,
+        polls.POLL_STARTED_BODY,
+        polls.POLL_PLACEHOLDERS,
+    ),
+    MailTemplateSpec(
+        polls.POLL_REMINDER_KEY,
+        polls.POLL_REMINDER_KEY,
+        polls.POLL_REMINDER_SUBJECT,
+        polls.POLL_REMINDER_BODY,
+        polls.POLL_PLACEHOLDERS,
     ),
     MailTemplateSpec(
         todos.TODO_ASSIGNED_KEY,

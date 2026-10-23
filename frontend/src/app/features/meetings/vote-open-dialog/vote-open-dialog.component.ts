@@ -41,10 +41,12 @@ import {
 } from '@stupa-makers/ui-kit';
 import { FIXED_VOTE_OPTIONS } from '../meetings-display.util';
 import { problemDetail } from '@core/api/problem';
+import { PollEditorComponent } from '../../voting/poll-editor/poll-editor.component';
+import { type PollDraft, emptyPollDraft, pollDraftValid, pollInOf } from '../../voting/poll.util';
 import { personLabel } from '@shared/person-label.util';
 
 const MAJORITY_RULES: readonly MajorityRule[] = ['simple', 'absolute', 'two_thirds'];
-const KINDS: readonly VoteKind[] = ['motion', 'election'];
+const KINDS: readonly VoteKind[] = ['motion', 'election', 'poll'];
 /** The bounds of the server (`ElectionConfig`). */
 export const MAX_SEATS = 50;
 export const MAX_CANDIDATES = 50;
@@ -76,6 +78,11 @@ export interface CandidateDraft {
  * default, and guests vote only when the lead switches them on. The dialog cannot
  * submit while there are fewer candidates than seats.
  *
+ * A free-text item also takes a poll ("Umfrage"): a question and two to twenty
+ * options in one of three modes. A poll only counts the answers: it has no quorum and
+ * no majority, and it never fires a branch. It is open unless the lead switches
+ * "Geheime Umfrage" on.
+ *
  * "Vorbereiten" saves the question as a draft without opening it, so the lead can
  * prepare the votes before the meeting starts. The vote card opens the draft later. A
  * planned meeting, or a meeting with another open vote, only prepares (`canOpen`).
@@ -99,6 +106,7 @@ export interface CandidateDraft {
     SelectFieldComponent,
     SwitchComponent,
     DecisionEditorComponent,
+    PollEditorComponent,
   ],
   templateUrl: './vote-open-dialog.component.html',
   styleUrl: './vote-open-dialog.component.scss',
@@ -161,14 +169,18 @@ export class VoteOpenDialogComponent {
   readonly freeName = signal('');
   /** An election is secret by default. */
   readonly electionSecret = signal(true);
+  /** The poll: its mode and options, and the switch "Geheime Umfrage". */
+  readonly poll = signal<PollDraft>(emptyPollDraft());
+  readonly pollSecret = signal(false);
   private nextKey = 1;
 
   readonly kindOptions = computed<SegmentedOption[]>(() =>
     KINDS.map((v) => ({ value: v, label: this.i18n.translate(`meetings.vote.kind.${v}`) })),
   );
-  /** An election is only possible on a free-text item. */
+  /** An election and a poll are only possible on a free-text item. */
   readonly electionAllowed = computed(() => !this.item()?.applicationId);
   readonly isElection = computed(() => this.kind() === 'election');
+  readonly isPoll = computed(() => this.kind() === 'poll');
 
   /** The roster members that are no candidate yet, for the picker. */
   readonly memberOptions = computed<SelectFieldOption[]>(() => {
@@ -202,6 +214,7 @@ export class VoteOpenDialogComponent {
     );
   });
   readonly canSubmit = computed(() => {
+    if (this.isPoll()) return pollDraftValid(this.poll()) && this.question().trim().length > 0;
     if (!this.isElection()) return !this.proposalInvalid();
     return !this.tooFew() && !this.nameTwice() && this.question().trim().length > 0;
   });
@@ -277,11 +290,13 @@ export class VoteOpenDialogComponent {
     this.candidates.set([]);
     this.freeName.set('');
     this.electionSecret.set(true);
+    this.poll.set(emptyPollDraft());
+    this.pollSecret.set(false);
   }
 
   setKind(value: string | null): void {
-    if (value !== 'motion' && value !== 'election') return;
-    if (value === 'election' && !this.electionAllowed()) return;
+    if (value !== 'motion' && value !== 'election' && value !== 'poll') return;
+    if (value !== 'motion' && !this.electionAllowed()) return;
     this.kind.set(value);
     const it = this.item();
     // Guests vote in an election only when the lead switches them on.
@@ -376,7 +391,16 @@ export class VoteOpenDialogComponent {
     const guests = this.guestsAllowed()
       ? { guestsVote: this.guestsVote() && !this.guestsLocked() }
       : {};
-    const body = this.isElection()
+    const body = this.isPoll()
+      ? {
+          agendaItemId: it.id,
+          kind: 'poll' as const,
+          question: this.question().trim(),
+          poll: pollInOf(this.poll()),
+          secret: this.pollSecret(),
+          ...guests,
+        }
+      : this.isElection()
       ? {
           agendaItemId: it.id,
           kind: 'election' as const,

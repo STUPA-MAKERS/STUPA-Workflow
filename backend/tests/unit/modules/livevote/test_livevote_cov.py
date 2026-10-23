@@ -1544,6 +1544,8 @@ def _agenda_item(
         body=body,
         position=position,
         non_public=non_public,
+        done_at=None,
+        done_by=None,
     )
 
 
@@ -2380,6 +2382,11 @@ class _FakeAgendaService:
         self.actors.append(actor)
         return []
 
+    async def set_done(self, meeting_id, item_id, *, done, actor) -> list[Any]:  # noqa: ANN001
+        self.calls.append(f"set_done:{done}")
+        self.actors.append(actor)
+        return []
+
 
 class _FakeVotingService:
     def __init__(self) -> None:
@@ -2390,9 +2397,10 @@ class _FakeVotingService:
         self._vote = SimpleNamespace(id=uuid4(), meeting_id=None)
 
     async def create_internal(  # noqa: ANN201
-        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False  # noqa: ANN001
+        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False, actor=None  # noqa: ANN001, E501
     ):
         self.created.append((application_id, meeting_id, agenda_item_id))
+        self.actor = actor
         self.planned_ok = planned_ok
         self.last_payload = payload
         return self._vote
@@ -3779,3 +3787,248 @@ async def test_check_draft_open_reads_the_meeting_and_runs_the_checks(
     principal = Principal(sub="p", permissions=set(), roles=[])
     assert await vote_open.check_draft_open(_QueueSession(), out.id, vid, principal) == 4  # type: ignore[arg-type]
     assert seen == [(out, vid)]
+
+
+# The done mark of an agenda item ("TOP abhaken")
+async def test_set_done_marks_the_item(audit_calls: list[dict[str, Any]]) -> None:
+    m = _meeting(status="live")
+    item = _agenda_item()
+    # _meeting, the item lookup, then list()._meeting
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
+    await AgendaService(sess).set_done(m.id, item.id, done=True, actor="keeper")  # type: ignore[arg-type]
+    assert item.done_at is not None
+    assert item.done_at.tzinfo is not None
+    assert item.done_by == "keeper"
+    assert sess.committed == 1
+    [entry] = audit_calls
+    assert entry["action"].value == "agenda_item_done"
+    assert entry["actor"] == "keeper"
+    assert entry["data"]["agendaItemId"] == str(item.id)
+    assert "via" not in entry["data"]
+
+
+async def test_set_done_false_reopens_the_item(audit_calls: list[dict[str, Any]]) -> None:
+    m = _meeting(status="planned")
+    item = _agenda_item()
+    item.done_at = datetime(2026, 6, 8, tzinfo=UTC)
+    item.done_by = "keeper"
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
+    await AgendaService(sess).set_done(m.id, item.id, done=False, actor="mgr")  # type: ignore[arg-type]
+    assert item.done_at is None
+    assert item.done_by is None
+    [entry] = audit_calls
+    assert entry["action"].value == "agenda_item_reopened"
+
+
+@pytest.mark.parametrize("done", [True, False])
+async def test_set_done_without_change_writes_nothing(
+    done: bool, audit_calls: list[dict[str, Any]]
+) -> None:
+    m = _meeting(status="live")
+    item = _agenda_item()
+    first = datetime(2026, 6, 8, tzinfo=UTC) if done else None
+    item.done_at = first
+    item.done_by = "first" if done else None
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]])
+    await AgendaService(sess).set_done(m.id, item.id, done=done, actor="other")  # type: ignore[arg-type]
+    # A second tick keeps the time and the person of the first one.
+    assert item.done_at == first
+    assert item.done_by == ("first" if done else None)
+    assert audit_calls == []
+
+
+async def test_set_done_after_close_with_draft_protocol_ok(
+    audit_calls: list[dict[str, Any]],
+) -> None:
+    m = _meeting(status="closed")
+    item = _agenda_item()
+    sess = _QueueSession(executes=[res(m), res(item), res(m)], scalars_q=[[]], scalar_q=["draft"])
+    await AgendaService(sess).set_done(m.id, item.id, done=True, actor="mgr")  # type: ignore[arg-type]
+    assert item.done_by == "mgr"
+    assert len(audit_calls) == 1
+
+
+@pytest.mark.parametrize("protocol_status", ["rendering", "final"])
+async def test_set_done_after_close_with_locked_protocol_conflicts(
+    protocol_status: str,
+) -> None:
+    m = _meeting(status="closed")
+    item = _agenda_item()
+    sess = _QueueSession(executes=[res(m), res(item)], scalar_q=[protocol_status])
+    with pytest.raises(ConflictError) as ei:
+        await AgendaService(sess).set_done(m.id, item.id, done=True, actor="mgr")  # type: ignore[arg-type]
+    assert ei.value.code == "protocol_locked"
+    assert item.done_at is None
+
+
+async def test_set_done_item_of_other_meeting_not_found() -> None:
+    m = _meeting(status="live")
+    sess = _QueueSession(executes=[res(m), res()])
+    with pytest.raises(NotFoundError):
+        await AgendaService(sess).set_done(m.id, uuid4(), done=True, actor="mgr")  # type: ignore[arg-type]
+
+
+async def test_set_done_in_tx_names_the_path(audit_calls: list[dict[str, Any]]) -> None:
+    m = _meeting(status="live")
+    item = _agenda_item()
+    sess = _QueueSession(executes=[res(item)])
+    await AgendaService(sess).set_done_in_tx(m, item.id, done=True, actor="k", via="next")  # type: ignore[arg-type]
+    assert sess.committed == 0
+    assert sess.flushed == 1
+    assert audit_calls[0]["data"]["via"] == "next"
+
+
+async def test_agenda_list_carries_the_done_time() -> None:
+    m = _meeting()
+    item = _agenda_item(title="Bericht")
+    item.done_at = datetime(2026, 6, 8, tzinfo=UTC)
+    sess = _QueueSession(executes=[res(m)], scalars_q=[[item], []])
+    [out] = await AgendaService(sess).list(m.id)  # type: ignore[arg-type]
+    assert out.done_at == item.done_at
+    assert out.model_dump(by_alias=True)["doneAt"] == item.done_at
+
+
+@pytest.mark.parametrize(
+    ("status", "keeper", "is_keeper", "can_write", "expected"),
+    [
+        ("live", True, True, True, True),
+        ("live", True, False, True, False),
+        ("live", False, False, True, True),
+        ("planned", True, False, True, True),
+        ("closed", True, False, True, True),
+        ("live", True, True, False, False),
+    ],
+)
+async def test_can_mark_done_follows_the_gate_of_the_text(
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    keeper: bool,
+    is_keeper: bool,
+    can_write: bool,
+    expected: bool,
+) -> None:
+    m = _meeting(status=status)
+    m.protokollant_id = uuid4() if keeper else None
+
+    async def _write(_self: Any, _meeting: Any, _principal: Any) -> bool:
+        return can_write
+
+    async def _is_keeper(_self: Any, _meeting: Any, _principal: Any) -> bool:
+        return is_keeper
+
+    monkeypatch.setattr(MeetingService, "can_write", _write)
+    monkeypatch.setattr(MeetingService, "_is_protokollant", _is_keeper)
+    svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
+    assert await svc.can_mark_done(m, _principal()) is expected
+
+
+def test_meeting_patch_complete_needs_the_move() -> None:
+    from pydantic import ValidationError
+
+    from app.modules.livevote.schemas import MeetingPatch
+
+    with pytest.raises(ValidationError):
+        MeetingPatch.model_validate({"completeAgendaItemId": str(uuid4()), "status": "live"})
+    patch = MeetingPatch.model_validate(
+        {"completeAgendaItemId": str(uuid4()), "currentAgendaItemId": str(uuid4())}
+    )
+    assert patch.complete_agenda_item_id is not None
+
+
+async def test_patch_next_item_marks_the_left_item_done(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.livevote.schemas import MeetingPatch
+
+    m = _meeting(status="live")
+    m.protokollant_id = uuid4()
+    seen: list[dict[str, Any]] = []
+
+    async def _done(_self: Any, meeting: Any, item_id: UUID, **kw: Any) -> None:
+        seen.append({"meeting": meeting, "item": item_id, **kw})
+
+    monkeypatch.setattr(AgendaService, "set_done_in_tx", _done)
+    left, nxt = uuid4(), uuid4()
+    svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[m.id]))  # type: ignore[arg-type]
+    await svc.patch(
+        m.id,
+        MeetingPatch(currentAgendaItemId=nxt, completeAgendaItemId=left),
+        _keeper(monkeypatch),
+    )
+    assert m.current_agenda_item_id == nxt
+    assert seen == [{"meeting": m, "item": left, "done": True, "actor": "keeper", "via": "next"}]
+
+
+async def test_patch_next_item_without_the_done_gate_forbidden(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.modules.livevote.schemas import MeetingPatch
+
+    m = _meeting(status="live")
+
+    async def _no(_self: Any, _meeting: Any, _principal: Any) -> bool:
+        return False
+
+    async def _done(*_a: Any, **_kw: Any) -> None:
+        raise AssertionError("no done mark without the gate")
+
+    monkeypatch.setattr(MeetingService, "can_mark_done", _no)
+    monkeypatch.setattr(AgendaService, "set_done_in_tx", _done)
+    svc = MeetingService(_QueueSession(executes=[res(m)], scalar_q=[m.id]))  # type: ignore[arg-type]
+    with pytest.raises(ForbiddenError):
+        await svc.patch(
+            m.id,
+            MeetingPatch(currentAgendaItemId=uuid4(), completeAgendaItemId=uuid4()),
+            _keeper(monkeypatch),
+        )
+
+
+def test_set_agenda_done_forbidden(app: FastAPI, client: TestClient, fakes) -> None:
+    fakes["meeting"]._meeting_out = _meeting_out(can_write=False)
+    _login(app)
+    r = client.put(f"/api/meetings/{uuid4()}/agenda/{uuid4()}/done", json={"done": True})
+    assert r.status_code == 403
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert fakes["agenda"].calls == []
+
+
+@pytest.mark.parametrize(
+    ("status", "keeper", "is_keeper", "code"),
+    [
+        ("live", True, False, 403),
+        ("live", True, True, 200),
+        ("live", False, False, 200),
+        ("planned", True, False, 200),
+        ("closed", True, False, 200),
+    ],
+)
+def test_set_agenda_done_live_only_the_protokollant(
+    app: FastAPI,
+    client: TestClient,
+    fakes,
+    status: str,
+    keeper: bool,
+    is_keeper: bool,
+    code: int,
+) -> None:
+    out = _meeting_out(status=status, can_write=True, is_protokollant=is_keeper)
+    fakes["meeting"]._meeting_out = out.model_copy(
+        update={"protokollant_id": uuid4() if keeper else None}
+    )
+    _login(app)
+    r = client.put(f"/api/meetings/{uuid4()}/agenda/{uuid4()}/done", json={"done": False})
+    assert r.status_code == code
+    if code == 403:
+        assert r.json()["code"] == "not_protokollant"
+        assert fakes["agenda"].calls == []
+        assert fakes["meeting"].broadcasts == 0
+    else:
+        assert fakes["agenda"].calls == ["set_done:False"]
+        assert fakes["agenda"].actors == ["p"]
+        assert fakes["meeting"].broadcasts == 1
+
+
+def test_set_agenda_done_needs_a_bool(app: FastAPI, client: TestClient, fakes) -> None:
+    _login(app)
+    r = client.put(f"/api/meetings/{uuid4()}/agenda/{uuid4()}/done", json={})
+    assert r.status_code == 422

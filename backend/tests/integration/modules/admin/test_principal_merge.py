@@ -73,6 +73,7 @@ from app.modules.delegations.models import (
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import (
     Meeting,
+    MeetingAgendaItem,
     MeetingAttendance,
     MeetingGuest,
     MeetingSettings,
@@ -309,6 +310,14 @@ async def _seed(maker: async_sessionmaker[AsyncSession]) -> World:
             [
                 ProtocolKeeperPeriod(
                     meeting_id=meeting.id, principal_id=old.id, handed_over_by=old.sub
+                ),
+                # The old account ticked an agenda item as done.
+                MeetingAgendaItem(
+                    meeting_id=meeting.id,
+                    title="TOP 1",
+                    position=0,
+                    done_at=datetime.now(UTC),
+                    done_by=old.sub,
                 ),
                 # #17: the old account decided on a join request of a guest.
                 MeetingGuest(

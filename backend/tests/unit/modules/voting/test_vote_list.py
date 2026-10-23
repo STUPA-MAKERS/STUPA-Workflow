@@ -92,6 +92,30 @@ async def test_scope_reader_of_applications_reads_every_standalone_vote(
     assert "eligible_group IN" not in sql
 
 
+async def test_scope_application_reader_does_not_read_gremium_polls(
+    scope: dict[str, Any],
+) -> None:
+    reader = Principal(sub="r", permissions={"application.read"})
+    sql = _sql(await listing.read_scope(fake_session(), reader))
+    # The standalone application votes, never a poll of a Gremium.
+    assert "vote.kind != %(kind_1)s" in sql
+
+
+async def test_scope_admin_reads_every_standalone_vote_and_poll(scope: dict[str, Any]) -> None:
+    sql = _sql(await listing.read_scope(fake_session(), Principal(sub="a", roles=["admin"])))
+    assert "vote.meeting_id IS NULL" in sql
+    assert "vote.kind" not in sql
+
+
+async def test_scope_application_reader_with_a_gremium_key_reads_its_polls(
+    scope: dict[str, Any],
+) -> None:
+    reader = Principal(sub="r", permissions={"application.read"}, groups={vote_group_key(GID)})
+    sql = _sql(await listing.read_scope(fake_session(), reader))
+    assert "vote.kind != %(kind_1)s" in sql
+    assert "eligible_group IN" in sql
+
+
 async def test_scope_all_meetings_for_view_all(scope: dict[str, Any]) -> None:
     scope["visible"] = None
     clause = await listing.read_scope(
@@ -220,7 +244,14 @@ async def test_service_delegates_to_listing(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(listing, "list_votes", _list)
     out = await VotingService(fake_session()).list_visible(Principal(sub="p"), q="x")
     assert out.total == 0
-    assert seen == {"statuses": None, "gremium_id": None, "q": "x", "limit": 50, "offset": 0}
+    assert seen == {
+        "statuses": None,
+        "gremium_id": None,
+        "q": "x",
+        "kind": None,
+        "limit": 50,
+        "offset": 0,
+    }
 
 
 async def test_meeting_read_scope_all_and_scoped() -> None:
@@ -272,19 +303,32 @@ def test_router_list_passes_filters() -> None:
     svc = _ListService()
     r = _client(svc).get(
         "/api/votes",
-        params=[("status", "open"), ("status", "draft"), ("gremiumId", str(GID)), ("q", "x"),
-                ("limit", "20"), ("offset", "40")],
+        params=[
+            ("status", "open"),
+            ("status", "draft"),
+            ("gremiumId", str(GID)),
+            ("q", "x"),
+            ("kind", "poll"),
+            ("limit", "20"),
+            ("offset", "40"),
+        ],
     )
     assert r.status_code == 200
     body = r.json()
     assert body["total"] == 1
     assert body["items"][0]["canCast"] is True
-    assert body["items"][0]["myBallot"] == {"cast": False, "choice": None, "choices": None}
+    assert body["items"][0]["myBallot"] == {
+        "cast": False,
+        "choice": None,
+        "choices": None,
+        "answers": None,
+    }
     assert svc.kw == {
         "sub": "p",
         "statuses": ["open", "draft"],
         "gremium_id": GID,
         "q": "x",
+        "kind": "poll",
         "limit": 20,
         "offset": 40,
     }
@@ -294,3 +338,10 @@ def test_router_list_rejects_unknown_status_422() -> None:
     r = _client(_ListService()).get("/api/votes", params={"status": "running"})
     assert r.status_code == 422
     assert r.headers["content-type"] == "application/problem+json"
+
+
+async def test_list_filters_by_kind(scope: dict[str, Any]) -> None:
+    db = fake_session(result())
+    await listing.list_votes(db, Principal(sub="x"), kind="poll", limit=5, offset=0)
+    sql = str(db.statements[0].compile(compile_kwargs={"literal_binds": True}))
+    assert "vote.kind = 'poll'" in sql

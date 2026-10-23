@@ -116,6 +116,12 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     )
     round: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
     election_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    # Polls ("Umfrage", ``kind = 'poll'``, ``config`` = PollConfig). A poll only counts:
+    # ``result`` stays NULL, and ``poll_result`` holds the counts of a closed poll. A
+    # poll without a meeting ends at ``closes_at``; ``reminded_at`` records the one
+    # reminder mail 24 h before that end.
+    poll_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
         # ``cancelled``: the application left the vote state manually, so the vote ends
@@ -129,7 +135,7 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
             "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",
             name="vote_result",
         ),
-        CheckConstraint("kind IN ('motion','election')", name="vote_kind"),
+        CheckConstraint("kind IN ('motion','election','poll')", name="vote_kind"),
         Index("ix_vote_application_id", "application_id"),
         Index("ix_vote_status_closes_at", "status", "closes_at"),
     )

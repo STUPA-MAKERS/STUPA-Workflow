@@ -14,6 +14,15 @@ The beamer is read-only. It receives only `meeting_state`, `vote_opened`,
 `vote_tally` and `vote_closed` through the filtered fan-out. A cast from the
 beamer gets `read_only`.
 
+Body draft: while the protokollant of a live meeting types the text of an agenda
+item, the client sends `body_draft` frames. The handler checks the sender against
+the current protokollant on every frame (so a handover takes effect at once), the
+agenda item against the meeting and the UTF-8 size against `AGENDA_BODY_MAX`. It then
+publishes the frame on the meeting channel. It writes nothing to the database and
+no audit entry. More than `_DRAFT_MAX_PER_SECOND` drafts in one second are dropped
+without an answer, and the drafts do not take tokens of the general throttle, so
+typing cannot block a cast.
+
 Cast: the distributed lock `vote:{id}:cast:{sub}` serializes the casts of one
 voter. `VotingService.cast` then runs. A unique constraint in the database backs
 the cast. A ballot never changes after the cast (O11): a second cast gets the error
@@ -42,6 +51,8 @@ from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
 from app.modules.livevote.broker import MeetingBroker
 from app.modules.livevote.events import (
+    BodyDraftEvent,
+    BodyDraftMessage,
     CastMessage,
     ErrorEvent,
     MeetingStateEvent,
@@ -50,7 +61,9 @@ from app.modules.livevote.events import (
     VoteTallyEvent,
 )
 from app.modules.livevote.locks import Locker
+from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.livevote.presence import PRESENCE
+from app.modules.livevote.schemas import AGENDA_BODY_MAX
 from app.modules.livevote.service import BrokerPublisher, MeetingService, meeting_channel
 from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
@@ -81,6 +94,9 @@ _LEAD_EVENTS = frozenset({"guest_requested", "guest_updated"})
 # before any database or lock work.
 _THROTTLE_RATE = 5.0
 _THROTTLE_BURST = 10.0
+# Body drafts of one connection per one-second window. The client sends at most one
+# frame per 300 ms, so only a faulty or hostile client reaches the cap.
+_DRAFT_MAX_PER_SECOND = 10
 
 
 async def account_can_act(db: AsyncSession, sub: str) -> bool:
@@ -129,6 +145,9 @@ class LiveVoteConnection:
         # clock does not affect.
         self._tokens = _THROTTLE_BURST
         self._last_refill = time.monotonic()
+        # Fixed one-second window of the body draft cap.
+        self._draft_window = time.monotonic()
+        self._draft_count = 0
 
     def _allow_frame(self) -> bool:
         """Take one token of the bucket for an inbound frame.
@@ -147,6 +166,20 @@ class LiveVoteConnection:
             return False
         self._tokens -= 1.0
         return True
+
+    def _allow_draft(self) -> bool:
+        """Count one body draft in the current one-second window.
+
+        Returns:
+            True while the window holds at most `_DRAFT_MAX_PER_SECOND` drafts. On
+            False the caller drops the draft without an answer.
+        """
+        now = time.monotonic()
+        if now - self._draft_window >= 1.0:
+            self._draft_window = now
+            self._draft_count = 0
+        self._draft_count += 1
+        return self._draft_count <= _DRAFT_MAX_PER_SECOND
 
     async def _send(self, payload: dict[str, object]) -> None:
         await self.ws.send_json(payload)
@@ -253,6 +286,72 @@ class LiveVoteConnection:
                 return None
         return await self.voting.get(msg.vote_id)
 
+    async def _is_live_protokollant(self) -> bool:
+        """Read whether the principal keeps the minutes of this live meeting now.
+
+        The check reads the meeting row for every draft, so the old protokollant
+        loses the right with the commit of a handover. A deactivated or merged
+        account does not pass. The scope cap of ``protocol.write`` applies.
+        """
+        if not self.principal.scope_allows("protocol.write"):
+            return False
+        count = await self.voting.session.scalar(
+            select(func.count())
+            .select_from(Meeting)
+            .join(PrincipalRow, PrincipalRow.id == Meeting.protokollant_id)
+            .where(
+                Meeting.id == self.meeting_id,
+                Meeting.status == "live",
+                PrincipalRow.sub == self.principal.sub,
+                PrincipalRow.active.is_not(False),
+                PrincipalRow.merged_into.is_(None),
+            )
+        )
+        return bool(count)
+
+    async def _item_in_meeting(self, item_id: UUID) -> bool:
+        """Read whether the agenda item belongs to the meeting of this connection."""
+        count = await self.voting.session.scalar(
+            select(func.count())
+            .select_from(MeetingAgendaItem)
+            .where(
+                MeetingAgendaItem.id == item_id,
+                MeetingAgendaItem.meeting_id == self.meeting_id,
+            )
+        )
+        return bool(count)
+
+    async def _handle_body_draft(self, raw: dict[str, object]) -> None:
+        """Check one body draft and publish it on the meeting channel."""
+        if not self._allow_draft():
+            return
+        if self.beamer:
+            await self._send_error("read_only")
+            return
+        try:
+            msg = BodyDraftMessage.model_validate(raw)
+        except ValidationError:
+            await self._send_error("invalid_message")
+            return
+        # The cap counts UTF-8 bytes, not characters: a character can take up to 4
+        # bytes, and the frame travels as bytes to every viewer.
+        if len(msg.body.encode("utf-8", "surrogatepass")) > AGENDA_BODY_MAX:
+            await self._send_error("too_large")
+            return
+        try:
+            if not await self._is_live_protokollant():
+                await self._send_error("not_protokollant")
+                return
+            if not await self._item_in_meeting(msg.agenda_item_id):
+                await self._send_error("unknown_agenda_item")
+                return
+        finally:
+            await self._end_transaction()
+        await self.broker.publish(
+            meeting_channel(self.meeting_id),
+            BodyDraftEvent(agendaItemId=msg.agenda_item_id, body=msg.body, seq=msg.seq).dump(),
+        )
+
     async def _handle_message(self, raw: dict[str, object]) -> None:
         kind = raw.get("type")
         if kind == "subscribe":
@@ -291,6 +390,11 @@ class LiveVoteConnection:
             except json.JSONDecodeError:
                 # A frame that is not JSON keeps the connection open.
                 await self._send_error("invalid_message")
+                continue
+            # A body draft has its own cap and does not take a token of the
+            # general throttle, so a long run of typing cannot block a cast.
+            if isinstance(raw, dict) and raw.get("type") == "body_draft":
+                await self._handle_body_draft(raw)
                 continue
             # Throttle before any database or lock work. The handler drops the
             # excess frames of a flooding client and keeps the connection open.

@@ -30,6 +30,8 @@ import {
   ScrollFadeDirective,
   ToastService,
 } from '@stupa-makers/ui-kit';
+import { problemDetail } from '@core/api/problem';
+import type { Observable } from 'rxjs';
 import { RailStatusService } from '../../layout/rail-status.service';
 import type { BallotCaster, BallotFailure } from './ballot/ballot.component';
 import { VotePhoneHeaderComponent } from './phone-header/phone-header.component';
@@ -181,7 +183,9 @@ export class VoteCastComponent implements OnDestroy {
     if (this.vote()?.status !== 'open') return null;
     const d = this.delegation();
     if (d?.blocked) {
-      return this.i18n.translate('voting.cast.delegation.blocked', { name: d.delegatedToName || '?' });
+      return this.i18n.translate('voting.cast.delegation.blocked', {
+        name: d.delegatedToName || '?',
+      });
     }
     if (this.own() === null && this.proxyName() === null) {
       return this.i18n.translate('voting.cast.notEligible');
@@ -229,19 +233,40 @@ export class VoteCastComponent implements OnDestroy {
     return null;
   });
 
-  /** The ⋮ menu. The template shows it only while `canDelete` holds. */
-  readonly menu = computed<RowMenuSection[]>(() => [
-    {
-      items: [
-        {
-          id: 'delete',
-          label: this.i18n.translate('voting.delete.action'),
-          icon: 'trash',
-          danger: true,
-        },
-      ],
-    },
-  ]);
+  /**
+   * The poll of a Gremium (no meeting) that the person may manage: "Starten" while it is
+   * a draft, "Umfrage beenden" while it is open. A meeting poll runs in its meeting.
+   */
+  readonly pollAction = computed<'start' | 'close' | null>(() => {
+    const vote = this.loaded();
+    if (!vote || vote.kind !== 'poll' || vote.meetingId || vote.canManage !== true) return null;
+    if (vote.status === 'draft') return 'start';
+    return vote.status === 'open' ? 'close' : null;
+  });
+  /** A poll action runs. */
+  readonly pollBusy = signal(false);
+
+  /** The ⋮ menu: the poll action, then the delete. */
+  readonly menu = computed<RowMenuSection[]>(() => {
+    const items: RowMenuSection['items'][number][] = [];
+    const action = this.pollAction();
+    if (action === 'start') {
+      items.push({ id: 'start', label: this.i18n.translate('poll.action.start'), icon: 'play' });
+    } else if (action === 'close') {
+      items.push({ id: 'close', label: this.i18n.translate('poll.action.close'), icon: 'square' });
+    }
+    if (this.canDelete()) {
+      items.push({
+        id: 'delete',
+        label: this.i18n.translate('voting.delete.action'),
+        icon: 'trash',
+        danger: true,
+      });
+    }
+    return [{ items }];
+  });
+  /** The ⋮ menu has an item. */
+  readonly hasMenu = computed(() => this.menu()[0]!.items.length > 0);
 
   /** Send one ballot. The ballot component locks the row and reports the outcome. */
   readonly caster: BallotCaster = (choice, asDelegation) =>
@@ -273,6 +298,33 @@ export class VoteCastComponent implements OnDestroy {
 
   onMenu(id: string): void {
     if (id === 'delete') this.confirmDelete.set(true);
+    else if (id === 'start' || id === 'close') this.runPoll(id);
+  }
+
+  /** "Starten" opens the draft of a poll, "Umfrage beenden" closes it before its end. */
+  private runPoll(action: 'start' | 'close'): void {
+    const vote = this.loaded();
+    if (!vote || this.pollBusy()) return;
+    this.pollBusy.set(true);
+    const call: Observable<unknown> =
+      action === 'start' ? this.api.openVote(vote.id) : this.api.closeVote(vote.id);
+    call.subscribe({
+      next: () => {
+        this.pollBusy.set(false);
+        this.toast.success(
+          this.i18n.translate(action === 'start' ? 'poll.toast.started' : 'poll.toast.closed'),
+        );
+        this.page?.notify({ id: vote.id, kind: 'updated' });
+        this.reload();
+      },
+      error: (err: unknown) => {
+        this.pollBusy.set(false);
+        const detail = problemDetail(err);
+        const base = this.i18n.translate('meetings.toast.actionFailed');
+        this.toast.error(detail ? `${base}: ${detail}` : base);
+        this.reload();
+      },
+    });
   }
 
   /** The ballot says "Danke! Deine Stimme: Ja" itself, so no toast repeats it. */

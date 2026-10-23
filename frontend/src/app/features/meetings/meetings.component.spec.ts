@@ -1075,11 +1075,26 @@ describe('MeetingsComponent — methods', () => {
       expect(cmp.savingAgenda()).toBe(false);
     });
 
+    it('ticks a TOP and removes the tick', async () => {
+      const { cmp, http } = await loaded();
+      cmp.setDone(AGENDA_ITEM() as never, true);
+      const req = http.expectOne('/api/meetings/m-1/agenda/t-1/done');
+      expect(req.request.method).toBe('PUT');
+      expect(req.request.body).toEqual({ done: true });
+      req.flush([AGENDA_ITEM({ doneAt: '2026-10-15T16:30:00Z' })]);
+      expect(cmp.savingAgenda()).toBe(false);
+      expect(cmp.agenda()[0].doneAt).toBe('2026-10-15T16:30:00Z');
+      cmp.setDone(AGENDA_ITEM() as never, false);
+      http.expectOne('/api/meetings/m-1/agenda/t-1/done').flush(null, { status: 403, statusText: 'Forbidden' });
+      expect(cmp.savingAgenda()).toBe(false);
+    });
+
     it('does nothing on agenda actions without a loaded meeting', async () => {
       const { fixture } = await setup({ id: null });
       const cmp = fixture.componentInstance as Cmp;
       cmp.removeFromAgenda('t-1');
       cmp.setNonPublic(AGENDA_ITEM() as never, true);
+      cmp.setDone(AGENDA_ITEM() as never, true);
       expect(cmp.savingAgenda()).toBe(false);
     });
   });
@@ -2166,6 +2181,23 @@ describe('MeetingsComponent — methods', () => {
       cmp.meeting.set(null);
       cmp.jumpTo('t-2');
       http.expectNone('/api/meetings/m-1');
+    });
+
+    it('ticks the item that the room leaves with "Nächster TOP", in the same request', async () => {
+      const { cmp, http } = await loaded();
+      cmp.meeting.set({ ...MEETING_MODEL, isProtokollant: true, currentAgendaItemId: 't-1' });
+      cmp.agenda.set([AGENDA_ITEM(), AGENDA_ITEM({ id: 't-2', position: 1 })] as never);
+      cmp.jumpNext('t-2', 't-1');
+      expect(cmp.selectedTopId()).toBe('t-2');
+      const req = http.expectOne('/api/meetings/m-1');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ currentAgendaItemId: 't-2', completeAgendaItemId: 't-1' });
+      req.flush({ ...MEETING, currentAgendaItemId: 't-2' });
+      // The tick is on the agenda: the page reads it again.
+      http
+        .expectOne((r) => r.method === 'GET' && r.url === '/api/meetings/m-1/agenda')
+        .flush([AGENDA_ITEM({ doneAt: '2026-10-15T16:30:00Z' }), AGENDA_ITEM({ id: 't-2', position: 1 })]);
+      expect(cmp.agenda()[0].doneAt).toBe('2026-10-15T16:30:00Z');
     });
 
     it('leaves the meeting untouched when the "now" broadcast fails', async () => {

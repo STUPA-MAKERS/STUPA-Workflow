@@ -7,7 +7,7 @@ import type { ClientMessage, MeetingStateMsg, ServerMessage, TodoServerMessage, 
 export interface MeetingChannel {
   /** Stream of JSON messages from the server to the client. */
   messages$: Observable<ServerMessage>;
-  /** Send a client to server frame, that is `cast` or `subscribe`. */
+  /** Send a client to server frame, that is `cast`, `subscribe` or `body_draft`. */
   send(msg: ClientMessage): void;
   close(): void;
 }

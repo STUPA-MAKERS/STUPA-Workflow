@@ -58,6 +58,17 @@ describe('GuestViewComponent', () => {
     expect(screen.queryByText('Personal')).toBeNull();
   });
 
+  it('marks only the ticked items as done, not every item before the current one', async () => {
+    const me = guestMe();
+    const agenda = me.view!.agenda.map((a) => ({ ...a, done: a.id === 'a-4' }));
+    await setup({ ...me, view: { ...me.view!, votes: [], agenda } });
+    const items = [...document.querySelectorAll('.gv__item')];
+    expect(items[0]).not.toHaveClass('gv__item--done');
+    expect(items[0].querySelector('app-top-badge.tb--done')).toBeNull();
+    expect(items[3]).toHaveClass('gv__item--done');
+    expect(items[3].querySelector('app-top-badge.tb--done')).not.toBeNull();
+  });
+
   it('says when no protocol text exists yet', async () => {
     const me = guestMe();
     await setup({ ...me, view: { ...me.view!, votes: [], agenda: me.view!.agenda.map((a) => ({ ...a, body: null })) } });

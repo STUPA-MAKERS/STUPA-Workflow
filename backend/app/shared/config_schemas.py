@@ -19,7 +19,15 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, field_validator, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    HttpUrl,
+    field_validator,
+    model_validator,
+)
 
 from app.shared.guards import (
     ASSIGN_BUDGET_ACTION_TYPES,
@@ -585,6 +593,9 @@ class VoteConfig(_CamelModel):
             # F2: an election row (``vote.kind = 'election'``). The readers of the motion
             # rules (secret, guests, options) get the projection of the election.
             return ElectionConfig.model_validate(data).as_vote_config()
+        if "mode" in data:
+            # A poll row (``vote.kind = 'poll'``): the same projection as an election.
+            return PollConfig.model_validate(data).as_vote_config()
         return cls.model_validate({k: v for k, v in data.items() if k not in _LEGACY_VOTE_KEYS})
 
 
@@ -691,6 +702,106 @@ class ElectionConfig(_CamelModel):
             majorityRule="simple",
             quorum=self.quorum,
             abstainCountsQuorum=self.abstain_counts_quorum,
+            secret=self.secret,
+            tieBreak="tie",
+            guestsVote=self.guests_vote,
+        )
+
+
+# Polls ("Umfrage"). A poll only counts the answers: no quorum, no majority, no lot,
+# no flow branch. ``abstain`` is the key of the abstentions in the counts, so an option
+# id never takes it.
+POLL_MIN_OPTIONS = 2
+POLL_MAX_OPTIONS = 20
+POLL_LABEL_MAX = 200
+PollMode = Literal["single", "multi", "date"]
+DateAnswer = Literal["yes", "maybe", "no"]
+
+
+class PollOption(_CamelModel):
+    """One option of a poll: a text (``label``) or a date (``start``, optional ``end``).
+
+    The server sets ``id`` (``o1``, ``o2``, ...) in the order of the creator. A
+    single and a multi poll take a label, a date poll takes the start and an optional
+    end on the same date. ``PollConfig`` checks which form the mode needs.
+    """
+
+    id: str = Field(min_length=1, max_length=16, pattern=r"^o[0-9]+$")
+    label: str | None = Field(default=None, min_length=1, max_length=POLL_LABEL_MAX)
+    start: AwareDatetime | None = None
+    end: AwareDatetime | None = None
+
+    @field_validator("label")
+    @classmethod
+    def _strip_label(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("the option label is empty")
+        return stripped
+
+    @model_validator(mode="after")
+    def _end_after_start(self) -> PollOption:
+        if self.end is not None and (self.start is None or self.end <= self.start):
+            raise ValueError("the end of a date option must come after its start")
+        return self
+
+
+class PollConfig(_CamelModel):
+    """The rules of one poll, stored as JSONB in ``vote.config`` (``vote.kind = 'poll'``).
+
+    ``single``: one option or an abstention. ``multi``: 0 to ``maxChoices`` options
+    (``[]`` = abstention; no ``maxChoices`` = every option). ``date``: Ja/Vielleicht/
+    Nein for every date. ``secret`` uses the secret ballot tables of a vote.
+    """
+
+    mode: PollMode
+    options: list[PollOption] = Field(min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS)
+    max_choices: int | None = Field(default=None, alias="maxChoices", ge=1)
+    secret: bool = False
+    guests_vote: bool = Field(default=False, alias="guestsVote")
+
+    @model_validator(mode="after")
+    def _check(self) -> PollConfig:
+        ids = self.option_ids
+        if len(set(ids)) != len(ids):
+            raise ValueError("poll option ids must be unique")
+        dated = self.mode == "date"
+        for option in self.options:
+            if dated and (option.start is None or option.label is not None):
+                raise ValueError("a date poll takes a start (and an end) for each option")
+            if not dated and (option.label is None or option.start is not None):
+                raise ValueError("a poll takes a label for each option")
+        if self.max_choices is not None and (
+            self.mode != "multi" or self.max_choices > len(self.options)
+        ):
+            raise ValueError("maxChoices needs a multi poll and at most one per option")
+        return self
+
+    @property
+    def option_ids(self) -> list[str]:
+        return [o.id for o in self.options]
+
+    @property
+    def choice_limit(self) -> int:
+        """Return the most options of one ballot (single: 1, multi: maxChoices)."""
+        if self.mode == "single":
+            return 1
+        return self.max_choices or len(self.options)
+
+    def as_vote_config(self) -> VoteConfig:
+        """Project the poll on the motion rules for the shared vote readers.
+
+        The options are the option ids plus ``abstain`` (a date poll has no
+        abstention). The majority rule of the projection is never applied: the poll
+        tally (``tally.tally_poll``) only counts.
+        """
+        options = self.option_ids if self.mode == "date" else [*self.option_ids, "abstain"]
+        return VoteConfig(
+            options=options,
+            majorityRule="simple",
+            quorum=None,
             secret=self.secret,
             tieBreak="tie",
             guestsVote=self.guests_vote,

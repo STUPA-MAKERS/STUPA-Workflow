@@ -12,8 +12,19 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.modules.applications.decision import DecisionIn
-from app.modules.voting.schemas import ElectionResultOut, MyBallot, VoteKind
-from app.shared.config_schemas import ELECTION_MAX_CANDIDATES, ElectionConfig, Quorum
+from app.modules.voting.schemas import (
+    ElectionResultOut,
+    MyBallot,
+    PollIn,
+    PollResultOut,
+    VoteKind,
+)
+from app.shared.config_schemas import (
+    ELECTION_MAX_CANDIDATES,
+    ElectionConfig,
+    PollConfig,
+    Quorum,
+)
 
 MeetingStatus = Literal["planned", "live", "closed"]
 # #17: admitted guests of a public meeting vote (`vote`) or only follow it (`watch`).
@@ -67,6 +78,10 @@ class MeetingPatch(_CamelModel):
     # The agenda item the room handles now. ``null`` clears it. Needs
     # ``canManageVotes``: the protokollant or the session lead.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
+    # The item that the room leaves on a move to the next item ("Nächster TOP"). The
+    # server sets its done mark in the same transaction. It needs
+    # ``currentAgendaItemId`` in the same patch and the gate of the done mark.
+    complete_agenda_item_id: UUID | None = Field(default=None, alias="completeAgendaItemId")
     status: MeetingStatus | None = None
     # A new title. Needs ``canManage``, like the date and the time. A closed meeting
     # keeps its title (409), because the sent protocol names the meeting.
@@ -87,6 +102,11 @@ class MeetingPatch(_CamelModel):
     def _at_least_one(self) -> MeetingPatch:
         if "title" in self.model_fields_set and self.title is None:
             raise ValueError("title must not be null")
+        if (
+            self.complete_agenda_item_id is not None
+            and "current_agenda_item_id" not in self.model_fields_set
+        ):
+            raise ValueError("completeAgendaItemId needs currentAgendaItemId")
         managed = {
             "title",
             "date",
@@ -171,6 +191,9 @@ class MeetingVoteOut(_CamelModel):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
+    # A poll with its mode and options, and its counts once closed or revealed.
+    poll: PollConfig | None = None
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
 class CurrentAgendaItemOut(_CamelModel):
@@ -415,6 +438,8 @@ class AgendaItemOut(_CamelModel):
     position: int = 0
     # The public protocol PDF redacts a non-public agenda item.
     non_public: bool = Field(default=False, alias="nonPublic")
+    # The time of the done mark ("TOP abhaken"). None for an item that is not done.
+    done_at: _datetime | None = Field(default=None, alias="doneAt")
     # Current application status as an i18n label.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
     # The requested amount of the application (F1: the decision proposal of the vote
@@ -498,6 +523,10 @@ class MeetingVoteOpenBody(_CamelModel):
     # F1: the decision proposal (approved amount, conditions). Only an application
     # agenda item takes it (422 `decision_not_allowed` otherwise).
     proposal: DecisionIn | None = None
+    # A poll (``kind = poll``): the mode and the options as the lead types them. The
+    # server gives the option ids. ``question`` is required, ``options`` and
+    # ``majorityRule`` do not apply, and a poll has no quorum.
+    poll: PollIn | None = None
     # Prepare the question only: the vote stays a draft and does not open.
     draft: bool = False
 
@@ -505,6 +534,10 @@ class MeetingVoteOpenBody(_CamelModel):
     def _min_options(self) -> MeetingVoteOpenBody:
         if len(self.options) < 2:
             raise ValueError("at least two options are required")
+        if (self.kind == "poll") != (self.poll is not None):
+            raise ValueError("a poll (kind poll) takes its options in poll, and only a poll")
+        if self.kind == "poll" and not (self.question or "").strip():
+            raise ValueError("a poll needs its question")
         if self.kind == "election":
             if not (self.question or "").strip():
                 raise ValueError("an election needs the name of the ballot (question)")
@@ -549,6 +582,12 @@ class AgendaAddBody(_CamelModel):
         return self
 
 
+# The longest Markdown text of one agenda item that a live draft frame carries
+# (`body_draft`). It is the cap of the protocol Markdown (`ProtocolPatch.markdown`),
+# because the item texts go into that protocol. The REST route sets no cap of its own.
+AGENDA_BODY_MAX = 512_000
+
+
 class AgendaBodyBody(_CamelModel):
     """``PATCH …/agenda/{itemId}`` — set the markdown body or the title of an item.
 
@@ -560,6 +599,12 @@ class AgendaBodyBody(_CamelModel):
     body: str | None = None
     title: str | None = Field(default=None, min_length=1)
     non_public: bool | None = Field(default=None, alias="nonPublic")
+
+
+class AgendaDoneBody(_CamelModel):
+    """``PUT …/agenda/{itemId}/done`` — set or remove the done mark of an item."""
+
+    done: bool
 
 
 class AgendaReorderBody(_CamelModel):

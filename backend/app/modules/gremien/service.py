@@ -799,6 +799,8 @@ class GremienService:
         gremium_of = func.coalesce(sql_cast(Meeting.gremium_id, Text), Vote.eligible_group)
         where: list[ColumnElement[bool]] = [
             Vote.status == "closed",
+            # A poll only counts: it is no decision of the Gremium.
+            Vote.kind != "poll",
             gremium_of == str(gremium_id),
             await read_scope(self.session, principal),
             self._search(q),

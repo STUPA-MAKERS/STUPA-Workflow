@@ -118,6 +118,7 @@ from app.modules.delegations.models import (
 from app.modules.forms.models import FormVersion
 from app.modules.livevote.models import (
     Meeting,
+    MeetingAgendaItem,
     MeetingAttendance,
     MeetingGuest,
     MeetingSettings,
@@ -195,6 +196,7 @@ SUB_COLUMNS: tuple[tuple[MergeArea, InstrumentedAttribute[Any]], ...] = (
     ("substitutes", DelegationSubstitute.created_by),
     ("meetings", Meeting.created_by),
     ("meetings", ProtocolKeeperPeriod.handed_over_by),
+    ("meetings", MeetingAgendaItem.done_by),
     ("meetings", Protocol.author),
     ("budget", BudgetExpense.actor),
     ("budget", Invoice.actor),

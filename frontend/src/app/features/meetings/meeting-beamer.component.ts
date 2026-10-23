@@ -6,6 +6,8 @@ import type {
   ElectionConfig,
   ElectionResult,
   MajorityRule,
+  PollConfig,
+  PollResult,
   QrMatrix,
   Quorum,
   VoteResult,
@@ -15,6 +17,8 @@ import { IconComponent, SegBarComponent, StatusTextComponent } from '@stupa-make
 import { VoteBarsComponent } from '../voting/vote-bars.component';
 import { ElectionResultComponent } from '../voting/election-result/election-result.component';
 import { electionCaption, electionResultLine, electionStatus } from '../voting/election.util';
+import { PollResultComponent } from '../voting/poll-result/poll-result.component';
+import { pollCaption } from '../voting/poll.util';
 import {
   guestComposition,
   majorityLabel,
@@ -49,6 +53,9 @@ export interface BeamerVote {
   election?: ElectionConfig | null;
   electionResult?: ElectionResult | null;
   round?: number;
+  /** A poll: the mode, the options and the stored counts. */
+  poll?: PollConfig | null;
+  pollResult?: PollResult | null;
 }
 
 /** The join code of a public meeting on the screen (#17): never a name, only the code. */
@@ -108,6 +115,7 @@ interface BeamerText {
     IconComponent,
     QrCodeComponent,
     ElectionResultComponent,
+    PollResultComponent,
     SegBarComponent,
     StatusTextComponent,
     VoteBarsComponent,
@@ -153,6 +161,7 @@ export class MeetingBeamerComponent {
   private describe(v: BeamerVote): BeamerText {
     const t: Translate = (key, params) => this.i18n.translate(key, params);
     if (v.election) return this.describeElection(v, v.election, t);
+    if (v.poll) return this.describePoll(v, v.poll, t);
     const guests = !!v.guestsVote;
     const majority = majorityLabel(v.majorityRule, guests, t);
     const q = v.quorum;
@@ -188,6 +197,21 @@ export class MeetingBeamerComponent {
         ? [t('guests.vote.castN', { n: v.voted }), t('guests.vote.majorityOfCast')].join(' · ')
         : outcome.join(' · '),
       composition,
+    };
+  }
+
+  /** A poll: "Umfrage · Einzelwahl · offene Abstimmung". It has no result. */
+  private describePoll(v: BeamerVote, poll: PollConfig, t: Translate): BeamerText {
+    const rules = [pollCaption(poll, t), secrecyLabel(v.secret, t)].join(' · ');
+    return {
+      bars: v.counts !== null && (v.status === 'closed' || !v.secret),
+      turnout: t('meetings.vote.progress', { voted: v.voted, present: v.present }),
+      hiddenKey: v.secret ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
+      rules,
+      quorumWarning: null,
+      passed: false,
+      outcome: rules,
+      composition: null,
     };
   }
 

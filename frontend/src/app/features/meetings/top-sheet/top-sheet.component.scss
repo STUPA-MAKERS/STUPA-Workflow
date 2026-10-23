@@ -26,6 +26,9 @@
   gap: var(--space-3);
   padding: var(--space-5) var(--space-4) var(--space-2) 28px;
 }
+.ts__done {
+  flex: none;
+}
 .ts__titles {
   display: flex;
   flex: 1 1 auto;

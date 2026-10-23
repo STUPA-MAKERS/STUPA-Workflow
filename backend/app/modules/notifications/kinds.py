@@ -47,4 +47,8 @@ NOTIFICATION_KINDS: tuple[str, ...] = (
     # The user was mentioned in a comment on an application or in a ticket note
     # (`comment_mentioned`, `ticket_mentioned`).
     "mention",
+    # A poll of a Gremium of the user started (members with vote.cast).
+    "poll_started",
+    # Reminder 24 h before the end of a poll that the user has not answered.
+    "poll_reminder",
 )

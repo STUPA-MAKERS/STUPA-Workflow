@@ -78,6 +78,7 @@ class BrokerPublisher:
             electionResult=(
                 vote.election_result.public() if vote.election_result is not None else None
             ),
+            pollResult=vote.poll_result,
         )
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 

@@ -244,6 +244,7 @@ async def test_close_meeting_vote_broadcasts_vote_closed(
         branch_fired=False,
         kind="motion",
         election_result=None,
+        poll_result=None,
     )
 
     class _Closing(_VotingFake):
@@ -564,7 +565,7 @@ async def test_process_deadlines_orchestrates_all(patched: None) -> None:
         FakeSession([[]]),             # discard of unconfirmed guest applications → none
     ]
     out = await wd.process_deadlines(_ctx(sessions))
-    assert out == "reminders=1 actions=1 votes=1 auto=0 discarded=0 todos=0"
+    assert out == "reminders=1 actions=1 votes=1 auto=0 discarded=0 todos=0 polls=0"
 
 
 async def test_todo_due_step_counts_and_survives_a_failure(
@@ -580,6 +581,21 @@ async def test_todo_due_step_counts_and_survives_a_failure(
     assert await wd._process_todo_due({}, NOW) == 2
     monkeypatch.setattr(wd, "process_todo_due", _boom)
     assert await wd._process_todo_due({}, NOW) == 0
+
+
+async def test_poll_reminder_step_counts_and_survives_a_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _one(_ctx: dict[str, Any], _now: datetime) -> int:
+        return 1
+
+    async def _boom(_ctx: dict[str, Any], _now: datetime) -> int:
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(wd, "process_poll_reminders", _one)
+    assert await wd._process_poll_reminders({}, NOW) == 1
+    monkeypatch.setattr(wd, "process_poll_reminders", _boom)
+    assert await wd._process_poll_reminders({}, NOW) == 0
 
 
 @freeze_time(FROZEN)
