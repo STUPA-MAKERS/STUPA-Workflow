@@ -217,6 +217,10 @@
   .mp__sheet {
     min-height: 60dvh;
   }
+  /* The prep card ends below its last line, not at the dock: the page scrolls. */
+  .mp__prep {
+    flex: none;
+  }
   .mp__dock {
     position: fixed;
     inset-inline: 0;
