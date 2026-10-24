@@ -56,15 +56,29 @@
 .chat__log > :first-child {
   margin-top: auto;
 }
-/* Phone: the log runs edge to edge. */
+/* Phone: the log runs edge to edge, and it scrolls right up to the rule of the composer:
+   the host has no gap, so a message is never cut short of that line. The padding at the
+   foot keeps the last message where the gap put it. A consumer whose log starts at a line
+   above it (the tabs of a ticket) moves the log up to that line and keeps the first
+   message in place with `--chat-log-inset-top`. */
 /* The on-screen keyboard shrinks the viewport (`interactive-widget=resizes-content`) and a
    bottom sheet with it. The minimum of the log then yields to the viewport, because a log
    taller than the space left runs on under the pinned composer. */
+:host(.chat--phone) {
+  gap: 0;
+}
 :host(.chat--phone) .chat__log {
   min-height: min(var(--chat-log-min, 10rem), 25dvh);
-  padding: 4px 0 12px;
+  padding: var(--chat-log-inset-top, 4px) 0 calc(12px + var(--space-3));
   border: 0;
   border-radius: 0;
+}
+/* Messages above the log fade out while the log is scrolled down, because no line ends
+   the log at the top (the head of a sheet). A consumer whose log ends at a line sets
+   `--chat-log-fade-top: 0px`. */
+:host(.chat--phone) .chat__log.is-fade-start {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--chat-log-fade-top, var(--space-5)));
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--chat-log-fade-top, var(--space-5)));
 }
 
 .chat__sep {
