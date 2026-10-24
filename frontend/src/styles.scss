@@ -58,11 +58,13 @@
 // overscroll at the top edge reloaded the app by accident in Chrome, and on iOS the page
 // with the bars moved with the finger, which a native app never does. A browser tab keeps
 // both. The panes that scroll inside themselves keep `overscroll-behavior: contain`, so
-// they still end their own scroll without handing it to the page.
+// they still end their own scroll without handing it to the page. `manipulation` stops
+// the double-tap zoom; the pinch zoom stops in `lockInstalledAppZoom` (zoom-lock.ts).
 @media (display-mode: standalone), (display-mode: fullscreen) {
   html,
   body {
     overscroll-behavior-y: none;
+    touch-action: manipulation;
   }
 }
 
