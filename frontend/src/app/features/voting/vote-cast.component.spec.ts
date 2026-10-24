@@ -858,4 +858,64 @@ describe('VoteCastComponent', () => {
       expect(sessions[1].close).toHaveBeenCalled();
     });
   });
+
+  describe('poll of a Gremium', () => {
+    const POLL = {
+      mode: 'single' as const,
+      options: [
+        { id: 'o1', label: 'Ulm' },
+        { id: 'o2', label: 'Tübingen' },
+      ],
+      secret: false,
+    };
+    const pollVote = (over: Partial<Vote> = {}) =>
+      vote({
+        kind: 'poll',
+        poll: POLL,
+        meetingId: null,
+        agendaItemId: null,
+        applicationId: null,
+        config: { options: ['o1', 'o2', 'abstain'], majorityRule: 'simple' },
+        ...over,
+      });
+
+    async function withLifecycle(v: Vote, fail = false) {
+      const view = await setup({ vote: v, canManage: true, page: { split: true } });
+      const api = view.fixture.debugElement.injector.get(ApiClient) as unknown as Record<string, jest.Mock>;
+      const answer = () => (fail ? throwError(() => conflict('vote_not_open')) : of(void 0));
+      api['openVote'] = jest.fn(answer);
+      api['closeVote'] = jest.fn(answer);
+      return { ...view, api };
+    }
+
+    it('"Umfrage beenden" closes an open poll before its end', async () => {
+      const { api, toast, page, getVote, fixture } = await withLifecycle(pollVote());
+      expect(fixture.componentInstance.pollAction()).toBe('close');
+      await userEvent.click(screen.getByRole('button', { name: 'Weitere Aktionen' }));
+      await userEvent.click(screen.getByRole('menuitem', { name: 'Umfrage beenden' }));
+      expect(api['closeVote']).toHaveBeenCalledWith('v1');
+      expect(toast.success).toHaveBeenCalledWith('Umfrage beendet');
+      expect(page?.notify).toHaveBeenCalledWith({ id: 'v1', kind: 'updated' });
+      expect(getVote).toHaveBeenCalledTimes(2);
+    });
+
+    it('"Starten" opens a draft, and a failure says why', async () => {
+      const { api, toast, fixture } = await withLifecycle(pollVote({ status: 'draft' }), true);
+      expect(fixture.componentInstance.pollAction()).toBe('start');
+      fixture.componentInstance.onMenu('start');
+      expect(api['openVote']).toHaveBeenCalledWith('v1');
+      expect(toast.error).toHaveBeenCalled();
+      expect(fixture.componentInstance.pollBusy()).toBe(false);
+    });
+
+    it.each([
+      ['in a meeting', { meetingId: 'm1' }, true],
+      ['without the right', {}, false],
+      ['after the end', { status: 'closed' as const }, true],
+    ])('offers no poll action %s', async (_name, over, canManage) => {
+      const { fixture } = await setup({ vote: pollVote(over), canManage });
+      expect(fixture.componentInstance.pollAction()).toBeNull();
+      if (!canManage) expect(fixture.componentInstance.hasMenu()).toBe(false);
+    });
+  });
 });

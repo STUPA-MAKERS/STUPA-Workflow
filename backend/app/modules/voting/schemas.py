@@ -9,7 +9,17 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.modules.applications.decision import DecisionIn
-from app.shared.config_schemas import ElectionConfig, Quorum, VoteConfig
+from app.shared.config_schemas import (
+    POLL_LABEL_MAX,
+    POLL_MAX_OPTIONS,
+    POLL_MIN_OPTIONS,
+    DateAnswer,
+    ElectionConfig,
+    PollConfig,
+    PollMode,
+    Quorum,
+    VoteConfig,
+)
 
 
 class _CamelModel(BaseModel):
@@ -22,7 +32,7 @@ class _CamelModel(BaseModel):
 # election (F2) gives ``elected``, ``runoff`` (a runoff decides the open seats),
 # ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
 VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
-VoteKind = Literal["motion", "election"]
+VoteKind = Literal["motion", "election", "poll"]
 
 
 class ElectionRunoffOut(_CamelModel):
@@ -76,6 +86,109 @@ class ElectionResultOut(_CamelModel):
         return self.model_copy(update={"lot": self.lot.model_copy(update={"by": None})})
 
 
+class PollResultOut(_CamelModel):
+    """The counts of a poll (``vote.poll_result`` once closed).
+
+    ``counts`` holds the votes per option id (a date poll: the Ja answers), ``maybe``
+    the Vielleicht answers of a date poll. ``order`` lists the option ids highest
+    first, and ``top`` the options with the most votes (every tied one). Aggregates
+    only, never a voter.
+    """
+
+    counts: dict[str, int]
+    maybe: dict[str, int] | None = None
+    abstentions: int = 0
+    ballots: int = 0
+    order: list[str] = Field(default_factory=list)
+    top: list[str] = Field(default_factory=list)
+
+
+class PollOptionIn(_CamelModel):
+    """One option of a new poll: a text, or a date with a start and an optional end.
+
+    The server gives the ids (``o1``, ``o2``, ...) in the given order. An unknown key
+    gives 422.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    label: str | None = Field(default=None, max_length=POLL_LABEL_MAX)
+    start: datetime | None = None
+    end: datetime | None = None
+
+
+class PollIn(_CamelModel):
+    """The options of a poll as the creator types them (create and edit)."""
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    mode: PollMode
+    options: list[PollOptionIn] = Field(min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS)
+    max_choices: int | None = Field(default=None, alias="maxChoices", ge=1)
+
+    def config(self, *, secret: bool, guests_vote: bool = False) -> PollConfig:
+        """Build the stored config with the server-side ids (``o1``, ``o2``, ...).
+
+        Raises:
+            pydantic.ValidationError: The options do not fit the mode (422).
+        """
+        return PollConfig.model_validate(
+            {
+                "mode": self.mode,
+                "options": [
+                    {
+                        "id": f"o{n}",
+                        **o.model_dump(by_alias=True, exclude_none=True),
+                    }
+                    for n, o in enumerate(self.options, start=1)
+                ],
+                "maxChoices": self.max_choices,
+                "secret": secret,
+                "guestsVote": guests_vote,
+            }
+        )
+
+
+class PollCreate(PollIn):
+    """``POST /votes`` - create a poll of a Gremium, without a meeting.
+
+    ``eligibleGroup`` is the Gremium. ``closesAt`` is the planned end (at least one
+    hour ahead). ``draft`` keeps the poll a draft; otherwise it opens at once.
+    """
+
+    kind: Literal["poll"] = "poll"
+    eligible_group: UUID = Field(alias="eligibleGroup")
+    question: str = Field(min_length=1, max_length=2000)
+    secret: bool = False
+    closes_at: datetime = Field(alias="closesAt")
+    draft: bool = False
+
+    @field_validator("question")
+    @classmethod
+    def _strip_question(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("the question is empty")
+        return stripped
+
+
+class PollPatch(_CamelModel):
+    """``PATCH /votes/{id}`` - change a poll while it holds no ballot.
+
+    ``options`` replaces every option (the server gives new ids), and the mode stays.
+    ``closesAt`` moves the end of a poll without a meeting.
+    """
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+    question: str | None = Field(default=None, min_length=1, max_length=2000)
+    options: list[PollOptionIn] | None = Field(
+        default=None, min_length=POLL_MIN_OPTIONS, max_length=POLL_MAX_OPTIONS
+    )
+    max_choices: int | None = Field(default=None, alias="maxChoices", ge=1)
+    closes_at: datetime | None = Field(default=None, alias="closesAt")
+
+
 class VoteCreate(_CamelModel):
     """``POST /applications/{id}/votes`` - create a vote (status ``draft``).
 
@@ -107,8 +220,9 @@ class VoteCreateInternal(_CamelModel):
     gremium. The live-vote route builds it from the meeting. No client sends it.
     """
 
-    # A motion carries a VoteConfig, an election (F2) an ElectionConfig.
-    config: VoteConfig | ElectionConfig
+    # A motion carries a VoteConfig, an election (F2) an ElectionConfig, a poll a
+    # PollConfig.
+    config: VoteConfig | ElectionConfig | PollConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
     # F2: the election that a runoff continues, and its round.
@@ -130,7 +244,7 @@ class VoteCreateInternal(_CamelModel):
     @model_validator(mode="after")
     def _percent_quorum_needs_eligible(self) -> VoteCreateInternal:
         """A percent quorum requires an eligible-voter count (fail-closed)."""
-        quorum = self.config.quorum
+        quorum = None if isinstance(self.config, PollConfig) else self.config.quorum
         if quorum is not None and quorum.type == "percent" and self.eligible_count is None:
             raise ValueError(
                 "eligibleCount is required when a percent quorum is configured"
@@ -147,13 +261,17 @@ class BallotIn(_CamelModel):
 
     # A motion and the single-candidate election take one option. An election with
     # several candidates takes the list of the chosen candidate ids (F2; ``[]`` = full
-    # abstention, at most ``seats`` ids, no id twice).
-    choice: str | list[str]
+    # abstention, at most ``seats`` ids, no id twice). A single or multi poll takes the
+    # list of the chosen option ids (``[]`` = abstention), a date poll one answer per
+    # option id (``{"o1": "yes", "o2": "maybe"}``).
+    choice: str | list[str] | dict[str, DateAnswer]
     as_delegation: bool = Field(default=False, alias="asDelegation")
 
     @field_validator("choice")
     @classmethod
-    def _non_empty_option(cls, v: str | list[str]) -> str | list[str]:
+    def _non_empty_option(
+        cls, v: str | list[str] | dict[str, DateAnswer]
+    ) -> str | list[str] | dict[str, DateAnswer]:
         if isinstance(v, str) and not v:
             raise ValueError("choice must not be empty")
         return v
@@ -199,9 +317,11 @@ class MyBallot(_CamelModel):
 
     cast: bool = False
     choice: str | None = None
-    # F2: the chosen candidate ids of an open election ballot. None for a motion and
-    # for a secret vote.
+    # F2: the chosen candidate ids of an open election ballot, and the chosen option
+    # ids of an open single or multi poll. None for a motion and for a secret vote.
     choices: list[str] | None = None
+    # The answers of an open date poll ballot. None otherwise.
+    answers: dict[str, DateAnswer] | None = None
 
 
 class VoteOut(_CamelModel):
@@ -233,6 +353,11 @@ class VoteOut(_CamelModel):
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
+    # A poll carries its mode and options (``config`` then holds the projection: the
+    # option ids plus ``abstain``). ``pollResult`` holds the counts once the poll
+    # closed, and while it runs as soon as the counts are revealed.
+    poll: PollConfig | None = None
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     # Copies of ``config`` for the vote card, so a client needs no config parse.
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
@@ -323,11 +448,13 @@ class VoteClosed(_CamelModel):
     id: UUID
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    result: VoteResultValue
+    # None for a poll: a poll only counts.
+    result: VoteResultValue | None
     tally: TallyOut
     # F2: the result of an election (None for a motion).
     kind: VoteKind = "motion"
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     fired_transition_id: UUID | None = Field(
         default=None, alias="firedTransitionId"

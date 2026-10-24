@@ -55,8 +55,6 @@
     [voted]="v.tally.voted ?? 0"
     [total]="turnoutTotal()"
     [basis]="basis()"
-    [secret]="secret()"
-    [hidden]="!showBars()"
   />
 }
 
@@ -73,25 +71,30 @@
     [compact]="compact()"
     [columns]="layout() === 'strip'"
     [election]="election()"
+    [poll]="poll()"
     (castDone)="castDone.emit($event)"
     (castFailed)="castFailed.emit($event)"
   />
 }
 
-@if (layout() === 'strip' && isOpen() && !showBars()) {
-  <p class="vpn__summary">{{ hiddenKey() | t }}</p>
-} @else if (layout() !== 'phone' && layout() !== 'strip' && isOpen()) {
+@if (layout() !== 'phone' && layout() !== 'strip' && isOpen()) {
   <hr class="vpn__hr" />
   <app-vote-progress
     [voted]="v.tally.voted ?? 0"
     [total]="turnoutTotal()"
     [basis]="basis()"
-    [secret]="secret()"
-    [hidden]="!showBars()"
   />
 }
 
-@if (showBars() && election(); as el) {
+@if (showBars() && poll(); as p) {
+  <app-poll-result
+    [poll]="p"
+    [result]="v.pollResult ?? null"
+    [counts]="v.tally.counts"
+    [answered]="pollAnswered()"
+    [total]="pollTotal()"
+  />
+} @else if (showBars() && election(); as el) {
   <app-election-result
     [election]="el"
     [result]="v.status === 'closed' ? v.result : null"

@@ -9,8 +9,9 @@
  *    the editor reaches the output. Angular also sanitizes the `innerHTML`.
  */
 
-import type { MeetingVote } from '@core/api/models';
+import type { MeetingVote, PollConfig, PollOption } from '@core/api/models';
 import { escapeHtml, markdownToSafeHtml } from '@shared/markdown/markdown.util';
+import { dateOptionLabel } from '../voting/poll.util';
 
 export { escapeHtml };
 
@@ -71,6 +72,7 @@ function countOf(text: string, part: string): number {
  * own head line, as in the backend `build_election_snippet`.
  */
 export function voteSnippetQuestion(vote: MeetingVote): string {
+  if (vote.kind === 'poll') return vote.question?.trim() || 'Umfrage';
   if (vote.kind === 'election') {
     const head = vote.question?.trim() || 'Wahlgang';
     const round = vote.round ?? 1;
@@ -87,6 +89,7 @@ export function voteSnippetQuestion(vote: MeetingVote): string {
  */
 export function voteSnippet(vote: MeetingVote): string {
   if (vote.kind === 'election' && vote.election) return electionSnippet(vote);
+  if (vote.kind === 'poll' && vote.poll) return pollSnippet(vote, vote.poll);
   const lines = [voteSnippetHead(vote)];
   const counts = Object.entries(vote.counts ?? {});
   if (counts.length) {
@@ -105,10 +108,7 @@ export function electionSnippet(vote: MeetingVote): string {
   const election = vote.election;
   const result = vote.electionResult ?? null;
   const round = vote.round ?? 1;
-  const lines = [voteSnippetHead(vote)];
-  let meta = `Wahl · ${election?.seats ?? 1} Posten`;
-  if (round > 1) meta += ` · Stichwahl (${round}. Wahlgang)`;
-  lines.push(`> ${meta}`);
+  const lines = [voteSnippetHead(vote), `> ${electionMeta(vote)}`];
   if (!election || !result) return lines.join('\n');
   const names = new Map(election.candidates.map((c) => [c.id, c.name]));
   const yesNo = typeof result.yes === 'number' && typeof result.no === 'number';
@@ -135,6 +135,61 @@ export function electionSnippet(vote: MeetingVote): string {
     lines.push(`> Stichwahl (${round + 1}. Wahlgang) um ${result.runoff.seats} Posten: ${who}`);
   }
   return lines.join('\n');
+}
+
+/**
+ * The protocol callout of a poll, the same text as the backend `build_poll_snippet`
+ * writes: the kind line ("Umfrage · Einzelwahl", "Terminumfrage") and, once closed, one
+ * line per option (highest first; a date poll "3 (+2)" = Ja and Vielleicht), the
+ * abstentions, the options with the most votes and the number of answers. A poll lists
+ * counts only, never a name.
+ */
+export function pollSnippet(vote: MeetingVote, poll: PollConfig): string {
+  const lines = [voteSnippetHead(vote), `> ${pollMeta(poll)}`];
+  const result = vote.pollResult;
+  if (!result) return lines.join('\n');
+  const date = poll.mode === 'date';
+  const labels = new Map(poll.options.map((o) => [o.id, pollSnippetLabel(o)]));
+  const known = result.order.filter((id) => labels.has(id));
+  const order = known.length ? known : [...labels.keys()];
+  const top = new Set(result.top);
+  for (const id of order) {
+    const count = result.counts[id] ?? 0;
+    const text = date ? `${count} (+${result.maybe?.[id] ?? 0})` : `${count}`;
+    lines.push(`> ${oneLine(labels.get(id) ?? id)}: ${text}`);
+  }
+  if (!date) lines.push(`> Enthaltungen: ${result.abstentions}`);
+  else lines.push('> Zahl = Ja, (+n) = Vielleicht');
+  const best = order.filter((id) => top.has(id)).map((id) => oneLine(labels.get(id) ?? id));
+  if (best.length) lines.push(`> ${date ? 'Bester Termin' : 'Meiste Stimmen'}: ${best.join(', ')}`);
+  lines.push(`> ${result.ballots} ${result.ballots === 1 ? 'Antwort' : 'Antworten'}`);
+  return lines.join('\n');
+}
+
+/** The kind line of an election callout: "Wahl · 2 Posten", a runoff names its round. */
+export function electionMeta(vote: MeetingVote): string {
+  const round = vote.round ?? 1;
+  const meta = `Wahl · ${vote.election?.seats ?? 1} Posten`;
+  return round > 1 ? `${meta} · Stichwahl (${round}. Wahlgang)` : meta;
+}
+
+/** The kind line of a poll callout, as the backend `poll_meta` writes it. */
+export function pollMeta(poll: PollConfig): string {
+  if (poll.mode === 'date') return 'Terminumfrage';
+  if (poll.mode === 'single') return 'Umfrage · Einzelwahl';
+  return poll.maxChoices != null
+    ? `Umfrage · Mehrfachwahl, höchstens ${poll.maxChoices}`
+    : 'Umfrage · Mehrfachwahl';
+}
+
+/** "Di, 3.11. · 18:00–20:00" in the time zone of the protocol, as the backend writes it. */
+function pollSnippetLabel(option: PollOption): string {
+  if (!option.start) return option.label ?? option.id;
+  return dateOptionLabel(option.start, option.end, 'de');
+}
+
+function oneLine(text: string): string {
+  return text.replace(/\r\n|\r|\n/g, ' ');
 }
 
 /**

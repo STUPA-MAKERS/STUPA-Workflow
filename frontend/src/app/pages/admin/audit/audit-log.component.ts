@@ -112,6 +112,9 @@ export const AUDIT_ACTIONS = [
   'vote_cancel',
   'vote_branch_blocked',
   'vote_lot_drawn',
+  // Polls: created and changed. Open, close and cancel reuse the vote actions.
+  'poll_created',
+  'poll_updated',
   // Meeting and agenda (F12). They mirror the MEETING_* and AGENDA_* values in actions.py.
   'meeting_create',
   'meeting_update',
@@ -120,6 +123,8 @@ export const AUDIT_ACTIONS = [
   'agenda_item_update',
   'agenda_item_remove',
   'agenda_reorder',
+  'agenda_item_done',
+  'agenda_item_reopened',
   // Attendance set or reset by the meeting lead (F12). They mirror ATTENDANCE_* in actions.py.
   'attendance_set',
   'attendance_reset',

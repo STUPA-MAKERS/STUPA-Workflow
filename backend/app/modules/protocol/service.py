@@ -77,8 +77,11 @@ from app.modules.protocol.markdown import (
     ElectionLine,
     ElectionSnippet,
     KeeperLine,
+    PollLine,
+    PollSnippet,
     ProtocolDoc,
     build_election_snippet,
+    build_poll_snippet,
     build_protocol_document,
     build_vote_snippet,
     demote_headings,
@@ -98,10 +101,10 @@ from app.modules.protocol.public import (
 )
 from app.modules.protocol.schemas import ProtocolOut
 from app.modules.voting.models import Vote
-from app.modules.voting.schemas import ElectionResultOut, VoteOut
+from app.modules.voting.schemas import ElectionResultOut, PollResultOut, VoteOut
 from app.modules.voting.service import VotingService
 from app.settings import Settings, get_settings
-from app.shared.config_schemas import ElectionConfig
+from app.shared.config_schemas import ElectionConfig, PollConfig, PollOption
 from app.shared.errors import (
     BadRequestError,
     ConflictError,
@@ -502,7 +505,9 @@ class ProtocolService:
             if inserted is None:
                 continue  # a parallel request embedded the vote already
             view = await voting.get(vote_id)
-            snippets.append(_snippet(view, _vote_title(view.application_id, view.question)))
+            snippets.append(
+                _snippet(view, _vote_title(view.application_id, view.question), tz=self._tz())
+            )
 
         if snippets:
             body = protocol.markdown.rstrip("\n")
@@ -1107,8 +1112,8 @@ class ProtocolService:
                     body,
                     [
                         (
-                            _snippet(view, "Beschlussfrage"),
-                            _snippet(view, "Beschlussfrage", public=True),
+                            _snippet(view, "Beschlussfrage", tz=self._tz()),
+                            _snippet(view, "Beschlussfrage", public=True, tz=self._tz()),
                         )
                         for view in views
                         if getattr(view, "kind", "motion") == "election"
@@ -1119,12 +1124,16 @@ class ProtocolService:
                 # top-level. Otherwise every `#` counts as its own agenda item.
                 block.append(demote_headings(body))
             top = PublicTop(number=number, title=heading, markdown=body or None)
-            snippets = [_snippet(view, "Beschlussfrage", public=public) for view in views]
+            snippets = [
+                _snippet(view, "Beschlussfrage", public=public, tz=self._tz()) for view in views
+            ]
             # The protokollant may have put the result into the text already, with
             # the same snippet. One box per vote, also for two votes with one question.
             found = votes_in_body(body, snippets)
             for view, snippet, in_text in zip(views, snippets, found, strict=True):
-                if getattr(view, "status", None) == "closed":
+                decides = getattr(view, "kind", None) != "poll"
+                if getattr(view, "status", None) == "closed" and decides:
+                    # A poll is no decision: it stays out of the public decisions.
                     # The public list shows the result also when the protokollant
                     # put the snippet into the text already. `inText` tells the
                     # detail page to show no second box for it.
@@ -1376,10 +1385,24 @@ class ProtocolService:
         return vote
 
 
-def _snippet(view: VoteOut, fallback: str, *, public: bool = False) -> str:
-    """Build the protocol callout of a vote: a motion or an election (F2)."""
+def _snippet(
+    view: VoteOut, fallback: str, *, public: bool = False, tz: ZoneInfo | None = None
+) -> str:
+    """Build the protocol callout of a vote: a motion, an election (F2) or a poll.
+
+    ``tz`` is the local time zone of the dates of a date poll.
+    """
     if getattr(view, "kind", "motion") == "election" and view.election is not None:
         return build_election_snippet(_election_snippet(view), public=public)
+    if getattr(view, "kind", "motion") == "poll" and view.poll is not None:
+        return build_poll_snippet(
+            poll_snippet_of(
+                view.poll,
+                view.poll_result if view.status == "closed" else None,
+                question=view.question,
+                tz=tz or ZoneInfo("Europe/Berlin"),
+            )
+        )
     return build_vote_snippet(
         view.question or fallback,
         view.tally.counts,
@@ -1432,6 +1455,61 @@ def election_snippet_of(
         lot_pending=lot is not None and lot.drawn is None,
         runoff_names=[names.get(cid, cid) for cid in runoff.candidate_ids] if runoff else [],
         runoff_seats=runoff.seats if runoff else 0,
+        closed=result is not None,
+    )
+
+
+_WEEKDAYS = ("Mo", "Di", "Mi", "Do", "Fr", "Sa", "So")
+
+
+def poll_option_label(option: PollOption, tz: ZoneInfo) -> str:
+    """Return the label of a poll option: its text, or „Di, 3.11. · 18:00–20:00“."""
+    if option.start is None:
+        return option.label or option.id
+    start = option.start.astimezone(tz)
+    text = f"{_WEEKDAYS[start.weekday()]}, {start.day}.{start.month}. · {start:%H:%M}"
+    if option.end is not None:
+        text += f"–{option.end.astimezone(tz):%H:%M}"
+    return text
+
+
+def poll_meta(config: PollConfig) -> str:
+    """Return the kind line of a poll snippet."""
+    if config.mode == "date":
+        return "Terminumfrage"
+    if config.mode == "single":
+        return "Umfrage · Einzelwahl"
+    if config.max_choices is not None:
+        return f"Umfrage · Mehrfachwahl, höchstens {config.max_choices}"
+    return "Umfrage · Mehrfachwahl"
+
+
+def poll_snippet_of(
+    config: PollConfig, result: PollResultOut | None, *, question: str | None, tz: ZoneInfo
+) -> PollSnippet:
+    """Map a poll and its stored result on the protocol view (highest first)."""
+    labels = {o.id: poll_option_label(o, tz) for o in config.options}
+    date = config.mode == "date"
+    lines: list[PollLine] = []
+    if result is not None:
+        order = [oid for oid in result.order if oid in labels] or list(labels)
+        top = set(result.top)
+        lines = [
+            PollLine(
+                label=labels[oid],
+                count=result.counts.get(oid, 0),
+                maybe=(result.maybe or {}).get(oid, 0) if date else None,
+                top=oid in top,
+            )
+            for oid in order
+        ]
+    return PollSnippet(
+        question=(question or "Umfrage").strip() or "Umfrage",
+        meta=poll_meta(config),
+        lines=lines,
+        abstentions=None if date else (result.abstentions if result is not None else 0),
+        ballots=result.ballots if result is not None else 0,
+        date=date,
         closed=result is not None,
     )
 

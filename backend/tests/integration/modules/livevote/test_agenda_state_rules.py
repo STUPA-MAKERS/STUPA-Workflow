@@ -21,7 +21,7 @@ from app.deps import get_current_principal
 from app.modules.admin.models import GremiumMembership, GremiumRole
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.auth.principal import Principal
-from app.modules.livevote.models import MeetingAgendaItem
+from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.voting.models import Ballot, Vote
 from tests.integration.modules.livevote.conftest import ADMIN_SUB, audit_actions, seed
 
@@ -130,6 +130,15 @@ async def test_live_minutes_are_not_audited(
     maker: async_sessionmaker[AsyncSession], api: FastAPI
 ) -> None:
     s = await seed(maker, status="live", protocol="draft")
+    # In a live meeting only the protokollant writes the minutes.
+    async with maker() as session:
+        sub = await session.scalar(
+            select(PrincipalRow.sub)
+            .join(Meeting, Meeting.protokollant_id == PrincipalRow.id)
+            .where(Meeting.id == s.meeting_id)
+        )
+    assert sub is not None
+    api.dependency_overrides[get_current_principal] = lambda: Principal(sub=sub)
     with TestClient(api) as client:
         resp = client.patch(
             f"/api/meetings/{s.meeting_id}/agenda/{s.item_ids[0]}", json={"body": "Notiz"}

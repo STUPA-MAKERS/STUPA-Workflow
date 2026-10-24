@@ -1087,6 +1087,24 @@ describe('mockApiInterceptor', () => {
       expect(reordered[0].position).toBe(0);
     });
 
+    it('PUT …/agenda/{id}/done ticks an item, keeps the first time and removes the tick', async () => {
+      type Row = { id: string; doneAt?: string | null };
+      const agenda = await firstValueFrom(http.get<Row[]>('/api/meetings/m1/agenda'));
+      const id = agenda[agenda.length - 1].id;
+      const put = (done: boolean) =>
+        firstValueFrom(http.put<Row[]>(`/api/meetings/m1/agenda/${id}/done`, { done }));
+      const first = (await put(true)).find((a) => a.id === id)?.doneAt;
+      expect(first).toBeTruthy();
+      expect((await put(true)).find((a) => a.id === id)?.doneAt).toBe(first);
+      expect((await put(false)).find((a) => a.id === id)?.doneAt).toBeNull();
+      // "Nächster TOP": the move ticks the item that the room leaves.
+      await firstValueFrom(
+        http.patch('/api/meetings/m1', { currentAgendaItemId: agenda[0].id, completeAgendaItemId: id }),
+      );
+      const after = await firstValueFrom(http.get<Row[]>('/api/meetings/m1/agenda'));
+      expect(after.find((a) => a.id === id)?.doneAt).toBeTruthy();
+    });
+
     it('PUT …/agenda/order with no itemIds yields an empty agenda', async () => {
       const res = await firstValueFrom(
         http.put<unknown[]>('/api/meetings/m1/agenda/order', {}),

@@ -5,8 +5,9 @@ import type {
   VoteCalloutInfo,
   VoteCalloutResolver,
 } from '@stupa-makers/ui-kit/markdown-editor';
-import { voteSnippetQuestion } from '../meetings.util';
+import { electionMeta, pollMeta, voteSnippetQuestion } from '../meetings.util';
 import { electionCaption, electionStatus } from '../../voting/election.util';
+import { pollCaption } from '../../voting/poll.util';
 import { clock } from '@shared/date-format';
 
 /**
@@ -20,6 +21,7 @@ import { clock } from '@shared/date-format';
  */
 export function voteResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
   if (vote.kind === 'election') return electionResultInfo(vote, t, locale);
+  if (vote.kind === 'poll') return pollResultInfo(vote, t, locale);
   const parts = [t('meetings.voteResult.caption')];
   const time = clock(vote.closedAt, toFormatLocale(locale));
   if (time) parts.push(time);
@@ -64,6 +66,23 @@ function electionResultInfo(vote: MeetingVote, t: Translate, locale: string): Vo
   };
 }
 
+/** The card of a poll: "Umfrage · Einzelwahl · 18:52". A poll has no result. */
+function pollResultInfo(vote: MeetingVote, t: Translate, locale: string): VoteCalloutInfo {
+  const parts = vote.poll ? [pollCaption(vote.poll, t)] : [t('meetings.vote.kind.poll')];
+  const time = clock(vote.closedAt, toFormatLocale(locale));
+  if (time) parts.push(time);
+  return {
+    caption: parts.join(' · '),
+    result: null,
+    labels: {
+      yes: t('vote.option.yes'),
+      no: t('vote.option.no'),
+      abstain: t('vote.option.abstain'),
+      result: t('meetings.voteResult.result'),
+    },
+  };
+}
+
 /**
  * The text of a question as the card reads it: without Markdown emphasis, code marks and
  * backslash escapes, with single spaces. The server escapes Markdown characters in the
@@ -88,16 +107,29 @@ export function voteResultResolver(
   t: Translate,
   locale: string,
 ): VoteCalloutResolver {
-  const byQuestion = new Map<string, MeetingVote>();
+  const byQuestion = new Map<string, MeetingVote[]>();
   for (const v of votes) {
     if (v.status !== 'closed') continue;
-    if (v.kind !== 'election' && !(v.question?.trim() || v.title?.trim())) continue;
+    if (v.kind !== 'election' && v.kind !== 'poll' && !(v.question?.trim() || v.title?.trim())) continue;
     // A runoff names its round in the head, so the two rounds of an election
     // keep apart (see `voteSnippetQuestion`).
-    byQuestion.set(normalizeQuestion(voteSnippetQuestion(v)), v);
+    const key = normalizeQuestion(voteSnippetQuestion(v));
+    byQuestion.set(key, [...(byQuestion.get(key) ?? []), v]);
   }
-  return (question) => {
-    const vote = byQuestion.get(normalizeQuestion(question));
+  return (question, lines) => {
+    const found = byQuestion.get(normalizeQuestion(question)) ?? [];
+    // Two votes can share a question. A poll or election card names its kind in its
+    // first line, so the vote of that kind wins; otherwise the last vote wins.
+    const kind = lines?.[0]?.trim();
+    const last = [...found].reverse();
+    const vote = last.find((v) => kind != null && kindLine(v) === kind) ?? last[0];
     return vote ? voteResultInfo(vote, t, locale) : null;
   };
+}
+
+/** The kind line that the snippet of a vote writes under its head, if it has one. */
+function kindLine(vote: MeetingVote): string | null {
+  if (vote.kind === 'poll' && vote.poll) return pollMeta(vote.poll);
+  if (vote.kind === 'election' && vote.election) return electionMeta(vote);
+  return null;
 }

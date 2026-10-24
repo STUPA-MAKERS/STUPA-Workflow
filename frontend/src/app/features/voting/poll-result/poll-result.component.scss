@@ -1,0 +1,16 @@
+/* The abstentions and the footer lines of a poll result. */
+.pr__row--abstain .bars__label {
+  color: var(--color-text-muted);
+  font-weight: var(--fw-regular, 400);
+}
+.pr__foot {
+  margin: 0;
+  font-size: var(--fs-small);
+  color: var(--color-text-muted);
+}
+
+:host(.bars--beamer) {
+  .pr__foot {
+    font-size: 1.25rem;
+  }
+}

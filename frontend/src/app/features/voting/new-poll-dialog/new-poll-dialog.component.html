@@ -1,0 +1,77 @@
+<app-dialog
+  [open]="open()"
+  [title]="'poll.new.title' | t"
+  [closeLabel]="'action.close' | t"
+  (closed)="cancel()"
+>
+  <form class="npd" (submit)="$event.preventDefault(); submit(false)">
+    <app-select
+      name="gremium"
+      [id]="'npd-gremium'"
+      [label]="'poll.new.gremium' | t"
+      [options]="gremiumOptions()"
+      [required]="true"
+      [ngModel]="gremium()"
+      (ngModelChange)="gremium.set($event)"
+    />
+    <app-textarea [label]="'poll.dialog.question' | t">
+      <textarea
+        id="npd-question"
+        rows="3"
+        name="question"
+        [ngModel]="question()"
+        (ngModelChange)="question.set($event)"
+      ></textarea>
+    </app-textarea>
+
+    <app-poll-editor idPrefix="npd" [(draft)]="draft" />
+
+    <div class="npd__end">
+      <app-datepicker
+        class="npd__date"
+        name="endDate"
+        [id]="'npd-end-date'"
+        [label]="'poll.new.endDate' | t"
+        [required]="true"
+        [ngModel]="endDate()"
+        (ngModelChange)="endDate.set($event)"
+      />
+      <app-time-input
+        class="npd__time"
+        name="endTime"
+        [id]="'npd-end-time'"
+        [label]="'poll.new.endTime' | t"
+        [required]="true"
+        [ngModel]="endTime()"
+        (ngModelChange)="endTime.set($event)"
+      />
+    </div>
+
+    <app-switch
+      [id]="'npd-secret'"
+      [checked]="secret()"
+      (checkedChange)="secret.set($event)"
+      ><span class="npd__switchLabel">{{ 'poll.dialog.secret' | t }}</span></app-switch
+    >
+  </form>
+  <app-button dialog-footer variant="text" (click)="cancel()">{{ 'action.cancel' | t }}</app-button>
+  <app-button
+    dialog-footer
+    variant="tonal"
+    [loading]="submitting() && savingDraft()"
+    [disabled]="!canSubmit()"
+    (click)="submit(true)"
+  >
+    {{ 'poll.new.saveDraft' | t }}
+  </app-button>
+  <app-button
+    dialog-footer
+    variant="fill"
+    [loading]="submitting() && !savingDraft()"
+    [disabled]="!canSubmit()"
+    (click)="submit(false)"
+  >
+    <app-icon name="vote" [size]="16" />
+    {{ 'poll.new.start' | t }}
+  </app-button>
+</app-dialog>

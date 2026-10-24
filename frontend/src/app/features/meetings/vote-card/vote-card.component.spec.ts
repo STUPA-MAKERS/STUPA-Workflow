@@ -66,8 +66,8 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('3 von 4 Anwesenden haben abgestimmt')).toBeInTheDocument();
       expect(screen.getByText('75 %')).toBeInTheDocument();
       expect(screen.getByRole('img', { name: '3 von 4 Anwesenden haben abgestimmt' })).toBeInTheDocument();
-      // No interim tally for the lead: the fixed text instead of the counts.
-      expect(screen.getByText('Zwischenstand sichtbar, sobald alle Anwesenden abgestimmt haben.')).toBeInTheDocument();
+      // No interim tally for the lead, and no line that explains it.
+      expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
       expect(screen.queryByRole('definition')).toBeNull();
     });
 
@@ -82,7 +82,7 @@ describe('VoteCardComponent', () => {
     it('names the hidden result of a secret vote and a percentage quorum', async () => {
       await setup({ vote: vote({ secret: true, quorum: { type: 'percent', value: 50 } }) });
       expect(screen.getByText(/geheime Abstimmung · Quorum 50 %/)).toBeInTheDocument();
-      expect(screen.getByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeInTheDocument();
+      expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
     });
 
     it('names a secret vote that another manager opened live, before the next read', async () => {
@@ -98,7 +98,7 @@ describe('VoteCardComponent', () => {
         }),
       });
       expect(screen.getByText(/^geheime Abstimmung · seit \d\d:\d\d$/)).toBeInTheDocument();
-      expect(screen.getByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeInTheDocument();
+      expect(screen.queryByText(/Das Ergebnis zeigt sich nach dem Schließen/)).toBeNull();
       expect(screen.queryByText(/Zwischenstand sichtbar/)).toBeNull();
     });
 
@@ -107,14 +107,14 @@ describe('VoteCardComponent', () => {
       expect(screen.getByText('0 %')).toBeInTheDocument();
     });
 
-    it('closes and cancels; the close is the danger action, the cancel a text action', async () => {
+    it('closes and cancels; close and cancel are both danger actions', async () => {
       const { on, container } = await setup();
       const close = screen.getByRole('button', { name: 'Abstimmung schließen' });
       expect(close).toHaveClass('btn--danger');
       await userEvent.click(close);
       expect(on.close).toHaveBeenCalledWith('v-1');
       const cancel = screen.getByRole('button', { name: 'Abstimmung abbrechen' });
-      expect(cancel).toHaveClass('btn--text');
+      expect(cancel).toHaveClass('btn--danger');
       await userEvent.click(cancel);
       expect(on.cancel).toHaveBeenCalledWith('v-1');
       // An open vote is part of the record: no delete.
@@ -183,6 +183,8 @@ describe('VoteCardComponent', () => {
       await setup({ vote: closed, canInsert: true, inProtocol: true });
       expect(screen.getByText('Im Protokoll')).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'Ins Protokoll übernehmen' })).toBeNull();
+      // The folded card leaves the result to the text.
+      expect(screen.queryByText('Angenommen')).toBeNull();
     });
 
     it('names a rejection, also a tie (O18), and a missed quorum', async () => {

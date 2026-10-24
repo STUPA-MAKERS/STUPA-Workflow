@@ -24,7 +24,10 @@
   flex: none;
   align-items: flex-start;
   gap: var(--space-3);
-  padding: var(--space-5) var(--space-4) var(--space-2) 28px;
+  padding: var(--space-5) 28px var(--space-2);
+}
+.ts__done {
+  flex: none;
 }
 .ts__titles {
   display: flex;
@@ -126,9 +129,11 @@
   flex: none;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-2) 2px;
+  gap: var(--space-2);
   min-height: var(--control-height);
-  padding: 0 var(--space-5) 10px;
+  /* The glyph of the first tool sits on the edge of the text: 28px minus the inset of
+     the glyph in its 40px button. Every control on the right ends on that edge too. */
+  padding: 0 28px 10px 14px;
 }
 .ts__tools {
   display: flex;
@@ -175,7 +180,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding-inline-end: var(--space-2);
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
@@ -213,6 +217,13 @@
 .ts__editor ::ng-deep .mde__host .ProseMirror {
   min-height: 16rem;
   line-height: 1.7;
+}
+/* A paragraph keeps the gap of a list, so a blank line in the text shows as one. */
+.ts__editor ::ng-deep .mde__host .ProseMirror > p {
+  margin: var(--space-2) 0;
+}
+.ts__editor ::ng-deep .mde__host .ProseMirror > p:first-child {
+  margin-top: 0;
 }
 /* A read-only text (a final protocol, a reader) is a text to read: full contrast, as on
    the boards. The missing format bar already says that nobody types here. */
@@ -283,7 +294,7 @@
 /* Phone: the title may take two lines, and the gutters shrink. */
 @include bp.phone {
   .ts__head {
-    padding: var(--space-4) var(--space-2) var(--space-2) var(--space-4);
+    padding: var(--space-4) var(--space-4) var(--space-2);
   }
   .ts__title {
     display: -webkit-box;
@@ -302,12 +313,35 @@
     font-size: var(--fs-h2);
   }
   .ts__bar {
-    padding-inline: var(--space-2);
+    row-gap: 0;
+    padding-inline: 0 var(--space-4);
   }
-  /* The format buttons and the save state take the first row, the view switch the second. */
-  .ts__mode {
+  /* The format buttons and the save state take the first row. "Erledigt" and the view
+     switch take the second, on the edges of the text: the three do not fit in one row
+     of a phone, and a save state between them pushed the switch to a third row. A
+     line break of full width (the pseudo element) separates the rows. */
+  .ts__bar::after {
+    content: '';
+    flex-basis: 100%;
     order: 1;
-    margin-inline: var(--space-2) 0;
+    height: 0;
+  }
+  .ts__tools {
+    flex: 1 1 auto;
+  }
+  .ts__bar .ts__spacer {
+    display: none;
+  }
+  .ts__done,
+  .ts__mode {
+    order: 2;
+    margin-top: var(--space-2);
+  }
+  .ts__done {
+    margin-inline-start: var(--space-4);
+  }
+  .ts__mode {
+    margin-inline-start: auto;
   }
   .ts__rule {
     margin-inline: var(--space-4);
@@ -327,7 +361,6 @@
 /* The switch between the formatted text and its Markdown source. */
 .ts__mode {
   flex: none;
-  margin-inline-end: var(--space-3);
 }
 
 /* The Markdown source: the same type size and inset as the formatted text, so the text

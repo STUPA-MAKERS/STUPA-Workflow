@@ -2,18 +2,18 @@
 <section class="vc" [attr.aria-label]="v.question || ('meetings.vote.untitled' | t)">
   <div class="vc__status">
     <app-status-text class="vc__cap" [kind]="status().kind">{{ capKey() | t }}</app-status-text>
-    @if (result(); as r) {
+    @if (!folded() && result(); as r) {
       <app-status-text class="vc__result" [kind]="r.kind">{{ r.key | t }}</app-status-text>
     }
   </div>
-  @if (electionCap(); as cap) {
+  @if (!folded() && electionCap(); as cap) {
     <p class="vc__meta">{{ cap }}</p>
   }
   <h3 class="vc__q">{{ v.question || ('meetings.vote.untitled' | t) }}</h3>
-  @if (meta()) {
+  @if (meta() && !folded()) {
     <p class="vc__meta">{{ meta() }}</p>
   }
-  @if (v.result === 'rejected' && v.failedReason === 'quorum') {
+  @if (!folded() && v.result === 'rejected' && v.failedReason === 'quorum') {
     <p class="vc__fail">{{ 'vote.failedQuorum' | t }}</p>
   }
 
@@ -27,10 +27,18 @@
   }
 
   @if (v.status === 'open') {
-    <app-vote-progress size="fat" [voted]="v.voted" [total]="v.present" [secret]="!!v.secret" [hidden]="!showCounts()" />
+    <app-vote-progress size="fat" [voted]="v.voted" [total]="v.present" />
   }
 
-  @if (showCounts() && election(); as el) {
+  @if (showCounts() && poll(); as p) {
+    <app-poll-result
+      [poll]="p"
+      [result]="v.pollResult ?? null"
+      [counts]="v.counts ?? {}"
+      [answered]="v.pollResult?.ballots ?? v.voted"
+      [total]="v.present"
+    />
+  } @else if (showCounts() && election(); as el) {
     <app-election-result
       [election]="el"
       [result]="v.status === 'closed' ? v.result : null"
@@ -51,7 +59,18 @@
     </dl>
   }
 
-  @if (v.status === 'open' && canVote() && election(); as el) {
+  @if (v.status === 'open' && canVote() && poll(); as p) {
+    <app-ballot
+      [voteId]="v.id"
+      [options]="options()"
+      [secret]="!!v.secret"
+      [own]="v.myBallot ?? notCast"
+      [caster]="caster"
+      [compact]="true"
+      [poll]="p"
+      (castFailed)="onBallotFailed($event)"
+    />
+  } @else if (v.status === 'open' && canVote() && election(); as el) {
     <app-ballot
       [voteId]="v.id"
       [options]="options()"
@@ -65,7 +84,7 @@
   } @else if (v.status === 'open' && canVote() && !hasVoted()) {
     <div class="vc__ballot" role="group" [attr.aria-label]="'meetings.dock.yourVote' | t">
       @for (opt of options(); track opt) {
-        <app-button size="sm" variant="tonal" [block]="true" [loading]="casting() === v.id" (click)="cast.emit({ voteId: v.id, choice: opt })">{{ optionLabel(opt) }}</app-button>
+        <app-button variant="outlined" [block]="true" [loading]="casting() === v.id" (click)="cast.emit({ voteId: v.id, choice: opt })">{{ optionLabel(opt) }}</app-button>
       }
     </div>
   }
@@ -74,7 +93,7 @@
   @if (v.status === 'open' && canManage() && canRun()) {
     <div class="vc__actions">
       <app-button variant="danger" [block]="true" (click)="close.emit(v.id)">{{ 'meetings.vote.close' | t }}</app-button>
-      <app-button variant="text" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+      <app-button variant="danger" [block]="true" (click)="cancel.emit(v.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
     </div>
   }
 

@@ -1,10 +1,10 @@
 """WebSocket message schemas for live voting.
 
 The models from server to client are `meeting_state`, `vote_opened`,
-`vote_tally`, `vote_closed` and `error`. The models from client to server are
-`cast` and `subscribe`. Every message is JSON of the form `{"type": …, …}` with
-`type` as the discriminator. These models are the single source of the
-WebSocket contract.
+`vote_tally`, `vote_closed`, `body_draft` and `error`. The models from client to
+server are `cast`, `subscribe` and `body_draft`. Every message is JSON of the
+form `{"type": …, …}` with `type` as the discriminator. These models are the
+single source of the WebSocket contract.
 
 Secrecy rules: `vote_tally` and `vote_closed` carry aggregates only. They never
 carry voter identities. While a secret vote is open, the live feed must not
@@ -20,11 +20,16 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt
 
 from app.modules.livevote.schemas import GuestsMode, MeetingGuestOut
-from app.modules.voting.schemas import ElectionResultOut, VoteKind, VoteResultValue
-from app.shared.config_schemas import ElectionConfig
+from app.modules.voting.schemas import (
+    ElectionResultOut,
+    PollResultOut,
+    VoteKind,
+    VoteResultValue,
+)
+from app.shared.config_schemas import DateAnswer, ElectionConfig, PollConfig
 
 if TYPE_CHECKING:
     from app.modules.voting.schemas import VoteOut
@@ -90,6 +95,8 @@ class VoteOpenedEvent(_CamelModel):
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     round: int = 1
+    # A poll carries its mode and options (the ballot of the dock).
+    poll: PollConfig | None = None
 
     @classmethod
     def from_vote(cls, vote: VoteOut, *, replay: bool = False) -> VoteOpenedEvent:
@@ -107,6 +114,7 @@ class VoteOpenedEvent(_CamelModel):
             # The channel reaches the beamer and the guests: names, no account ids.
             election=vote.election.public() if vote.election is not None else None,
             round=vote.round,
+            poll=vote.poll,
         )
 
 
@@ -139,8 +147,11 @@ class VoteTallyEvent(_CamelModel):
     present_guests: int | None = Field(default=None, alias="presentGuests")
     guests_vote: bool = Field(default=False, alias="guestsVote")
     # F2: for an election `counts` holds the votes per candidate id plus `abstain`,
-    # and `cast` the cast ballots.
+    # and `cast` the cast ballots. A poll holds the votes per option id (a date poll:
+    # the Ja answers); `pollResult` adds the order and the Vielleicht answers once
+    # revealed.
     kind: VoteKind = "motion"
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
     @classmethod
     def from_vote(cls, vote: VoteOut) -> VoteTallyEvent:
@@ -165,6 +176,7 @@ class VoteTallyEvent(_CamelModel):
             presentGuests=vote.tally.present_guests,
             guestsVote=vote.guests_vote,
             kind=vote.kind,
+            pollResult=vote.poll_result if revealed else None,
         )
 
 
@@ -173,7 +185,8 @@ class VoteClosedEvent(_CamelModel):
 
     type: Literal["vote_closed"] = "vote_closed"
     vote_id: UUID = Field(alias="voteId")
-    result: VoteResultValue
+    # None for a poll: a poll only counts.
+    result: VoteResultValue | None
     counts: dict[str, int]
     # Why the vote failed. Set for `rejected` only, when the vote missed the
     # quorum or the majority. `None` for `passed` and for `tie`.
@@ -184,6 +197,7 @@ class VoteClosedEvent(_CamelModel):
     # candidate ids only.
     kind: VoteKind = "motion"
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
+    poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
 
 class VoteLotDrawnEvent(_CamelModel):
@@ -249,6 +263,20 @@ class GuestStatusEvent(_CamelModel):
     reason: GuestEventReason | None = None
 
 
+class BodyDraftEvent(_CamelModel):
+    """The text of an agenda item while the protokollant types it (not saved yet).
+
+    Only the voter channel passes it on. The beamer filter and the guest channel drop
+    it. The next `meeting_state` re-read brings the saved text, which replaces the
+    draft. ``seq`` rises per editor session, so a client drops an older frame.
+    """
+
+    type: Literal["body_draft"] = "body_draft"
+    agenda_item_id: UUID = Field(alias="agendaItemId")
+    body: str
+    seq: NonNegativeInt
+
+
 class ErrorEvent(_CamelModel):
     """A WebSocket error, for example `not_eligible`, `read_only` or `not_open`."""
 
@@ -267,8 +295,8 @@ class CastMessage(_CamelModel):
     type: Literal["cast"]
     vote_id: UUID = Field(alias="voteId")
     # One option; for an election with several candidates the list of the chosen
-    # candidate ids (F2).
-    choice: Annotated[str, Field(min_length=1)] | list[str]
+    # candidate ids (F2); for a poll the chosen option ids, or the answer per date.
+    choice: Annotated[str, Field(min_length=1)] | list[str] | dict[str, DateAnswer]
     as_delegation: bool = Field(default=False, alias="asDelegation")
 
 
@@ -276,3 +304,16 @@ class SubscribeMessage(_CamelModel):
     """Request the current state, which keeps a reconnect consistent."""
 
     type: Literal["subscribe"]
+
+
+class BodyDraftMessage(_CamelModel):
+    """The protokollant sends the text of the open agenda item while typing.
+
+    The server checks the protokollant of the live meeting, the agenda item and the
+    size, then publishes a `body_draft` event. It writes nothing to the database.
+    """
+
+    type: Literal["body_draft"]
+    agenda_item_id: UUID = Field(alias="agendaItemId")
+    body: str
+    seq: NonNegativeInt

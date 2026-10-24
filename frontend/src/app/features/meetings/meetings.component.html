@@ -53,6 +53,7 @@
     [attendanceConflict]="attendanceConflict()"
     (back)="goBack()"
     (selectTop)="jumpTo($event)"
+    (nextTop)="jumpNext($event.id, $event.from)"
     (bodyChange)="onTopBodyChange($event.itemId, $event.body)"
     (castVote)="cast($event.voteId, $event.choice)"
     (voteOpen)="openVote($event)"
@@ -79,6 +80,7 @@
     (cancelRename)="cancelRename()"
     (renameTop)="renameTop($event)"
     (setNonPublic)="setNonPublic($event.item, $event.nonPublic)"
+    (setDone)="setDone($event.item, $event.done)"
     (moveTop)="moveTop($event.from, $event.to)"
   />
 
@@ -130,7 +132,7 @@
                 } @else {
                   @if (m.isProtokollant) {
                     <app-button variant="danger" size="sm" (click)="closeVote(vote.id)">{{ 'meetings.vote.close' | t }}</app-button>
-                    <app-button variant="text" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
+                    <app-button variant="danger" size="sm" (click)="cancelVote(vote.id)">{{ 'meetings.vote.cancel' | t }}</app-button>
                   }
                 }
               </div>

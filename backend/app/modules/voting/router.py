@@ -11,6 +11,8 @@
   ballot state (no tally).
 * ``POST /api/votes/{id}/draw-lot``     - draw the lot of a tied election (F2).
 * ``POST /api/votes/{id}/runoff``       - create the runoff of an election (F2).
+* ``POST /api/votes``                   - create the poll of a Gremium (no meeting).
+* ``PATCH /api/votes/{id}``             - change a poll while it holds no ballot.
 
 The manage right is the admin role or the gremium permission ``vote.manage`` or
 ``session.manage`` in the gremium of the vote (``VotingService.can_manage_group``). The
@@ -28,19 +30,24 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
-from app.deps import DbSession, require_principal
+from app.deps import DbSession, SettingsDep, require_principal
 from app.modules.auth.principal import Principal
 from app.modules.flow.dispatch import ActionDispatcher
 from app.modules.flow.router import get_action_dispatcher
 from app.modules.livevote.publisher import MeetingPublisher, get_meeting_publisher
+from app.modules.notifications.polls import notify_poll_started
 from app.modules.voting.election import ElectionService
+from app.modules.voting.poll import PollService
 from app.modules.voting.schemas import (
     BallotAccepted,
     BallotIn,
+    PollCreate,
+    PollPatch,
     VoteClosed,
     VoteCreate,
+    VoteKind,
     VoteListItem,
     VoteOut,
     VoteStatus,
@@ -75,6 +82,67 @@ PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
 # or a gremium role with ``vote.manage`` or ``session.manage`` in the gremium of the
 # vote. This is symmetric with the scoped read (``get_scoped``).
 ReaderDep = Annotated[Principal, Depends(require_principal())]
+
+
+def _mail_poll_start(
+    vote: VoteOut, background: BackgroundTasks, request: Request, settings: SettingsDep
+) -> None:
+    """Send ``poll_started`` after the open of a poll of a Gremium (background task).
+
+    A meeting poll runs in the room and sends no mail; a motion and an election send
+    none either.
+    """
+    if vote.kind != "poll" or vote.meeting_id is not None or vote.status != "open":
+        return
+    pool = getattr(request.app.state, "arq_pool", None)
+    background.add_task(notify_poll_started, settings, vote.id, pool, now=datetime.now(UTC))
+
+
+@router.post(
+    "/votes",
+    response_model=VoteOut,
+    responses=_errors(400, 401, 403, 422),
+)
+async def create_poll(
+    payload: PollCreate,
+    service: ServiceDep,
+    principal: ReaderDep,
+    background: BackgroundTasks,
+    request: Request,
+    settings: SettingsDep,
+) -> VoteOut:
+    """Create the poll of a Gremium, without a meeting and without an application.
+
+    Only ``kind: poll``. The caller needs the gremium permission ``vote.manage`` in
+    ``eligibleGroup`` (or the admin role), else 403. ``closesAt`` lies at least one
+    hour ahead (422 ``closes_at_too_soon``); the deadline cron closes the poll then.
+    Without ``draft`` the poll opens at once, and the eligible members (``vote.cast``)
+    get the mail ``poll_started``.
+    """
+    vote = await PollService(service).create(payload, principal, now=datetime.now(UTC))
+    _mail_poll_start(vote, background, request, settings)
+    return vote
+
+
+@router.patch(
+    "/votes/{vote_id}",
+    response_model=VoteOut,
+    responses=_errors(401, 403, 404, 409, 422),
+)
+async def patch_poll(
+    vote_id: UUID,
+    payload: PollPatch,
+    service: ServiceDep,
+    principal: ReaderDep,
+) -> VoteOut:
+    """Change the question, the options or the end of a poll.
+
+    Only while the poll holds no ballot (409 ``poll_has_answers``); an ended poll
+    gives 409 ``poll_not_editable``, a motion or an election 409 ``not_a_poll``.
+    Gremium-scoped manage right.
+    """
+    await service.assert_can_manage_vote(vote_id, principal)
+    return await PollService(service).patch(vote_id, payload, principal, now=datetime.now(UTC))
 
 
 @router.post(
@@ -114,6 +182,9 @@ async def open_vote(
     service: ServiceDep,
     publisher: PublisherDep,
     principal: ReaderDep,
+    background: BackgroundTasks,
+    request: Request,
+    settings: SettingsDep,
 ) -> VoteOut:
     """Open a vote and move it from ``draft`` to ``open``.
 
@@ -124,7 +195,8 @@ async def open_vote(
     A meeting vote runs the checks of the open route of the meeting first
     (``livevote.vote_open``): a prepared draft can wait while the state changes, and
     this route must not open it around them. The quorum denominator then comes from
-    the current roster.
+    the current roster. A poll of a Gremium opens only with its end at least one hour
+    ahead (422 ``closes_at_too_soon``) and sends ``poll_started``.
     """
     await service.assert_can_run_vote(vote_id, principal)
     eligible: int | None = None
@@ -138,6 +210,7 @@ async def open_vote(
         vote_id, now=datetime.now(UTC), actor=principal.sub, eligible_count=eligible
     )
     await publisher.vote_opened(vote)
+    _mail_poll_start(vote, background, request, settings)
     return vote
 
 
@@ -312,6 +385,7 @@ async def list_votes(
     status: Annotated[list[VoteStatus] | None, Query()] = None,
     gremium_id: Annotated[UUID | None, Query(alias="gremiumId")] = None,
     q: Annotated[str | None, Query(max_length=200)] = None,
+    kind: Annotated[VoteKind | None, Query()] = None,
     limit: Annotated[int, Query(ge=1, le=MAX_LIMIT)] = DEFAULT_LIMIT,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> Page[VoteListItem]:
@@ -322,14 +396,16 @@ async def list_votes(
     ``application.read``, an eligible voter or a manager of the vote. ``status`` repeats
     (``?status=open&status=closed``). Without it the list leaves out the drafts.
     ``gremiumId`` keeps the votes of one gremium, and ``q`` searches the question and
-    the meeting title. Each row carries ``canCast`` and the own ballot (``myBallot``; a
-    secret vote gives only ``cast``) and no tally.
+    the meeting title. ``kind`` keeps the motions, the elections or the polls. Each row
+    carries ``canCast`` and the own ballot (``myBallot``; a secret vote gives only
+    ``cast``) and no tally.
     """
     return await service.list_visible(
         principal,
         statuses=status,
         gremium_id=gremium_id,
         q=q,
+        kind=kind,
         limit=limit,
         offset=offset,
     )

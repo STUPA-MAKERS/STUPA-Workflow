@@ -17,8 +17,9 @@ import { take } from 'rxjs/operators';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { I18nService } from '@core/i18n/i18n.service';
 import { TranslatePipe } from '@core/i18n/translate.pipe';
+import type { Translate } from '@core/i18n/translations';
 import { NgTemplateOutlet } from '@angular/common';
-import type { ElectionConfig, MyBallot, ProblemDetail } from '@core/api/models';
+import type { DateAnswer, ElectionConfig, MyBallot, PollConfig, ProblemDetail } from '@core/api/models';
 import { ButtonComponent, haptic, IconComponent, observeElementSize } from '@stupa-makers/ui-kit';
 import { voteOptionLabel } from '../../meetings/meetings-display.util';
 import {
@@ -28,14 +29,30 @@ import {
   electionCountText,
   isYesNoElection,
 } from '../election.util';
+import {
+  DATE_ANSWERS,
+  answersComplete,
+  pollAsElection,
+  pollChoiceLabel,
+  pollCountText,
+  pollOptionLabel,
+} from '../poll.util';
 
 /** The two ballots a person can hold in one vote: the own one, and the one of a member
  *  they represent. The server keeps them apart. */
 export type BallotRow = 'own' | 'proxy';
 
-/** A pick: one option, or the candidate ids of an election ballot (F2; `[]` = full
- *  abstention). */
-export type BallotPick = string | readonly string[];
+/** The answers of a date poll ballot, one per date. */
+export type DateAnswers = Readonly<Record<string, DateAnswer>>;
+
+/** A pick: one option, the candidate ids of an election ballot (F2; `[]` = full
+ *  abstention) or the option ids of a poll, or the answers of a date poll. */
+export type BallotPick = string | readonly string[] | DateAnswers;
+
+/** The pick holds the answers of a date poll. */
+function isAnswers(pick: BallotPick | null): pick is DateAnswers {
+  return typeof pick === 'object' && pick !== null && !Array.isArray(pick);
+}
 
 /**
  * Sends one ballot to the server. The observable gives one value when the server
@@ -88,6 +105,10 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
  *   "Ganz enthalten" picks no candidate. A free vote is an abstention. The button
  *   counts, "Stimmen abgeben (2 Namen, 1 Enthaltung)", and its accessible name adds the
  *   names. One candidate keeps the Ja/Nein/Enthaltung options.
+ * - `poll` ("Umfrage"): a single or multi poll takes the candidate rows of an election
+ *   with its options ("Enthaltung", or the counter "1 von höchstens 2 gewählt" and "Ganz
+ *   enthalten"). A date poll gives one row per date with Ja, Vielleicht and Nein, and
+ *   "Antworten abgeben" stays off until every date has an answer.
  *
  * The component calls the server through `caster`; the page owns the toasts and the
  * reload (`castDone`, `castFailed`).
@@ -135,6 +156,8 @@ export class BallotComponent {
   readonly columns = input(false);
   /** The personnel election of the vote (F2), or `null` for a motion. */
   readonly election = input<ElectionConfig | null>(null);
+  /** The poll of the vote, or `null`. */
+  readonly poll = input<PollConfig | null>(null);
 
   readonly castDone = output<BallotCast>();
   readonly castFailed = output<BallotFailure>();
@@ -142,8 +165,18 @@ export class BallotComponent {
   /** The pick of each row (step 1). */
   protected readonly picked = signal<Record<BallotRow, BallotPick | null>>({ own: null, proxy: null });
 
-  /** The ballot picks candidates (an election with more than one candidate). */
-  protected readonly candidateMode = computed(() => (this.election()?.candidates.length ?? 0) > 1);
+  /** The candidate rows: the election, or a single or multi poll as an election. */
+  protected readonly ballotElection = computed<ElectionConfig | null>(() => {
+    const poll = this.poll();
+    if (poll) return poll.mode === 'date' ? null : pollAsElection(poll);
+    return this.election();
+  });
+  /** A date poll: Ja, Vielleicht or Nein per date. */
+  protected readonly dateMode = computed(() => this.poll()?.mode === 'date');
+  /** The ballot picks candidates (an election with more than one candidate) or options. */
+  protected readonly candidateMode = computed(
+    () => (this.ballotElection()?.candidates.length ?? 0) > 1,
+  );
   /**
    * The name a Ja/Nein election (one candidate) asks about. The choices say only
    * Ja/Nein/Enthaltung, so the ballot names the candidate above them.
@@ -153,9 +186,15 @@ export class BallotComponent {
     if (!isYesNoElection(election)) return null;
     return candidateLabel(election!.candidates[0], (key, params) => this.i18n.translate(key, params));
   });
-  /** Several seats: check boxes and a counter. */
-  protected readonly multiSeat = computed(() => (this.election()?.seats ?? 1) > 1);
-  protected readonly seats = computed(() => this.election()?.seats ?? 1);
+  /** Several seats, or a multi poll: check boxes and a counter. */
+  protected readonly multiSeat = computed(() => {
+    const poll = this.poll();
+    if (poll) return poll.mode === 'multi';
+    return (this.election()?.seats ?? 1) > 1;
+  });
+  protected readonly seats = computed(() => this.ballotElection()?.seats ?? 1);
+  /** The three answers of a date row. */
+  protected readonly dateAnswers = DATE_ANSWERS;
   /** The row the button acts on: the row of the last pick. */
   protected readonly active = signal<BallotRow>('own');
   /** The row whose ballot is on its way to the server. */
@@ -200,10 +239,16 @@ export class BallotComponent {
     const row = this.target();
     const choice = row ? this.picked()[row] : null;
     const name = this.proxyName() ?? '';
+    if (this.dateMode()) {
+      return row === 'proxy'
+        ? this.i18n.translate('voting.ballot.confirmProxyEmpty', { name })
+        : this.i18n.translate('poll.ballot.submitDate');
+    }
     if (this.multiSeat() && Array.isArray(choice)) {
-      const count = electionCountText(this.election(), choice, (key, params) =>
-        this.i18n.translate(key, params),
-      );
+      const t: Translate = (key, params) => this.i18n.translate(key, params);
+      const count = this.poll()
+        ? pollCountText(choice.length, t)
+        : electionCountText(this.election(), choice, t);
       return row === 'proxy'
         ? this.i18n.translate('voting.ballot.confirmProxyCount', { name, count })
         : this.i18n.translate('voting.ballot.confirmCount', { count });
@@ -228,7 +273,7 @@ export class BallotComponent {
     if (!this.multiSeat() || !Array.isArray(choice) || choice.length === 0) return '';
     return this.i18n.translate('voting.ballot.confirmNames', {
       label: this.confirmLabel(),
-      names: candidateNames(this.election(), choice, (key, params) =>
+      names: candidateNames(this.ballotElection(), choice, (key, params) =>
         this.i18n.translate(key, params),
       ).join(', '),
     });
@@ -246,7 +291,10 @@ export class BallotComponent {
 
   protected readonly canConfirm = computed(() => {
     const row = this.target();
-    return row !== null && this.picked()[row] !== null && this.pending() === null;
+    if (row === null || this.pending() !== null) return false;
+    const pick = this.picked()[row];
+    if (this.dateMode()) return answersComplete(this.poll()!, isAnswers(pick) ? pick : null);
+    return pick !== null;
   });
 
   /** The pinned bar of the phone layout, measured to keep room for it below the rows. */
@@ -275,18 +323,53 @@ export class BallotComponent {
     return voteOptionLabel(option, (key) => this.i18n.translate(key));
   }
 
-  /** The label of a pick: an option, or the candidates with the abstentions. */
+  /** The label of a pick: an option, the candidates with the abstentions, or the
+   *  chosen options of a poll. */
   protected choiceLabel(pick: BallotPick): string {
     if (typeof pick === 'string') return this.label(pick);
-    return electionChoiceLabel(this.election(), pick, (key, params) =>
-      this.i18n.translate(key, params),
-    );
+    if (isAnswers(pick)) return '';
+    const t: Translate = (key, params) => this.i18n.translate(key, params);
+    const poll = this.poll();
+    if (poll) return pollChoiceLabel(poll, pick, this.i18n.formatLocale(), t);
+    return electionChoiceLabel(this.election(), pick, t);
+  }
+
+  /** The label of a date of a date poll. */
+  protected dateLabel(id: string): string {
+    const option = this.poll()?.options.find((o) => o.id === id);
+    return option ? pollOptionLabel(option, this.i18n.formatLocale()) : id;
+  }
+
+  /** "Ja", "Vielleicht", "Nein". */
+  protected answerLabel(answer: DateAnswer): string {
+    if (answer === 'maybe') return this.i18n.translate('poll.answer.maybe');
+    return this.i18n.translate(answer === 'yes' ? 'vote.option.yes' : 'vote.option.no');
+  }
+
+  /** The answer of a row for a date: the pick of an open row, or the cast answer. */
+  protected answerOf(row: BallotRow, id: string): DateAnswer | null {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (state?.cast) return this.secret() ? null : (state.answers?.[id] ?? null);
+    const pick = this.picked()[row];
+    return isAnswers(pick) ? (pick[id] ?? null) : null;
+  }
+
+  /** Step 1 of a date poll: answer one date of a row. */
+  protected answer(row: BallotRow, id: string, value: DateAnswer): void {
+    const state = row === 'own' ? this.ownState() : this.proxyState();
+    if (!state || state.cast || this.pending() !== null) return;
+    this.picked.update((p) => {
+      const current = p[row];
+      const answers = isAnswers(current) ? current : {};
+      return { ...p, [row]: { ...answers, [id]: value } };
+    });
+    this.active.set(row);
   }
 
   /** The candidate ids that a row picked, or `[]`. */
   protected picks(row: BallotRow): readonly string[] {
     const pick = this.picked()[row];
-    return Array.isArray(pick) ? pick : [];
+    return Array.isArray(pick) ? (pick as readonly string[]) : [];
   }
 
   /** The candidate is chosen: the pick of an open row, or the ballot of a cast row. */
@@ -376,10 +459,11 @@ export class BallotComponent {
       });
   }
 
-  /** The choice to mark as cast in a row, or `null` (secret, or not known). */
+  /** The choice to mark as cast in a row, or `null` (secret, not known, or a date
+   *  poll: its rows show the answers). */
   protected castChoice(row: BallotRow): BallotPick | null {
     const state = row === 'own' ? this.ownState() : this.proxyState();
-    if (!state?.cast || this.secret()) return null;
+    if (!state?.cast || this.secret() || this.dateMode()) return null;
     return state.choices ?? state.choice;
   }
 
@@ -391,10 +475,10 @@ export class BallotComponent {
   }
 
   private lock(row: BallotRow, choice: BallotPick | null): void {
-    const ballot: MyBallot =
-      typeof choice === 'string' || choice === null
-        ? { cast: true, choice }
-        : { cast: true, choice: null, choices: [...choice] };
+    let ballot: MyBallot;
+    if (typeof choice === 'string' || choice === null) ballot = { cast: true, choice };
+    else if (isAnswers(choice)) ballot = { cast: true, choice: null, answers: { ...choice } };
+    else ballot = { cast: true, choice: null, choices: [...choice] };
     this.local.update((l) => ({ ...l, [row]: ballot }));
     this.picked.update((p) => ({ ...p, [row]: null }));
   }

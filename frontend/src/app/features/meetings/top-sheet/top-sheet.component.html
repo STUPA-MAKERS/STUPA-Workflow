@@ -132,29 +132,26 @@
             >
               <app-icon name="image" [size]="20" />
             </button>
-            @if (inTable()) {
-              <app-row-menu
-                class="ts__tableMenu"
-                icon="table"
-                align="start"
-                [label]="'meetings.editor.tableMenu' | t"
-                [sections]="tableMenu()"
-                (selected)="onTableMenu($event)"
-              />
-            }
           </div>
         }
         <span class="ts__spacer"></span>
-        <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
-          @switch (saveState()) {
-            @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
-            @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
-            @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
-            @default {}
-          }
-        </span>
+        @if (!saveInFoot()) {
+          <ng-container [ngTemplateOutlet]="saveTpl" />
+        }
+        @if (editable()) {
+          <app-button
+            class="ts__done"
+            variant="outlined"
+            [ariaPressed]="!!t.doneAt"
+            (click)="doneChange.emit({ item: t, done: !t.doneAt })"
+          >
+            <app-icon name="check" />
+            {{ 'meetings.agenda.done' | t }}
+          </app-button>
+        }
         <app-segmented
           class="ts__mode"
+          size="control"
           width="equal"
           [check]="false"
           [ariaLabel]="'meetings.editor.mode' | t"
@@ -232,6 +229,21 @@
       @if (!proto.isLocked && !canEdit() && m.canWrite) {
         <span>{{ 'meetings.protocol.takenBy' | t: { name: m.protokollantName ?? '' } }}</span>
       }
+      @if (saveInFoot() && !proto.isLocked) {
+        <span class="ts__spacer"></span>
+        <ng-container [ngTemplateOutlet]="saveTpl" />
+      }
     </footer>
   }
 </article>
+
+<ng-template #saveTpl>
+  <span class="ts__save mtg__saveState" [attr.data-state]="saveState()" aria-live="polite">
+    @switch (saveState()) {
+      @case ('saving') { {{ 'meetings.protocol.saving' | t }} }
+      @case ('saved') { <app-icon name="check" [size]="16" /> {{ 'meetings.protocol.saved' | t }} }
+      @case ('error') { {{ 'meetings.protocol.saveFailed' | t }} }
+      @default {}
+    }
+  </span>
+</ng-template>

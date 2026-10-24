@@ -6,6 +6,8 @@ import type { Translate, TranslationKey } from '@core/i18n/translations';
 import type { MyBallot, Vote } from '@core/api/models';
 import { ElectionResultComponent } from '../election-result/election-result.component';
 import { electionCaption, electionOf } from '../election.util';
+import { PollResultComponent } from '../poll-result/poll-result.component';
+import { pollCaption, pollOf, pollStatus } from '../poll.util';
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import {
   BallotComponent,
@@ -47,6 +49,7 @@ import {
     BallotComponent,
     ElectionResultComponent,
     NoteComponent,
+    PollResultComponent,
     SheetBarComponent,
     SheetBarTitleDirective,
     StatusTextComponent,
@@ -96,10 +99,18 @@ export class VotePanelComponent {
   /** The personnel election of the vote (F2), or `null` for a motion. */
   protected readonly election = computed(() => electionOf(this.vote()));
 
-  protected readonly status = computed<StatusView>(() => meetingVoteStatus(this.vote().status));
+  /** The poll of the vote, or `null`. */
+  protected readonly poll = computed(() => pollOf(this.vote()));
+
+  /** The status; a poll reads "Umfrage offen" or "Umfrage beendet". */
+  protected readonly status = computed<StatusView>(() => {
+    const status = this.vote().status;
+    return (this.poll() ? pollStatus(status) : null) ?? meetingVoteStatus(status);
+  });
   /** The caption of the card: "Abstimmung offen", "Abstimmung geschlossen". */
   protected readonly cardCap = computed<TranslationKey>(() => {
     const status = this.vote().status;
+    if (this.poll() && (status === 'open' || status === 'closed')) return this.status().key;
     if (status === 'open') return 'meetings.vote.card.open';
     if (status === 'closed') return 'meetings.vote.card.closed';
     return this.status().key;
@@ -133,6 +144,13 @@ export class VotePanelComponent {
   protected readonly rules = computed(() => {
     const v = this.vote();
     const t: Translate = (key, params) => this.i18n.translate(key, params);
+    const poll = this.poll();
+    if (poll) {
+      // "Umfrage · Mehrfachwahl, höchstens 2 · geheime Abstimmung".
+      const parts = [pollCaption(poll, t)];
+      if (this.secret()) parts.push(secrecyLabel(true, t));
+      return parts.join(' · ');
+    }
     const election = this.election();
     if (election) {
       // "Wahl · 2 Posten · geheime Abstimmung".
@@ -184,11 +202,6 @@ export class VotePanelComponent {
     }),
   );
 
-  /** The fixed line while the counts are hidden (the strip has no progress block). */
-  protected readonly hiddenKey = computed<TranslationKey>(() =>
-    this.secret() ? 'meetings.vote.hiddenSecret' : 'meetings.vote.progressHidden',
-  );
-
   /** The ballot shows while the vote is open and the person holds a ballot. */
   protected readonly showBallot = computed(
     () => this.isOpen() && (this.own() !== null || !!this.proxyName()),
@@ -201,7 +214,8 @@ export class VotePanelComponent {
    */
   protected readonly closedSummary = computed<string | null>(() => {
     const v = this.vote();
-    if (v.status !== 'closed') return null;
+    // A poll counts its answers in its own footer.
+    if (v.status !== 'closed' || this.poll()) return null;
     const t = v.tally;
     const cast = t.voted ?? Object.values(t.counts).reduce((sum, n) => sum + n, 0);
     if (this.guestsVote()) {
@@ -220,6 +234,23 @@ export class VotePanelComponent {
       parts.push(`${this.i18n.translate('vote.tally.quorum')}: ${state}`);
     }
     return parts.join(' · ');
+  });
+
+  /** The answers of a poll: the ballots of its result, else the turnout. */
+  protected readonly pollAnswered = computed(
+    () => this.vote().pollResult?.ballots ?? this.vote().tally.voted ?? 0,
+  );
+  /**
+   * The persons a poll asks: the eligible members of a poll of a Gremium; in a meeting
+   * the present members (and the guests of a vote with guests), fixed at the close.
+   */
+  protected readonly pollTotal = computed(() => {
+    const v = this.vote();
+    const t = v.tally;
+    if (!v.meetingId) return t.eligible;
+    if (v.status !== 'closed') return t.present ?? 0;
+    const guests = this.guestsVote() ? (t.presentGuests ?? 0) : 0;
+    return t.presentMembers != null ? t.presentMembers + guests : t.eligible;
   });
 
   /** Counts show after the close, or while open once the server revealed them. */

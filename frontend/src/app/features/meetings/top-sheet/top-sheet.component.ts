@@ -13,6 +13,7 @@ import {
   untracked,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { firstValueFrom } from 'rxjs';
 import { RouterLink } from '@angular/router';
@@ -21,13 +22,13 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import type { TranslationKey } from '@core/i18n/translations';
 import type { AgendaItem, Meeting, Protocol, Uuid } from '@core/api/models';
 import {
+  ButtonComponent,
   EmptyStateComponent,
   IconComponent,
   type IconName,
+  MEDIA,
+  mediaQuery,
   NoteComponent,
-  RowMenuComponent,
-  type RowMenuItem,
-  type RowMenuSection,
   SegmentedComponent,
   type SegmentedOption,
   type StatusKind,
@@ -38,7 +39,6 @@ import {
   MarkdownEditorComponent,
   type MarkdownFormat,
   type MarkdownImageUploader,
-  type MarkdownTableCommand,
 } from '@stupa-makers/ui-kit/markdown-editor';
 import { MediaApiService } from '@shared/markdown/media-api.service';
 import {
@@ -74,15 +74,6 @@ const TOOLS: readonly FormatTool[] = [
   { format: 'bulletList', icon: 'list', label: 'meetings.editor.list' },
 ];
 
-/** The items of the table menu, in the order of the menu. */
-const TABLE_ITEMS: readonly { id: MarkdownTableCommand; label: TranslationKey; icon: IconName; danger?: boolean }[] = [
-  { id: 'addRowAfter', label: 'meetings.editor.addRow', icon: 'plus' },
-  { id: 'addColumnAfter', label: 'meetings.editor.addColumn', icon: 'plus' },
-  { id: 'deleteRow', label: 'meetings.editor.deleteRow', icon: 'minus' },
-  { id: 'deleteColumn', label: 'meetings.editor.deleteColumn', icon: 'minus' },
-  { id: 'deleteTable', label: 'meetings.editor.deleteTable', icon: 'trash', danger: true },
-];
-
 /** The file name without its extension, as the alt text of an uploaded image. */
 function altOf(file: File): string {
   return file.name.replace(/\.[^.]*$/, '');
@@ -104,6 +95,9 @@ function altOf(file: File): string {
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
  * 18:55)". The text stays editable for every writer while the protocol is a draft (O22).
  *
+ * A writer of the minutes (`editable`) ticks the open item with "Erledigt" right of the
+ * title, a toggle that also removes the tick ("TOP abhaken").
+ *
  * The participant view (`follow`) reads the same sheet without a protocol of its own.
  *
  * A switch in the format bar shows the text formatted or as its Markdown source. The
@@ -120,15 +114,16 @@ function altOf(file: File): string {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    ButtonComponent,
     EmptyStateComponent,
     FormsModule,
+    NgTemplateOutlet,
     RouterLink,
     TranslatePipe,
     IconComponent,
     MarkdownEditorComponent,
     MarkdownImageUploadDirective,
     NoteComponent,
-    RowMenuComponent,
     ProtocolBarComponent,
     SegmentedComponent,
     StatusTextComponent,
@@ -185,6 +180,19 @@ export class TopSheetComponent {
   readonly startRename = output<AgendaItem>();
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();
+  /** "Erledigt" in the bar: set or remove the done mark of the open item. */
+  readonly doneChange = output<{ item: AgendaItem; done: boolean }>();
+
+  private readonly phone = mediaQuery(MEDIA.phone);
+
+  /**
+   * The save state sits in the footer of a live protocol, so the bar keeps one row. A
+   * phone keeps it in the bar: there the footer is at the end of the text.
+   */
+  protected readonly saveInFoot = computed(() => {
+    const m = this.meeting();
+    return !!this.protocol() && m.status !== 'closed' && !this.follow() && !this.phone();
+  });
 
   protected readonly tools = TOOLS;
 
@@ -282,26 +290,6 @@ export class TopSheetComponent {
     }
   };
 
-  /** The cursor of the formatted view is in a table. */
-  protected readonly inTable = computed(
-    () => this.mode() !== 'raw' && (this.editor()?.inTable() ?? false),
-  );
-
-  /** The table menu: rows, columns and the whole table. */
-  protected readonly tableMenu = computed<RowMenuSection[]>(() => {
-    this.i18n.locale();
-    return [
-      {
-        items: TABLE_ITEMS.map((item) => ({
-          id: item.id,
-          icon: item.icon,
-          danger: item.danger,
-          label: this.i18n.translate(item.label),
-        })),
-      },
-    ];
-  });
-
   /** The formats at the cursor. The Markdown source shows none as pressed. */
   protected readonly activeFormats = computed(() =>
     this.mode() === 'raw' ? NO_FORMATS : (this.editor()?.activeFormats() ?? NO_FORMATS),
@@ -353,11 +341,6 @@ export class TopSheetComponent {
       return;
     }
     this.rawUpload()?.pick();
-  }
-
-  /** An item of the table menu. */
-  protected onTableMenu(item: RowMenuItem): void {
-    this.editor()?.tableCommand(item.id as MarkdownTableCommand);
   }
 
   /** An edit in the formatted editor. A reader changes nothing, also when the editor emits. */

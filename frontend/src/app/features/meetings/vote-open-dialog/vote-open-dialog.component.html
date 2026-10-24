@@ -1,6 +1,6 @@
 <app-dialog
   [open]="item() !== null"
-  [title]="(canOpen() ? 'meetings.vote.dialogTitle' : 'meetings.vote.prepareTitle') | t"
+  [title]="(isPoll() && canOpen() ? 'poll.dialog.title' : canOpen() ? 'meetings.vote.dialogTitle' : 'meetings.vote.prepareTitle') | t"
   [subtitle]="subtitle()"
   [closeLabel]="'action.close' | t"
   (closed)="cancel()"
@@ -26,18 +26,27 @@
       />
       <hr class="vod__divider" />
     }
-    <app-textarea [label]="(isElection() ? 'election.dialog.round' : 'meetings.vote.question') | t">
+    <app-textarea [label]="(isPoll() ? 'poll.dialog.question' : isElection() ? 'election.dialog.round' : 'meetings.vote.question') | t">
       <textarea
         id="vod-question"
-        [rows]="isElection() ? 1 : 3"
+        [rows]="isElection() || isPoll() ? 1 : 3"
         name="question"
-        [placeholder]="(isElection() ? 'election.dialog.roundPlaceholder' : 'meetings.vote.questionPlaceholder') | t"
+        [placeholder]="isPoll() ? '' : ((isElection() ? 'election.dialog.roundPlaceholder' : 'meetings.vote.questionPlaceholder') | t)"
         [ngModel]="question()"
         (ngModelChange)="setQuestion($event)"
       ></textarea>
     </app-textarea>
 
-    @if (isElection()) {
+    @if (isPoll()) {
+    <app-poll-editor idPrefix="vod-poll" [draft]="poll()" (draftChange)="poll.set($event)" />
+
+    <app-switch
+      [id]="'vod-poll-secret'"
+      [checked]="pollSecret()"
+      (checkedChange)="pollSecret.set($event)"
+      ><span class="vod__switchLabel">{{ 'poll.dialog.secret' | t }}</span></app-switch
+    >
+    } @else if (isElection()) {
     <div class="vod__group">
       <span class="vod__cap cap" id="vod-seats-cap">{{ 'election.dialog.seats' | t }}</span>
       <div class="vod__stepper" role="group" aria-labelledby="vod-seats-cap">
@@ -172,7 +181,7 @@
   @if (canOpen()) {
     <app-button dialog-footer variant="fill" [loading]="submitting() && !preparing()" [disabled]="!canSubmit() || (submitting() && preparing())" (click)="submit(false)">
       <app-icon name="vote" [size]="16" />
-      {{ (isElection() ? 'election.dialog.submit' : 'meetings.vote.openSubmit') | t }}
+      {{ (isPoll() ? 'poll.dialog.submit' : isElection() ? 'election.dialog.submit' : 'meetings.vote.openSubmit') | t }}
     </app-button>
   }
 </app-dialog>

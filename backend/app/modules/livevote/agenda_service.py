@@ -19,14 +19,20 @@ State rules (F24, O22, O25):
   protocol leaves the draft. The minute-taker can thus write the minutes of an item
   before the meeting starts.
 
+The done mark of an item ("TOP abhaken") follows the minutes window too. A person
+sets and removes it by hand, and the move to the next item sets it for the item that
+the room leaves.
+
 Every change writes an audit entry (F12): `agenda_item_add`, `agenda_item_update`,
-`agenda_item_remove` and `agenda_reorder`. A body edit of a planned or live meeting
+`agenda_item_remove`, `agenda_reorder`, `agenda_item_done` and
+`agenda_item_reopened`. A body edit of a planned or live meeting
 is the preparation or the running minutes, and its autosave is not audited. A body
 edit after the close is a correction of the minutes and is audited, without the text.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
@@ -225,6 +231,7 @@ class AgendaService:
                     body=r.body,
                     position=r.position,
                     nonPublic=r.non_public,
+                    doneAt=r.done_at,
                     stateLabel=state.label_i18n if state is not None else None,
                     amount=app.amount if app is not None else None,
                 )
@@ -290,6 +297,59 @@ class AgendaService:
         await self.session.flush()
         await self.session.commit()
         return await self.list(meeting_id)
+
+    async def set_done(
+        self, meeting_id: UUID, item_id: UUID, *, done: bool, actor: str
+    ) -> list[AgendaItemOut]:
+        """Set or remove the done mark of an agenda item, then commit.
+
+        The rules are those of `set_done_in_tx`. The caller checks the right.
+
+        Raises:
+            NotFoundError: The meeting has no agenda item with this id.
+            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+        """
+        meeting = await self._meeting(meeting_id)
+        await self.set_done_in_tx(meeting, item_id, done=done, actor=actor)
+        await self.session.commit()
+        return await self.list(meeting_id)
+
+    async def set_done_in_tx(
+        self,
+        meeting: Meeting,
+        item_id: UUID,
+        *,
+        done: bool,
+        actor: str,
+        via: str | None = None,
+    ) -> None:
+        """Set or remove the done mark of an agenda item. It does not commit.
+
+        The mark follows the minutes window (O22): a `planned` or `live` meeting, or a
+        closed meeting with a draft protocol. A mark that does not change writes
+        nothing, so a second tick keeps the time and the person of the first one. A
+        change writes `agenda_item_done` or `agenda_item_reopened`. `via` names the
+        path in the audit entry (`next` for the move to the next item).
+
+        Raises:
+            NotFoundError: The meeting has no agenda item with this id.
+            ConflictError: The protocol is no longer a draft (``protocol_locked``).
+        """
+        row = await self.item(meeting.id, item_id)
+        await self._assert_minutes_open(meeting)
+        if done == (row.done_at is not None):
+            return
+        if done:
+            row.done_at = datetime.now(UTC)
+            row.done_by = actor
+            action = AuditAction.AGENDA_ITEM_DONE
+        else:
+            row.done_at = None
+            row.done_by = None
+            action = AuditAction.AGENDA_ITEM_REOPENED
+        extra = {"via": via} if via is not None else {}
+        await self._audit(action, actor=actor, item=row, **extra)
+        await self.session.flush()
 
     async def _has_guest_vote(self, item_id: UUID) -> bool:
         """Tell if the item has an open or closed vote with guests (#17)."""

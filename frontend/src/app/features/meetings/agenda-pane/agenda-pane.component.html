@@ -22,7 +22,7 @@
     (cdkDropListDropped)="dropped($event)"
   >
     @for (item of agenda(); track item.id; let i = $index) {
-      @let done = isDone(i);
+      @let done = isDone(item);
       <li
         class="ap__row"
         cdkDrag
@@ -64,7 +64,7 @@
               <app-top-badge [number]="i + 1" [state]="done ? 'done' : isNow(item) ? 'now' : 'todo'" decorative />
             </span>
             @if (isNow(item) || done) {
-              <span sub class="sr-only">{{ (isNow(item) ? 'meetings.dock.now' : 'meetings.dock.done') | t }}</span>
+              <span sub class="sr-only">{{ (done ? 'meetings.dock.done' : 'meetings.dock.now') | t }}</span>
             }
             <span trail class="ap__trail">
               @if (item.nonPublic) {

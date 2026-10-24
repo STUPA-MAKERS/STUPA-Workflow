@@ -37,7 +37,7 @@ import { TodoLinkedRefresh } from '../../todos/linked-list/todo-linked-refresh';
 import { TopBadgeComponent } from '../top-badge/top-badge.component';
 
 /** The ids of the row menu items of an agenda item. */
-type AgendaAction = 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
+type AgendaAction = 'done' | 'rename' | 'up' | 'down' | 'nonPublic' | 'remove' | 'todo';
 
 /**
  * Add, rename, reorder and remove agenda items: the meeting lead with write access, while
@@ -57,9 +57,12 @@ export interface AgendaMove {
  * The agenda of the session page ("Tagesordnung · n TOPs").
  *
  * A row shows the number, the title, the kind ("Antrag" or "Freitext"), an open vote
- * and the tag NÖ. The number is filled for the item that the room handles now, and an
- * item before it shows a check: it counts as handled (O19). A click opens the item in
- * the sheet.
+ * and the tag NÖ. The number is filled for the item that the room handles now, and a
+ * ticked item shows a check ("TOP abhaken"). Only a stored tick marks an item as done,
+ * never its place before "now". A click opens the item in the sheet.
+ *
+ * A writer of the minutes (`canTick`) ticks an item and removes the tick with the first
+ * entry of the row menu.
  *
  * The row menu holds every agenda change (N21): rename (free text only), move up and
  * down, the non-public switch and the remove. Drag and drop also reorders (frame 7): the
@@ -118,6 +121,8 @@ export class AgendaPaneComponent {
    * is for screen readers only, and the pane shows no add of its own.
    */
   readonly inSheet = input(false);
+  /** The viewer may tick an item: the gate of the item text (`editable` of the page). */
+  readonly canTick = input(false);
 
   /**
    * Open an item in the sheet. No output of the pane has the name of a DOM event: a
@@ -131,6 +136,7 @@ export class AgendaPaneComponent {
   readonly cancelRename = output<void>();
   readonly renameTop = output<AgendaItem>();
   readonly setNonPublic = output<{ item: AgendaItem; nonPublic: boolean }>();
+  readonly setDone = output<{ item: AgendaItem; done: boolean }>();
   readonly move = output<AgendaMove>();
   readonly remove = output<Uuid>();
 
@@ -171,12 +177,6 @@ export class AgendaPaneComponent {
     const m = this.meeting();
     return m.status === 'planned' ? null : m.currentAgendaItemId;
   });
-  /** The index of the item that the room handles now, or -1. */
-  private readonly nowIndex = computed(() => {
-    const id = this.nowId();
-    return id ? this.agenda().findIndex((a) => a.id === id) : -1;
-  });
-
   /** Put the focus on the heading of the pane, for "Tagesordnung bearbeiten". */
   focus(): void {
     this.heading().nativeElement.focus();
@@ -216,10 +216,9 @@ export class AgendaPaneComponent {
     return this.nowId() !== null && item.id === this.nowId();
   }
 
-  /** An item before "now" in the agenda order counts as handled (O19). */
-  protected isDone(index: number): boolean {
-    const now = this.nowIndex();
-    return now > -1 && index < now;
+  /** A ticked item counts as done ("TOP abhaken"). */
+  protected isDone(item: AgendaItem): boolean {
+    return !!item.doneAt;
   }
 
   protected votesFor(itemId: Uuid): MeetingVote[] {
@@ -250,9 +249,15 @@ export class AgendaPaneComponent {
   /** The row menu of an item. Empty when nothing on the agenda may change. */
   private menu(item: AgendaItem, index: number): RowMenuSection[] {
     const sections = this.agendaMenu(item, index);
-    if (!this.canCreateTodo()) return sections;
-    const todo: RowMenuItem = { id: 'todo', label: this.i18n.translate('meetings.agenda.todo'), icon: 'circleok' };
-    return [{ items: [todo] }, ...sections];
+    if (this.canCreateTodo()) {
+      const todo: RowMenuItem = { id: 'todo', label: this.i18n.translate('meetings.agenda.todo'), icon: 'circleok' };
+      sections.unshift({ items: [todo] });
+    }
+    if (this.canTick()) {
+      const key: TranslationKey = item.doneAt ? 'meetings.agenda.markOpen' : 'meetings.agenda.markDone';
+      sections.unshift({ items: [{ id: 'done', label: this.i18n.translate(key), icon: 'check' }] });
+    }
+    return sections;
   }
 
   private agendaMenu(item: AgendaItem, index: number): RowMenuSection[] {
@@ -304,6 +309,9 @@ export class AgendaPaneComponent {
     }
     if (this.savingAgenda()) return;
     switch (action.id as AgendaAction) {
+      case 'done':
+        this.setDone.emit({ item, done: !item.doneAt });
+        break;
       case 'rename':
         this.startRename.emit(item);
         break;

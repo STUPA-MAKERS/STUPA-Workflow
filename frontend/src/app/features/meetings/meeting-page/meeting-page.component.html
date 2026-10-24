@@ -65,10 +65,6 @@
         </app-button>
       }
       @case ('close') {
-        <!-- Visible, not only a tooltip: a disabled button takes no focus and no touch. -->
-        @if (anyOpenVote()) {
-          <span class="mp__blocked">{{ 'meetings.page.closeBlocked' | t }}</span>
-        }
         <app-button variant="danger" [loading]="finalizing()" [disabled]="anyOpenVote()" [title]="(anyOpenVote() ? 'meetings.page.closeBlocked' : 'meetings.control.closeSession') | t" (click)="closeSession.emit()">
           {{ 'meetings.control.closeSession' | t }}
         </app-button>
@@ -166,6 +162,7 @@
         (startRename)="startRename.emit($event)"
         (cancelRename)="cancelRename.emit()"
         (renameTop)="renameTop.emit($event)"
+        (doneChange)="setDone.emit($event)"
       />
     }
   </div>
@@ -177,7 +174,6 @@
   [agenda]="agenda()"
   [topIndex]="topIndex()"
   [attendance]="attendance()"
-  [wordCount]="wordCount()"
   [myVote]="myVote()"
   [(panel)]="panel"
   (step)="step($event)"
@@ -229,12 +225,14 @@
     [savingAgenda]="savingAgenda()"
     [renamingTopId]="renamingTopId()"
     [(renameDraft)]="renameDraft"
+    [canTick]="editable()"
     (pick)="jump($event)"
     (add)="addTop.emit()"
     (startRename)="startRename.emit($event)"
     (cancelRename)="cancelRename.emit()"
     (renameTop)="renameTop.emit($event)"
     (setNonPublic)="setNonPublic.emit($event)"
+    (setDone)="setDone.emit($event)"
     (move)="moveTop.emit($event)"
     (remove)="removeFromAgenda.emit($event)"
   />

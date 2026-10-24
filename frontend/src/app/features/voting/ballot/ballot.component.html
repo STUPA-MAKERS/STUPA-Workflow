@@ -12,7 +12,12 @@
     @if (named()) {
       <h2 class="sec ballot__name">{{ 'voting.ballot.own' | t }}</h2>
     }
-    @if (candidateMode()) {
+    @if (dateMode()) {
+      <ng-container
+        [ngTemplateOutlet]="dates"
+        [ngTemplateOutletContext]="{ row: 'own', cast: own.cast, label: ('voting.ballot.own' | t) }"
+      />
+    } @else if (candidateMode()) {
       <ng-container
         [ngTemplateOutlet]="cands"
         [ngTemplateOutletContext]="{ row: 'own', cast: own.cast, label: ('voting.ballot.own' | t) }"
@@ -79,7 +84,12 @@
     <h2 class="sec ballot__name ell" [title]="'voting.ballot.proxy' | t: { name }">
       {{ 'voting.ballot.proxy' | t: { name } }}
     </h2>
-    @if (candidateMode()) {
+    @if (dateMode()) {
+      <ng-container
+        [ngTemplateOutlet]="dates"
+        [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: ('voting.ballot.proxy' | t: { name }) }"
+      />
+    } @else if (candidateMode()) {
       <ng-container
         [ngTemplateOutlet]="cands"
         [ngTemplateOutletContext]="{ row: 'proxy', cast: proxy.cast, label: ('voting.ballot.proxy' | t: { name }) }"
@@ -120,10 +130,6 @@
     <div class="ballot__spacer" aria-hidden="true" [style.height.px]="barHeight()"></div>
   }
   <div #bar class="ballot__bar">
-    <p class="ballot__lock">
-      <app-icon name="lock" [size]="13" />
-      {{ 'voting.ballot.final' | t }}
-    </p>
     <app-button
       variant="fill"
       [size]="compact() ? 'md' : 'lg'"
@@ -151,10 +157,10 @@
   >
     @if (multi && !cast) {
       <p class="ballot__counter" aria-live="polite">
-        {{ 'election.ballot.counter' | t: { n: picks(row).length, m: seats() } }}
+        {{ (poll() ? 'poll.ballot.counter' : 'election.ballot.counter') | t: { n: picks(row).length, m: seats() } }}
       </p>
     }
-    @for (c of election()?.candidates ?? []; track c.id) {
+    @for (c of ballotElection()?.candidates ?? []; track c.id) {
       @let on = isPicked(row, c.id);
       <button
         type="button"
@@ -204,6 +210,41 @@
         </span>
         <span class="choice__label">{{ 'vote.option.abstain' | t }}</span>
       </button>
+    }
+  </div>
+</ng-template>
+
+
+<!-- A date poll: one row per date with Ja, Vielleicht and Nein, three equal buttons. -->
+<ng-template #dates let-row="row" let-cast="cast" let-label="label">
+  @let busy = pending() !== null;
+  <div class="ballot__dates" role="group" [attr.aria-label]="label">
+    @for (o of poll()?.options ?? []; track o.id) {
+      @let date = dateLabel(o.id);
+      @let current = answerOf(row, o.id);
+      <div class="ballot__date">
+        <span class="ballot__dateLabel" [id]="'bd-' + voteId() + '-' + row + '-' + o.id">{{ date }}</span>
+        <div
+          class="ballot__answers"
+          role="radiogroup"
+          [attr.aria-labelledby]="'bd-' + voteId() + '-' + row + '-' + o.id"
+        >
+          @for (a of dateAnswers; track a) {
+            @let on = current === a;
+            <button
+              type="button"
+              class="pchoice ballot__answer"
+              [class.pchoice--on]="on"
+              role="radio"
+              [attr.aria-checked]="on"
+              [disabled]="cast || busy"
+              (click)="answer(row, o.id, a)"
+            >
+              {{ answerLabel(a) }}
+            </button>
+          }
+        </div>
+      </div>
     }
   </div>
 </ng-template>
