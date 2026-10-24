@@ -4,8 +4,9 @@
     <meta charset="utf-8" />
     <title>STUPA Antragsplattform</title>
     <base href="/" />
-    <!-- Pinch zoom stays on (WCAG 1.4.4): the inputs are 16 px, so iOS does not zoom on
-         focus. viewport-fit=cover draws under the notch and the home bar; the shell keeps
+    <!-- Pinch zoom stays on in a browser tab (WCAG 1.4.4); the installed app adds
+         maximum-scale=1, user-scalable=no at the start (zoom-lock.ts). The inputs are
+         16 px, so iOS does not zoom on focus. viewport-fit=cover draws under the notch and the home bar; the shell keeps
          its chrome clear of them with the safe-area insets. interactive-widget makes the
          on-screen keyboard shrink the layout viewport (Android), so a pinned composer, a
          FAB or a sheet stays above the keyboard; the bottom bar steps aside while a text
