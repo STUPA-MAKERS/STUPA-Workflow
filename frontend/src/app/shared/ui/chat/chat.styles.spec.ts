@@ -35,6 +35,19 @@ describe('chat styles', () => {
     );
   });
 
+  it('scrolls the phone log right up to the rule of the composer', () => {
+    expect(rule(':host(.chat--phone)')).toMatch(/gap: 0;/);
+    expect(rule(':host(.chat--phone) .chat__log')).toMatch(
+      /padding: var\(--chat-log-inset-top, 4px\) 0 calc\(12px \+ var\(--space-3\)\);/,
+    );
+  });
+
+  it('fades the top of the phone log only while messages lie above it', () => {
+    expect(rule(':host(.chat--phone) .chat__log.is-fade-start')).toMatch(
+      /mask-image: linear-gradient\(to bottom, transparent, #000 var\(--chat-log-fade-top, var\(--space-5\)\)\);/,
+    );
+  });
+
   it('never scrolls the log sideways', () => {
     expect(rule('.chat__log')).toMatch(/overflow-x: hidden;/);
   });

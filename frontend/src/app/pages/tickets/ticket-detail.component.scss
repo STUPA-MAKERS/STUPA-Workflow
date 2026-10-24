@@ -295,6 +295,16 @@
     flex: 1 1 0;
     min-height: 0;
   }
+  /* The log scrolls right up to the line of the tabs: the panel takes back the gap below
+     the tabs, and the log keeps the first message where the gap put it. The line ends
+     the log, so it does not fade. */
+  .td__panel--log {
+    margin-top: calc(-1 * var(--space-5));
+  }
+  .td__panel--log .td__chat {
+    --chat-log-inset-top: calc(4px + var(--space-5));
+    --chat-log-fade-top: 0px;
+  }
   .td__panel--details {
     margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-4)) calc(-1 * var(--main-pad-bottom, 0px));
     padding: var(--space-5) var(--space-4) var(--main-pad-bottom, 0px);

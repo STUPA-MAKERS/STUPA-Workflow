@@ -37,6 +37,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { BrandingService } from '@core/branding/branding.service';
 import { SwUpdateService } from '@core/pwa/sw-update.service';
 import { guardTouchContextMenu } from '@core/touch/touch-context-menu';
+import { lockInstalledAppZoom } from '@core/touch/zoom-lock';
+import { IS_INSTALLED_APP } from '@core/browser/installed-app.token';
 import { AvatarService } from '@shared/ui/avatar/avatar.service';
 import { routes } from './app.routes';
 import { provideServiceWorker } from '@angular/service-worker';
@@ -97,6 +99,8 @@ export const appConfig: ApplicationConfig = {
       inject(SwUpdateService).init();
       // A long press on a row link opens no link menu of the browser (Android).
       guardTouchContextMenu(inject(DOCUMENT));
+      // The installed app does not zoom as a whole page; a browser tab keeps the zoom.
+      lockInstalledAppZoom(inject(DOCUMENT), inject(IS_INSTALLED_APP)());
       // A back gesture that the browser animated gets no second transition from us.
       watchUAVisualTransitions();
       // EN lives in a lazy chunk. Wait for it, so the first paint is not German.
