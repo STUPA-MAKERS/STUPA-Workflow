@@ -42,29 +42,30 @@ def test_crlf_line_endings() -> None:
 
 
 def test_timed_event_utc_summer() -> None:
-    # 18:00 Europe/Berlin on 2026-07-15 is CEST (+02:00), so 16:00Z. The default adds 1 h.
+    """Convert 18:00 Europe/Berlin in summer (CEST, +02:00) to 16:00Z and add the default hour."""
     out = _ics([_ev(date=date(2026, 7, 15), start_time=time(18, 0))])
     assert "DTSTART:20260715T160000Z" in out
     assert "DTEND:20260715T170000Z" in out
 
 
 def test_timed_event_utc_winter() -> None:
-    # 18:00 on 2026-01-15 is CET (+01:00), so 17:00Z. The builder handles the DST switch.
+    """Convert 18:00 in winter (CET, +01:00) to 17:00Z across the DST switch."""
     out = _ics([_ev(date=date(2026, 1, 15), start_time=time(18, 0))])
     assert "DTSTART:20260115T170000Z" in out
     assert "DTEND:20260115T180000Z" in out
 
 
 def test_explicit_end_time() -> None:
+    """Use an explicit end time: 20:30 CEST is 18:30Z."""
     out = _ics([_ev(start_time=time(18, 0), end_time=time(20, 30))])
     assert "DTSTART:20260715T160000Z" in out
-    assert "DTEND:20260715T183000Z" in out  # 20:30 CEST → 18:30Z
+    assert "DTEND:20260715T183000Z" in out
 
 
 def test_end_before_start_falls_back_to_default() -> None:
-    # An end at or before the start is invalid, so the builder uses the default duration.
+    """Use the default duration for an end at or before the start: 16:00Z plus 1 h."""
     out = _ics([_ev(start_time=time(18, 0), end_time=time(17, 0))])
-    assert "DTEND:20260715T170000Z" in out  # start (16:00Z) plus 1 h
+    assert "DTEND:20260715T170000Z" in out
 
 
 def test_all_day_event_has_no_dtend() -> None:
@@ -101,14 +102,14 @@ def test_summary_and_description() -> None:
 
 
 def test_no_description_without_gremium() -> None:
+    """Leave out DESCRIPTION without a gremium; the VALARM keeps its own description."""
     out = _ics([_ev(title="Solo", gremium_name=None)])
     assert "SUMMARY:Solo" in out
-    # The event has no DESCRIPTION. The VALARM still carries its own description.
     assert "DESCRIPTION:Gremium" not in out
 
 
 def test_text_escaping() -> None:
-    # RFC5545 escaping of comma, semicolon and backslash (icalendar).
+    """Escape comma, semicolon and backslash as RFC 5545 demands."""
     out = _ics([_ev(title="A, B; C\\ D")])
     assert "SUMMARY:A\\, B\\; C\\\\ D" in out
 

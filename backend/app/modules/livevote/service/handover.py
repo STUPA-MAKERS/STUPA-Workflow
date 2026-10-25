@@ -46,9 +46,9 @@ from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 
-# The audit mode of a planned period that a move of the agenda item started.
+#: The audit mode of a planned period that a move of the agenda item started.
 _MODE_ACTIVATE = "activate"
-# The audit mode of a discarded planned handover.
+#: The audit mode of a discarded planned handover.
 _MODE_CANCEL = "cancel"
 
 
@@ -274,14 +274,15 @@ class HandoverOps(PermissionOps, VoteReadOps):
     async def _live_for_handover(self, meeting_id: UUID, principal: Principal) -> Meeting:
         """Lock the meeting row and check the state and the right of the caller.
 
+        The row lock serializes the handover with the close and the move of the agenda item,
+        because both change the periods too.
+
         Raises:
             NotFoundError: The meeting does not exist.
             ConflictError: The meeting is not live (`meeting_not_live`).
             ForbiddenError: The caller neither manages the meeting nor keeps the
                 minutes now.
         """
-        # The row lock serializes the handover with the close and the move of the
-        # agenda item, which both change the periods too.
         meeting = await self._get(meeting_id, for_update=True)
         if not await self.can_hand_over(meeting, principal):
             raise ForbiddenError("only the session lead or the protokollant hands over")
@@ -347,9 +348,7 @@ class HandoverOps(PermissionOps, VoteReadOps):
         meeting = await self._live_for_handover(meeting_id, principal)
         planned = await self._drop_planned(meeting.id)
         if planned is None:
-            raise NotFoundError(
-                "the meeting has no planned handover", code="no_planned_handover"
-            )
+            raise NotFoundError("the meeting has no planned handover", code="no_planned_handover")
         await self._audit_handover(
             meeting,
             principal.sub,

@@ -272,21 +272,24 @@ def _m(**over: Any) -> SimpleNamespace:
 
 
 async def test_apply_public_rules() -> None:
+    """Apply the rules of the public settings.
+
+    No change writes no audit entry. A switch-on gives a code, the audit entry and a counts
+    event. A switch from vote to watch with an open guest vote gives 409. A switch-off
+    removes the guests. A switch to watch while off changes only the mode.
+    """
     lead = Principal(sub="lead")
     m = _m()
-    # No change: no audit.
     assert (
         await _Lifecycle(FakeSession())._apply_public(m, MeetingPatch(publicJoin=False), lead, NOW)  # type: ignore[arg-type]
         is None
     )
-    # Switch on: a code, the audit entry, a counts event.
     session = FakeSession()
     events = await _Lifecycle(session)._apply_public(m, MeetingPatch(publicJoin=True), lead, NOW)  # type: ignore[arg-type]
     assert m.public_join is True and m.join_code is not None and events is not None
     [entry] = [a for a in session.added if type(a).__name__ == "AuditEntry"]
     assert entry.action == "meeting_public_join_changed"
     assert entry.data["publicJoin"] == {"from": False, "to": True}
-    # vote -> watch with an open guest vote: 409.
     with pytest.raises(ConflictError) as err:
         await _Lifecycle(FakeSession(), open_vote=True)._apply_public(
             m,  # type: ignore[arg-type]
@@ -295,7 +298,6 @@ async def test_apply_public_rules() -> None:
             NOW,
         )
     assert err.value.code == "guest_vote_open"
-    # Switch off removes the guests.
     off = await _Lifecycle(FakeSession())._apply_public(
         m,  # type: ignore[arg-type]
         MeetingPatch(publicJoin=False),
@@ -303,7 +305,6 @@ async def test_apply_public_rules() -> None:
         NOW,
     )
     assert m.public_join is False and off is not None and off.counts is True
-    # Watch while off: only the mode changes.
     watch = await _Lifecycle(FakeSession())._apply_public(
         m,  # type: ignore[arg-type]
         MeetingPatch(guestsMode="watch"),
@@ -396,6 +397,11 @@ def _request(path: str = "/api/public/meetings/join/7kq-4mp", cookie: str | None
 
 
 async def test_public_rate_limits() -> None:
+    """Apply the public rate limits.
+
+    A cookie that resolves to a guest counts against that guest. Unknown cookies and no
+    cookie count against the IP, so random cookies get no budget.
+    """
     settings = get_settings().model_copy(
         update={
             "rl_public_join_ip_per_hour": 1,
@@ -413,11 +419,9 @@ async def test_public_rate_limits() -> None:
         await antiabuse.rate_limit_public_read(_request(), settings, limiter)
     from app.modules.livevote.public_router import rate_limit_public_guest_write
 
-    # A cookie that resolves to a guest counts against that guest.
     known = FakeSession()
     known.scalar_results = [uuid4()]
     await rate_limit_public_guest_write(_request(cookie="tok"), settings, limiter, known)  # type: ignore[arg-type]
-    # Unknown cookies and no cookie count against the IP: random cookies get no budget.
     await rate_limit_public_guest_write(_request(cookie="r1"), settings, limiter, FakeSession())  # type: ignore[arg-type]
     with pytest.raises(RateLimitedError):
         await rate_limit_public_guest_write(_request(cookie="r2"), settings, limiter, FakeSession())  # type: ignore[arg-type]
@@ -453,11 +457,15 @@ def test_meeting_defaults_route(setup: Any) -> None:
 
 
 async def test_public_join_needs_a_gremium_without_quorum() -> None:
+    """Allow public participation only in a gremium without a quorum.
+
+    The gremium has a quorum of 50 %.
+    """
     from app.shared.errors import ValidationProblem
 
     lead = Principal(sub="lead")
     session = FakeSession()
-    session.scalar_results = [50]  # the gremium quorum
+    session.scalar_results = [50]
     with pytest.raises(ValidationProblem) as err:
         await _Lifecycle(session)._apply_public(_m(), MeetingPatch(publicJoin=True), lead, NOW)  # type: ignore[arg-type]
     assert err.value.code == "public_join_needs_no_quorum"

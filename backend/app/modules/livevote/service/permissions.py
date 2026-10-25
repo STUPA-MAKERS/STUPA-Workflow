@@ -257,9 +257,7 @@ class PermissionOps(MeetingServiceBase):
             return
         raise ForbiddenError("not allowed to view this meeting")
 
-    async def meeting_read_scope(
-        self, principal: Principal
-    ) -> tuple[set[UUID] | None, set[UUID]]:
+    async def meeting_read_scope(self, principal: Principal) -> tuple[set[UUID] | None, set[UUID]]:
         """Return the read scope of `assert_can_read` as two id sets.
 
         The first set holds the gremien whose meetings the principal can read. `None`
@@ -284,12 +282,13 @@ class PermissionOps(MeetingServiceBase):
         `meeting.view_all` permission is global, read-only, and purely additive. The
         server gates management, write access, and voting separately.
 
+        Both checks apply the OAuth scope cap. `Principal.has` grants the admin role every
+        in-scope right. A read of `principal.roles` here would return `None`, that is every
+        gremium, for a token scoped to far less.
+
         Returns:
             The visible gremium ids, or `None` for all gremien.
         """
-        # Both checks apply the OAuth scope cap. `Principal.has` grants the admin role
-        # every in-scope right. Reading `principal.roles` here would return `None` —
-        # every gremium — for a token scoped to far less.
         if principal.has("meeting.view_all") or admin_bypass(principal, "session.manage"):
             return None
         member = await gremium_member_ids(self.session, principal.sub)

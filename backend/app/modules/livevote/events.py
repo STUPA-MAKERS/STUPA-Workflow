@@ -56,7 +56,7 @@ class MeetingStateEvent(_CamelModel):
 
     type: Literal["meeting_state"] = "meeting_state"
     active_application_id: UUID | None = Field(default=None, alias="activeApplicationId")
-    # The agenda item the room handles now. Followers scroll to it, the beamer shows it.
+    #: The agenda item the room handles now. Followers scroll to it, the beamer shows it.
     current_agenda_item_id: UUID | None = Field(default=None, alias="currentAgendaItemId")
     status: Literal["planned", "live", "closed"]
 
@@ -77,30 +77,34 @@ class VoteOpenedEvent(_CamelModel):
 
     type: Literal["vote_opened"] = "vote_opened"
     vote_id: UUID = Field(alias="voteId")
-    # `None` marks a generic motion: a free-text agenda item with no application.
+    #: `None` marks a generic motion: a free-text agenda item with no application.
     application_id: UUID | None = Field(default=None, alias="applicationId")
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
-    # Motion text for the live dialog and the beamer: what is the vote about?
+    #: Motion text for the live dialog and the beamer: what is the vote about?
     question: str | None = None
     options: list[str]
     closes_at: datetime | None = Field(default=None, alias="closesAt")
-    # A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
+    #: A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
     secret: bool = False
-    # True when the server sends the frame as part of the state on a connect or on a
-    # `subscribe`, and not because the vote opened now. A client then knows that the
-    # vote did not open while it watched.
+    #: True when the server sends the frame as part of the state on a connect or on a
+    #: `subscribe`, and not because the vote opened now. A client then knows that the
+    #: vote did not open while it watched.
     replay: bool = False
-    # An election carries its seats and candidates (the ballot of the dock), and
-    # a runoff its round.
+    #: An election carries its seats and candidates (the ballot of the dock), and
+    #: a runoff its round.
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     round: int = 1
-    # A poll carries its mode and options (the ballot of the dock).
+    #: A poll carries its mode and options (the ballot of the dock).
     poll: PollConfig | None = None
 
     @classmethod
     def from_vote(cls, vote: VoteOut, *, replay: bool = False) -> VoteOpenedEvent:
-        """Build the event from a vote."""
+        """Build the event from a vote.
+
+        The channel reaches the beamer and the guests, so an election carries names and no account
+        ids.
+        """
         return cls(
             voteId=vote.id,
             applicationId=vote.application_id,
@@ -111,7 +115,6 @@ class VoteOpenedEvent(_CamelModel):
             secret=vote.secret,
             replay=replay,
             kind=vote.kind,
-            # The channel reaches the beamer and the guests: names, no account ids.
             election=vote.election.public() if vote.election is not None else None,
             round=vote.round,
             poll=vote.poll,
@@ -128,28 +131,28 @@ class VoteTallyEvent(_CamelModel):
 
     type: Literal["vote_tally"] = "vote_tally"
     vote_id: UUID = Field(alias="voteId")
-    # Votes per option. Stays empty while the tally is concealed, see `revealed`.
+    #: Votes per option. Stays empty while the tally is concealed, see `revealed`.
     counts: dict[str, int]
-    # Ballots cast (participation). Always visible, even concealed: "N of M present".
+    #: Ballots cast (participation). Always visible, even concealed: "N of M present".
     cast: int = 0
     eligible: int
-    # Present members are the denominator of the reveal. `revealed` tells whether
-    # the choice counts are visible.
+    #: Present members are the denominator of the reveal. `revealed` tells whether
+    #: the choice counts are visible.
     present: int = 0
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
-    # A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
+    #: A secret vote hides the live bars in the frontend (showBars = !secret || isClosed).
     secret: bool = False
-    # Counts of the attendance, never names. ``guestsVote`` marks a vote with
-    # guests (no quorum).
+    #: Counts of the attendance, never names. ``guestsVote`` marks a vote with
+    #: guests (no quorum).
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
     guests_vote: bool = Field(default=False, alias="guestsVote")
-    # For an election `counts` holds the votes per candidate id plus `abstain`,
-    # and `cast` the cast ballots. A poll holds the votes per option id (a date poll:
-    # the Ja answers); `pollResult` adds the order and the Vielleicht answers once
-    # revealed.
+    #: For an election `counts` holds the votes per candidate id plus `abstain`,
+    #: and `cast` the cast ballots. A poll holds the votes per option id (a date poll:
+    #: the Ja answers); `pollResult` adds the order and the Vielleicht answers once
+    #: revealed.
     kind: VoteKind = "motion"
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
 
@@ -185,16 +188,14 @@ class VoteClosedEvent(_CamelModel):
 
     type: Literal["vote_closed"] = "vote_closed"
     vote_id: UUID = Field(alias="voteId")
-    # None for a poll: a poll only counts.
+    #: None for a poll: a poll only counts.
     result: VoteResultValue | None
     counts: dict[str, int]
-    # Why the vote failed. Set for `rejected` only, when the vote missed the
-    # quorum or the majority. `None` for `passed` and for `tie`.
-    failed_reason: Literal["quorum", "majority"] | None = Field(
-        default=None, alias="failedReason"
-    )
-    # The result of an election (elected, runoff, pending lot). Aggregates and
-    # candidate ids only.
+    #: Why the vote failed. Set for `rejected` only, when the vote missed the
+    #: quorum or the majority. `None` for `passed` and for `tie`.
+    failed_reason: Literal["quorum", "majority"] | None = Field(default=None, alias="failedReason")
+    #: The result of an election (elected, runoff, pending lot). Aggregates and
+    #: candidate ids only.
     kind: VoteKind = "motion"
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
@@ -294,8 +295,8 @@ class CastMessage(_CamelModel):
 
     type: Literal["cast"]
     vote_id: UUID = Field(alias="voteId")
-    # One option; for an election with several candidates the list of the chosen
-    # candidate ids; for a poll the chosen option ids, or the answer per date.
+    #: One option; for an election with several candidates the list of the chosen
+    #: candidate ids; for a poll the chosen option ids, or the answer per date.
     choice: Annotated[str, Field(min_length=1)] | list[str] | dict[str, DateAnswer]
     as_delegation: bool = Field(default=False, alias="asDelegation")
 

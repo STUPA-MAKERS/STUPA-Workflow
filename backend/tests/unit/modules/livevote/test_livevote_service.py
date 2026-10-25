@@ -64,6 +64,10 @@ def test_meeting_channel() -> None:
 
 @pytest.mark.asyncio
 async def test_publisher_vote_opened_for_meeting_bound_vote() -> None:
+    """Publish the open of a meeting-bound vote.
+
+    A broadcast is a vote that opens now, not the replay of a connect.
+    """
     broker = _CaptureBroker()
     mid = uuid4()
     vote = _vote_out(meeting_id=mid)
@@ -72,7 +76,6 @@ async def test_publisher_vote_opened_for_meeting_bound_vote() -> None:
     assert channel == f"meeting:{mid}"
     assert msg["type"] == "vote_opened"
     assert msg["options"] == ["yes", "no"]
-    # A broadcast is a vote that opens now, not the replay of a connect.
     assert msg["replay"] is False
 
 
@@ -119,9 +122,12 @@ async def test_publisher_vote_tally_and_closed() -> None:
 
 @pytest.mark.asyncio
 async def test_publisher_open_secret_vote_broadcasts_no_choice_counts() -> None:
-    # Security regression (fix/secret-live-tally): the WebSocket and beamer fan-out of
-    # an OPEN secret vote carries only the participation. It must never carry the choice
-    # counts or the leading option.
+    """Broadcast no choice counts for an open secret vote.
+
+    The WebSocket and beamer fan-out of an open secret vote carries only the participation
+    (3 + 1 of 10). It must never carry the choice counts or the leading option, so no
+    interim result reaches the beamer or a phone.
+    """
     broker = _CaptureBroker()
     mid = uuid4()
     await BrokerPublisher(broker).vote_tally(_vote_out(meeting_id=mid, secret=True))
@@ -129,17 +135,20 @@ async def test_publisher_open_secret_vote_broadcasts_no_choice_counts() -> None:
     assert channel == f"meeting:{mid}"
     assert msg["type"] == "vote_tally"
     assert msg["secret"] is True
-    assert msg["counts"] == {}            # no interim result on the beamer or on mobile
+    assert msg["counts"] == {}
     assert msg["leading"] is None
-    assert msg["cast"] == 4               # participation only: 3 + 1 out of 10
+    assert msg["cast"] == 4
     assert msg["eligible"] == 10
     assert {3, 1}.isdisjoint(v for v in msg.values() if type(v) is int)
 
 
 @pytest.mark.asyncio
 async def test_publisher_closed_secret_vote_reveals_full_aggregates() -> None:
-    # The close reveals the full aggregates through vote_closed. A vote_tally with the
-    # closed status reveals them too. The rule is: counts only after the close.
+    """Reveal the full aggregates of a closed secret vote.
+
+    The close reveals them through `vote_closed`, and a `vote_tally` with the closed status
+    reveals them too. The counts appear only after the close.
+    """
     broker = _CaptureBroker()
     mid = uuid4()
     await BrokerPublisher(broker).vote_tally(
@@ -173,7 +182,6 @@ async def test_publisher_meeting_state() -> None:
     }
 
 
-# MeetingService against a fake session
 @pytest.fixture(autouse=True)
 def _no_audit_chain(monkeypatch: pytest.MonkeyPatch) -> None:
     """Keep the audit chain off the fake session, and find no open vote.
@@ -210,11 +218,11 @@ class _Result:
         return self._value
 
     def scalars(self) -> _Scalars:
-        # `_votes_for` (meeting votes) needs `.scalars().all()`. An empty list is enough.
+        """Return an empty result, because `_votes_for` needs only `.scalars().all()`."""
         return _Scalars([])
 
     def all(self) -> list[object]:
-        # Aggregate queries such as `_present_by_meeting` need `.all()`. Empty is enough.
+        """Return no rows for the aggregate queries such as `_present_by_meeting`."""
         return []
 
 
@@ -225,13 +233,13 @@ class _FakeSession:
         self.added: list[object] = []
 
     async def execute(self, stmt: object) -> _Result:
-        # The meeting has no keeper period in these tests.
+        """Return no keeper period, because the meeting has none in these tests."""
         if "protocol_keeper_period" in str(stmt):
             return _Result(None)
         return _Result(self.existing)
 
     async def get(self, _model: object, _pk: object) -> object | None:
-        # The Gremium name lookup in `_emit` does not matter for these tests.
+        """Return None, because the Gremium name lookup in `_emit` does not matter here."""
         return None
 
     def add(self, obj: object) -> None:
@@ -240,7 +248,7 @@ class _FakeSession:
         self.added.append(obj)
 
     async def flush(self) -> None:
-        # Mimic the database server default. The insert sets `created_at`.
+        """Set `created_at` on the insert like the database server default."""
         for obj in self.added:
             if getattr(obj, "created_at", None) is None:
                 obj.created_at = datetime(2026, 6, 8, tzinfo=UTC)  # type: ignore[attr-defined]
@@ -251,14 +259,15 @@ class _FakeSession:
 
 @pytest.mark.asyncio
 async def test_service_create_sets_planned_and_commits() -> None:
+    """Create a meeting in status planned and commit.
+
+    The create needs a date and a start time.
+    """
     session = _FakeSession()
     svc = MeetingService(session)  # type: ignore[arg-type]
     gid = uuid4()
-    # The create call needs a date and a start time. They set the meeting schedule.
     out = await svc.create(
-        MeetingCreate(
-            gremiumId=gid, title="GV", date=date(2026, 6, 20), startTime=time(18, 0)
-        ),
+        MeetingCreate(gremiumId=gid, title="GV", date=date(2026, 6, 20), startTime=time(18, 0)),
         _principal(),
     )
     assert out.status == "planned"
@@ -284,12 +293,15 @@ async def test_service_get_not_found() -> None:
 
 @pytest.mark.asyncio
 async def test_service_patch_applies_and_broadcasts_meeting_state() -> None:
+    """Apply a patch and broadcast the meeting state.
+
+    The start needs a protocol writer; without one the service answers 409.
+    """
     meeting = Meeting(gremium_id=uuid4(), title="GV")
     meeting.id = uuid4()
     meeting.status = "planned"
     meeting.date = None
     meeting.active_application_id = None
-    # The start needs a protocol writer. Without one the service answers 409.
     meeting.protokollant_id = uuid4()
     meeting.created_at = datetime(2026, 6, 8, tzinfo=UTC)
     session = _FakeSession(existing=meeting)
@@ -355,15 +367,17 @@ async def test_service_patch_closed_session_cannot_reopen() -> None:
 
 @pytest.mark.asyncio
 async def test_service_open_vote_returns_row() -> None:
+    """Return the open vote row.
+
+    The autouse fixture stubs `open_vote` on the facade, so the test calls the real one.
+    """
     vote = Vote(application_id=uuid4(), eligible_group="stupa", config={})
     svc = MeetingService(_FakeSession(existing=vote))  # type: ignore[arg-type]
-    # The autouse fixture stubs `open_vote` on the facade. Call the real one.
     from app.modules.livevote.service.votes import VoteReadOps
 
     assert await VoteReadOps.open_vote(svc, uuid4()) is vote
 
 
-# The list endpoint finds meetings again.
 class _ListResult:
     def __init__(self, rows: list) -> None:
         self._rows = rows
@@ -400,9 +414,13 @@ def _meeting_row(*, status: str = "planned") -> Meeting:
 
 @pytest.mark.asyncio
 async def test_service_list_maps_protocol_and_keeps_order() -> None:
+    """Map the protocol ids and keep the order of the list.
+
+    Only the first meeting has a protocol.
+    """
     m1, m2 = _meeting_row(), _meeting_row()
     pid = uuid4()
-    session = _ListSession([m1, m2], [(m1.id, pid)])  # only m1 has a protocol
+    session = _ListSession([m1, m2], [(m1.id, pid)])
     out = await MeetingService(session).list(_principal())  # type: ignore[arg-type]
     assert [o.id for o in out] == [m1.id, m2.id]
     assert out[0].protocol_id == pid
@@ -423,10 +441,13 @@ async def test_service_list_empty_returns_empty() -> None:
 
 
 def _principal():
+    """Build a principal.
+
+    For an admin the permission flags short-circuit without a gremium query against the fake
+    session.
+    """
     from app.modules.auth.principal import Principal
 
-    # For an admin, the permission flags short-circuit without a gremium query
-    # against the fake session.
     return Principal(sub="mgr", roles=["admin"])
 
 
@@ -451,14 +472,16 @@ def _meeting(status: str = "planned") -> Meeting:
 
 @pytest.mark.asyncio
 async def test_service_patch_close_sets_closed_at() -> None:
-    """A change to closed stamps `closed_at` once, for the end of the protocol."""
+    """A change to closed stamps `closed_at` once, for the end of the protocol.
+
+    A second close is a no-op and does not overwrite the stamp.
+    """
     meeting = _meeting(status="live")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     out = await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
     assert out.status == "closed"
     assert meeting.closed_at is not None
     first = meeting.closed_at
-    # A second close is a no-op. It does not overwrite the stamp.
     await svc.patch(meeting.id, MeetingPatch(status="closed"), _principal())
     assert meeting.closed_at == first
 
@@ -476,9 +499,7 @@ async def test_service_patch_protokollant_locked_after_finalize(
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     with pytest.raises(ConflictError):
-        await svc.patch(
-            meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
-        )
+        await svc.patch(meeting.id, MeetingPatch(protokollantId=uuid4()), _principal())
 
 
 class _DeletableSession(_FakeSession):
@@ -509,6 +530,8 @@ async def test_service_delete_finalized_requires_special_permission(
     """Only `meeting.delete_finalized` deletes a meeting with a final protocol.
 
     Without the permission the service returns 403 and deletes nothing.
+
+    The manager holds `session.manage` through a gremium role of the meeting.
     """
     from app.modules.auth.principal import Principal
     from app.shared.errors import ForbiddenError
@@ -523,7 +546,6 @@ async def test_service_delete_finalized_requires_special_permission(
     session = _DeletableSession(existing=meeting)
     svc = MeetingService(session)  # type: ignore[arg-type]
 
-    # The manager holds `session.manage` through a gremium role of the meeting.
     from app.modules.admin import gremium_roles as gremium_roles_mod
 
     async def _manages(_s, _sub, perm, _now=None):
@@ -571,13 +593,9 @@ async def test_service_patch_closed_session_settings_frozen() -> None:
     meeting = _meeting(status="closed")
     svc = MeetingService(_FakeSession(existing=meeting))  # type: ignore[arg-type]
     with pytest.raises(ConflictError):
-        await svc.patch(
-            meeting.id, MeetingPatch(date=date(2026, 7, 1)), _principal()
-        )
+        await svc.patch(meeting.id, MeetingPatch(date=date(2026, 7, 1)), _principal())
     with pytest.raises(ConflictError):
-        await svc.patch(
-            meeting.id, MeetingPatch(protokollantId=uuid4()), _principal()
-        )
+        await svc.patch(meeting.id, MeetingPatch(protokollantId=uuid4()), _principal())
     assert meeting.date is None
 
 
@@ -588,6 +606,8 @@ async def test_pool_substitute_sees_committee_timeline(
 
     The visible set is the union of the member Gremien and the pool Gremien. The user
     needs no own membership.
+
+    The fake `execute(...).scalars().all()` returns the pool Gremium.
     """
     from app.modules.auth.principal import Principal
     from app.modules.livevote.service import permissions as livevote_permissions_mod
@@ -600,11 +620,8 @@ async def test_pool_substitute_sees_committee_timeline(
         return {member_g}
 
     monkeypatch.setattr(livevote_permissions_mod, "gremium_member_ids", _members)
-    # The fake execute(...).scalars().all() returns the pool Gremium.
     svc = MeetingService(fake_session(result(pool_g)))
-    visible = await svc._visible_gremium_ids(
-        Principal(sub="sub-1", permissions=set())
-    )
+    visible = await svc._visible_gremium_ids(Principal(sub="sub-1", permissions=set()))
     assert visible == {member_g, pool_g}
 
 
@@ -612,17 +629,16 @@ async def test_pool_substitute_not_live_participant_without_delegation() -> None
     """Pool membership gives only the timeline view, never the live channel.
 
     The live channel needs a concrete delegation. `is_participant` checks it.
+
+    `is_member` finds no membership, and `_delegated_meeting_ids` returns none.
     """
     from app.modules.auth.principal import Principal
     from tests._support.auth_fakes import fake_session, result
 
     gremium = uuid4()
     meeting = uuid4()
-    # is_member finds no membership and _delegated_meeting_ids returns none.
     svc = MeetingService(fake_session(result(), result()))
-    is_part = await svc.is_participant(
-        meeting, gremium, Principal(sub="sub-1", permissions=set())
-    )
+    is_part = await svc.is_participant(meeting, gremium, Principal(sub="sub-1", permissions=set()))
     assert is_part is False
 
 
@@ -631,6 +647,8 @@ async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch
 
     Meeting details include the roster. The user is not a member, not in the pool, not
     a manager and not the receiver of a delegation.
+
+    `_get` returns the meeting. The pool query and the delegated query stay empty.
     """
     from app.modules.auth.principal import Principal
     from app.modules.livevote.service import permissions as mod
@@ -644,14 +662,16 @@ async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch
         return set()
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)
-    # _get returns the meeting. The pool query and the delegated query stay empty.
     svc = MeetingService(fake_session(result(meeting), result(), result()))
     with pytest.raises(ForbiddenError):
         await svc.assert_can_read(meeting.id, Principal(sub="x", permissions=set()))
 
 
 async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A member of the meeting Gremium can read."""
+    """A member of the meeting Gremium can read.
+
+    The fake session answers `_get` and the pool query.
+    """
     from app.modules.auth.principal import Principal
     from app.modules.livevote.service import permissions as mod
     from tests._support.auth_fakes import fake_session, result
@@ -663,20 +683,22 @@ async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) ->
         return {meeting.gremium_id}
 
     monkeypatch.setattr(mod, "gremium_member_ids", _member)
-    svc = MeetingService(fake_session(result(meeting), result()))  # _get and pool query
+    svc = MeetingService(fake_session(result(meeting), result()))
     await svc.assert_can_read(meeting.id, Principal(sub="x", permissions=set()))
 
 
 async def test_view_all_sees_every_committee() -> None:
-    """#meeting-view-all: the global read holder sees every Gremium.
+    """The global read holder sees every Gremium.
 
     `_visible_gremium_ids` returns `None`, which means no Gremium filter. The admin
     role behaves the same way.
+
+    The short circuit needs no database query.
     """
     from app.modules.auth.principal import Principal
     from tests._support.auth_fakes import fake_session
 
-    svc = MeetingService(fake_session())  # the short circuit needs no database query
+    svc = MeetingService(fake_session())
     visible = await svc._visible_gremium_ids(
         Principal(sub="viewer", permissions={"meeting.view_all"})
     )
@@ -686,10 +708,12 @@ async def test_view_all_sees_every_committee() -> None:
 async def test_view_all_is_live_participant_without_membership(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#meeting-view-all: the live read channel opens across every Gremium.
+    """The live read channel opens across every Gremium.
 
     The holder needs no membership and no delegation. The channel stays read only. A
     separate gate still controls the right to vote.
+
+    `meeting.view_all` short-circuits before any query.
     """
     from app.modules.auth.principal import Principal
     from app.modules.livevote.service import permissions as mod
@@ -699,7 +723,7 @@ async def test_view_all_is_live_participant_without_membership(
         return set()
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)
-    svc = MeetingService(fake_session())  # view_all short-circuits before any query
+    svc = MeetingService(fake_session())
     is_part = await svc.is_participant(
         uuid4(), uuid4(), Principal(sub="viewer", permissions={"meeting.view_all"})
     )
@@ -709,9 +733,12 @@ async def test_view_all_is_live_participant_without_membership(
 async def test_view_all_can_read_foreign_meeting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """#meeting-view-all: `assert_can_read` opens a foreign meeting to the read holder.
+    """`assert_can_read` opens a foreign meeting to the read holder.
 
     The holder is neither a member nor a delegate of that Gremium and gets no 403.
+
+    `_get` returns the meeting. `meeting.view_all` short-circuits `_visible`, so no pool
+    query runs.
     """
     from app.modules.auth.principal import Principal
     from app.modules.livevote.service import permissions as mod
@@ -724,8 +751,5 @@ async def test_view_all_can_read_foreign_meeting(
         return set()
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)
-    # _get returns the meeting. view_all short-circuits _visible, so no pool query runs.
     svc = MeetingService(fake_session(result(meeting)))
-    await svc.assert_can_read(
-        meeting.id, Principal(sub="viewer", permissions={"meeting.view_all"})
-    )
+    await svc.assert_can_read(meeting.id, Principal(sub="viewer", permissions={"meeting.view_all"}))

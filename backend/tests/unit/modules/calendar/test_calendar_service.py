@@ -42,7 +42,7 @@ async def test_rotate_missing_principal_returns_none() -> None:
 
 @pytest.mark.parametrize("token", ["", None])
 async def test_principal_by_token_empty(token: str) -> None:
-    # An empty token short-circuits without a query.
+    """Short-circuit an empty token without a query."""
     assert await service.principal_by_calendar_token(fake_session(), token) is None
 
 
@@ -57,7 +57,7 @@ async def test_principal_by_token_miss() -> None:
 
 
 async def test_member_meetings_no_gremien() -> None:
-    # active_gremium_roles returns nothing, so there are no Gremien and the list stays empty.
+    """Return an empty list when the principal has no active gremium role."""
     assert await service.member_meetings(fake_session(result()), "u1") == []
 
 

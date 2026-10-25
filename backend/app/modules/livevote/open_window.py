@@ -110,6 +110,7 @@ class MeetingSettingsService:
     """Read and change the meeting settings."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a session."""
         self.session = session
 
     async def get(self) -> MeetingSettings:

@@ -28,9 +28,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-async def session(
-    migrated: tuple[str, str], engine: Engine
-) -> AsyncIterator[AsyncSession]:
+async def session(migrated: tuple[str, str], engine: Engine) -> AsyncIterator[AsyncSession]:
     eng = create_async_engine(migrated[1])
     maker = async_sessionmaker(eng, expire_on_commit=False)
     async with maker() as s:
@@ -53,6 +51,11 @@ async def _member_of(session: AsyncSession, gremium: Gremium) -> PrincipalRow:
 
 
 async def test_calendar_token_round_trip(session: AsyncSession) -> None:
+    """Round-trip the calendar token.
+
+    An unknown token gives None. An inactive principal blocks the feed, so nothing leaks and
+    the endpoint answers 404.
+    """
     gremium = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     session.add(gremium)
     await session.flush()
@@ -66,15 +69,17 @@ async def test_calendar_token_round_trip(session: AsyncSession) -> None:
     assert await service.get_calendar_token(session, member.sub) == token
     resolved = await service.principal_by_calendar_token(session, token)
     assert resolved is not None and resolved.sub == member.sub
-    # An unknown token gives None.
     assert await service.principal_by_calendar_token(session, "nope") is None
-    # An inactive principal blocks the feed. Nothing leaks. The endpoint answers 404.
     resolved.active = False
     await session.flush()
     assert await service.principal_by_calendar_token(session, token) is None
 
 
 async def test_member_meetings_filters(session: AsyncSession) -> None:
+    """Filter the meetings of a member.
+
+    A meeting without a date and a meeting of another Gremium drop out.
+    """
     home = Gremium(name="StuPa", slug=f"g-{uuid.uuid4()}")
     other = Gremium(name="AStA", slug=f"g-{uuid.uuid4()}")
     session.add_all([home, other])
@@ -89,9 +94,7 @@ async def test_member_meetings_filters(session: AsyncSession) -> None:
                 start_time=_time(18, 0),
                 status="planned",
             ),
-            # No date, so it drops out.
             Meeting(gremium_id=home.id, title="ohne Datum", status="planned"),
-            # Another Gremium, so it drops out.
             Meeting(
                 gremium_id=other.id,
                 title="fremd",

@@ -89,6 +89,10 @@ class AttendanceService:
     """Read the roster of a meeting and change the attendance records."""
 
     def __init__(self, session: AsyncSession, *, tz_name: str | None = None) -> None:
+        """Bind the service to a session.
+
+        `tz_name` overrides the local time zone of the settings.
+        """
         self.session = session
         self._tz_name = tz_name
 

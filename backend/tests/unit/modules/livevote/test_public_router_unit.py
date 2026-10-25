@@ -87,6 +87,10 @@ def rest() -> Any:
 
 
 def test_public_rest_routes(rest: Any) -> None:
+    """Serve the public REST routes.
+
+    With the device cookie the writes need the CSRF double submit.
+    """
     client, fake = rest
     assert client.get("/api/public/meetings/7KQ4MP").json()["code"] == "7KQ4MP"
     joined = client.post("/api/public/meetings/join/7KQ4MP", json={"displayName": "Jana Roth"})
@@ -99,7 +103,6 @@ def test_public_rest_routes(rest: Any) -> None:
     assert "set-cookie" not in again.headers or "mg_token" not in again.headers["set-cookie"]
     client.cookies.set("mg_token", "tok", path="/api/public/meetings")
     assert client.get("/api/public/meetings/7KQ4MP/me").json()["status"] == "admitted"
-    # With the device cookie the writes need the CSRF double submit.
     assert (
         client.patch("/api/public/meetings/7KQ4MP/me", json={"displayName": "J R"}).status_code
         == 403
@@ -117,9 +120,6 @@ def test_public_rest_routes(rest: Any) -> None:
     left = client.delete("/api/public/meetings/7KQ4MP/me")
     assert left.status_code == 204 and 'mg_token=""' in left.headers["set-cookie"]
     assert ("me", "tok") in fake.calls and ("cast", "yes") in fake.calls
-
-
-# -- WebSocket ---------------------------------------------------------------------
 
 
 def _guest(status: str = "pending") -> SimpleNamespace:
@@ -279,6 +279,11 @@ async def _connection(
 
 
 async def test_guest_filter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Filter the channel events for a guest.
+
+    The own admission switches the feed on and sends the state. A second tally of the same
+    vote reads the visibility from the cache.
+    """
     conn, sent = await _connection("pending")
     other = {"type": "guest_updated", "guest": {"id": str(uuid4()), "status": "admitted"}}
     await conn.handle(other)
@@ -286,7 +291,6 @@ async def test_guest_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     await conn.handle({"type": "meeting_state", "status": "live"})
     await conn.handle({"type": "viewers", "viewers": ["Anna"]})
     assert sent == []
-    # The own admission switches the feed on and sends the state.
     mine = {
         "type": "guest_updated",
         "guest": {
@@ -315,7 +319,7 @@ async def test_guest_filter(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     vote = str(uuid4())
     await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 1})
-    await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 2})  # cached
+    await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 2})
     await conn.handle({"type": "vote_closed", "voteId": "not-a-uuid"})
     assert sent == [
         {"type": "guest_counts", "admittedGuests": 5},
@@ -379,6 +383,10 @@ async def test_send_state_of_a_closed_meeting_ends() -> None:
 
 
 def test_ws_admitted_guest_closes_with_the_meeting(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Close the socket of an admitted guest with the meeting.
+
+    The first frame after the connect is `guest_counts`.
+    """
     app, broker = _ws_app(
         monkeypatch,
         _guest("admitted"),
@@ -390,7 +398,7 @@ def test_ws_admitted_guest_closes_with_the_meeting(monkeypatch: pytest.MonkeyPat
     ):
         assert ws.receive_json()["type"] == "guest_status"
         assert ws.receive_json()["status"] == "closed"
-        ws.receive_json()  # guest_counts
+        ws.receive_json()
         with pytest.raises(WebSocketDisconnect):
             ws.receive_json()
 
@@ -471,11 +479,14 @@ async def test_waiting_guest_socket_ends_with_the_meeting() -> None:
 
 
 async def test_item_turning_non_public_stops_its_vote_events() -> None:
+    """Stop the vote events of an item that turns non-public.
+
+    The agenda edit sends a meeting state, and the cache goes.
+    """
     conn, sent = await _connection()
     vote = str(uuid4())
     await conn.handle({"type": "vote_tally", "voteId": vote, "cast": 1})
     assert len(sent) == 1
-    # The item turns non-public: the agenda edit sends a meeting state, the cache goes.
     WsGuests.public = False
     await conn.handle({"type": "meeting_state", "status": "live", "currentAgendaItemId": None})
     sent.clear()

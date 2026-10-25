@@ -31,6 +31,9 @@ frame `already_voted`, the same code as the REST 409. The handler broadcasts
 
 Disconnect: `WebSocketDisconnect` tears both tasks down. The broker context
 manager closes the subscription.
+
+The handshake helpers live in `app.shared.ws`, because the to-do channel uses them too. The
+names stay importable from here, so the routers and the tests keep their imports.
 """
 
 from __future__ import annotations
@@ -68,9 +71,6 @@ from app.modules.livevote.service import BrokerPublisher, MeetingService, meetin
 from app.modules.voting.schemas import VoteOut
 from app.modules.voting.service import VotingService
 from app.shared.errors import AppError, ForbiddenError
-
-# The handshake helpers live in ``app.shared.ws`` (the to-do channel uses them too).
-# The names stay importable from here, so the routers and the tests keep their imports.
 from app.shared.ws import WS_FORBIDDEN as WS_FORBIDDEN
 from app.shared.ws import WS_NOT_FOUND as WS_NOT_FOUND
 from app.shared.ws import WS_UNAUTHENTICATED as WS_UNAUTHENTICATED
@@ -79,23 +79,23 @@ from app.shared.ws import resolve_ws_principal as resolve_ws_principal
 
 logger = logging.getLogger("app.livevote")
 
-# Events the read-only beamer stream lets through. `guest_counts` carries counts and
-# the join code only, never a name.
+#: Events the read-only beamer stream lets through. `guest_counts` carries counts and
+#: the join code only, never a name.
 _BEAMER_EVENTS = frozenset(
     {"meeting_state", "vote_opened", "vote_tally", "vote_closed", "vote_lot_drawn", "guest_counts"}
 )
-# Guest events with names. Only a connection of the meeting lead gets them.
+#: Guest events with names. Only a connection of the meeting lead gets them.
 _LEAD_EVENTS = frozenset({"guest_requested", "guest_updated"})
 
-# Inbound throttle against denial of service. Every client message hits the
-# database or takes a distributed lock. A per-connection token bucket allows
-# `_THROTTLE_BURST` frames at once and refills at `_THROTTLE_RATE` tokens per
-# second. The handler answers an excess frame with `rate_limited` and drops it
-# before any database or lock work.
+#: Inbound throttle against denial of service. Every client message hits the
+#: database or takes a distributed lock. A per-connection token bucket allows
+#: `_THROTTLE_BURST` frames at once and refills at `_THROTTLE_RATE` tokens per
+#: second. The handler answers an excess frame with `rate_limited` and drops it
+#: before any database or lock work.
 _THROTTLE_RATE = 5.0
 _THROTTLE_BURST = 10.0
-# Body drafts of one connection per one-second window. The client sends at most one
-# frame per 300 ms, so only a faulty or hostile client reaches the cap.
+#: Body drafts of one connection per one-second window. The client sends at most one
+#: frame per 300 ms, so only a faulty or hostile client reaches the cap.
 _DRAFT_MAX_PER_SECOND = 10
 
 
@@ -129,8 +129,14 @@ class LiveVoteConnection:
         locker: Locker,
         can_manage: bool = False,
     ) -> None:
+        """Bind the socket to the meeting, the principal and the services.
+
+        `can_manage` marks the meeting lead, who gets the guest events with names and the
+        join code. The token bucket of the throttle starts with the full burst at connect.
+        It reads `time.monotonic`, which a jump of the wall clock does not affect. The body
+        draft cap uses a fixed one-second window.
+        """
         self.ws = websocket
-        # The meeting lead gets the guest events with names and the join code.
         self.can_manage = can_manage
         self.meeting_id = meeting_id
         self.beamer = beamer
@@ -140,12 +146,8 @@ class LiveVoteConnection:
         self.publisher = BrokerPublisher(broker)
         self.meetings = meetings
         self.voting = voting
-        # Token-bucket state of the throttle. The bucket starts with the full
-        # burst at connect. It reads `time.monotonic`, which a jump of the wall
-        # clock does not affect.
         self._tokens = _THROTTLE_BURST
         self._last_refill = time.monotonic()
-        # Fixed one-second window of the body draft cap.
         self._draft_window = time.monotonic()
         self._draft_count = 0
 
@@ -202,7 +204,11 @@ class LiveVoteConnection:
         await self.voting.session.rollback()
 
     async def _send_state(self) -> None:
-        """Send the current state on connect and on a `subscribe` reconnect."""
+        """Send the current state on connect and on a `subscribe` reconnect.
+
+        `from_vote` applies the rule that a secret vote reveals the counts only after the
+        close.
+        """
         try:
             meeting = await self.meetings.get(self.meeting_id)
             vote = await self.meetings.open_vote(self.meeting_id)
@@ -219,11 +225,15 @@ class LiveVoteConnection:
         if vote_out is None:
             return
         await self._send(VoteOpenedEvent.from_vote(vote_out, replay=True).dump())
-        # `from_vote` applies the rule that a secret vote reveals the counts
-        # only after the close.
         await self._send(VoteTallyEvent.from_vote(vote_out).dump())
 
     async def _handle_cast(self, raw: dict[str, object]) -> None:
+        """Validate one cast frame, run the cast and publish the tally.
+
+        Every path of the cast reads the database: the vote, the account and the tally after
+        the cast. The handler ends that transaction on every path, also after a refused
+        cast, whose partial work the rollback discards.
+        """
         if self.beamer:
             await self._send_error("read_only")
             return
@@ -235,19 +245,24 @@ class LiveVoteConnection:
         try:
             vote_out = await self._cast(msg)
         finally:
-            # Every path of the cast reads the database: the vote, the account and
-            # the tally after the cast. End that transaction on every path, also
-            # after a refused cast, whose partial work the rollback discards.
             await self._end_transaction()
         if vote_out is not None:
             await self.publisher.vote_tally(vote_out)
 
     async def _cast(self, msg: CastMessage) -> VoteOut | None:
-        """Run one cast and return the vote after it, or None after an error frame."""
-        # Channel binding as defense in depth. The vote MUST belong to the meeting
-        # of this connection. The handler rejects a vote of another meeting, and an
-        # unknown vote, before the lock and the database. `VotingService.cast`
-        # checks the eligibility again.
+        """Run one cast and return the vote after it, or None after an error frame.
+
+        The vote must belong to the meeting of this connection (channel binding as defense
+        in depth). The handler rejects a vote of another meeting, and an unknown vote,
+        before the lock and the database. `VotingService.cast` checks the eligibility again.
+        The own cast and the delegated cast take different locks, because both casts are
+        valid.
+
+        The socket resolved the principal at the handshake. Since then an admin may have
+        deactivated the account or merged it into another one, whose ballots now carry this
+        vote. The handler checks the row again before every cast, so an open socket cannot
+        vote for a locked account or vote twice for a person.
+        """
         try:
             target = await self.voting.get(msg.vote_id)
         except AppError:
@@ -256,17 +271,12 @@ class LiveVoteConnection:
         if target.meeting_id != self.meeting_id:
             await self._send_error("not_eligible")
             return None
-        # Lock the own cast and the delegated cast apart. Both casts are valid.
         suffix = ":proxy" if msg.as_delegation else ""
         lock_key = f"vote:{msg.vote_id}:cast:{self.principal.sub}{suffix}"
         async with self.locker.acquire(lock_key) as acquired:
             if not acquired:
                 await self._send_error("locked")
                 return None
-            # The socket resolved the principal at the handshake. Since then an admin
-            # may have deactivated the account or merged it into another one, whose
-            # ballots now carry this vote. Check the row again before every cast, so an
-            # open socket cannot vote for a locked account (or vote twice for a person).
             if not await account_can_act(self.voting.session, self.principal.sub):
                 await self._send_error("account_inactive")
                 return None
@@ -322,7 +332,11 @@ class LiveVoteConnection:
         return bool(count)
 
     async def _handle_body_draft(self, raw: dict[str, object]) -> None:
-        """Check one body draft and publish it on the meeting channel."""
+        """Check one body draft and publish it on the meeting channel.
+
+        The cap counts UTF-8 bytes, not characters, because a character can take up to 4
+        bytes and the frame travels as bytes to every viewer.
+        """
         if not self._allow_draft():
             return
         if self.beamer:
@@ -333,8 +347,6 @@ class LiveVoteConnection:
         except ValidationError:
             await self._send_error("invalid_message")
             return
-        # The cap counts UTF-8 bytes, not characters: a character can take up to 4
-        # bytes, and the frame travels as bytes to every viewer.
         if len(msg.body.encode("utf-8", "surrogatepass")) > AGENDA_BODY_MAX:
             await self._send_error("too_large")
             return
@@ -384,20 +396,22 @@ class LiveVoteConnection:
                 await self._send(filtered)
 
     async def _receive(self) -> None:
+        """Read client frames until the disconnect.
+
+        A frame that is not JSON keeps the connection open. A body draft has its own cap and
+        takes no token of the general throttle, so a long run of typing cannot block a cast.
+        Every other frame passes the throttle before any database or lock work. The handler
+        drops the excess frames of a flooding client and keeps the connection open.
+        """
         while True:
             try:
                 raw = await self.ws.receive_json()
             except json.JSONDecodeError:
-                # A frame that is not JSON keeps the connection open.
                 await self._send_error("invalid_message")
                 continue
-            # A body draft has its own cap and does not take a token of the
-            # general throttle, so a long run of typing cannot block a cast.
             if isinstance(raw, dict) and raw.get("type") == "body_draft":
                 await self._handle_body_draft(raw)
                 continue
-            # Throttle before any database or lock work. The handler drops the
-            # excess frames of a flooding client and keeps the connection open.
             if not self._allow_frame():
                 await self._send_error("rate_limited")
                 continue
@@ -410,57 +424,47 @@ class LiveVoteConnection:
         """Open the subscription and send the initial state.
 
         The connection then fans out and receives until the disconnect.
+
+        A voter connection registers and broadcasts the roster. The subscription already
+        exists, so this broadcast is also the first snapshot for the new client. A beamer
+        does not count, because it is a display and not a person; the event filter of the
+        beamer hides `viewers`.
+
+        The pump and the receive task race with FIRST_COMPLETED. `_pump` can end first on a
+        send error or on a serialization error, and the connection then goes down, because a
+        client must never stop receiving broadcasts on an open socket. An end of `_receive`
+        first is a normal disconnect. The handler reads the exception of the finished task,
+        because it stays hidden otherwise: a disconnect is expected, a dead pump is logged
+        and tears the connection down. A failure to leave the roster does not break the
+        close.
         """
         channel = meeting_channel(self.meeting_id)
         async with self.broker.subscribe(channel) as subscription:
             await self._send_state()
-            # Register a voter connection and broadcast the roster. The
-            # subscription already exists, so this broadcast is also the first
-            # snapshot for the new client. A beamer does not count, because it is
-            # a display and not a person. The event filter of the beamer hides
-            # `viewers`.
             connection_id: str | None = None
             if not self.beamer:
-                name = (
-                    self.principal.display_name
-                    or self.principal.email
-                    or self.principal.sub
-                )
-                connection_id, names = PRESENCE.join(
-                    self.meeting_id, self.principal.sub, name
-                )
-                await self.broker.publish(
-                    channel, ViewersEvent(viewers=names).dump()
-                )
+                name = self.principal.display_name or self.principal.email or self.principal.sub
+                connection_id, names = PRESENCE.join(self.meeting_id, self.principal.sub, name)
+                await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
             pump = asyncio.create_task(self._pump(subscription))
             receive = asyncio.create_task(self._receive())
             try:
-                # Race both tasks with FIRST_COMPLETED. `_pump` can end first on
-                # a send error or on a serialization error. The connection then
-                # goes down. A client must never stop receiving broadcasts on an
-                # open socket. An end of `_receive` first is a normal disconnect.
                 done, _pending = await asyncio.wait(
                     {pump, receive}, return_when=asyncio.FIRST_COMPLETED
                 )
-                # Read the exception of the finished task. Without this call it
-                # stays hidden. A disconnect is expected. A dead pump is logged.
                 for task in done:
                     try:
                         task.result()
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # pump failure tears the connection down
-                        logger.warning(
-                            "live-vote pump/receive task failed", exc_info=True
-                        )
+                    except Exception:
+                        logger.warning("live-vote pump/receive task failed", exc_info=True)
             finally:
                 pump.cancel()
                 receive.cancel()
                 if connection_id is not None:
                     names = PRESENCE.leave(self.meeting_id, connection_id)
                     try:
-                        await self.broker.publish(
-                            channel, ViewersEvent(viewers=names).dump()
-                        )
-                    except Exception:  # leaving must not break the close
+                        await self.broker.publish(channel, ViewersEvent(viewers=names).dump())
+                    except Exception:
                         logger.debug("viewers broadcast on leave failed", exc_info=True)

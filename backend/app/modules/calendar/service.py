@@ -18,7 +18,7 @@ from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.models import Meeting
 
-# 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
+#: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
 _TOKEN_BYTES = 32
 
 
@@ -55,9 +55,7 @@ async def rotate_calendar_token(db: AsyncSession, sub: str) -> str | None:
     return row.calendar_token
 
 
-async def principal_by_calendar_token(
-    db: AsyncSession, token: str
-) -> PrincipalRow | None:
+async def principal_by_calendar_token(db: AsyncSession, token: str) -> PrincipalRow | None:
     """Resolve an active principal by feed token.
 
     An empty token, an unknown principal or a deactivated principal gives `None`.

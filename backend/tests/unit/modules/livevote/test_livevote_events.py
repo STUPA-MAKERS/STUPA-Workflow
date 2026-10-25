@@ -2,7 +2,7 @@
 
 The tests pin the WS contract that the frontend builds against: camelCase
 field names and the ``type`` discriminator. The security-critical part: a tally event
-and a closed event carry **only** aggregates (requirements N1a, no voter identity).
+and a closed event carry **only** aggregates (no voter identity).
 """
 
 from __future__ import annotations
@@ -27,6 +27,11 @@ from app.shared.config_schemas import VoteConfig
 
 
 def _vote_out(*, secret: bool, status: str) -> VoteOut:
+    """Build a vote for the events.
+
+    The gate of `from_vote` uses only `revealed`, because the service makes the reveal
+    decision from the attendance. A closed vote or a public vote shows its counts.
+    """
     return VoteOut(
         id=uuid4(),
         applicationId=uuid4(),
@@ -42,8 +47,6 @@ def _vote_out(*, secret: bool, status: str) -> VoteOut:
             eligible=12,
             voted=8,
             present=10,
-            # The from_vote gate uses only ``revealed``. The service makes the
-            # attendance-based reveal decision. A closed vote or a public vote shows.
             revealed=status == "closed" or not secret,
             quorumMet=True,
             leading="yes",
@@ -52,6 +55,10 @@ def _vote_out(*, secret: bool, status: str) -> VoteOut:
 
 
 def test_meeting_state_event_camel_and_optional_active() -> None:
+    """Serialize the meeting state in camelCase with an optional active application.
+
+    Without an active application the field stays null and the beamer shows nothing.
+    """
     aid = uuid4()
     tid = uuid4()
     dumped = MeetingStateEvent(
@@ -63,7 +70,6 @@ def test_meeting_state_event_camel_and_optional_active() -> None:
         "currentAgendaItemId": str(tid),
         "status": "live",
     }
-    # Without an active application the field stays null and the beamer shows nothing.
     planned = MeetingStateEvent(status="planned").dump()
     assert planned["activeApplicationId"] is None
     assert planned["currentAgendaItemId"] is None
@@ -84,6 +90,7 @@ def test_vote_opened_event_serialises_options_and_iso_closes_at() -> None:
 
 
 def test_vote_tally_event_is_aggregate_only_no_voter_identity() -> None:
+    """Keep the tally event aggregate: it never carries a voter identity."""
     dumped = VoteTallyEvent(
         voteId=uuid4(),
         counts={"yes": 5, "no": 2, "abstain": 1},
@@ -95,27 +102,32 @@ def test_vote_tally_event_is_aggregate_only_no_voter_identity() -> None:
     assert dumped["counts"] == {"yes": 5, "no": 2, "abstain": 1}
     assert dumped["quorumMet"] is True
     assert dumped["leading"] == "yes"
-    # A tally never carries a voter identity (requirements N1a).
     keys = set(dumped)
     assert not (keys & {"voter", "voterSub", "voters", "ballots", "names"})
 
 
 def test_tally_from_open_secret_vote_hides_counts_shows_participation() -> None:
-    # Security core (fix/secret-live-tally): an OPEN secret vote must not show a per
-    # option interim count over the WS feed or the beamer feed. It shows the turnout.
+    """Hide the counts of an open secret vote and show the participation.
+
+    An open secret vote must not show an interim count per option over the WebSocket feed or
+    the beamer feed. It shows the turnout (5 + 3 of 12). The raw choice counts must not leak
+    under any key.
+    """
     dumped = VoteTallyEvent.from_vote(_vote_out(secret=True, status="open")).dump()
     assert dumped["type"] == "vote_tally"
     assert dumped["secret"] is True
     assert dumped["counts"] == {}
     assert dumped["leading"] is None
-    assert dumped["cast"] == 8                 # turnout only: 5 + 3 of 12
+    assert dumped["cast"] == 8
     assert dumped["eligible"] == 12
-    # The raw choice counts (5 and 3) must not leak under ANY key.
     assert {3, 5}.isdisjoint(v for v in dumped.values() if type(v) is int)
 
 
 def test_tally_from_closed_secret_vote_reveals_aggregates() -> None:
-    # After the close the full aggregates appear. The rule: counts only at the close.
+    """Reveal the aggregates of a closed secret vote.
+
+    The counts appear only at the close.
+    """
     dumped = VoteTallyEvent.from_vote(_vote_out(secret=True, status="closed")).dump()
     assert dumped["counts"] == {"yes": 5, "no": 3}
     assert dumped["leading"] == "yes"
@@ -123,7 +135,7 @@ def test_tally_from_closed_secret_vote_reveals_aggregates() -> None:
 
 
 def test_tally_from_open_public_vote_shows_live_counts() -> None:
-    # A public vote keeps the live interim count for the public bars.
+    """Show the live counts of an open public vote for the public bars."""
     dumped = VoteTallyEvent.from_vote(_vote_out(secret=False, status="open")).dump()
     assert dumped["secret"] is False
     assert dumped["counts"] == {"yes": 5, "no": 3}
@@ -138,9 +150,7 @@ def test_vote_opened_event_carries_secret_flag() -> None:
 
 
 def test_vote_closed_event_carries_result_and_counts_only() -> None:
-    dumped = VoteClosedEvent(
-        voteId=uuid4(), result="passed", counts={"yes": 7, "no": 1}
-    ).dump()
+    dumped = VoteClosedEvent(voteId=uuid4(), result="passed", counts={"yes": 7, "no": 1}).dump()
     assert dumped["type"] == "vote_closed"
     assert dumped["result"] == "passed"
     assert dumped["counts"] == {"yes": 7, "no": 1}

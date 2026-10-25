@@ -62,7 +62,10 @@ class _Session:
 
 
 def test_window_counts_back_from_the_local_start() -> None:
-    # 18:00 in Berlin in October (CEST) is 16:00 UTC.
+    """Count the window back from the local start.
+
+    18:00 in Berlin in October (CEST) is 16:00 UTC.
+    """
     window = open_window(_meeting(), _settings(), TZ)
     assert window == OpenWindow(
         opens_at=datetime(2026, 10, 20, 15, 0, tzinfo=UTC),
@@ -79,9 +82,7 @@ def test_window_without_start_time_starts_at_midnight() -> None:
     assert window.opens_at == window.confirm_until - timedelta(minutes=30)
 
 
-@pytest.mark.parametrize(
-    "meeting", [_meeting("live"), _meeting("closed"), _meeting(day=None)]
-)
+@pytest.mark.parametrize("meeting", [_meeting("live"), _meeting("closed"), _meeting(day=None)])
 def test_no_window(meeting: Meeting) -> None:
     assert open_window(meeting, _settings(), TZ) is None
 

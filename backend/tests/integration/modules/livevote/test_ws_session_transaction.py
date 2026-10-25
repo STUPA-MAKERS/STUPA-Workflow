@@ -57,6 +57,10 @@ def _connection(
 async def test_resync_ends_the_transaction_and_sends_the_new_state(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """End the transaction on a resync and send the new state.
+
+    Another request starts the meeting meanwhile.
+    """
     s = await seed(maker, status="planned")
     async with maker() as session:
         conn = _connection(session, s.meeting_id, Principal(sub="viewer"))
@@ -64,7 +68,6 @@ async def test_resync_ends_the_transaction_and_sends_the_new_state(
         assert session.in_transaction() is False
         assert conn.ws.sent[-1]["status"] == "planned"  # type: ignore[attr-defined]
 
-        # Another request starts the meeting.
         async with maker() as other:
             meeting = await other.get(Meeting, s.meeting_id)
             assert meeting is not None
@@ -78,6 +81,10 @@ async def test_resync_ends_the_transaction_and_sends_the_new_state(
 
 
 async def test_cast_ends_the_transaction(maker: async_sessionmaker[AsyncSession]) -> None:
+    """End the transaction of every cast.
+
+    A second cast gets the error frame and ends its transaction too.
+    """
     s = await seed(maker, status="live", votes=("open",))
     vote_id = s.vote_ids["open"]
     sub = f"voter-{uuid.uuid4().hex[:8]}"
@@ -100,7 +107,6 @@ async def test_cast_ends_the_transaction(maker: async_sessionmaker[AsyncSession]
         assert len(published) == 1
         assert published[0].tally.voted == 1
 
-        # A second cast gets the error frame and ends its transaction too.
         await conn._handle_cast({"type": "cast", "voteId": str(vote_id), "choice": "no"})
         assert conn.ws.sent[-1] == {"type": "error", "code": "already_voted"}  # type: ignore[attr-defined]
         assert session.in_transaction() is False

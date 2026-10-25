@@ -145,7 +145,11 @@ def _meeting(status: str = "planned") -> Meeting:
 
 
 def _service(meeting: Meeting, *extra: list[Any], publisher: Any = None) -> MeetingService:
-    # _get, then the open-vote check of a close (empty unless a test queues a vote).
+    """Build the service on a fake session.
+
+    The session answers `_get` and then the open-vote check of a close, which is empty
+    unless a test queues a vote.
+    """
     return MeetingService(_Session([meeting], *extra), publisher)  # type: ignore[arg-type]
 
 
@@ -154,13 +158,16 @@ def _service(meeting: Meeting, *extra: list[Any], publisher: Any = None) -> Meet
 async def test_status_machine(
     current: str, target: str, audit: list[dict[str, Any]], voting: SimpleNamespace
 ) -> None:
+    """Run the status machine.
+
+    A no-op status writes no audit entry.
+    """
     m = _meeting(current)
     svc = _service(m)
     if current == target or (current, target) in ALLOWED:
         out = await svc.patch(m.id, MeetingPatch(status=target), _admin())  # type: ignore[arg-type]
         assert out.status == target
         assert m.status == target
-        # A no-op status writes no audit entry.
         assert bool(audit) == (current != target)
     else:
         with pytest.raises(ConflictError) as ei:
@@ -208,8 +215,12 @@ async def test_close_cancels_drafts_and_publishes_after_commit(
 async def test_close_broadcast_failure_keeps_the_close(
     audit: list[dict[str, Any]], voting: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Patch the logger, not caplog: an earlier `logging.config.fileConfig` in the
-    # suite (Alembic) can disable the module logger, and caplog then sees nothing.
+    """Keep the close when its broadcast fails.
+
+    The test patches the logger, not `caplog`, because an earlier
+    `logging.config.fileConfig` in the suite (Alembic) can disable the module logger, and
+    `caplog` then sees nothing.
+    """
     warnings: list[str] = []
     monkeypatch.setattr(
         lifecycle_mod.logger, "warning", lambda msg, *args: warnings.append(msg % args)
@@ -226,24 +237,30 @@ async def test_close_broadcast_failure_keeps_the_close(
 async def test_close_without_drafts_or_publisher(
     audit: list[dict[str, Any]], voting: SimpleNamespace
 ) -> None:
+    """Close a meeting without drafts or a publisher.
+
+    Without a publisher nothing reads the cancelled votes back.
+    """
     m = _meeting("live")
     voting.drafts = [SimpleNamespace(id=uuid4())]
     out = await _service(m).patch(m.id, MeetingPatch(status="closed"), _admin())
     assert out.status == "closed"
-    # Without a publisher nothing reads the cancelled votes back.
     assert voting.reads == []
 
 
 async def test_start_sets_started_at_once(
     audit: list[dict[str, Any]], voting: SimpleNamespace
 ) -> None:
+    """Set `started_at` once on the start.
+
+    A repeated start is a no-op and keeps the stamp.
+    """
     m = _meeting("planned")
     svc = _service(m)
     out = await svc.patch(m.id, MeetingPatch(status="live"), _admin())
     assert m.started_at is not None
     assert out.started_at == m.started_at
     first = m.started_at
-    # A repeated start is a no-op and keeps the stamp.
     await _service(m).patch(m.id, MeetingPatch(status="live"), _admin())
     assert m.started_at == first
 
@@ -338,9 +355,12 @@ def test_create_strips_and_checks_the_title() -> None:
 async def test_current_item_change_is_not_audited(
     audit: list[dict[str, Any]], voting: SimpleNamespace, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Leave a change of the current item out of the audit log.
+
+    The session answers `_get` and then the owner lookup of the item.
+    """
     m = _meeting("live")
     item = uuid4()
-    # _get, then the owner lookup of the item.
     svc = MeetingService(_Session([m], scalars=[m.id]))  # type: ignore[arg-type]
     monkeypatch.setattr(MeetingService, "can_set_current_item", AsyncMock(return_value=True))
     await svc.patch(m.id, MeetingPatch(currentAgendaItemId=item), _admin())
@@ -364,7 +384,6 @@ async def test_create_is_audited(audit: list[dict[str, Any]]) -> None:
     assert entry["data"]["title"] == "GV"
 
 
-# The agenda summary of MeetingOut
 async def test_agenda_summary_empty_list() -> None:
     assert await MeetingService(_Session())._agenda_summaries([]) == {}  # type: ignore[arg-type]
 
@@ -401,8 +420,12 @@ async def test_agenda_summary_application_item_takes_the_application_title() -> 
 
 
 async def test_agenda_summary_without_agenda() -> None:
+    """Build an agenda summary without an agenda.
+
+    The current item id is stale and matches no row.
+    """
     m = _meeting("planned")
-    m.current_agenda_item_id = uuid4()  # a stale id that matches no row
+    m.current_agenda_item_id = uuid4()
     out = await MeetingService(_Session())._agenda_summaries([m])  # type: ignore[arg-type]
     assert out[m.id] == (0, None)
 
@@ -429,7 +452,6 @@ async def test_detail_and_list_carry_the_agenda_summary(
         assert dumped["startedAt"] == m.started_at
 
 
-# Public participation in the lifecycle
 class _Guests:
     calls: list[tuple[str, Any]] = []
 
@@ -490,12 +512,14 @@ async def test_close_purges_guests_and_public_patch_publishes(
 
 
 def _soon(minutes: int) -> Meeting:
-    """A planned meeting that starts ``minutes`` from now (Berlin local time)."""
+    """A planned meeting that starts ``minutes`` from now (Berlin local time).
+
+    The function adds real minutes in UTC, because aware arithmetic in one zone adds
+    wall-clock time, which is wrong across a DST switch.
+    """
     from zoneinfo import ZoneInfo
 
     m = _meeting("planned")
-    # Add real minutes in UTC: aware arithmetic in one zone adds wall-clock time,
-    # which is wrong across a DST switch.
     local = (datetime.now(UTC) + timedelta(minutes=minutes)).astimezone(ZoneInfo("Europe/Berlin"))
     m.date = local.date()
     m.start_time = local.time().replace(second=0, microsecond=0)

@@ -78,7 +78,14 @@ async def _principal(
 async def _closed_meeting(
     maker: async_sessionmaker[AsyncSession],
 ) -> tuple[uuid.UUID, uuid.UUID, dict[str, uuid.UUID]]:
-    """Seed a closed meeting with one principal per roster case."""
+    """Seed a closed meeting with one principal per roster case.
+
+    The cases: a membership that ended after the meeting, or during the meeting with an
+    excuse, is on the roster with the record. A record without any membership, for example
+    after the OIDC sync removed it, is on the roster. An open membership without a record is
+    on the roster with an open status. A membership that started after the meeting, or ended
+    before it, is not on the roster.
+    """
     s = await seed(maker, status="closed", items=0)
     async with maker() as session:
         await session.execute(
@@ -89,7 +96,6 @@ async def _closed_meeting(
         await session.commit()
     g, m = s.gremium_id, s.meeting_id
     ids = {
-        # The membership ended after the meeting: on the roster with the record.
         "ended_later": await _principal(
             maker,
             g,
@@ -98,21 +104,16 @@ async def _closed_meeting(
             status="present",
             meeting_id=m,
         ),
-        # A record without any membership (for example removed by the OIDC sync).
         "record_only": await _principal(
             maker, g, "Bert", member=False, status="present", meeting_id=m
         ),
-        # An open membership without a record: on the roster, status open.
         "open_member": await _principal(maker, g, "Carla"),
-        # The membership started after the meeting: not on the roster.
         "joined_later": await _principal(
             maker, g, "Dora", valid_from=datetime(2026, 8, 1, tzinfo=UTC)
         ),
-        # The membership ended before the meeting: not on the roster.
         "left_before": await _principal(
             maker, g, "Emil", valid_until=datetime(2026, 6, 1, tzinfo=UTC)
         ),
-        # The membership ended during the meeting, excused: on the roster.
         "ended_during": await _principal(
             maker,
             g,
@@ -177,6 +178,8 @@ async def test_protocol_quorum_counts_the_meeting_roster(
 
     The roster has 4 entries and 2 are present, so a 50 % quorum holds. The members
     that are valid now are 2 (Carla and Dora), which would give the wrong count.
+
+    Without a meeting the members that are valid now count (Carla, Dora).
     """
     gremium_id, meeting_id, _ = await _closed_meeting(maker)
     async with maker() as session:
@@ -187,5 +190,4 @@ async def test_protocol_quorum_counts_the_meeting_roster(
         svc = ProtocolService(session)
         assert await svc._quorate(gremium, meeting, 2) is True
         assert await svc._quorate(gremium, meeting, 1) is False
-        # Without a meeting the members that are valid now count (Carla, Dora).
         assert await svc._quorate(gremium, None, 1) is True

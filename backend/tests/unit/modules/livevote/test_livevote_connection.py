@@ -1,8 +1,22 @@
-"""LiveVoteConnection internals: the beamer fan-out filter (requirements N1a).
+"""LiveVoteConnection internals: the beamer fan-out filter.
 
 The beamer stream is read-only. It passes **only** ``meeting_state``, ``vote_opened``,
 ``vote_tally`` and ``vote_closed``. The fan-out drops everything else, for example an
 internal event. The voter channel passes everything through.
+
+A cast binds the vote id to the authorized meeting of the connection.
+
+The state on a connect marks its `vote_opened` as a replay, so a client does not take a vote
+that is already open for a vote that opens now.
+
+An open socket must not cast for an account that an admin deactivated or merged after the
+handshake, so the connection reads the account again before each cast.
+
+Every read cycle of the socket ends its transaction. The socket keeps its request session
+for the whole meeting, so an open transaction would hold a pool connection.
+
+The identity events are two events that carry a voter identity. An audit channel or a cast
+channel can carry such events, and the beamer must never receive them.
 """
 
 from __future__ import annotations
@@ -84,8 +98,6 @@ def _conn(*, beamer: bool) -> LiveVoteConnection:
     )
 
 
-# Whitelisted aggregate events plus two events that carry a voter identity. An audit
-# channel or a cast channel can carry such events. The beamer must never receive them.
 _IDENTITY_EVENTS = [
     {"type": "ballot_cast", "voter": "alice", "choice": "yes"},
     {"type": "internal_secret", "voters": ["alice", "bob"]},
@@ -102,15 +114,17 @@ _STREAM = [
 
 @pytest.mark.asyncio
 async def test_beamer_pump_drops_non_whitelisted_events() -> None:
+    """Drop every event but the four aggregate types on the beamer.
+
+    The ballot secrecy holds: the fan-out passes no event that carries an identity, and no
+    `voter` or `voters` field leaks over the beamer feed.
+    """
     conn = _conn(beamer=True)
     await conn._pump(_Sub(_STREAM))
     sent = conn.ws.sent  # type: ignore[attr-defined]
     types_sent = [m["type"] for m in sent]
-    # Only the four aggregate event types reach the beamer.
     assert types_sent == ["meeting_state", "vote_opened", "vote_tally", "vote_closed"]
-    # N1a ballot secrecy: the fan-out passes no event that carries an identity.
     assert all(ev not in sent for ev in _IDENTITY_EVENTS)
-    # No voter field and no voters field leaks over the beamer feed.
     assert all("voter" not in m and "voters" not in m for m in sent)
 
 
@@ -122,7 +136,6 @@ async def test_voter_pump_passes_everything_through() -> None:
     assert types_sent == [m["type"] for m in _STREAM]
 
 
-# FIX 4: the origin allowlist at the WS handshake (CSWSH and CSRF).
 def _settings(origins: list[str], base: str = "http://localhost") -> Any:
     return SimpleNamespace(
         cors_allow_origins=origins,
@@ -132,12 +145,15 @@ def _settings(origins: list[str], base: str = "http://localhost") -> Any:
 
 
 def test_origin_allowed_missing_header_passes() -> None:
-    # Non-browser clients (native, MCP, CLI) send no Origin. The cookie gate is enough.
+    """Pass a request without an Origin header.
+
+    Non-browser clients (native, MCP, CLI) send no Origin. The cookie gate is enough.
+    """
     assert origin_allowed(None, _settings([], base="https://app.example")) is True
 
 
 def test_origin_allowed_no_configured_origins_passes() -> None:
-    # Without configured origins AND without a base URL, the check stays open.
+    """Pass every origin without configured origins and without a base URL."""
     assert origin_allowed("https://evil.example", _settings([], base="")) is True
 
 
@@ -170,12 +186,12 @@ class _HandshakeWS:
 
 @pytest.mark.asyncio
 async def test_resolve_ws_principal_rejects_foreign_origin() -> None:
+    """After the close, a second `close` from the router is a no-op and stays silent."""
     ws = _HandshakeWS("https://evil.example")
     s = _settings(["https://app.example"], base="https://app.example")
     principal = await resolve_ws_principal(ws, object(), s)  # type: ignore[arg-type]
     assert principal is None
     assert ws.closed_code == WS_FORBIDDEN
-    # After that, ``close`` is a no-op. A second close from the router stays silent.
     ws.closed_code = None
     await ws.close(code=4401)
     assert ws.closed_code is None
@@ -183,8 +199,11 @@ async def test_resolve_ws_principal_rejects_foreign_origin() -> None:
 
 @pytest.mark.asyncio
 async def test_resolve_ws_principal_no_cookie_after_origin_ok() -> None:
-    # No Origin header, so the origin check passes. The cookie is missing. The call
-    # gives None on the regular 4401 path and not on the 4403 path.
+    """Return None without a cookie after a passed origin check.
+
+    Without an Origin header the origin check passes. The cookie is missing, so the call
+    gives None on the regular 4401 path and not on the 4403 path.
+    """
     ws = _HandshakeWS(None)
     s = _settings([], base="https://app.example")
     principal = await resolve_ws_principal(ws, object(), s)  # type: ignore[arg-type]
@@ -192,31 +211,42 @@ async def test_resolve_ws_principal_no_cookie_after_origin_ok() -> None:
     assert ws.closed_code is None
 
 
-# FIX 5: the inbound throttle (token bucket).
 def test_allow_frame_burst_then_throttles() -> None:
+    """Allow the burst, then throttle.
+
+    Three tokens allow three frames. The fourth frame blocks without a refill. A refill in
+    the same time slice stays far below one token.
+    """
     conn = _conn(beamer=False)
     conn._tokens = 3.0
     conn._last_refill = time.monotonic()
-    # Three tokens allow three frames. The fourth frame blocks without a refill.
     assert conn._allow_frame() is True
     assert conn._allow_frame() is True
     assert conn._allow_frame() is True
-    # A refill in the same time slice stays far below one token.
     conn._last_refill = time.monotonic()
     conn._tokens = 0.0
     assert conn._allow_frame() is False
 
 
 def test_allow_frame_refills_over_time() -> None:
+    """Refill the bucket over time.
+
+    The last refill lies far in the past, so the bucket fills up to the burst size.
+    """
     conn = _conn(beamer=False)
     conn._tokens = 0.0
-    # The last refill lies far in the past, so the bucket fills up to the burst size.
     conn._last_refill = time.monotonic() - 100.0
     assert conn._allow_frame() is True
 
 
 @pytest.mark.asyncio
 async def test_receive_drops_rate_limited_frames() -> None:
+    """Drop the frames over the rate limit.
+
+    `subscribe` calls `_send_state`, which calls `meetings.get`. This test measures only the
+    throttle, so a no-op replaces the handler and the test counts `rate_limited`. The burst
+    of 10 frames passes, and the connection drops the rest.
+    """
     conn = _conn(beamer=False)
     frames: list[dict[str, object]] = [{"type": "subscribe"} for _ in range(30)]
 
@@ -235,9 +265,6 @@ async def test_receive_drops_rate_limited_frames() -> None:
 
     ws = _FloodWS()
     conn.ws = ws  # type: ignore[assignment]
-    # ``subscribe`` calls ``_send_state``, which calls ``meetings.get``. This test
-    # measures only the throttle. A no-op replaces the handler and counts
-    # ``rate_limited``.
     handled: list[dict[str, object]] = []
 
     async def _noop_handle(raw: dict[str, object]) -> None:
@@ -246,13 +273,11 @@ async def test_receive_drops_rate_limited_frames() -> None:
     conn._handle_message = _noop_handle
     with pytest.raises(asyncio.CancelledError):
         await conn._receive()
-    # The burst of 10 frames passes. The connection drops the rest as rate_limited.
     assert len(handled) == 10
     assert all(s == {"type": "error", "code": "rate_limited"} for s in ws.sent)
     assert len(ws.sent) == 20
 
 
-# FIX 6: run() tears the connection down when the pump dies. It must not hang.
 class _RunWS:
     def __init__(self) -> None:
         self.sent: list[dict[str, object]] = []
@@ -261,7 +286,7 @@ class _RunWS:
         self.sent.append(data)
 
     async def receive_json(self) -> dict[str, object]:
-        # The receive blocks forever. Only a dying pump may end run().
+        """Block forever, so only a dying pump may end `run()`."""
         await asyncio.Event().wait()
         raise AssertionError("unreachable")
 
@@ -291,17 +316,21 @@ class _BoomBroker:
 
 @pytest.mark.asyncio
 async def test_run_dead_pump_tears_down_connection() -> None:
+    """Tear the connection down when the pump dies.
+
+    A beamer needs no presence call and no state read. `run()` must not hang: the crashed
+    pump ends the race.
+    """
     conn = LiveVoteConnection(
         _RunWS(),  # type: ignore[arg-type]
         uuid4(),
-        beamer=True,  # a beamer needs no presence call and no state DB call
+        beamer=True,
         principal=Principal(sub="p"),
         meetings=_StateMeetings(),  # type: ignore[arg-type]
         voting=SimpleNamespace(session=_TxSession()),  # type: ignore[arg-type]
         broker=_BoomBroker(),  # type: ignore[arg-type]
         locker=InMemoryLocker(),
     )
-    # The call run() must NOT hang. The crashed pump ends the race.
     await asyncio.wait_for(conn.run(), timeout=2.0)
 
 
@@ -315,7 +344,6 @@ class _StateMeetings:
         return None
 
 
-# Cast binds the vote id to the authorized meeting of the connection.
 class _MeetingBoundVoting:
     """Fake VotingService for the meeting binding of a cast.
 
@@ -324,10 +352,13 @@ class _MeetingBoundVoting:
     """
 
     def __init__(self, vote_meeting_id: UUID, *, account_ok: bool = True) -> None:
+        """Store the meeting of the vote and the account verdict.
+
+        The connection reads the account again through the session of the service.
+        """
         self._vote_meeting_id = vote_meeting_id
         self.cast_calls = 0
         self.account_ok = account_ok
-        # The connection re-reads the account through the session of the service.
         self.session = self
         self.statements: list[object] = []
 
@@ -349,23 +380,28 @@ class _MeetingBoundVoting:
 
 @pytest.mark.asyncio
 async def test_cast_rejects_vote_from_other_meeting() -> None:
+    """Reject a vote of another meeting before the database cast and the lock.
+
+    The connection has its own meeting id, which differs from the meeting of the vote.
+    """
     other_meeting = uuid4()
     voting = _MeetingBoundVoting(other_meeting)
     conn = _conn(beamer=False)
-    # conn.meeting_id is its own uuid4 and differs from other_meeting.
     conn.voting = voting  # type: ignore[assignment]
-    await conn._handle_cast(
-        {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
-    )
-    # The connection rejects the frame before it reaches the DB cast or the lock.
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
     assert voting.cast_calls == 0
     assert conn.ws.sent == [{"type": "error", "code": "not_eligible"}]  # type: ignore[attr-defined]
 
 
 @pytest.mark.asyncio
 async def test_cast_allows_vote_from_own_meeting() -> None:
+    """Allow a vote of the own meeting.
+
+    The meeting binding holds, so the cast runs exactly once, no error frame goes out and
+    the publisher sends the tally.
+    """
     conn = _conn(beamer=False)
-    voting = _MeetingBoundVoting(conn.meeting_id)  # the vote belongs to the own meeting
+    voting = _MeetingBoundVoting(conn.meeting_id)
     conn.voting = voting  # type: ignore[assignment]
 
     published: list[object] = []
@@ -374,17 +410,12 @@ async def test_cast_allows_vote_from_own_meeting() -> None:
         published.append(vote)
 
     conn.publisher.vote_tally = _stub_tally
-    await conn._handle_cast(
-        {"type": "cast", "voteId": str(uuid4()), "choice": "yes"}
-    )
-    # The meeting binding holds, so cast runs exactly once and no error frame goes out.
+    await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
     assert voting.cast_calls == 1
-    assert published  # the publisher sent the tally
+    assert published
     assert all(s.get("code") != "not_eligible" for s in conn.ws.sent)  # type: ignore[attr-defined]
 
 
-# The state on a connect marks its `vote_opened` as a replay, so that a client does
-# not take a vote that is already open for a vote that opens now.
 class _OpenVoteMeetings(_StateMeetings):
     def __init__(self, vote_id: UUID) -> None:
         self._vote_id = vote_id
@@ -433,8 +464,6 @@ async def test_send_state_marks_the_open_vote_as_replay() -> None:
     assert sent[1]["replay"] is True
 
 
-# An open socket must not cast for an account that an admin deactivated or merged
-# after the handshake: the connection re-reads the account before each cast.
 @pytest.mark.asyncio
 async def test_cast_refused_when_the_account_is_no_longer_active() -> None:
     conn = _conn(beamer=False)
@@ -447,8 +476,6 @@ async def test_cast_refused_when_the_account_is_no_longer_active() -> None:
     assert "principal.active" in stmt and "principal.merged_into IS NULL" in stmt
 
 
-# B1: every read cycle of the socket ends its transaction. The socket keeps its request
-# session for the whole meeting, so an open transaction would hold a pool connection.
 class _TxMeetings:
     """Meeting service double whose reads open the transaction of the shared session."""
 
@@ -487,11 +514,11 @@ class _TxVoting:
         return SimpleNamespace(id=vote_id, meeting_id=self.meeting_id)
 
     async def cast(self, *_args: object, **_kwargs: object) -> None:
+        """Commit like the real cast, which ends the transaction."""
         self.session.begin()
         if self.exc is not None:
             raise self.exc
         self.casts += 1
-        # The real cast commits, which ends the transaction.
         self.session.in_tx = False
 
 
@@ -544,7 +571,7 @@ async def test_cast_ends_the_transaction_after_the_tally_read() -> None:
     published: list[object] = []
 
     async def _tally(vote: object) -> None:
-        # The broadcast runs after the transaction ended.
+        """Record the transaction state, because the broadcast runs after the transaction ended."""
         assert session.in_tx is False
         published.append(vote)
 
@@ -557,9 +584,12 @@ async def test_cast_ends_the_transaction_after_the_tally_read() -> None:
 
 @pytest.mark.asyncio
 async def test_cast_ends_the_transaction_on_an_error_frame() -> None:
-    """The early exits (foreign vote, refused cast) end the transaction too."""
+    """The early exits (foreign vote, refused cast) end the transaction too.
+
+    The vote belongs to another meeting.
+    """
     conn, session, _meetings, voting = _tx_conn()
-    voting.meeting_id = uuid4()  # a vote of another meeting
+    voting.meeting_id = uuid4()
     await conn._handle_cast({"type": "cast", "voteId": str(uuid4()), "choice": "yes"})
     assert conn.ws.sent == [{"type": "error", "code": "not_eligible"}]  # type: ignore[attr-defined]
     assert session.in_tx is False

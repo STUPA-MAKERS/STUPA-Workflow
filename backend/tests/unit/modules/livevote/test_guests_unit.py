@@ -123,17 +123,17 @@ class Recorder:
         self.events.append(("tally", vote))
 
 
-# -- pure helpers ---------------------------------------------------------------------
-
-
 def test_codes_tokens_and_qr() -> None:
+    """Create codes, tokens and the QR matrix.
+
+    The finder pattern sits in the top left corner.
+    """
     code = new_join_code()
     assert len(code) == 6 and set(code) <= set(CODE_ALPHABET)
     assert normalize_code(" 7kq-4mp ") == "7KQ4MP"
     assert token_hash("a") != token_hash("b") and len(token_hash("a")) == 32
     qr = qr_matrix("https://stupa.example/j/7KQ4MP")
     assert qr.size == len(qr.rows) and all(len(r) == qr.size for r in qr.rows)
-    # The finder pattern sits in the top left corner.
     assert qr.rows[0].startswith("1111111")
 
 
@@ -143,9 +143,6 @@ def test_retry_after() -> None:
     assert GuestService._retry_after(guest(status="rejected", decided_at=NOW), NOW) == 180  # type: ignore[arg-type]
     late = guest(status="removed", decided_at=NOW - timedelta(minutes=5))
     assert GuestService._retry_after(late, NOW) == 0  # type: ignore[arg-type]
-
-
-# -- lookups and the lead -------------------------------------------------------------
 
 
 async def test_meeting_and_guest_lookups_404() -> None:
@@ -190,13 +187,16 @@ async def test_counts() -> None:
     ],
 )
 async def test_decisions(method: str, status: str, to: str, action: str) -> None:
+    """Admit, reject and remove guests.
+
+    Each decision publishes the meeting and the counts.
+    """
     row = guest(status=status)
     lead = uuid4()
     session = db(
         result(meeting()),
         result(row),
         result((lead, "Lea Lead", None)),
-        # publish: the meeting and the counts
         result(meeting()),
         result(("admitted", 1)),
         scalars=[lead],
@@ -331,17 +331,17 @@ async def test_switch_off_purge_pseudonymize_attended() -> None:
 
 
 async def test_publish_paths() -> None:
-    await GuestService(db()).publish(MID, GuestEvents(counts=True))  # no publisher: no-op
+    """Publish the guest events.
+
+    Without a publisher the call is a no-op. A broker fault only logs.
+    """
+    await GuestService(db()).publish(MID, GuestEvents(counts=True))
     quiet = Recorder()
     await GuestService(db(), quiet).publish(MID, GuestEvents())  # type: ignore[arg-type]
     assert quiet.events == []
     failing = Recorder(fail=True)
     out = GuestService._out(guest())  # type: ignore[arg-type]
-    # A broker fault only logs.
     await GuestService(db(), failing).publish(MID, GuestEvents(requested=[out]))  # type: ignore[arg-type]
-
-
-# -- the guest -----------------------------------------------------------------------
 
 
 async def test_meeting_by_code_and_head() -> None:
@@ -390,6 +390,10 @@ async def test_join_of_a_closed_or_hidden_meeting_is_unknown() -> None:
 
 
 async def test_join_same_device_rules() -> None:
+    """Apply the rules of a join from the same device.
+
+    After the window the same row asks again. A waiting device replaces its name.
+    """
     admitted = guest(status="admitted")
     with pytest.raises(ConflictError) as err:
         await GuestService(db(result(meeting()), result(admitted))).join(
@@ -402,7 +406,6 @@ async def test_join_same_device_rules() -> None:
             "C", "Jo Do", "tok", now=NOW
         )
     assert wait.value.code == "retry_later" and wait.value.headers == {"Retry-After": "180"}
-    # After the window the same row asks again.
     old = guest(status="rejected", decided_at=NOW - timedelta(minutes=4))
     recorder = Recorder()
     me, token = await GuestService(db(result(meeting()), result(old)), recorder).join(  # type: ignore[arg-type]
@@ -410,7 +413,6 @@ async def test_join_same_device_rules() -> None:
     )
     assert token is None and me.status == "pending" and old.decided_at is None
     assert recorder.events[0][0] == "requested"
-    # A waiting device replaces its name.
     waiting = guest()
     recorder = Recorder()
     me, token = await GuestService(db(result(meeting()), result(waiting)), recorder).join(  # type: ignore[arg-type]
@@ -421,6 +423,10 @@ async def test_join_same_device_rules() -> None:
 
 
 async def test_join_removed_left_and_other_meeting() -> None:
+    """Handle a join after a removal, a leave and from another meeting.
+
+    The other meeting hears about the leave, so its lead list and the device socket follow.
+    """
     removed = guest(status="removed", decided_at=NOW)
     with pytest.raises(RateLimitedError):
         await GuestService(db(result(meeting()), result(removed))).join(
@@ -445,7 +451,6 @@ async def test_join_removed_left_and_other_meeting() -> None:
             None,
         )
         assert elsewhere.decided_at == NOW
-        # The other meeting hears about it, so its lead list and the device socket follow.
         left = [e for e in recorder.events if e[0] == "updated"]
         assert left and left[0][1][0].status == "left"
     rejected_elsewhere = guest(meeting_id=uuid4(), status="rejected")
@@ -456,6 +461,11 @@ async def test_join_removed_left_and_other_meeting() -> None:
 
 
 async def test_me_rename_leave() -> None:
+    """Rename, leave and read the own state.
+
+    A rename works while waiting and gives 409 afterwards. A leave pseudonymizes; a rejected
+    guest keeps the status.
+    """
     row = guest(last_seen_at=NOW - timedelta(minutes=5))
     session = db(result(row), result(meeting()))
     me = await GuestService(session).me("7KQ4MP", "tok", now=NOW)
@@ -464,7 +474,6 @@ async def test_me_rename_leave() -> None:
     session = db(result(fresh), result(meeting()))
     await GuestService(session).me("7KQ4MP", "tok", now=NOW)
     assert session.committed == 0
-    # Rename while waiting, 409 afterwards.
     waiting = guest()
     out = await GuestService(db(result(waiting), result(meeting()))).rename_self(
         "7KQ4MP", "tok", "Jana R.", now=NOW
@@ -474,7 +483,6 @@ async def test_me_rename_leave() -> None:
         await GuestService(db(result(guest(status="admitted")), result(meeting()))).rename_self(
             "7KQ4MP", "tok", "X Y", now=NOW
         )
-    # Leave pseudonymizes; a rejected guest keeps the status.
     leaving = guest(status="admitted")
     await GuestService(db(result(leaving), result(meeting()))).leave("7KQ4MP", "tok", now=NOW)
     assert (leaving.status, leaving.display_name, leaving.token_hash) == ("left", None, None)
@@ -484,6 +492,11 @@ async def test_me_rename_leave() -> None:
 
 
 async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apply the cast rules of a guest.
+
+    An unknown vote, a vote of another meeting and a vote of a non-public item give 404.
+    """
+
     class FakeVoting:
         def __init__(self) -> None:
             self.casts: list[Any] = []
@@ -521,7 +534,6 @@ async def test_cast_rules(monkeypatch: pytest.MonkeyPatch) -> None:
         )
     assert watch.value.code == "guests_watch_only"
     vote = SimpleNamespace(id=uuid4(), meeting_id=MID, agenda_item_id=uuid4())
-    # Unknown vote, a vote of another meeting, a vote of a non-public item: 404.
     for got, non_public in (
         (None, None),
         (SimpleNamespace(id=vote.id, meeting_id=uuid4(), agenda_item_id=None), None),
@@ -559,6 +571,10 @@ async def test_vote_is_public() -> None:
 
 
 async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hide the non-public content from an admitted guest.
+
+    The done mark of a public item shows; a non-public item hides it.
+    """
     app_id = uuid4()
     items = [
         SimpleNamespace(
@@ -621,7 +637,6 @@ async def test_admitted_view_hides_non_public_content(monkeypatch: pytest.Monkey
         ("Zuschuss", "application", "A"),
         ("Personal", "freetext", None),
     ]
-    # The done mark of a public item shows; a non-public item hides it.
     assert [a.done for a in me.view.agenda] == [True, False]
     assert me.view.present_members == 2 and me.view.admitted_guests == 1
     [gv] = me.view.votes

@@ -37,12 +37,17 @@ class BrokerPublisher:
     This class implements the leaf `MeetingPublisher` protocol. The voting module
     hooks into that protocol when it opens or closes a vote. The protocol avoids an
     import cycle.
+
+    The guest events go to the meeting channel too. The connection layer filters them: the
+    guest events with names reach only the meeting lead, the counts reach everybody.
     """
 
     def __init__(self, broker: MeetingBroker) -> None:
+        """Bind the publisher to a broker."""
         self._broker = broker
 
     async def meeting_state(self, meeting: MeetingOut) -> None:
+        """Publish the state of a meeting."""
         event = MeetingStateEvent(
             activeApplicationId=meeting.active_application_id,
             currentAgendaItemId=meeting.current_agenda_item_id,
@@ -51,21 +56,30 @@ class BrokerPublisher:
         await self._broker.publish(meeting_channel(meeting.id), event.dump())
 
     async def vote_opened(self, vote: VoteOut) -> None:
+        """Publish the open of a meeting vote."""
         if vote.meeting_id is None:
             return
         event = VoteOpenedEvent.from_vote(vote)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_tally(self, vote: VoteOut) -> None:
+        """Publish the tally of a meeting vote.
+
+        `from_vote` hides the choice counts while the vote is secret and open. This prevents
+        an interim leak to the beamer and to the voters. Only the participation count
+        travels.
+        """
         if vote.meeting_id is None:
             return
-        # `from_vote` hides the choice counts while the vote is secret and open.
-        # This prevents an interim leak to the beamer and to the voters. Only the
-        # participation count travels.
         event = VoteTallyEvent.from_vote(vote)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_closed(self, vote: VoteClosed) -> None:
+        """Publish the close of a meeting vote.
+
+        The channel reaches the beamer and the guests, so the event carries no `sub` of the
+        lead.
+        """
         if vote.meeting_id is None:
             return
         event = VoteClosedEvent(
@@ -74,7 +88,6 @@ class BrokerPublisher:
             counts=vote.tally.counts,
             failedReason=vote.tally.failed_reason,
             kind=vote.kind,
-            # The channel reaches the beamer and the guests: no `sub` of the lead.
             electionResult=(
                 vote.election_result.public() if vote.election_result is not None else None
             ),
@@ -92,14 +105,14 @@ class BrokerPublisher:
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
     async def vote_cancelled(self, vote: VoteOut) -> None:
+        """Publish the cancel of a meeting vote."""
         if vote.meeting_id is None:
             return
         event = VoteCancelledEvent(voteId=vote.id)
         await self._broker.publish(meeting_channel(vote.meeting_id), event.dump())
 
-    # Public meeting. The connection layer filters these events: the guest
-    # events with names reach only the meeting lead, the counts reach everybody.
     async def guest_requested(self, meeting_id: UUID, guest: MeetingGuestOut) -> None:
+        """Publish a new join request to the meeting lead."""
         event = GuestRequestedEvent(guest=guest)
         await self._broker.publish(meeting_channel(meeting_id), event.dump())
 
@@ -109,6 +122,7 @@ class BrokerPublisher:
         guest: MeetingGuestOut,
         reason: GuestEventReason | None = None,
     ) -> None:
+        """Publish a changed guest to the meeting lead."""
         event = GuestUpdatedEvent(guest=guest, reason=reason)
         await self._broker.publish(meeting_channel(meeting_id), event.dump())
 
@@ -122,6 +136,7 @@ class BrokerPublisher:
         admitted: int,
         pending: int,
     ) -> None:
+        """Publish the guest counts and the join code of a meeting."""
         event = GuestCountsEvent(
             publicJoin=public_join,
             guestsMode=guests_mode,

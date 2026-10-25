@@ -1,6 +1,6 @@
 """Unit tests for AttendanceService.
 
-The close of a meeting freezes the attendance (#attendance-lock). The final protocol
+The close of a meeting freezes the attendance. The final protocol
 carries the lists. A later change makes the PDF and the system disagree.
 """
 
@@ -47,9 +47,6 @@ async def test_set_for_conflict_when_closed() -> None:
     assert db.committed == 0
 
 
-# The attendance rules.
-
-
 def _member(sub: str) -> SimpleNamespace:
     return SimpleNamespace(id=uuid4(), sub=sub, display_name=sub, email=f"{sub}@x")
 
@@ -86,6 +83,10 @@ async def test_set_self_conflict_when_lead_set_it(audit_calls: list[dict[str, An
 async def test_set_self_excused_with_note_and_no_audit(
     audit_calls: list[dict[str, Any]],
 ) -> None:
+    """Store an own excuse with its note and write no audit entry.
+
+    The own report is not audited.
+    """
     meeting = _meeting("planned")
     me = _member("me")
     db = fake_session(result(meeting), result(me), result(), result(meeting), result(me))
@@ -94,7 +95,7 @@ async def test_set_self_excused_with_note_and_no_audit(
     )
     [added] = db.added
     assert (added.status, added.source, added.note) == ("excused", "self", "ill")
-    assert audit_calls == []  # the own report is not audited
+    assert audit_calls == []
     assert db.committed == 1
     assert out[0].principal_id == me.id
 
@@ -184,13 +185,14 @@ async def test_set_for_present_conflict_with_delegation(
 async def test_set_for_present_without_delegation_audits(
     audit_calls: list[dict[str, Any]],
 ) -> None:
+    """Audit a lead report of present while no delegation exists."""
     meeting = _meeting("live")
     member = _member("a")
     row = _row(member.id, status="excused", source="self", note="secret reason")
     db = fake_session(
         result(meeting),
         result(member),
-        result(),  # no delegation
+        result(),
         result(row),
         result(meeting),
         result(member),
@@ -213,6 +215,10 @@ async def test_set_for_present_without_delegation_audits(
 
 
 async def test_set_for_excused_keeps_member_note(audit_calls: list[dict[str, Any]]) -> None:
+    """Keep the note of the member on an excuse by the lead.
+
+    The lead sees the note.
+    """
     meeting = _meeting("live")
     member = _member("a")
     row = _row(member.id, status="excused", source="self", note="ill")
@@ -221,7 +227,6 @@ async def test_set_for_excused_keeps_member_note(audit_calls: list[dict[str, Any
     )
     out = await AttendanceService(db).set_for(meeting.id, member.id, "excused", "lead")
     assert (row.source, row.note) == ("lead", "ill")
-    # The lead sees the note.
     assert out[0].note == "ill"
     assert "ill" not in repr(audit_calls)
 
@@ -291,13 +296,15 @@ async def test_roster_note_only_for_self_and_lead() -> None:
 
 
 async def test_roster_marks_the_vote_and_the_keeper_right() -> None:
-    """The flags come from the union of the active gremium roles."""
+    """The flags come from the union of the active gremium roles.
+
+    The member holds two memberships: one role gives the vote, the other the minutes.
+    """
     meeting = _meeting("live")
     voter, keeper, both, former = _member("v"), _member("k"), _member("b"), _member("f")
     perms = result(
         (voter.id, ["vote.cast"]),
         (keeper.id, ["protocol.write"]),
-        # Two memberships: one role gives the vote, the other the minutes.
         (both.id, ["vote.cast"]),
         (both.id, None),
         (both.id, ["protocol.write"]),
@@ -313,12 +320,10 @@ async def test_roster_marks_the_vote_and_the_keeper_right() -> None:
     }
 
 
-# A ballot marks the voter present.
-
-
 async def test_cast_marks_a_member_without_record_present(
     audit_calls: list[dict[str, Any]],
 ) -> None:
+    """A ballot marks the voter present."""
     meeting = _meeting("live")
     me = _member("me")
     db = fake_session(result(meeting), result(me), result(None), result())
