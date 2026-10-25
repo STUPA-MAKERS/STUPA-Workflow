@@ -24,7 +24,7 @@
         (pointerdown)="onPagerTouch()"
       >
         @for (col of columns(); track col.id) {
-          <div class="bv__page" appScrollFade="y" [class.bv__page--empty]="!list(col).length">
+          <div class="bv__page" [class.bv__page--empty]="!list(col).length">
             <div class="bv__phoneCards" role="list" [attr.aria-label]="col.name">
               @for (card of list(col); track card.id) {
                 <app-todo-card-tile

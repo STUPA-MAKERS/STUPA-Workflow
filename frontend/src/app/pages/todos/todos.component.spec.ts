@@ -1702,9 +1702,10 @@ describe('TodosComponent', () => {
         expect(cmp.phoneList()).toBe(false);
         expect(harness.routeNativeElement!.querySelector('.bv--phone')).not.toBeNull();
         // A pane page: on the phone it pulls the foot gap of the main column back, so the
-        // pages reach the bottom bar; each page fades at an end with more cards past it.
+        // pages reach the bottom bar; a page does not fade, the tab line and the bottom bar
+        // cut it.
         expect(document.querySelector('app-todos')).toHaveClass('pane-page');
-        expect(harness.routeNativeElement!.querySelector('.bv__page')).toHaveAttribute('appScrollFade', 'y');
+        expect(harness.routeNativeElement!.querySelector('.bv__page')).not.toHaveAttribute('appScrollFade');
         TestBed.resetTestingModule();
         const list = await start('/todos/b-0?view=list', { board: personal() });
         expect(list.cmp.phoneList()).toBe(false);

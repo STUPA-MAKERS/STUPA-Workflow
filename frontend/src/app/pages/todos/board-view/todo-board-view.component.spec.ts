@@ -408,7 +408,7 @@ describe('TodoBoardViewComponent', () => {
 
     it('asks for the "Verschieben" sheet on a long press and does not open the card', async () => {
       const { on, container } = await setup(board(), { phone: true });
-      expect(container.querySelector('.bv__page')).toHaveAttribute('appScrollFade', 'y');
+      expect(container.querySelector('.bv__page')).not.toHaveAttribute('appScrollFade');
       jest.useFakeTimers();
       try {
         press('Raum buchen');
