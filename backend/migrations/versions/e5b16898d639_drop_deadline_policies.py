@@ -37,7 +37,7 @@ their schema so that the chain round-trips. It does not restore the guards, the
 the deadlines.
 
 Revision ID: e5b16898d639
-Revises: e029878bed05
+Revises: b7c41e9a2f53
 Create Date: 2026-10-25 10:00:00.000000
 """
 
@@ -51,7 +51,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "e5b16898d639"
-down_revision: str | None = "e029878bed05"
+down_revision: str | None = "b7c41e9a2f53"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
