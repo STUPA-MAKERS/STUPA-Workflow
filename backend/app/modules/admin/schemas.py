@@ -9,7 +9,7 @@ definitions come from the ``config_schemas`` models. The branding model is
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -376,7 +376,7 @@ class ApplicationTypeOut(_CamelModel):
     key: str
     name_i18n: I18nMap = Field(serialization_alias="nameI18n")
     has_budget: bool = Field(serialization_alias="hasBudget")
-    comparison_offers: dict | None = Field(serialization_alias="comparisonOffers")
+    comparison_offers: dict[Any, Any] | None = Field(serialization_alias="comparisonOffers")
     retention_months: int | None = Field(default=None, serialization_alias="retentionMonths")
     active_form_version_id: UUID | None = Field(
         serialization_alias="activeFormVersionId"

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import or_, select
@@ -78,7 +78,7 @@ class BudgetTreeServiceBase:
         *,
         target_type: str,
         target_id: str,
-        data: dict | None = None,
+        data: dict[str, Any] | None = None,
     ) -> None:
         """Write the audit entry inside the running transaction.
 

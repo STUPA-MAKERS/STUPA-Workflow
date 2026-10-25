@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     BigInteger,
@@ -154,10 +155,10 @@ class GremiumRole(UUIDPkMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
     key: Mapped[str] = mapped_column(Text)
-    name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     #: Granular meeting-domain permissions of this role, as a list of keys:
     #: session.manage, vote.manage, vote.cast, protocol.write, protocol.finalize.
-    permissions: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    permissions: Mapped[list[str]] = mapped_column(JSONB, server_default="[]")
 
     __table_args__ = (
         UniqueConstraint("gremium_id", "key", name="uq_gremium_role_gremium_key"),
@@ -291,9 +292,9 @@ class ApplicationType(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("gremium.id", ondelete="CASCADE"), nullable=True
     )
     key: Mapped[str] = mapped_column(Text, unique=True)
-    name_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    name_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     has_budget: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    comparison_offers: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    comparison_offers: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     #: GDPR retention in months until the anonymization. NULL = the global default
     #: ``privacy_settings.default_retention_months``.
     retention_months: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -336,7 +337,7 @@ class WebhookDelivery(UUIDPkMixin, Base):
         ForeignKey("webhook.id", ondelete="CASCADE")
     )
     event: Mapped[str] = mapped_column(Text)
-    payload: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    payload: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     status: Mapped[str] = mapped_column(Text, server_default="pending")
     attempts: Mapped[int] = mapped_column(Integer, server_default="0")
     idempotency_key: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -377,7 +378,7 @@ class SiteConfigVersion(UUIDPkMixin, CreatedAtMixin, Base):
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    branding: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    branding: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         UniqueConstraint("version", name="uq_site_config_version_version"),

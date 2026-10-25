@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     DateTime,
@@ -40,7 +41,7 @@ class ConfigRevision(Base):
     #: UUID string (form: application_type_id) or 'global' (flow/site_config).
     entity_id: Mapped[str] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer)
-    snapshot: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     #: Predecessor snapshot of the same entity (NULL = first state).
     prev_revision_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("config_revision.id", ondelete="RESTRICT"), nullable=True

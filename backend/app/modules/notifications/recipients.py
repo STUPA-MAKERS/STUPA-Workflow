@@ -111,7 +111,7 @@ def principal_rows_with_permission_stmt(
     now: datetime,
     *,
     gremium_id: uuid.UUID | None = None,
-) -> Select[uuid.UUID, str, str | None, list | None]:
+) -> Select[uuid.UUID, str, str | None, list[str] | None]:
     """Select the identity rows of the permission holders.
 
     The WHERE clauses match the mail statement. The projection

@@ -153,7 +153,7 @@ class AgendaService:
             },
         )
 
-    async def _state_labels(self, state_ids: set[UUID]) -> dict[UUID, dict]:
+    async def _state_labels(self, state_ids: set[UUID]) -> dict[UUID, dict[str, Any]]:
         """Return the label of each state, for the assignable list."""
         if not state_ids:
             return {}

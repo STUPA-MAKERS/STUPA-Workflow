@@ -1351,7 +1351,7 @@ async def test_oidc_callback_email_verified_bootstrap(
     monkeypatch.setattr(service, "sync_principal_memberships", _sync)
 
     db = fake_session(result())
-    cookie, row = await service.oidc_callback(
+    cookie, _row = await service.oidc_callback(
         db, settings, code="c", verifier="v", nonce="n"
     )
     assert cookie

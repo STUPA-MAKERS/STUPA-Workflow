@@ -10,6 +10,7 @@ turns into the namespaced `vote:` key.
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,7 +87,7 @@ async def resolve_principal(db: AsyncSession, row: PrincipalRow, now: datetime) 
         for g in (str(raw) for raw in (row.oidc_groups or []))
         if not g.startswith(VOTE_GROUP_PREFIX)
     }
-    role_ids: set = set()
+    role_ids: set[UUID] = set()
 
     assignments = (
         await db.execute(

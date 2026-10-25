@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from fnmatch import fnmatchcase
 from typing import Protocol
@@ -117,7 +117,7 @@ class InMemoryBroker:
         self._hub.fan_out(channel, message)
 
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncIterator[_QueueSubscription]:
+    async def subscribe(self, channel: str) -> AsyncGenerator[_QueueSubscription]:
         """Subscribe to one channel for the duration of the block."""
         queue = self._hub.register(channel)
         try:
@@ -126,7 +126,7 @@ class InMemoryBroker:
             self._hub.unregister(channel, queue)
 
     @asynccontextmanager
-    async def subscribe_pattern(self, pattern: str) -> AsyncIterator[_QueueSubscription]:
+    async def subscribe_pattern(self, pattern: str) -> AsyncGenerator[_QueueSubscription]:
         """Subscribe to every channel that matches a glob pattern for the block."""
         queue = self._hub.register_pattern(pattern)
         try:
@@ -166,7 +166,7 @@ class RedisBroker:
         await self._client.publish(channel, json.dumps(message))  # type: ignore[attr-defined]
 
     @asynccontextmanager
-    async def subscribe(self, channel: str) -> AsyncIterator[_RedisSubscription]:
+    async def subscribe(self, channel: str) -> AsyncGenerator[_RedisSubscription]:
         """Subscribe to one channel for the duration of the block."""
         pubsub = self._client.pubsub()  # type: ignore[attr-defined]
         await pubsub.subscribe(channel)
@@ -177,7 +177,7 @@ class RedisBroker:
             await pubsub.aclose()
 
     @asynccontextmanager
-    async def subscribe_pattern(self, pattern: str) -> AsyncIterator[_RedisSubscription]:
+    async def subscribe_pattern(self, pattern: str) -> AsyncGenerator[_RedisSubscription]:
         """Subscribe to every channel that matches a glob pattern for the block."""
         pubsub = self._client.pubsub()  # type: ignore[attr-defined]
         await pubsub.psubscribe(pattern)

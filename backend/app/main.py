@@ -14,7 +14,7 @@ MCP clients a fallback. The module-level ``app`` serves uvicorn (``app.main:app`
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI
@@ -151,7 +151,7 @@ async def _bootstrap_admins_on_startup(settings: Settings) -> None:  # pragma: n
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     """Open and close the shared clients of the app.
 
     The arq pool (mail and scan jobs) and the object storage are best effort: without Redis

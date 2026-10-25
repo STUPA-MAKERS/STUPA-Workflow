@@ -150,7 +150,7 @@ def _app(state_id: object, *, budget_id: UUID | None = None) -> Any:
     )
 
 
-def _t(app: Any, to_id: UUID, *, actions: list | None = None, automatic: bool = False) -> Any:
+def _t(app: Any, to_id: UUID, *, actions: list[Any] | None = None, automatic: bool = False) -> Any:
     return SimpleNamespace(
         id=uuid4(), flow_version_id=app.flow_version_id, from_state_id=app.current_state_id,
         to_state_id=to_id, label_i18n={}, color=None, guard=None,

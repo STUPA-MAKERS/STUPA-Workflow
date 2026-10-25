@@ -5,6 +5,7 @@ Exactly one global flow exists for all application types.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select, update
@@ -89,7 +90,7 @@ class FlowOps(ConfigServiceBase):
         actor: str,
         *,
         action: AuditAction = AuditAction.CONFIG_ACTIVATION,
-        extra_data: dict | None = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> FlowVersionOut:
         """Save the global flow as a new, immutable version.
 

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Protocol
 
@@ -35,7 +35,7 @@ class InMemoryLocker:
         self._locks: dict[str, asyncio.Lock] = {}
 
     @asynccontextmanager
-    async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
+    async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncGenerator[bool]:
         """Hold the process-local lock of the key for the block."""
         lock = self._locks.setdefault(key, asyncio.Lock())
         await lock.acquire()
@@ -68,7 +68,7 @@ class RedisLocker:
         self._client = client
 
     @asynccontextmanager
-    async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
+    async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncGenerator[bool]:
         """Hold the lock for the block and release it with a compare-and-set.
 
         An expiring TTL covers the crash case.

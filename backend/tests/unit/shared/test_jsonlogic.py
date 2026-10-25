@@ -1,5 +1,7 @@
 """Pure evaluator for the JsonLogic subset. Branch coverage 100 %."""
 
+from typing import Any
+
 import pytest
 
 from app.shared.jsonlogic import (
@@ -56,7 +58,7 @@ def test_var_non_string_path_raises() -> None:
         ({">": [1, 2]}, False),
     ],
 )
-def test_comparison_operators(expr: dict, expected: bool) -> None:
+def test_comparison_operators(expr: dict[str, Any], expected: bool) -> None:
     assert eval_jsonlogic(expr) is expected
 
 
@@ -119,7 +121,7 @@ def test_multi_key_operation_raises() -> None:
         {"in": ["x"]},
     ],
 )
-def test_arity_errors(expr: dict) -> None:
+def test_arity_errors(expr: dict[str, Any]) -> None:
     with pytest.raises(JsonLogicError):
         eval_jsonlogic(expr)
 

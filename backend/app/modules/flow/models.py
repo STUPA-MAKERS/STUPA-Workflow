@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -31,7 +32,7 @@ class FlowVersion(UUIDPkMixin, CreatedAtMixin, Base):
 
     version: Mapped[int] = mapped_column(Integer)
     active: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    editor_layout: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    editor_layout: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         UniqueConstraint("version"),
@@ -61,13 +62,13 @@ class State(UUIDPkMixin, Base):
         ForeignKey("flow_version.id", ondelete="CASCADE")
     )
     key: Mapped[str] = mapped_column(Text)
-    label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    label_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     edit_allowed: Mapped[bool] = mapped_column(Boolean, server_default="true")
     is_initial: Mapped[bool] = mapped_column(Boolean, server_default="false")
     is_terminal: Mapped[bool] = mapped_column(Boolean, server_default="false")
     kind: Mapped[str] = mapped_column(Text, server_default="normal")
-    config: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
     __table_args__ = (
         UniqueConstraint("flow_version_id", "key"),
@@ -105,10 +106,10 @@ class Transition(UUIDPkMixin, Base):
     to_state_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("state.id", ondelete="CASCADE")
     )
-    label_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    label_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
-    guard: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    actions: Mapped[list] = mapped_column(JSONB, server_default="[]")
+    guard: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    actions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default="[]")
     order: Mapped[int] = mapped_column("order", Integer, server_default="0")
     automatic: Mapped[bool] = mapped_column(Boolean, server_default="false")
     branch: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Any
 
@@ -19,7 +19,7 @@ from worker.main import WorkerSettings
 
 def _maker() -> Any:
     @asynccontextmanager
-    async def _session() -> AsyncIterator[object]:
+    async def _session() -> AsyncGenerator[object]:
         yield object()
 
     return _session

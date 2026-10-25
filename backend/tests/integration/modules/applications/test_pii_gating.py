@@ -14,6 +14,7 @@ from __future__ import annotations
 import io
 import uuid
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -71,13 +72,13 @@ async def _world(
     return seed, app_id
 
 
-def _detail(api: FastAPI, app_id: uuid.UUID) -> dict:
+def _detail(api: FastAPI, app_id: uuid.UUID) -> dict[str, Any]:
     body = get_json(api, f"/api/applications/{app_id}")
     assert isinstance(body, dict)
     return body
 
 
-def _versions(api: FastAPI, app_id: uuid.UUID) -> list:
+def _versions(api: FastAPI, app_id: uuid.UUID) -> list[Any]:
     body = get_json(api, f"/api/applications/{app_id}/versions")
     assert isinstance(body, list)
     return body

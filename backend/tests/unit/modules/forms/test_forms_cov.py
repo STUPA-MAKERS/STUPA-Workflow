@@ -113,7 +113,7 @@ def _app_type(
 
 
 def _form_version(
-    *, version: int = 1, active: bool = True, description: dict | None = None
+    *, version: int = 1, active: bool = True, description: dict[str, Any] | None = None
 ) -> FormVersion:
     fv = FormVersion(
         application_type_id=uuid.uuid4(),
@@ -130,12 +130,12 @@ def _form_field_row(
     type_: str,
     *,
     order: int = 0,
-    label: dict | None = None,
+    label: dict[str, Any] | None = None,
     required: bool = False,
-    validation: dict | None = None,
-    options: list[dict] | None = None,
-    visible_if: dict | None = None,
-    compute: dict | None = None,
+    validation: dict[str, Any] | None = None,
+    options: list[dict[str, Any]] | None = None,
+    visible_if: dict[str, Any] | None = None,
+    compute: dict[str, Any] | None = None,
     is_promoted: bool = False,
     promote_target: str | None = None,
 ) -> FormField:

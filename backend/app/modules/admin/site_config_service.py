@@ -16,7 +16,7 @@ scanner in production with 503.
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +62,11 @@ DEFAULT_APP_SHORT_NAME = "STUPA"
 MANIFEST_COLORS: dict[str, str] = {"light": "#e6e9e5", "dark": "#262a27"}
 
 #: The icon of a manifest shortcut: the app icon at 96 px, the size that Android asks for.
-_SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type": "image/png"}
+_SHORTCUT_ICON: dict[str, Any] = {
+    "src": "icons/icon-96x96.png",
+    "sizes": "96x96",
+    "type": "image/png",
+}
 
 #: The static manifest fields, that is everything except name and short_name.
 #: They are the single source of truth for the PWA manifest that the API serves.
@@ -70,7 +74,7 @@ _SHORTCUT_ICON: dict = {"src": "icons/icon-96x96.png", "sizes": "96x96", "type":
 #: The shortcut names are German like ``lang`` and equal those of
 #: ``frontend/public/manifest.webmanifest``. ``launch_handler`` opens an app link in
 #: the running app, not in a second window.
-_MANIFEST_BASE: dict = {
+_MANIFEST_BASE: dict[str, Any] = {
     "description": (
         "Antragsplattform des Studierendenparlaments — Anträge, Abstimmungen, "
         "Sitzungsprotokolle und Budget."
@@ -218,7 +222,7 @@ class SiteConfigService:
         actor: str,
         *,
         action: AuditAction = AuditAction.CONFIG_CHANGE,
-        extra_data: dict | None = None,
+        extra_data: dict[str, Any] | None = None,
     ) -> SiteConfigOut:
         """Replay a branding config as the new active version (restore or revert).
 
@@ -321,7 +325,7 @@ class SiteConfigService:
         await self.session.commit()
         return _help_tickets_of(branding)
 
-    async def manifest(self, scheme: Literal["light", "dark"] = "light") -> dict:
+    async def manifest(self, scheme: Literal["light", "dark"] = "light") -> dict[str, Any]:
         """Build the PWA manifest from the active branding config.
 
         ``name`` and ``short_name`` come from the config. An empty value falls
@@ -338,7 +342,7 @@ class SiteConfigService:
         }
 
 
-def _with_help_tickets_of(branding: Branding, source: Branding) -> dict:
+def _with_help_tickets_of(branding: Branding, source: Branding) -> dict[str, Any]:
     """Dump ``branding`` with ``help`` and ``tickets`` taken from ``source``."""
     return branding.model_copy(update={"help": source.help, "tickets": source.tickets}).model_dump(
         by_alias=True

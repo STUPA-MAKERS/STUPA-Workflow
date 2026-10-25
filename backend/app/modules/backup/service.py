@@ -23,7 +23,7 @@ import logging
 import os
 import tarfile
 import tempfile
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Generator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -86,7 +86,7 @@ def libpq_dsn(database_url: str) -> str:
 
 
 @contextmanager
-def temp_file(suffix: str) -> Iterator[IO[bytes]]:
+def temp_file(suffix: str) -> Generator[IO[bytes]]:
     """Open a named temporary file that is removed on the way out.
 
     The removal ignores an ``OSError``, because the file can already be gone.
@@ -101,7 +101,7 @@ def temp_file(suffix: str) -> Iterator[IO[bytes]]:
 
 
 @contextmanager
-def _open_staged(staged: list[tuple[str, Path]]) -> Iterator[list[tuple[str, IO[bytes]]]]:
+def _open_staged(staged: list[tuple[str, Path]]) -> Generator[list[tuple[str, IO[bytes]]]]:
     """Open every staged object for reading and close them all on the way out."""
     handles: list[tuple[str, IO[bytes]]] = []
     try:

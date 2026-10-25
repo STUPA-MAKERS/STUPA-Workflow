@@ -78,7 +78,9 @@ def _audits(db: Any) -> list[Any]:
     return [a for a in db.added if type(a).__name__ == "AuditEntry"]
 
 
-def _stored(choices: list[str | None], config: dict[str, Any], *, round_: int = 1) -> dict:
+def _stored(
+    choices: list[str | None], config: dict[str, Any], *, round_: int = 1
+) -> dict[str, Any]:
     outcome = tally_election(choices, ElectionConfig.model_validate(config), 10, round_=round_)
     return result_of(outcome).model_dump(mode="json", by_alias=True)
 
