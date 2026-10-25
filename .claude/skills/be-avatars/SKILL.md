@@ -38,7 +38,7 @@ the public `/api/site-config` carries it, so the frontend does not ask when it i
 
 **Conventions & gotchas:**
 - The URL is never user input: constant host, hex hash, bucketed size. The SSRF guard still
-  runs (`webhooks.ssrf.assert_allowed_url` with allowlist `gravatar.com`, then `pin_url`),
+  runs (`app.shared.ssrf.assert_allowed_url` with allowlist `gravatar.com`, then `pin_url`),
   against a DNS answer that points at an internal address.
 - Never pass Gravatar's headers or its `Content-Type` on. The type comes from the sniffed
   bytes; anything else is a miss.

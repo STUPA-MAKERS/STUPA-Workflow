@@ -7,9 +7,14 @@ from collections.abc import AsyncIterator
 
 import pytest
 
+from app.modules.files import scanner as scanner_mod
+from app.modules.files.scanner import ScanVerdict
 from app.modules.files.storage import StorageError
+from app.modules.media import service as service_mod
+from app.modules.media.images import CleanImage
 from app.modules.media.models import image_storage_key
 from app.modules.media.service import MediaService, render_asset_name
+from app.settings import Settings, load_settings
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,
@@ -65,6 +70,39 @@ async def test_upload_of_no_image_is_415(data: bytes) -> None:
 async def test_upload_whose_result_is_too_large_is_413() -> None:
     with pytest.raises(PayloadTooLargeError):
         await _service(storage=MediaStorage(), max_bytes=10).upload(encode("PNG"))
+
+
+class _InfectedScanner:
+    async def scan(self, data: bytes) -> ScanVerdict:
+        return ScanVerdict(clean=False, signature="Eicar-Test-Signature")
+
+
+async def test_upload_scans_the_client_bytes_before_the_decode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _infected(_settings: Settings) -> _InfectedScanner:
+        return _InfectedScanner()
+
+    def _never(_data: bytes) -> CleanImage:
+        raise AssertionError("an infected upload must not reach the decode")
+
+    monkeypatch.setattr(scanner_mod, "build_scanner", _infected)
+    monkeypatch.setattr(service_mod, "clean_image", _never)
+    session, storage = MediaSession(), MediaStorage()
+    with pytest.raises(UnsupportedMediaTypeError, match="Eicar-Test-Signature"):
+        await _service(session, storage).upload(encode("PNG"))
+    assert storage.objects == {}
+    assert session.rows == {}
+
+
+async def test_upload_without_scanner_in_production_is_503() -> None:
+    service = MediaService(
+        MediaSession(),  # pyright: ignore[reportArgumentType]
+        storage=MediaStorage(),  # pyright: ignore[reportArgumentType]
+        settings=load_settings(environment="production"),
+    )
+    with pytest.raises(ServiceUnavailableError, match="Virus scan"):
+        await service.upload(encode("PNG"))
 
 
 async def test_open_streams_the_image() -> None:

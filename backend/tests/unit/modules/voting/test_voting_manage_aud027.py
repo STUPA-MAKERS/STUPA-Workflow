@@ -18,7 +18,7 @@ import pytest
 
 from app.modules.admin import gremium_roles as gremium_roles_mod
 from app.modules.auth.principal import Principal
-from app.modules.voting.service import VotingService
+from app.modules.voting.service import VotingService, manages_votes_in_gremium
 from app.shared.errors import ForbiddenError
 from tests._support.flow_fakes import fake_session, result
 
@@ -164,3 +164,30 @@ async def test_assert_can_manage_vote_loads_then_checks() -> None:
     await VotingService(fake_session(result(vote))).assert_can_manage_vote(
         vote.id, principal
     )
+
+
+async def test_manage_admin_standalone_gremium_vote_ok(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The gremium rule admits the admin role without a gremium role (admin bypass)."""
+    _patch_permitted(monkeypatch, set())
+    principal = Principal(sub="a", roles=["admin"])
+    await VotingService(fake_session()).assert_can_manage_group(
+        str(uuid4()), None, principal
+    )
+
+
+async def test_gremium_rule_admin_token_scope_capped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`manages_votes_in_gremium` caps the admin bypass and the roles by the scope."""
+    gid = uuid4()
+    _patch_permitted(monkeypatch, set())
+    votes_token = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"vote.manage"})
+    )
+    read_token = Principal(
+        sub="a", roles=["admin"], scope_permissions=frozenset({"application.read"})
+    )
+    assert await manages_votes_in_gremium(fake_session(), gid, votes_token) is True
+    assert await manages_votes_in_gremium(fake_session(), gid, read_token) is False

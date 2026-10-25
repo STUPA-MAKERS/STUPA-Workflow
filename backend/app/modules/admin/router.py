@@ -137,8 +137,8 @@ def get_config_service(session: DbSession, request: Request) -> ConfigService:
     return ConfigService(session, storage=getattr(request.app.state, "object_storage", None))
 
 
-def get_site_config_service(session: DbSession) -> SiteConfigService:
-    return SiteConfigService(session)
+def get_site_config_service(session: DbSession, settings: SettingsDep) -> SiteConfigService:
+    return SiteConfigService(session, settings=settings)
 
 
 def get_gremium_role_service(session: DbSession) -> GremiumRoleService:
@@ -159,11 +159,13 @@ def get_principal_revoke_service(
     return PrincipalRevokeService(session, settings)
 
 
-def get_cd_variant_service(session: DbSession, request: Request) -> CdVariantService:
+def get_cd_variant_service(
+    session: DbSession, request: Request, settings: SettingsDep
+) -> CdVariantService:
     # Only the logo upload and download touch the object storage. Without MinIO
     # (development, contract CI) those two routes answer 503.
     storage = getattr(request.app.state, "object_storage", None)
-    return CdVariantService(session, storage=storage)
+    return CdVariantService(session, storage=storage, settings=settings)
 
 
 ServiceDep = Annotated[ConfigService, Depends(get_config_service)]

@@ -86,13 +86,49 @@ def test_csrf_write_with_mismatched_token_forbidden() -> None:
     assert resp.status_code == 403
 
 
-def test_csrf_bearer_request_exempt() -> None:
-    """CSRF cannot forge a Bearer-token request, so it stays exempt even with a cookie."""
+def test_csrf_principal_bearer_request_exempt() -> None:
+    """A principal access token authenticates instead of the cookie, so it stays exempt."""
+    s = _settings()
+    client = _csrf_app(s)
+    client.cookies.set(s.session_cookie_name, "sess")
+    resp = client.post("/w", headers={"Authorization": "Bearer apat_abc"})
+    assert resp.status_code == 200
+
+
+def test_csrf_other_bearer_with_auth_cookie_forbidden() -> None:
+    """A bearer that is no principal token leaves the cookie to authenticate: check CSRF."""
     s = _settings()
     client = _csrf_app(s)
     client.cookies.set(s.session_cookie_name, "sess")
     resp = client.post("/w", headers={"Authorization": "Bearer abc"})
+    assert resp.status_code == 403
+    assert resp.json()["code"] == "csrf_failed"
+
+
+def test_csrf_other_bearer_with_auth_cookie_and_token_allowed() -> None:
+    s = _settings()
+    client = _csrf_app(s)
+    client.cookies.set(s.applicant_cookie_name, "app")
+    client.cookies.set(s.csrf_cookie_name, "tok")
+    resp = client.post(
+        "/w", headers={"Authorization": "Bearer abc", s.csrf_header_name: "tok"}
+    )
     assert resp.status_code == 200
+
+
+def test_csrf_applicant_bearer_without_cookie_allowed() -> None:
+    """A magic-link bearer without an auth cookie has nothing to protect."""
+    s = _settings()
+    resp = _csrf_app(s).post("/w", headers={"Authorization": "Bearer some.signed.sid"})
+    assert resp.status_code == 200
+
+
+def test_csrf_non_bearer_authorization_with_cookie_forbidden() -> None:
+    s = _settings()
+    client = _csrf_app(s)
+    client.cookies.set(s.session_cookie_name, "sess")
+    resp = client.post("/w", headers={"Authorization": "Basic apat_abc"})
+    assert resp.status_code == 403
 
 
 def test_csrf_cookie_issued_on_safe_request() -> None:

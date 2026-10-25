@@ -1,6 +1,6 @@
 ---
 name: be-media
-description: Markdown images — upload, clean and serve the images of the Markdown texts (protocol TOPs, to-do cards, chat messages). One canonical reference `![alt](/api/media/images/<uuid>)`; Pillow re-encode (EXIF/GPS stripped, ≤ 2400 px, same format), no ClamAV pass; table markdown_image (no uploader column); routes POST/GET /api/media/images and the public GET /api/public/protocols/{id}/images/{image_id}; the protocol render sends the images to typst as `img-<uuid>.<ext>` assets within a budget. Use when working on image upload, the canonical image path, image headers, MarkdownImage, MediaService, render_assets, or images in the protocol PDF in backend/app/modules/media.
+description: Markdown images — upload, clean and serve the images of the Markdown texts (protocol TOPs, to-do cards, chat messages). One canonical reference `![alt](/api/media/images/<uuid>)`; ClamAV scan of the client bytes before the decode, then a Pillow re-encode (EXIF/GPS stripped, ≤ 2400 px, same format); table markdown_image (no uploader column); routes POST/GET /api/media/images and the public GET /api/public/protocols/{id}/images/{image_id}; the protocol render sends the images to typst as `img-<uuid>.<ext>` assets within a budget. Use when working on image upload, the canonical image path, image headers, MarkdownImage, MediaService, render_assets, or images in the protocol PDF in backend/app/modules/media.
 ---
 
 # Media — `backend/app/modules/media`
@@ -62,9 +62,12 @@ images of a protocol for the typst render.
   `X-Robots-Tag: noindex` of every `/api/public/` answer.
 
 **Conventions & gotchas:**
-- **No ClamAV pass, on purpose.** The stored bytes come from Pillow, never from the
-  client, so a polyglot or a payload in a metadata block does not survive. Do not
-  store the upload bytes "as is" for any format, and never add SVG.
+- **Scan first, then re-encode.** `upload` calls `files.scanner.scan_or_raise` on the
+  client bytes before Pillow decodes them (infected 415, scanner missing or failed in
+  production 503, skipped without a scanner outside production). The stored bytes
+  come from Pillow, never from the client, so a polyglot or a payload in a metadata
+  block does not survive. Do not store the upload bytes "as is" for any format, and
+  never add SVG.
 - **No uploader column.** A principal FK would pull the table into the account merge
   and the erasure. The id is a random uuid4; reading needs a session on top. The
   backup mirrors the image objects with the attachment bucket.

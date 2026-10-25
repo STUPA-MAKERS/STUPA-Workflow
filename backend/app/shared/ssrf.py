@@ -1,4 +1,4 @@
-"""SSRF guard for webhook targets.
+"""SSRF guard for outgoing HTTP requests: webhook targets and the Gravatar fetch.
 
 The guard checks the target before every send. It accepts only the `http` scheme and the
 `https` scheme. It applies the optional host allowlist. As the core check it then looks
@@ -7,10 +7,12 @@ link-local, multicast, reserved and unspecified. This also covers the metadata I
 `169.254.169.254`, which is link-local. The guard unwraps an IPv4-in-IPv6 mapping such
 as `::ffff:a.b.c.d` before the check.
 
-DNS rebinding: the worker resolves the host at send time, right before the POST. The
+DNS rebinding: the caller resolves the host at send time, right before the request. The
 guard checks every A record and AAAA record that comes back. One internal record blocks
-the send. A residual TOCTOU between resolution and connect stays, because httpx resolves
-again. The egress policy of the worker is the second line of defense.
+the send. The caller then connects through ``pin_url`` to a checked IP, with the original
+host in the ``Host`` header and the TLS SNI. The client therefore does not resolve again,
+and no TOCTOU between the check and the connect stays. The egress policy of the worker
+is the second line of defense.
 """
 
 from __future__ import annotations

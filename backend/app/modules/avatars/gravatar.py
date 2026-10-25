@@ -23,7 +23,7 @@ from typing import Literal, Protocol
 
 import httpx
 
-from app.modules.webhooks.ssrf import (
+from app.shared.ssrf import (
     Resolver,
     SsrfError,
     assert_allowed_url,

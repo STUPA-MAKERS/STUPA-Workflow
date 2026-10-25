@@ -27,6 +27,7 @@ from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.schemas import MeetingOut, MeetingVoteOut
 from app.modules.livevote.service.service_base import MeetingServiceBase
+from app.modules.voting.service import manages_votes_in_gremium
 from app.shared.errors import ForbiddenError
 
 
@@ -132,14 +133,16 @@ class PermissionOps(MeetingServiceBase):
             raise ForbiddenError("only the protokollant may open or close a vote")
 
     async def can_manage_votes(self, meeting: Meeting, principal: Principal) -> bool:
-        """Check who opens and closes votes: manager, protokollant, or `vote.manage`.
+        """Check who manages the votes of a meeting: manager, gremium rule, protokollant.
 
-        The admin role bypasses the gremium check. That keeps this rule equal to
-        the `admin_bypass(principal, "vote.manage")` gate of
-        `VotingService.can_manage_group` and to the batched flags of the meeting
-        list. The protokollant path, the gremium role, and the admin bypass are
-        scope-capped: through them, a token without `vote.manage` in its scope cannot
-        manage votes.
+        The meeting rule adds the session lead (`can_manage`) and the protokollant to
+        the gremium rule of vote management (`voting.service.manages_votes_in_gremium`:
+        the admin role or a gremium role with `vote.manage` or `session.manage`).
+        `VotingService.can_manage_group` asks this method for a meeting-bound vote, so
+        the enforced right equals the advertised `canManageVotes` flag. The batched
+        flags of the meeting list (`ListingOps`) compute the same union. The
+        protokollant path, the gremium role, and the admin bypass are scope-capped:
+        through them, a token without `vote.manage` in its scope cannot manage votes.
 
         The manager path needs only `session.manage`. The meeting lead includes
         vote management and the agenda-item change, so a `meetings:write` token
@@ -147,14 +150,10 @@ class PermissionOps(MeetingServiceBase):
         """
         if await self.can_manage(meeting.gremium_id, principal):
             return True
-        if admin_bypass(principal, "vote.manage"):
+        if await manages_votes_in_gremium(self.session, meeting.gremium_id, principal):
             return True
-        if principal.scope_allows("vote.manage") and await self._is_protokollant(
+        return principal.scope_allows("vote.manage") and await self._is_protokollant(
             meeting, principal
-        ):
-            return True
-        return meeting.gremium_id in await gremium_ids_for(
-            self.session, principal, "vote.manage"
         )
 
     async def can_finalize(self, meeting: Meeting, principal: Principal) -> bool:

@@ -7,7 +7,11 @@ allows at most one active version. Inactive rows from the time of the draft stay
 as history and are never read as a draft.
 
 ``admin.branding.Branding`` validates the branding. A logo must be an image and
-inline SVG is not allowed. Invalid branding fails with 422.
+inline SVG is not allowed. Invalid branding fails with 422. Every write of a
+branding from a request (save, restore, revert) scans each inline logo with ClamAV
+before the store (``files.scanner.scan_or_raise``), because the stored bytes are the
+bytes of the client: an infected logo fails with 415, and a missing or failed
+scanner in production with 503.
 """
 
 from __future__ import annotations
@@ -39,7 +43,8 @@ from app.modules.config_revision.service import (
     GLOBAL_ID,
     ConfigRevisionService,
 )
-from app.settings import get_settings
+from app.modules.files.scanner import scan_or_raise
+from app.settings import Settings, get_settings
 
 # Fallback app names for the case where the config leaves them empty. They match the
 # defaults in ``frontend/public/manifest.webmanifest``.
@@ -156,10 +161,28 @@ async def active_branding(session: AsyncSession) -> Branding:
 
 
 class SiteConfigService:
-    """Site-config operations bound to an ``AsyncSession``."""
+    """Site-config operations bound to an ``AsyncSession``.
 
-    def __init__(self, session: AsyncSession) -> None:
+    Without explicit settings the logo scan reads ``get_settings()``, so the scan
+    never falls back to a skip.
+    """
+
+    def __init__(self, session: AsyncSession, *, settings: Settings | None = None) -> None:
         self.session = session
+        self.settings = settings
+
+    async def _scan_logos(self, branding: Branding) -> None:
+        """Scan every inline logo of the branding before the store.
+
+        Raises:
+            UnsupportedMediaTypeError: The virus scan found a signature (415).
+            ServiceUnavailableError: The virus scan is unavailable in production (503).
+        """
+        settings = self.settings or get_settings()
+        for asset in branding.logos.values():
+            data = asset.inline_bytes()
+            if data is not None:
+                await scan_or_raise(data, settings)
 
     async def _active(self) -> SiteConfigVersion | None:
         return (
@@ -207,8 +230,10 @@ class SiteConfigService:
         the values of the active version, because the "Hilfe & Tickets" page is
         their only writer: a restore of an older snapshot would otherwise bring
         back its ticket settings, or the defaults (``publicEnabled=true``) for a
-        snapshot without them.
+        snapshot without them. The inline logos pass the virus scan first
+        (``_scan_logos``).
         """
+        await self._scan_logos(branding)
         latest = await self._latest()
         base = latest.version if latest is not None else 0
         payload = _with_help_tickets_of(branding, _branding(await self._active()))
