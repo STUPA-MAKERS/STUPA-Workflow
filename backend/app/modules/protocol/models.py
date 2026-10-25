@@ -30,14 +30,17 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, TimestampMixin, UUIDPkMixin
 
-# Lifecycle: draft → rendering → final. In `rendering` the finalize step ran
-# and the worker renders in the background. A render that fails permanently
-# falls back to `draft`.
+#: Lifecycle: draft → rendering → final. In `rendering` the finalize step ran
+#: and the worker renders in the background. A render that fails permanently
+#: falls back to `draft`.
 PROTOCOL_STATUSES = ("draft", "rendering", "final")
 
 
 class Protocol(UUIDPkMixin, TimestampMixin, Base):
-    """Meeting minutes with the Markdown body and the finalization state."""
+    """Meeting minutes with the Markdown body and the finalization state.
+
+    One protocol exists per meeting, which makes POST .../protocol idempotent.
+    """
 
     __tablename__ = "protocol"
 
@@ -49,43 +52,45 @@ class Protocol(UUIDPkMixin, TimestampMixin, Base):
     )
     markdown: Mapped[str] = mapped_column(Text, server_default="")
     pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Redacted public variant, set only when an agenda item is non-public.
+    #: Redacted public variant, set only when an agenda item is non-public.
     public_pdf_storage_key: Mapped[str | None] = mapped_column(Text, nullable=True)
     author: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="draft")
     sent_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # CD-variant key of the gremium, snapshotted at creation. `stupa` and `asta`
-    # select the render variant `protocol-stupa` and `protocol-asta`.
+    #: CD-variant key of the gremium, snapshotted at creation. `stupa` and `asta`
+    #: select the render variant `protocol-stupa` and `protocol-asta`.
     cd_variant: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Public protocols page. `public_withheld` holds back this one protocol, also
-    # when its gremium publishes its protocols. `public_content` is the snapshot of
-    # the public version (public TOPs, decisions, attendance counts, never a name)
-    # that the public API serves. It is set together with the public PDF, so a
-    # protocol without it never appears publicly. `public_search_text` is the
-    # plain text of the public TOPs for the search. `public_pdf_size` is the byte
-    # size of the public PDF.
+    #: Public protocols page. `public_withheld` holds back this one protocol, also
+    #: when its gremium publishes its protocols. `public_content` is the snapshot of
+    #: the public version (public TOPs, decisions, attendance counts, never a name)
+    #: that the public API serves. It is set together with the public PDF, so a
+    #: protocol without it never appears publicly. `public_search_text` is the
+    #: plain text of the public TOPs for the search. `public_pdf_size` is the byte
+    #: size of the public PDF.
     public_withheld: Mapped[bool] = mapped_column(Boolean, server_default="false")
     public_content: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     public_search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     public_pdf_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Permanent failures of the public build. The hourly heal job skips a protocol
-    # after a few of them; a successful build resets the count.
+    #: Permanent failures of the public build. The hourly heal job skips a protocol
+    #: after a few of them; a successful build resets the count.
     public_render_failures: Mapped[int] = mapped_column(Integer, server_default="0")
 
     __table_args__ = (
         CheckConstraint(
             "status IN ('draft','rendering','final')", name="protocol_status"
         ),
-        # One protocol per meeting. This makes POST .../protocol idempotent.
         UniqueConstraint("meeting_id", name="uq_protocol_meeting"),
         Index("ix_protocol_gremium_id", "gremium_id"),
     )
 
 
 class ProtocolVoteRef(UUIDPkMixin, Base):
-    """Embedded vote of a protocol, the anchor of a snippet."""
+    """Embedded vote of a protocol, the anchor of a snippet.
+
+    A vote references a protocol at most once, so the embedding is idempotent.
+    """
 
     __tablename__ = "protocol_vote_ref"
 
@@ -97,7 +102,6 @@ class ProtocolVoteRef(UUIDPkMixin, Base):
     )
 
     __table_args__ = (
-        # Embedding is idempotent: a vote references a protocol at most once.
         UniqueConstraint("protocol_id", "vote_id", name="uq_protocol_vote_ref"),
         Index("ix_protocol_vote_ref_protocol_id", "protocol_id"),
     )

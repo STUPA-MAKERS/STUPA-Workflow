@@ -36,14 +36,17 @@ class SubBookingOps(ExpenseOps):
         ]
 
     async def _subbooking_parent_or_error(self, parent_id: UUID) -> BudgetExpense:
-        """Load the parent booking for sub-bookings and check its invariants."""
+        """Load the parent booking for sub-bookings and check its invariants.
+
+        A transfer booking cannot get sub-bookings, because it must keep its paired
+        amount, or the net sum of the transfer is no longer 0.
+        """
         parent = await self.session.get(BudgetExpense, parent_id)
         if parent is None:
             raise NotFoundError(f"budget expense {parent_id} not found")
         if parent.parent_expense_id is not None:
             raise ValidationProblem("Sub-bookings cannot be nested.", code="subbooking_nested")
         if parent.transfer_id is not None:
-            # A transfer booking must keep its paired amount (else net ≠ 0).
             raise ValidationProblem(
                 "A transfer booking cannot be split into sub-bookings.",
                 code="subbooking_on_transfer",

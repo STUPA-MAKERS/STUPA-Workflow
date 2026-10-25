@@ -28,9 +28,9 @@ class _CamelModel(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-# The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
-# election gives ``elected``, ``runoff`` (a runoff decides the open seats),
-# ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
+#: The result of a closed vote. A motion gives ``passed``/``rejected``/``tie``. An
+#: election gives ``elected``, ``runoff`` (a runoff decides the open seats),
+#: ``tie`` (the lot decides) or ``rejected`` (quorum missed, or nobody elected).
 VoteResultValue = Literal["passed", "rejected", "tie", "elected", "runoff"]
 VoteKind = Literal["motion", "election", "poll"]
 
@@ -68,7 +68,7 @@ class ElectionResultOut(_CamelModel):
     counts: dict[str, int]
     abstentions: int = 0
     ballots: int = 0
-    # Only the single-candidate ballot (Ja/Nein/Enthaltung).
+    #: Only the single-candidate ballot (Ja/Nein/Enthaltung).
     yes: int | None = None
     no: int | None = None
     elected: list[str] = Field(default_factory=list)
@@ -201,15 +201,15 @@ class VoteCreate(_CamelModel):
 
     config: VoteConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
-    # The resolution question, for the protocol.
+    #: The resolution question, for the protocol.
     question: str | None = None
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
-    # The decision proposal: approved amount and conditions. Only an application
-    # vote takes it. A passed vote writes it as the decision of the application.
+    #: The decision proposal: approved amount and conditions. Only an application
+    #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
 
 
@@ -220,25 +220,25 @@ class VoteCreateInternal(_CamelModel):
     gremium. The live-vote route builds it from the meeting. No client sends it.
     """
 
-    # A motion carries a VoteConfig, an election an ElectionConfig, a poll a
-    # PollConfig.
+    #: A motion carries a VoteConfig, an election an ElectionConfig, a poll a
+    #: PollConfig.
     config: VoteConfig | ElectionConfig | PollConfig
     eligible_group: UUID = Field(alias="eligibleGroup")
     question: str | None = None
-    # The election that a runoff continues, and its round.
+    #: The election that a runoff continues, and its round.
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = Field(default=1, ge=1)
-    # Authoritative eligible-voter count (roster basis) and the denominator of the
-    # percent quorum. It does NOT come from the logged-in users, because that would be
-    # fail-open. A percent quorum requires it. Without it the quorum stays fail-closed.
+    #: Authoritative eligible-voter count (roster basis) and the denominator of the
+    #: percent quorum. It does NOT come from the logged-in users, because that would be
+    #: fail-open. A percent quorum requires it. Without it the quorum stays fail-closed.
     eligible_count: int | None = Field(default=None, alias="eligibleCount", ge=0)
     opens_state_id: UUID | None = Field(default=None, alias="opensStateId")
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result_branch_transition_id: UUID | None = Field(
         default=None, alias="resultBranchTransitionId"
     )
-    # The decision proposal: approved amount and conditions. Only an application
-    # vote takes it. A passed vote writes it as the decision of the application.
+    #: The decision proposal: approved amount and conditions. Only an application
+    #: vote takes it. A passed vote writes it as the decision of the application.
     proposal: DecisionIn | None = None
 
     @model_validator(mode="after")
@@ -259,11 +259,11 @@ class BallotIn(_CamelModel):
     rights are two separate ballots.
     """
 
-    # A motion and the single-candidate election take one option. An election with
-    # several candidates takes the list of the chosen candidate ids (``[]`` = full
-    # abstention, at most ``seats`` ids, no id twice). A single or multi poll takes the
-    # list of the chosen option ids (``[]`` = abstention), a date poll one answer per
-    # option id (``{"o1": "yes", "o2": "maybe"}``).
+    #: A motion and the single-candidate election take one option. An election with
+    #: several candidates takes the list of the chosen candidate ids (``[]`` = full
+    #: abstention, at most ``seats`` ids, no id twice). A single or multi poll takes the
+    #: list of the chosen option ids (``[]`` = abstention), a date poll one answer per
+    #: option id (``{"o1": "yes", "o2": "maybe"}``).
     choice: str | list[str] | dict[str, DateAnswer]
     as_delegation: bool = Field(default=False, alias="asDelegation")
 
@@ -282,27 +282,27 @@ class TallyOut(_CamelModel):
 
     counts: dict[str, int]
     eligible: int
-    # Turnout progress (always visible, even when secret or hidden): how many present
-    # members have already voted.
+    #: Turnout progress (always visible, even when secret or hidden): how many present
+    #: members have already voted.
     voted: int = 0
     present: int = 0
-    # ``counts`` and ``leading`` are visible only when ``revealed``: the vote is closed,
-    # or the vote is not secret and all present members have voted. Otherwise they stay
-    # hidden.
+    #: ``counts`` and ``leading`` are visible only when ``revealed``: the vote is closed,
+    #: or the vote is not secret and all present members have voted. Otherwise they stay
+    #: hidden.
     revealed: bool = True
     quorum_met: bool = Field(alias="quorumMet")
     leading: str | None = None
     result: VoteResultValue | None = None
-    # Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
-    # quorum met but majority missed. It stays None while the vote is open, and on
-    # passed or tie.
+    #: Why the vote failed: ``quorum`` = quorum missed (fail-closed), ``majority`` =
+    #: quorum met but majority missed. It stays None while the vote is open, and on
+    #: passed or tie.
     failed_reason: Literal["quorum", "majority"] | None = Field(
         default=None, alias="failedReason"
     )
-    # Attendance of a meeting vote: the present members and the admitted guests.
-    # An open vote shows the values of now, a closed vote the values fixed at the
-    # close. None for a vote without a meeting and for a vote that closed before the
-    # values were stored.
+    #: Attendance of a meeting vote: the present members and the admitted guests.
+    #: An open vote shows the values of now, a closed vote the values fixed at the
+    #: close. None for a vote without a meeting and for a vote that closed before the
+    #: values were stored.
     present_members: int | None = Field(default=None, alias="presentMembers")
     present_guests: int | None = Field(default=None, alias="presentGuests")
 
@@ -317,10 +317,10 @@ class MyBallot(_CamelModel):
 
     cast: bool = False
     choice: str | None = None
-    # The chosen candidate ids of an open election ballot, and the chosen option
-    # ids of an open single or multi poll. None for a motion and for a secret vote.
+    #: The chosen candidate ids of an open election ballot, and the chosen option
+    #: ids of an open single or multi poll. None for a motion and for a secret vote.
     choices: list[str] | None = None
-    # The answers of an open date poll ballot. None otherwise.
+    #: The answers of an open date poll ballot. None otherwise.
     answers: dict[str, DateAnswer] | None = None
 
 
@@ -328,63 +328,63 @@ class VoteOut(_CamelModel):
     """Vote state + tally (``GET /votes/{id}``)."""
 
     id: UUID
-    # A None value marks a generic resolution question of a free-text agenda item with
-    # no application.
+    #: A None value marks a generic resolution question of a free-text agenda item with
+    #: no application.
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # The meeting that holds the vote (live vote). It is None for a pure async vote.
+    #: The meeting that holds the vote (live vote). It is None for a pure async vote.
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     agenda_item_id: UUID | None = Field(default=None, alias="agendaItemId")
     question: str | None = None
     eligible_group: str = Field(alias="eligibleGroup")
     config: VoteConfig
-    # ``cancelled``: the application left the vote state manually and aborted the vote.
+    #: ``cancelled``: the application left the vote state manually and aborted the vote.
     status: Literal["draft", "open", "closed", "cancelled"]
     opens_at: datetime | None = Field(default=None, alias="opensAt")
-    # The planned end of the cast window (deadline). It is not the real close time.
+    #: The planned end of the cast window (deadline). It is not the real close time.
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     result: VoteResultValue | None = None
     secret: bool
-    # ``election`` carries the candidates and the seats (``config`` then holds
-    # the projection: the candidate ids plus ``abstain`` as options).
-    # ``electionResult`` is set once the election closed. A runoff names its parent
-    # election and its round.
+    #: ``election`` carries the candidates and the seats (``config`` then holds
+    #: the projection: the candidate ids plus ``abstain`` as options).
+    #: ``electionResult`` is set once the election closed. A runoff names its parent
+    #: election and its round.
     kind: VoteKind = "motion"
     election: ElectionConfig | None = None
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     parent_vote_id: UUID | None = Field(default=None, alias="parentVoteId")
     round: int = 1
-    # A poll carries its mode and options (``config`` then holds the projection: the
-    # option ids plus ``abstain``). ``pollResult`` holds the counts once the poll
-    # closed, and while it runs as soon as the counts are revealed.
+    #: A poll carries its mode and options (``config`` then holds the projection: the
+    #: option ids plus ``abstain``). ``pollResult`` holds the counts once the poll
+    #: closed, and while it runs as soon as the counts are revealed.
     poll: PollConfig | None = None
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")
-    # Copies of ``config`` for the vote card, so a client needs no config parse.
+    #: Copies of ``config`` for the vote card, so a client needs no config parse.
     majority_rule: Literal["simple", "absolute", "two_thirds"] = Field(
         default="simple", alias="majorityRule"
     )
     quorum: Quorum | None = None
-    # The real moment when the vote opened (``open`` sets ``opens_at``).
+    #: The real moment when the vote opened (``open`` sets ``opens_at``).
     opened_at: datetime | None = Field(default=None, alias="openedAt")
-    # The real moment when the vote ended (close or cancel). None while it runs.
+    #: The real moment when the vote ended (close or cancel). None while it runs.
     closed_at: datetime | None = Field(default=None, alias="closedAt")
     tally: TallyOut
-    # A vote with guests: no quorum, only the majority of the cast ballots. A
-    # copy of ``config.guestsVote`` for the vote card.
+    #: A vote with guests: no quorum, only the majority of the cast ballots. A
+    #: copy of ``config.guestsVote`` for the vote card.
     guests_vote: bool = Field(default=False, alias="guestsVote")
-    # The own ballot of the caller. Only ``GET /votes/{id}`` sets it. Other responses
-    # and the live-vote events leave it None.
+    #: The own ballot of the caller. Only ``GET /votes/{id}`` sets it. Other responses
+    #: and the live-vote events leave it None.
     my_ballot: MyBallot | None = Field(default=None, alias="myBallot")
-    # True when the caller holds a voting delegation for this vote and has cast the
-    # represented ballot. Only ``GET /votes/{id}`` sets it.
+    #: True when the caller holds a voting delegation for this vote and has cast the
+    #: represented ballot. Only ``GET /votes/{id}`` sets it.
     represented_cast: bool = Field(default=False, alias="representedCast")
-    # What the calling principal may do with this vote. Only ``GET /votes/{id}`` sets
-    # them. Every other response and the live-vote events leave them False.
-    # ``canManage``: open, close, cancel and delete (``assert_can_manage``).
-    # ``canCast``: cast an OWN ballot (roster of the gremium, human session). A
-    # delegated ballot has its own check.
+    #: What the calling principal may do with this vote. Only ``GET /votes/{id}`` sets
+    #: them. Every other response and the live-vote events leave them False.
+    #: ``canManage``: open, close, cancel and delete (``assert_can_manage``).
+    #: ``canCast``: cast an OWN ballot (roster of the gremium, human session). A
+    #: delegated ballot has its own check.
     can_manage: bool = Field(default=False, alias="canManage")
     can_cast: bool = Field(default=False, alias="canCast")
-    # The decision proposal of an application vote, or None.
+    #: The decision proposal of an application vote, or None.
     proposal: DecisionIn | None = None
 
 
@@ -418,7 +418,7 @@ class VoteListItem(_CamelModel):
     created_at: datetime = Field(alias="createdAt")
     opened_at: datetime | None = Field(default=None, alias="openedAt")
     closed_at: datetime | None = Field(default=None, alias="closedAt")
-    # The planned end of the cast window, not the real end.
+    #: The planned end of the cast window, not the real end.
     closes_at: datetime | None = Field(default=None, alias="closesAt")
     can_cast: bool = Field(default=False, alias="canCast")
     my_ballot: MyBallot = Field(default_factory=MyBallot, alias="myBallot")
@@ -448,10 +448,10 @@ class VoteClosed(_CamelModel):
     id: UUID
     meeting_id: UUID | None = Field(default=None, alias="meetingId")
     application_id: UUID | None = Field(default=None, alias="applicationId")
-    # None for a poll: a poll only counts.
+    #: None for a poll: a poll only counts.
     result: VoteResultValue | None
     tally: TallyOut
-    # The result of an election (None for a motion).
+    #: The result of an election (None for a motion).
     kind: VoteKind = "motion"
     election_result: ElectionResultOut | None = Field(default=None, alias="electionResult")
     poll_result: PollResultOut | None = Field(default=None, alias="pollResult")

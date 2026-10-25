@@ -33,16 +33,22 @@ PROTOCOL_RENDER_TASK_NAME = "render_protocol"
 class ProtocolRenderQueue(Protocol):
     """Enqueue interface for the router."""
 
-    async def enqueue(self, protocol_id: UUID) -> None: ...
+    async def enqueue(self, protocol_id: UUID) -> None:
+        """Enqueue the render job of the protocol."""
+        ...
 
 
 @dataclass(slots=True)
 class ArqProtocolRenderQueue:
-    """Queue for `render_protocol` jobs, backed by arq."""
+    """Queue for `render_protocol` jobs, backed by arq.
 
-    pool: object  # arq.ArqRedis, typed loosely to keep arq out of the API surface
+    ``pool`` is an ``arq.ArqRedis``, typed loosely to keep arq out of the API surface.
+    """
+
+    pool: object
 
     async def enqueue(self, protocol_id: UUID) -> None:
+        """Enqueue the render job of the protocol."""
         await self.pool.enqueue_job(  # type: ignore[attr-defined]
             PROTOCOL_RENDER_TASK_NAME, str(protocol_id)
         )

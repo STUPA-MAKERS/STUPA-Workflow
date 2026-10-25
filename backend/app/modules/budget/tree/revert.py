@@ -124,6 +124,8 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     async def _revert_node_create(self, budget_id: UUID) -> None:
         """Delete the cost center that the audited create action added.
 
+        ``delete_node`` runs the guard checks, writes the audit entry and commits.
+
         Raises:
             ConflictError: The cost center is now in use (409).
         """
@@ -133,8 +135,6 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
                 "Cost centre already removed; nothing to revert.",
                 code="already_reverted",
             )
-        # delete_node runs the guard checks and answers 409 when the node is
-        # still in use. It also writes the audit entry and commits.
         await self.delete_node(budget_id)
 
     @staticmethod
@@ -190,7 +190,11 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
     async def _revert_allocation_set(
         self, budget_id: UUID, data: dict, reverted_audit_id: int
     ) -> None:
-        """Restore the prior allocation value, or drop the row when there was none."""
+        """Restore the prior allocation value, or drop the row when there was none.
+
+        ``set_allocation`` validates the top-down constraints again, writes the audit
+        entry and commits.
+        """
         fy_raw = data.get("fiscalYearId")
         if not fy_raw:
             raise ConflictError("No fiscal year recorded.", code="not_revertable")
@@ -208,8 +212,6 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             )
         previous = data.get("previousAllocated")
         if previous is None:
-            # The action set the allocation for the first time. The revert
-            # removes the row again.
             await self._audit(
                 AuditAction.BUDGET_ALLOCATION_SET,
                 target_type="budget_allocation",
@@ -224,14 +226,15 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             await self.session.delete(cur)
             await self.session.commit()
         else:
-            # set_allocation re-validates the top-down constraints, writes the
-            # audit entry and commits.
             await self.set_allocation(
                 budget_id, fiscal_year_id, AllocationSet(allocated=Decimal(previous))
             )
 
     async def _revert_expense_update(self, expense_id: UUID, data: dict) -> None:
-        """Write back the prior values that the booking update recorded."""
+        """Write back the prior values that the booking update recorded.
+
+        Every field that the audited action set must be unchanged, not only the amount.
+        """
         before = data.get("before")
         if not isinstance(before, dict) or not before:
             raise ConflictError(
@@ -240,7 +243,5 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise ConflictError("Booking no longer exists.", code="already_reverted")
-        # Every field that the audited action set must be unchanged, not only
-        # the amount.
         self._assert_not_stale(expense, data.get("after"))
         await self.update_expense(expense_id, ExpenseUpdate(**before))

@@ -88,13 +88,14 @@ async def schedule_public_backfill(
     With Redis the arq worker runs the job. Without Redis (development, contract
     CI) the request runs it inline. The gremium change is already committed, so an
     error here only logs: the protocols without a public version stay hidden.
+
+    The hourly heal job builds the missing versions later.
     """
     pool = getattr(request.app.state, "arq_pool", None)
     if pool is not None:
         try:
             await enqueue_public_backfill(pool, gremium_id)
-        except Exception:  # the gremium save already succeeded
-            # The hourly heal job builds the missing versions later.
+        except Exception:
             logger.exception("public backfill enqueue failed (gremium=%s)", gremium_id)
         return
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
@@ -103,12 +104,12 @@ async def schedule_public_backfill(
     )
     try:
         await service.backfill_public(gremium_id)
-    except Exception:  # the gremium save already succeeded
+    except Exception:
         logger.exception("inline public backfill failed (gremium=%s)", gremium_id)
 
 
-# This dependency only requires authentication. Each endpoint checks the
-# per-gremium authorization through ProtocolService and MeetingService.
+#: This dependency only requires authentication. Each endpoint checks the
+#: per-gremium authorization through ProtocolService and MeetingService.
 PrincipalDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -160,6 +161,9 @@ async def update_protocol(
     under render). `publicWithheld` holds back the protocol from the public
     protocols page or releases it. It needs the right to finalize (the publishing
     right) and works in every status. It writes `protocol_publication`.
+
+    The schema requires one of the two fields, so without `markdown` the body sets
+    `publicWithheld`.
     """
     if payload.public_withheld is not None:
         await service.authorize_finalize(protocol_id, principal)
@@ -168,7 +172,6 @@ async def update_protocol(
         out = await service.update_markdown(protocol_id, payload.markdown)
         if payload.public_withheld is None:
             return out
-    # The schema requires one of the two fields, so `publicWithheld` is set here.
     return await service.set_public_withheld(
         protocol_id, bool(payload.public_withheld), actor=principal.sub
     )
@@ -242,6 +245,11 @@ async def finalize_protocol(
     The worker sets `final` and sends the mail. A permanent failure falls back
     to `draft`, and a new call starts again. Without Redis the request renders
     synchronously as a fallback, so a protocol never stays stuck in `rendering`.
+
+    In the sync fallback an error rolls the protocol back to `draft`, which allows a new
+    finalize, and re-raises unchanged as problem+json. After the enqueue the
+    meeting_state broadcast tells the followers at once, with the "rendering" tag. The
+    worker broadcasts again after `final` or a rollback.
     """
     await service.authorize_finalize(protocol_id, principal)
     withheld = payload.public_withheld if payload is not None else None
@@ -249,8 +257,6 @@ async def finalize_protocol(
     pool = getattr(request.app.state, "arq_pool", None)
     queue = protocol_render_queue_from_pool(pool)
     if queue is None:
-        # Sync fallback without Redis: on an error roll back to `draft`, which
-        # allows a new finalize, then re-raise unchanged as problem+json.
         try:
             return await service.finalize(protocol_id, now=datetime.now(UTC))
         except Exception:
@@ -258,8 +264,6 @@ async def finalize_protocol(
             await service.revert_to_draft(protocol_id)
             raise
     await queue.enqueue(protocol_id)
-    # Tell the followers at once through the meeting_state broadcast, with the
-    # "rendering" tag. The worker broadcasts again after final or a rollback.
     broker = getattr(request.app.state, "broker", None)
     if broker is not None:
         await MeetingService(service.session, BrokerPublisher(broker)).broadcast_state(

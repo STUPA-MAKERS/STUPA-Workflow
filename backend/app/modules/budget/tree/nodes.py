@@ -81,7 +81,13 @@ class NodeOps(BudgetTreeServiceBase):
         return await decision_gremium_of(self.session, node.parent_id)
 
     async def create_node(self, payload: BudgetNodeCreate) -> BudgetNodeOut:
-        """Create a cost center. A child inherits the Gremium of its parent."""
+        """Create a cost center. A child inherits the Gremium of its parent.
+
+        A budget is not bound to a Gremium, because the flow decides who votes and when,
+        not the budget. The optional ``gremiumId`` of a top-level node is validated only
+        when it is set. The fiscal start date counts only on the top level. A child
+        keeps the defaults.
+        """
         if not tree_rules.is_valid_key(payload.key):
             raise ValidationProblem(
                 "Invalid budget key.",
@@ -89,9 +95,6 @@ class NodeOps(BudgetTreeServiceBase):
             )
 
         if payload.parent_id is None:
-            # A budget is not bound to a Gremium. The service validates the
-            # optional gremiumId only when it is set. The flow decides who votes
-            # and when, not the budget.
             if payload.gremium_id is not None:
                 gremium = (
                     await self.session.execute(
@@ -122,8 +125,6 @@ class NodeOps(BudgetTreeServiceBase):
             active=payload.active,
             color=payload.color,
             decision_gremium_id=payload.decision_gremium_id,
-            # The fiscal start date counts only on the top level. A child keeps
-            # the defaults.
             fiscal_start_month=payload.fiscal_start_month,
             fiscal_start_day=payload.fiscal_start_day,
         )
@@ -165,6 +166,10 @@ class NodeOps(BudgetTreeServiceBase):
         Everything else references `budget_id`, not the path. A new fiscal start
         date on a top-level budget re-derives the start and end date of every
         existing fiscal year. The year stays and the dates follow.
+
+        The audit entry holds the prior and the new values of the changed fields. The
+        revert uses the new values to detect a later edit and answers 409 instead of
+        overwriting the changes of another user.
         """
         node = await self._get_node(budget_id)
         provided = payload.model_dump(exclude_unset=True)
@@ -177,7 +182,6 @@ class NodeOps(BudgetTreeServiceBase):
         ) or (
             "fiscal_start_day" in provided and provided["fiscal_start_day"] != node.fiscal_start_day
         )
-        # Capture the prior values of the changed fields for audit-log revert.
         before: dict[str, object] = {
             field: _json_safe(getattr(node, field)) for field in provided
         }
@@ -192,8 +196,6 @@ class NodeOps(BudgetTreeServiceBase):
                 fy.start_date, fy.end_date = self._fiscal_year_bounds(
                     fy.year, node.fiscal_start_month, node.fiscal_start_day
                 )
-        # Capture the new values too. Revert uses them to detect a later edit
-        # and answers 409 instead of overwriting the changes of another user.
         after: dict[str, object] = {
             field: _json_safe(getattr(node, field)) for field in before
         }
@@ -215,6 +217,8 @@ class NodeOps(BudgetTreeServiceBase):
     async def _rename_key(self, node: Budget, new_key: str) -> None:
         """Rename the `key` of a node and re-derive the `path_key` of its subtree.
 
+        The descendants are fetched by path prefix before the node is renamed.
+
         Raises:
             ValidationProblem: The new key segment is invalid (422).
             ConflictError: A sibling already uses the key (409).
@@ -231,7 +235,6 @@ class NodeOps(BudgetTreeServiceBase):
             parent_path = (await self._get_node(node.parent_id)).path_key
         old_path = node.path_key
         new_path = tree_rules.compose_path_key(parent_path, new_key)
-        # Fetch the descendants by path prefix before the rename of the node.
         descendants = (
             (
                 await self.session.execute(

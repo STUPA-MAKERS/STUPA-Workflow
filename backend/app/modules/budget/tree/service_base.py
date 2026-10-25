@@ -37,10 +37,12 @@ def _json_safe(value: object) -> object:
     The function stores money, date and id values as strings. `Decimal`, `date`,
     `datetime` and `UUID` therefore survive in the audit `data` without loss. On
     revert Pydantic coerces the strings back into typed patch fields.
+
+    A ``datetime`` takes the ``date`` branch, because it is a subclass of ``date``.
     """
     if isinstance(value, Decimal):
         return str(value)
-    if isinstance(value, date):  # also covers datetime, a subclass of date
+    if isinstance(value, date):
         return value.isoformat()
     if isinstance(value, UUID):
         return str(value)
@@ -58,13 +60,16 @@ class BudgetTreeServiceBase:
         settings: Settings | None = None,
         actor: str | None = None,
     ) -> None:
+        """Bind the service to a session.
+
+        Only the invoice import needs ``storage`` and ``settings``. The other budget
+        endpoints leave them as None. ``actor`` is the principal ``sub`` for the audit
+        trail of the money mutations. The router sets it, and an instance without an
+        actor, as in tests, logs ``actor=None``.
+        """
         self.session = session
-        # Only the invoice import needs storage and settings. The other budget
-        # endpoints do not wire them and leave them as None.
         self.storage = storage
         self.settings = settings or get_settings()
-        # Principal sub for the audit trail of money mutations. The router sets
-        # it. A direct instance without an actor, as in tests, logs actor=None.
         self.actor = actor
 
     async def _audit(
@@ -98,6 +103,9 @@ class BudgetTreeServiceBase:
         `TreeViewOps.can_view_node`: the root paths with a matching
         ``view_gremium_id`` open their whole subtree through the ``path_key`` prefix.
         A holder of the full budget view needs no filter and does not call this.
+
+        A path segment is alphanumeric (`tree_rules.is_valid_key`), so the prefix holds
+        no LIKE wildcard.
         """
         if not member_gremium_ids:
             return set()
@@ -108,8 +116,6 @@ class BudgetTreeServiceBase:
         ).all()
         if not root_paths:
             return set()
-        # A path segment is alphanumeric (`tree_rules.is_valid_key`), so the prefix
-        # holds no LIKE wildcard.
         scoped = or_(
             *[
                 or_(Budget.path_key == rp, Budget.path_key.like(f"{rp}{_SEP}%"))
