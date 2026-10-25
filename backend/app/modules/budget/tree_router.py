@@ -825,7 +825,7 @@ async def create_fiscal_year(
 ) -> FiscalYearOut:
     """Create a fiscal year.
 
-    The fiscal years of one top budget must stay disjoint. An overlap gives 422.
+    Each year exists at most once per top budget. A duplicate year gives 422.
     """
     return await service.create_fiscal_year(budget_id, payload)
 
