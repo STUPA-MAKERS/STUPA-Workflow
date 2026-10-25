@@ -75,7 +75,7 @@ import type {
   ChatSend,
   ChatVisibility,
 } from './chat.models';
-import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, linkify, newCount } from './chat.util';
+import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, newCount } from './chat.util';
 
 /** The log counts as "at the newest message" this close to its end, in px. */
 const BOTTOM_SLACK = 24;
@@ -123,7 +123,7 @@ export class ChatBodyPipe implements PipeTransform {
     // `markdownToSafeHtml` escapes the whole input before it writes any tag, and
     // `linkify` and `highlightMentions` only wrap escaped text, so the result holds no
     // markup of the author.
-    const html = linkify(markdownToSafeHtml(body));
+    const html = markdownToSafeHtml(body);
     const names = (mentions ?? []).flatMap((p) => (p.displayName ? [p.displayName] : []));
     return this.sanitizer.bypassSecurityTrustHtml(highlightMentions(html, names));
   }
