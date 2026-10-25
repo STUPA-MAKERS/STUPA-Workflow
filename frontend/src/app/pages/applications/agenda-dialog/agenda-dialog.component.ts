@@ -22,7 +22,6 @@ import {
   DialogComponent,
   EmptyStateComponent,
   IconComponent,
-  ScrollFadeDirective,
   SkeletonComponent,
   SwitchComponent,
   ToastService,
@@ -61,7 +60,6 @@ interface MeetingChoice {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     EmptyStateComponent,
-    ScrollFadeDirective,
     FormsModule,
     TranslatePipe,
     DateBlockComponent,

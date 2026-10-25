@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications page (applications-list.component.scss). */
@@ -44,22 +43,17 @@
 
 /* ------------------------------------------------------------------ rows */
 .vl__scroll {
-  @include lp.scroll(--vl-fade);
+  @include lp.scroll;
 }
 .vl:not(.vl--split) .vl__scroll {
   flex: 1 0 auto;
 }
 .vl--split .vl__scroll {
-  @include lp.split-scroll(--vl-fade);
+  @include lp.split-scroll;
 }
 .vl--split .vl__scroll > * {
   flex: none;
 }
-/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.vl__scroll {
-  @include fade.fade-y(var(--vl-fade));
-}
-
 .vl__group {
   @include lp.stack;
 }
@@ -140,9 +134,9 @@
 }
 
 @include bp.phone {
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  /* One row of chips that scrolls sideways, from screen edge to screen edge. */
   .vl__chips {
-    @include lp.phone-chips(--vl-chip-fade);
+    @include lp.phone-chips;
   }
   .vl__month {
     padding-inline: var(--space-1);

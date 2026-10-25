@@ -78,7 +78,6 @@
         <div
           class="apps__chips"
           role="group"
-          appScrollFade="x"
           [attr.aria-label]="'applications.list.filter.group' | t"
         >
           @if (mine()) {
@@ -155,7 +154,6 @@
         appPullRefresh
         [pullRefreshBusy]="loading() || reloading()"
         (appPullRefresh)="reload()"
-        appScrollFade="y"
         [attr.aria-busy]="reloading() || null"
       >
         @if (error()) {

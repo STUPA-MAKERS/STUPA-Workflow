@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications and the voting page. */
@@ -37,19 +36,16 @@
 
 /* ------------------------------------------------------------------ rows */
 .tk__scroll {
-  @include lp.scroll(--tk-fade);
+  @include lp.scroll;
 }
 .tk:not(.tk--split) .tk__scroll {
   flex: 1 0 auto;
 }
 .tk--split .tk__scroll {
-  @include lp.split-scroll(--tk-fade);
+  @include lp.split-scroll;
 }
 .tk--split .tk__scroll > * {
   flex: none;
-}
-.tk__scroll {
-  @include fade.fade-y(var(--tk-fade));
 }
 
 .tk__group {
@@ -142,10 +138,7 @@
 
 @include bp.phone {
   .tk__chips {
-    @include lp.phone-chips(--tk-chip-fade, $fade-ends: false);
-  }
-  .tk__chips {
-    @include fade.fade-x(var(--tk-chip-fade), $both: false);
+    @include lp.phone-chips;
   }
   .tk__groupTitle {
     padding-inline: var(--space-1);

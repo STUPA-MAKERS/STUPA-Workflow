@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
 @use '../../shared/ui/list-pane' as lp;
 
@@ -86,21 +85,16 @@
 
 /* ------------------------------------------------------------------ rows */
 .apps__scroll {
-  @include lp.scroll(--apps-fade);
+  @include lp.scroll;
   /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .apps--split .apps__scroll {
-  @include lp.split-scroll(--apps-fade);
+  @include lp.split-scroll;
 }
 .apps--split .apps__scroll > * {
   flex: none;
 }
-/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.apps__scroll {
-  @include fade.fade-y(var(--apps-fade));
-}
-
 .apps__group {
   @include lp.stack;
 }
@@ -223,9 +217,9 @@
 }
 
 @include bp.phone {
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  /* One row of chips that scrolls sideways, from screen edge to screen edge. */
   .apps__chips {
-    @include lp.phone-chips(--apps-chip-fade);
+    @include lp.phone-chips;
   }
   .apps__month {
     padding-inline: var(--space-1);

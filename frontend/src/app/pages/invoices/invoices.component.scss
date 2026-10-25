@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
 :host {
@@ -51,21 +50,16 @@
 
 /* ------------------------------------------------------------------ rows */
 .inv__scroll {
-  @include lp.scroll(--inv-fade);
+  @include lp.scroll;
   /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .inv--split .inv__scroll {
-  @include lp.split-scroll(--inv-fade);
+  @include lp.split-scroll;
 }
 .inv--split .inv__scroll > * {
   flex: none;
 }
-/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.inv__scroll {
-  @include fade.fade-y(var(--inv-fade));
-}
-
 .inv__group {
   @include lp.stack;
 }
@@ -167,9 +161,9 @@
   .inv__seg ::ng-deep .seg__opt {
     padding-inline: var(--space-2);
   }
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
+  /* One row of chips that scrolls sideways, from screen edge to screen edge. */
   .inv__chips {
-    @include lp.phone-chips(--inv-chip-fade);
+    @include lp.phone-chips;
   }
   .inv__month {
     padding-inline: var(--space-1);

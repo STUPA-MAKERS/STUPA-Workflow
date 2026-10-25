@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
 /* The list/detail pane page of the applications and the tasks
@@ -36,13 +35,12 @@
 
 /* ------------------------------------------------------------------ rows */
 .mtl__scroll {
-  @include lp.scroll(--mtl-fade);
+  @include lp.scroll;
   /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
-  @include fade.fade-y(var(--mtl-fade));
 }
 .mtl--split .mtl__scroll {
-  @include lp.split-scroll(--mtl-fade);
+  @include lp.split-scroll;
 }
 .mtl--split .mtl__scroll > * {
   flex: none;

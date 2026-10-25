@@ -37,7 +37,7 @@
   } @else {
     <div class="fe__cols" [class.fe__cols--preview]="preview()">
       @if (preview()) {
-        <article class="fe__preview" appScrollFade="y">
+        <article class="fe__preview">
           <h2 class="fe__pv-title">{{ resolved(title()) || ('admin.forms.untitled' | t) }}</h2>
           @if (resolved(description())) {
             <p class="fe__pv-desc">{{ resolved(description()) }}</p>
@@ -95,7 +95,7 @@
         </article>
       } @else {
         <!-- The outline: every group with its questions. -->
-        <nav class="fe__outline" appScrollFade="y" [attr.aria-label]="'admin.form.outline' | t">
+        <nav class="fe__outline" [attr.aria-label]="'admin.form.outline' | t">
           @for (group of groups(); track $index; let gi = $index) {
             <section
               class="fe__group"
@@ -172,7 +172,7 @@
         </nav>
 
         <!-- The cards of the shown group. -->
-        <div class="fe__main" appScrollFade="y">
+        <div class="fe__main">
           @if (duplicates().length > 0) {
             <p class="fe__alert" role="alert">{{ 'admin.form.dupKeys' | t: { keys: duplicates().join(', ') } }}</p>
           }
@@ -385,7 +385,7 @@
       }
 
       <!-- The form settings and the versions. -->
-      <aside class="fe__side" appScrollFade="y">
+      <aside class="fe__side">
         <section class="fe__card fe__meta" [attr.aria-label]="'admin.form.formCard' | t">
           <h2 class="cap fe__cap">{{ 'admin.form.formCard' | t }}</h2>
           <app-i18n-input

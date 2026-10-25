@@ -44,7 +44,6 @@
         appPullRefresh
         [pullRefreshBusy]="loading()"
         (appPullRefresh)="refreshAll()"
-        appScrollFade="y"
       >
         @if (error()) {
           <app-note class="tasks__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tasks.error' | t }}</app-note>

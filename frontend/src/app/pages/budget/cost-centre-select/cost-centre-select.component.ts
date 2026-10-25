@@ -24,7 +24,6 @@ import {
   MEDIA,
   mediaQuery,
   placeAtField,
-  ScrollFadeDirective,
   showInTopLayer,
   SideSheetComponent,
   watchAnchoredPopover,
@@ -108,7 +107,7 @@ export interface CostCentreGroup {
   selector: 'app-cost-centre-select',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [IconComponent, NgTemplateOutlet, ScrollFadeDirective, SideSheetComponent, TranslatePipe],
+  imports: [IconComponent, NgTemplateOutlet, SideSheetComponent, TranslatePipe],
   templateUrl: './cost-centre-select.component.html',
   styleUrl: './cost-centre-select.component.scss',
   host: {

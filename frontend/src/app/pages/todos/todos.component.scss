@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 :host {
   display: flex;
   flex-direction: column;
@@ -39,7 +38,6 @@
 }
 /* The board picker and the search start the bar; the filter chips end it. */
 .td__chips {
-  --td-chip-fade: var(--space-6);
   display: flex;
   flex: 0 1 auto;
   margin-inline-start: auto;
@@ -61,10 +59,6 @@
 }
 .td__chips::-webkit-scrollbar {
   display: none;
-}
-/* The strip scrolls sideways: a fade marks only the side where more chips are. */
-.td__chips {
-  @include fade.fade-x(var(--td-chip-fade));
 }
 .td__reset {
   min-height: 32px;
@@ -118,14 +112,6 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-}
-/* The shared top and bottom fade where the body scrolls as a whole (the rows): an end
-   fades only while more content lies past it (`appScrollFade="y"` sets the classes), so
-   the cards do not end at a hard cut under the bar. Elsewhere the body does not scroll
-   (overflow visible), the directive sets no class, and a mask would cut off the list view
-   or a tall state. */
-.td__body--rows {
-  @include fade.fade-y(var(--space-5));
 }
 /* "Meine To-Dos" with rows: the board and the rows below it scroll together, so the
    board keeps its natural height. */

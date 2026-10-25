@@ -30,7 +30,6 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  ScrollFadeDirective,
   SideSheetComponent,
 } from '@stupa-makers/ui-kit';
 import { meetingStatus } from '@shared/status-kind.util';
@@ -82,7 +81,6 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     MeetingHeadComponent,
-    ScrollFadeDirective,
     NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,

@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use '../todo-labels' as lbl;
 
 @include lbl.colors;
@@ -123,11 +122,6 @@
      of the checklist) has room at both ends. */
   margin-inline: -10px;
   padding-inline: 10px;
-  /* An end fades only while more content lies past it (`appScrollFade` sets the
-     classes), so the description never ends in a hard cut through a line or a row. The
-     scroll padding keeps a field that gets the focus clear of the fade. */
-  scroll-padding-block: var(--space-5);
-  @include fade.fade-y(var(--space-5));
 }
 /* An icon or text button at the end of a row lines its glyph up with the content edge. */
 .cd__secHead > app-button {
@@ -518,17 +512,6 @@
   margin-top: var(--space-4);
   padding: var(--space-3) 0;
   background: var(--cd-bar-bg);
-}
-/* The fade above the bar: the details fade out as they scroll under it, so a line or a
-   table row never ends in a hard cut at the edge of the bar. At rest it lies over the gap
-   above the bar, in the colour of the bar, so nothing shows. */
-.cd__bar::before {
-  content: '';
-  position: absolute;
-  inset: auto 0 100%;
-  height: var(--space-5);
-  background: linear-gradient(to top, var(--cd-bar-bg), transparent);
-  pointer-events: none;
 }
 /* In the pane of "Aufgaben" a phone shows the detail on the page, not on a sheet. */
 :host(.cd--pane) .cd__bar {

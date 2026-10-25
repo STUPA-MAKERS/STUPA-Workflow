@@ -98,7 +98,7 @@
       }
       <!-- The wide layout scrolls the sheet inside itself, with a fade at an end only where
            more content is. The card keeps its background; only the content fades. -->
-      <div class="bd__sheetBody" appScrollFade="y">
+      <div class="bd__sheetBody">
         <!-- Narrower layouts name the path in the chip above and put the actions beside the
              page title, so the sheet starts with the figures. -->
         @if (wide()) {
@@ -267,7 +267,6 @@
       }
       <nav
         class="bd__tree"
-        appScrollFade="y"
         [attr.aria-label]="'budget.dash.tree' | t"
         (focusin)="revealRow($event)"
       >

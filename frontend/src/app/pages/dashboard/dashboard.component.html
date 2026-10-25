@@ -52,7 +52,7 @@
     </header>
   }
 
-  <div class="dash__todayBody" appScrollFade="y">
+  <div class="dash__todayBody">
     @if (meetingsLoading()) {
       <app-skeleton variant="rows" [count]="2" [label]="'dashboard.loading' | t" />
     }
@@ -167,7 +167,6 @@
   <div
     class="dash__panel"
     role="tabpanel"
-    appScrollFade="y"
     [id]="tabBar.panelId(tab())"
     [attr.aria-labelledby]="tabBar.tabId(tab())"
   >

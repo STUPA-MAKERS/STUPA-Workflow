@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 
 :host {
   display: flex;
@@ -54,24 +53,25 @@
   min-height: 0;
   padding: 0 var(--space-1) var(--space-2);
 }
+/* The entries start directly under the search, as the rows of a list pane do
+   (`lp.split-scroll`): the body takes back the gap of the column and lies over the bar. */
 .af--split .af__navBody {
   position: relative;
+  z-index: calc(var(--z-sticky) - 1);
+  margin-top: calc(-1 * var(--space-3));
+  padding-top: var(--space-3);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
 /* One column: the title, the search, the tiles and the entries start on the content
-   edge, the same as the gremien under them. The inset only keeps the focus rings and
-   the fades clear of the edge of the scrolling column. */
+   edge, the same as the gremien under them. The inset only keeps the focus rings clear
+   of the edge of the scrolling column. */
 .af:not(.af--split) {
   --ph-inset: 0px;
 }
 .af:not(.af--split) .af__navBody {
   padding-inline: 0;
-}
-
-.af__navBody {
-  @include fade.fade-y(var(--space-6));
 }
 
 .af__hidden {
@@ -187,7 +187,7 @@
    top and at the bottom in every scroll position, and a straight cut by a rectangular
    scroll box (or by the viewport edge) cannot occur. A sticky bar of the page sticks to
    the top or the bottom of the body. The scroll padding keeps an element that gets the
-   focus clear of the corners and the fades. */
+   focus clear of the corners. */
 .af--split .af__page {
   display: flex;
   flex-direction: column;
@@ -199,7 +199,9 @@
   --stb-bg: var(--color-surface-1);
 }
 .af--split .af__pageBody {
-  --af-fade: var(--space-6);
+  /* A sticky bar of the page (the users search) sticks to the top edge of the sheet, not
+     to the top padding of the body, so no row shows above the stuck bar. */
+  --ld-sticky-top: calc(-1 * var(--space-6));
   /* The containing block of an absolute child (`.sr-only`), see `.ld__detail`. */
   position: relative;
   display: flex;
@@ -209,7 +211,7 @@
   padding: var(--space-6) var(--space-6) var(--space-7);
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: var(--af-fade);
+  scroll-padding-block: var(--space-6);
 }
 /* The page in the sheet keeps its content height, and the body scrolls. A page with
    columns of its own (the mail templates) takes the free height of the body with
@@ -217,38 +219,10 @@
 .af--split .af__pageBody > ::ng-deep * {
   flex-shrink: 0;
 }
-/* The shared fades of a scroll area: an end fades only while content is hidden past it
-   (`appScrollFade` sets the classes). The mask is on the body, so the sheet keeps its
-   colour and its shape. */
-/* A page with a sticky bar (`app-sticky-bar`, the users search) has the fade of the bar
-   at the top. The top fade of the body would make the stuck bar transparent, so the body
-   fades only at the end. */
-.af--split .af__pageBody.is-fade-start:has(app-sticky-bar:not(.stb--off)) {
-  mask-image: none;
-}
-.af--split .af__pageBody.is-fade-end:has(app-sticky-bar:not(.stb--off)) {
-  mask-image: linear-gradient(to top, transparent, #000 var(--af-fade));
-}
-.af--split .af__pageBody {
-  @include fade.fade-y(var(--af-fade));
-}
-/* A mask makes the body the containing block of every `position: fixed` element in it.
-   An open dialog or side sheet of the page would then cover only the sheet and be cut by
-   its round corners (the merge dialog of the users list, a long list with the end fade).
-   While an overlay of the page is open, the body has no fade. The state wins over every
-   fade rule above, whatever their specificity. */
-.af--split .af__pageBody:has(.dialog__backdrop, .ss__scrim) {
-  mask-image: none !important;
-}
 /* A page with a floating "new" button (`app-fab`): the button is fixed in the window, at
-   the foot of the sheet. The mask would make the body its containing block, so it would
-   scroll away with the page and fade at the end; the body has no fade then. The page
-   ends with room for the button, so its last row scrolls above it (the 56px button, 16px
-   below and above it). One column the page scrolls as a whole and the body ends with the
-   same room. */
-.af--split .af__pageBody:has(app-fab) {
-  mask-image: none !important;
-}
+   the foot of the sheet. The page ends with room for the button, so its last row scrolls
+   above it (the 56px button, 16px below and above it). One column the page scrolls as a
+   whole and the body ends with the same room. */
 .af .af__pageBody:has(app-fab) {
   padding-bottom: calc(56px + 2 * var(--space-4));
 }

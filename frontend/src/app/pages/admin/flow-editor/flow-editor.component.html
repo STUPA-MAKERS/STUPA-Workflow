@@ -216,7 +216,7 @@
       </div>
     </section>
 
-    <aside #panel class="fe__panel" appScrollFade="y" [attr.aria-label]="'admin.flow.inspector' | t">
+    <aside #panel class="fe__panel" [attr.aria-label]="'admin.flow.inspector' | t">
       <!-- The version history stays loaded (it names the active version in the lead
            line) and shows only on "Versionen". -->
       <div class="fe__versions" [class.fe__hidden]="!showVersions()">

@@ -30,7 +30,7 @@
         </app-sticky-bar>
       }
 
-      <div #navBody class="af__navBody" appScrollFade="y">
+      <div #navBody class="af__navBody">
         <!-- "Zustand" stays in the column on every admin page, not only on the home page.
              The navigation shows below wide only on the home page, so the one-column
              layout shows the tiles there only. A class hides the tiles during a search.
@@ -88,7 +88,7 @@
     (appSwipeBack)="goBack()"
     (appSwipeBackEnd)="swiping.set(false)"
   >
-    <div #page class="af__pageBody" [class.ld-under-bar]="showBar()" appScrollFade="y">
+    <div #page class="af__pageBody" [class.ld-under-bar]="showBar()">
       <!-- Below wide: the bar of every one-view page (the detail of a list/detail page),
            with the way back, the title in small type and the actions of the page header. -->
       @if (showBar()) {

@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the applications page (applications-list.component.scss). */
@@ -24,19 +23,14 @@
 
 /* ------------------------------------------------------------------ rows */
 .tasks__scroll {
-  @include lp.scroll(--tasks-fade);
+  @include lp.scroll;
 }
 .tasks--split .tasks__scroll {
-  @include lp.split-scroll(--tasks-fade);
+  @include lp.split-scroll;
 }
 .tasks--split .tasks__scroll > * {
   flex: none;
 }
-/* An end fades only while more rows lie past it (`appScrollFade` sets the classes). */
-.tasks__scroll {
-  @include fade.fade-y(var(--tasks-fade));
-}
-
 .tasks__group {
   @include lp.stack;
 }

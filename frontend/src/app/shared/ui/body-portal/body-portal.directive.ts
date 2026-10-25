@@ -5,11 +5,10 @@ import { Directive, ElementRef, OnDestroy, OnInit, inject } from '@angular/core'
  * Moves its host to the end of `document.body` while it lives, and removes it there when
  * Angular destroys it.
  *
- * Use it on a dialog that a component renders inside a scroll container. `appScrollFade`
- * puts a `mask-image` on a container that overflows, and a mask clips every descendant,
- * also a `position: fixed` one. The backdrop and the pane of a dialog inside such a
- * container then paint only inside the container: the agenda of a long meeting turned
- * dark and "To-Do anlegen" showed no dialog.
+ * Use it on a dialog that a component renders inside a scroll container. A container with
+ * a mask, a transform or a filter clips every descendant, also a `position: fixed` one.
+ * The backdrop and the pane of a dialog inside such a container then paint only inside
+ * the container, so a dialog of a scroll area goes to the body.
  *
  * ```html
  * <app-confirm-dialog appBodyPortal [open]="…" />

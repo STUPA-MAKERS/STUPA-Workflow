@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 
 /* The participant view is a pane page like the session page: it takes the free height
    of the main column of the shell (`flex: 1 1 0`) and pulls the block padding and the
@@ -40,15 +39,6 @@
 .fv__strip {
   flex: none;
   margin: 0 var(--space-3) var(--space-3);
-}
-
-/* Every inner scroll area fades an end only while more content lies past it
-   (`appScrollFade` sets the classes). */
-.fv__fade {
-  --fv-fade: var(--space-5);
-}
-.fv__fade {
-  @include fade.fade-y(var(--fv-fade));
 }
 
 .fv__body {
@@ -123,7 +113,6 @@
 /* The radius of the cards in it: the column is the window they scroll in. */
 .fv__body--wide .fv__side {
   border-radius: var(--radius-xl);
-  scroll-padding-block: var(--space-4);
 }
 .fv__body--wide .fv__main,
 .fv__body--wide .fv__sheet {

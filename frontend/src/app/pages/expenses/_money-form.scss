@@ -5,7 +5,6 @@
 // columns of sections, and a foot (the shared pane-form foot: delete on the left; cancel
 // and the main action on the right). In the bottom sheet the sheet brings the head and the side gutter.
 // The two form components `@use` this file.
-@use 'scroll-fade' as fade;
 :host {
   display: flex;
   flex: 1 1 auto;
@@ -46,10 +45,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   container-type: inline-size;
-  /* An end fades only while more content lies past it (`appScrollFade` sets the
-     classes): the head has no rule, so a field must not end in a hard cut under it. */
-  scroll-padding-block: var(--space-5);
-  @include fade.fade-y(var(--space-5));
 }
 /* In the bottom sheet the sheet body gives the side gutter. */
 .mf--sheet .mf__body {

@@ -1,5 +1,3 @@
-@use 'scroll-fade' as fade;
-
 /* The detail pane of the page "Abstimmungen". Side by side the vote sits on a sheet
    (surface 1, large radius) that fills the pane, as the open application does. One pane
    at a time it sits on the page, and the panel keeps its card (board
@@ -80,12 +78,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0 var(--space-6) var(--space-6);
-  scroll-padding-block: var(--space-5);
-}
-/* The shared fade of a scroll area: an end fades only while more of the vote lies past
-   it (`appScrollFade` sets the classes). */
-.vc--ready.vc--sheet .vc__body {
-  @include fade.fade-y(var(--space-5));
 }
 
 .vc__line {

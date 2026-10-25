@@ -25,7 +25,6 @@
         <div
           class="vl__chips"
           role="group"
-          appScrollFade="x"
           [attr.aria-label]="'voting.list.filter.group' | t"
         >
           <app-filter-select
@@ -73,7 +72,6 @@
         appPullRefresh
         [pullRefreshBusy]="loading() || reloading()"
         (appPullRefresh)="reload()"
-        appScrollFade="y"
         [attr.aria-busy]="reloading() || null"
       >
         @if (error()) {

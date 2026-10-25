@@ -44,7 +44,7 @@
 
         <!-- Side by side only this part scrolls, under the bar, with the shared fade at
              an end while more of the vote lies past it. -->
-        <div class="vc__body" appScrollFade="y">
+        <div class="vc__body">
           @if (session()?.connection() === 'reconnecting') {
             <p class="vc__line vc__line--warn" role="status">{{ 'voting.live.reconnecting' | t }}</p>
           }

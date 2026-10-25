@@ -3,7 +3,6 @@
 // on top and the cost centres grouped by their top-level budget.
 @use 'field' as f;
 @use 'option-menu' as om;
-@use 'scroll-fade' as fade;
 
 :host {
   display: block;
@@ -190,7 +189,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 0 var(--space-2) var(--space-2);
-  @include fade.fade-y(var(--space-5));
 }
 // The popover gives the list its own limit: the room of the popover less the search. The
 // list then scrolls even where a flex item in a box with only a `max-height` does not

@@ -25,7 +25,6 @@ import {
   IconComponent,
   MEDIA,
   mediaQuery,
-  ScrollFadeDirective,
   SideSheetComponent,
   type StatusKind,
 } from '@stupa-makers/ui-kit';
@@ -86,7 +85,6 @@ const EXCERPT_LENGTH = 160;
     EmptyStateComponent,
     NgTemplateOutlet,
     TranslatePipe,
-    ScrollFadeDirective,
     ButtonComponent,
     IconComponent,
     SideSheetComponent,

@@ -1510,7 +1510,7 @@ describe('TodosComponent', () => {
         expect(screen.getByRole('list', { name: 'Meine To-Dos' })).toHaveTextContent('Privat');
         expect(root.querySelector('.td__body')).toHaveClass('td__body--rows');
         expect(root.querySelector('.td__body')).toHaveClass('td__body--fab');
-        expect(root.querySelector('.td__body')).toHaveAttribute('appScrollFade', 'y');
+        expect(root.querySelector('.td__body')).not.toHaveAttribute('appScrollFade');
       });
 
       it('shows one muted line for an empty personal board and no lead while nothing matches', async () => {
@@ -1720,6 +1720,6 @@ describe('TodosComponent', () => {
     expect(cmp.lead()).toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-todo-board-view')).not.toBeNull();
     expect(harness.routeNativeElement!.querySelector('app-todo-move-sheet')).toBeNull();
-    expect(harness.routeNativeElement!.querySelector('.bv__scroll')).toHaveAttribute('appScrollFade', 'y');
+    expect(harness.routeNativeElement!.querySelector('.bv__scroll')).not.toHaveAttribute('appScrollFade');
   });
 });

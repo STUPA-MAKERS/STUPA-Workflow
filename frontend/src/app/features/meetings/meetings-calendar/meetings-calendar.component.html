@@ -110,7 +110,7 @@
          detail sheet. It stays fixed; only the content below it scrolls. The person picks
          the day, so only the meetings of the day are a live region (one region). -->
     <app-sheet-bar class="cal__dayHead" kickerId="cal-day" [kicker]="dayHeading()" />
-    <div class="cal__panelScroll" [class.cal__panelScroll--fab]="canCreate()" appScrollFade="y">
+    <div class="cal__panelScroll" [class.cal__panelScroll--fab]="canCreate()">
       <section class="cal__daySec" aria-labelledby="cal-day" aria-live="polite">
         @if (error()) {
           <app-note kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'meetings.overview.calendarError' | t }}</app-note>

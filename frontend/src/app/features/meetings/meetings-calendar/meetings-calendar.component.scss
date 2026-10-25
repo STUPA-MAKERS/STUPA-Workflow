@@ -1,4 +1,3 @@
-@use 'scroll-fade' as fade;
 @use 'dot-parts' as dots;
 
 /* The calendar view (board Sitzungen, variant C).
@@ -258,7 +257,6 @@
   background: var(--color-surface-1);
 }
 .cal__panelScroll {
-  --cal-fade: var(--space-6);
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
@@ -268,7 +266,6 @@
   padding: 10px var(--space-6) var(--space-6);
   overflow-y: auto;
   overscroll-behavior: contain;
-  @include fade.fade-y(var(--cal-fade));
 }
 /* "Sitzung anlegen" floats over the end of the panel: room to scroll the last row above
    it. */

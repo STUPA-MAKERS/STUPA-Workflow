@@ -31,7 +31,6 @@ import {
   RowMenuComponent,
   type RowMenuItem,
   type RowMenuSection,
-  ScrollFadeDirective,
   type TabItem,
   TabsComponent,
 } from '@stupa-makers/ui-kit';
@@ -102,7 +101,6 @@ export interface BoardMove {
     IconComponent,
     LongPressDirective,
     RowMenuComponent,
-    ScrollFadeDirective,
     TabsComponent,
     TodoCardTileComponent,
   ],

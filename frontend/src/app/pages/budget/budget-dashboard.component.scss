@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use 'swatch';
 
 :host {
@@ -123,22 +122,8 @@
   max-width: 100%;
 }
 
-/* ------------------------------------------------------------------ fades
-   An end of a scrolling list fades only when there is more content past it
-   (`appScrollFade` sets the classes). The tree and the wide sheet share the mask. */
-.bd__tree,
-.bd__sheetBody {
-  --bd-fade: var(--space-6);
-}
-.bd__tree,
-.bd__sheetBody {
-  @include fade.fade-y(var(--bd-fade));
-}
-
 /* ------------------------------------------------------------------ tree
-   The tree is the only part of the pane that scrolls. An end fades only when there are
-   more rows past it (`appScrollFade` sets the classes). The scroll padding keeps a row
-   that gets the focus clear of the fade. */
+   The tree is the only part of the pane that scrolls. */
 .bd__tree {
   display: flex;
   flex: 1 1 auto;
@@ -148,7 +133,6 @@
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scroll-padding-block: var(--bd-fade);
 }
 /* The rows keep their size; the list scrolls instead of squeezing them. */
 .bd__tree > * {
@@ -244,7 +228,7 @@
 
 /* ------------------------------------------------------------------ sheet
    The card carries the background; the body inside it holds the content and, on the
-   wide layout, scrolls. So the fade masks the content and never the card. */
+   wide layout, scrolls, so the card edge cuts the content. */
 .bd__sheet {
   display: flex;
   flex-direction: column;

@@ -28,7 +28,7 @@
           @if (loading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shown().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.assignableLabel' | t">
+            <div class="aid__list" role="radiogroup" [attr.aria-label]="'meetings.agenda.assignableLabel' | t">
               @for (a of shown(); track a.applicationId) {
                 @let on = pick() === a.applicationId;
                 <label class="aid__row" [class.aid__row--on]="on">
@@ -65,7 +65,7 @@
           @if (todosLoading()) {
             <app-skeleton variant="rows" [count]="4" [label]="'common.loading' | t" />
           } @else if (shownTodos().length) {
-            <div class="aid__list" appScrollFade="y" role="radiogroup" [attr.aria-label]="'meetings.agenda.openTodosLabel' | t">
+            <div class="aid__list" role="radiogroup" [attr.aria-label]="'meetings.agenda.openTodosLabel' | t">
               @for (c of shownTodos(); track c.id) {
                 @let on = todoPick() === c.id;
                 <label class="aid__row" [class.aid__row--on]="on">

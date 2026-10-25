@@ -54,7 +54,6 @@
         appPullRefresh
         [pullRefreshBusy]="store.loading() || store.refreshing()"
         (appPullRefresh)="store.refresh()"
-        appScrollFade="y"
       >
         @if (store.loading()) {
           <!-- The shape of the loaded list (a group heading, rows with the logo in the

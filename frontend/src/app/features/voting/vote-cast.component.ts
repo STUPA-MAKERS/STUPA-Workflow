@@ -27,7 +27,6 @@ import {
   mediaQuery,
   RowMenuComponent,
   type RowMenuSection,
-  ScrollFadeDirective,
   ToastService,
 } from '@stupa-makers/ui-kit';
 import { problemDetail } from '@core/api/problem';
@@ -92,7 +91,6 @@ const NOT_CAST: MyBallot = { cast: false, choice: null };
     EmptyStateComponent,
     IconComponent,
     RowMenuComponent,
-    ScrollFadeDirective,
     TodoLinkedListComponent,
     TranslatePipe,
     VotePanelComponent,

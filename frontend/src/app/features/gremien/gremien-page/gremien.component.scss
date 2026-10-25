@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
 /* The same two panes as the votes (voting.component.scss). */
@@ -38,20 +37,17 @@
 }
 
 .grl__scroll {
-  @include lp.scroll(--grl-fade);
+  @include lp.scroll;
 }
 .grl:not(.grl--split) .grl__scroll {
   flex: 1 0 auto;
 }
 /* Side by side only the rows scroll, down to the bottom edge of the pane. */
 .grl--split .grl__scroll {
-  @include lp.split-scroll(--grl-fade);
+  @include lp.split-scroll;
 }
 .grl--split .grl__scroll > * {
   flex: none;
-}
-.grl__scroll {
-  @include fade.fade-y(var(--grl-fade));
 }
 
 .grl__group {

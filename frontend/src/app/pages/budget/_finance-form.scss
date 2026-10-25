@@ -5,7 +5,6 @@
 // out its own. The form components `@use` this file.
 @use 'field' as f;
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../shared/ui/surface-card' as sc;
 
 :host {
@@ -44,7 +43,6 @@
 }
 
 .ff__body {
-  --ff-fade: var(--space-5);
   flex: 1 1 auto;
   min-height: 0;
   padding: var(--space-4) var(--space-6) var(--space-6);
@@ -55,9 +53,6 @@
    gutter, so the fields go from 16px to 16px of a phone screen. */
 .ff--sheet .ff__body {
   padding: var(--space-2) 0 var(--space-5);
-}
-.ff__body {
-  @include fade.fade-y(var(--ff-fade));
 }
 
 .ff__cols {

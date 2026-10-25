@@ -102,7 +102,7 @@
       </div>
     }
     @if ((board() || all()) && (!phone() || filtersOpen())) {
-      <div class="td__chips" role="group" appScrollFade="x" [attr.aria-label]="'todos.filter.group' | t">
+      <div class="td__chips" role="group" [attr.aria-label]="'todos.filter.group' | t">
         <app-filter-select
           [label]="'todos.filter.assignee' | t"
           [options]="assigneeOptions()"
@@ -144,7 +144,6 @@
   <div
     class="td__body"
     cdkScrollable
-    appScrollFade="y"
     [class.td__body--fab]="canAdd()"
     [class.td__body--rows]="all() || phoneList() || (loading() ? skeleton().natural : rowsBelow())">
     @if (all()) {

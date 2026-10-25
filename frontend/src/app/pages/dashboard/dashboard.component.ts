@@ -39,7 +39,6 @@ import {
   MEDIA,
   mediaQuery,
   NoteComponent,
-  ScrollFadeDirective,
   SearchPillComponent,
   SegBarComponent,
   SideSheetComponent,
@@ -154,7 +153,6 @@ type Loaded<T> = T | null | undefined;
     SideSheetComponent,
     SkeletonComponent,
     StatusTextComponent,
-    ScrollFadeDirective,
     AccountMenuComponent,
   ],
   host: {

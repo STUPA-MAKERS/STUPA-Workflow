@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 @use '../../../shared/ui/drag-preview' as dp;
 
 :host {
@@ -55,13 +54,12 @@
   flex-direction: column;
   gap: var(--space-2);
   min-height: 0;
+  /* The cards are cut at the column head and at the column foot: the area takes back the
+     gap of the column at both ends and keeps the cards at their place with padding. */
+  margin-block: calc(-1 * var(--space-2));
+  padding-block: var(--space-2);
   overflow-y: auto;
   overscroll-behavior: contain;
-}
-/* The cards of a column fade at an end only while more cards lie past it
-   (`appScrollFade="y"`). A phone page does not fade: a line bounds it at both ends. */
-.bv__scroll {
-  @include fade.fade-y(var(--space-5));
 }
 .bv__head {
   display: flex;
@@ -248,7 +246,7 @@
    itself, so a vertical swipe moves the cards and a horizontal one the column.
    `--bv-gutter` is the side padding of the page (`.page-shell`), which the tab bar and the
    pager run over. The pager starts directly at the tab line and ends at the bottom bar, so
-   the cards are cut at these two lines and not by a fade. */
+   the cards are cut at these two lines. */
 .bv--phone {
   --bv-gutter: var(--layout-gutter);
   position: relative;

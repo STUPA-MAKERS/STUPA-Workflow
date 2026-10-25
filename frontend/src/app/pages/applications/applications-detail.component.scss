@@ -302,22 +302,6 @@
   padding-inline: var(--ad-gutter);
   background: var(--color-surface-3);
 }
-/* The fade below the bar: the form fades out as it scrolls under the bar (the shared
-   top fade of a scroll area). At rest it lies over the gap above the first field, in the
-   colour of the ground, so nothing shows. */
-.ad__editFade {
-  position: absolute;
-  inset: 100% 0 auto;
-  height: var(--space-5);
-  background: linear-gradient(to bottom, var(--ad-edit-ground), transparent);
-  pointer-events: none;
-}
-.ad--edit {
-  --ad-edit-ground: var(--color-bg);
-}
-.ad--edit.ad--split {
-  --ad-edit-ground: var(--color-surface-1);
-}
 /* The page side padding of a phone (`.page-shell`). */
 @include bp.phone {
   .ad--edit {
@@ -386,8 +370,7 @@
 }
 
 /* ------------------------------------------------------------------ dialogs */
-/* The tree scrolls here, above the fiscal year. An end fades only
-   when more rows are past it (`appScrollFade` sets the classes). */
+/* The tree scrolls here, above the fiscal year. */
 .ad__ccFy {
   display: block;
   margin-top: var(--space-3);

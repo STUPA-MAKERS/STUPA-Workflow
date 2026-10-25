@@ -28,7 +28,6 @@ import {
   EmptyStateComponent,
   IconComponent,
   InputComponent,
-  ScrollFadeDirective,
   SearchPillComponent,
   SegmentedComponent,
   type SegmentedOption,
@@ -78,7 +77,6 @@ export interface AgendaTodoOption {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     TruncatedDirective,
-    ScrollFadeDirective,
     FormsModule,
     NgTemplateOutlet,
     TranslatePipe,

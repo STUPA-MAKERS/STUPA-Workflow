@@ -108,9 +108,9 @@
   @if (!wide() && votes.vote()) {
     <app-participant-vote class="fv__strip" layout="strip" [position]="votePosition()" />
   }
-  <div class="fv__body fv__fade" [class.fv__body--wide]="wide()" appScrollFade="y">
+  <div class="fv__body" [class.fv__body--wide]="wide()">
     @if (wide()) {
-      <section class="fv__agenda fv__fade" appScrollFade="y" [attr.aria-label]="'meetings.agenda.title' | t">
+      <section class="fv__agenda" [attr.aria-label]="'meetings.agenda.title' | t">
         <ng-container [ngTemplateOutlet]="agendaTpl" />
       </section>
     }
@@ -135,7 +135,7 @@
       }
     </div>
 
-    <aside class="fv__side fv__fade" appScrollFade="y" [attr.aria-label]="'participant.side' | t">
+    <aside class="fv__side" [attr.aria-label]="'participant.side' | t">
       @if (m.status === 'planned') {
         @if (me(); as row) {
           <app-participant-attendance

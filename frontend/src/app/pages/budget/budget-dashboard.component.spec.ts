@@ -230,45 +230,25 @@ describe('BudgetDashboardComponent', () => {
   // ------------------------------------------------------------------ tree
 
   describe('tree', () => {
-    it('scrolls only the tree and fades an end only where more rows are', async () => {
+    it('scrolls only the tree and cuts it at its edges without a fade', async () => {
       const view = await setup();
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
       // The year, the overview and the search are outside the scrolling list.
       expect(tree.querySelector('app-search-pill, .chip')).toBeNull();
       // The pane sits on the page, so the search field keeps its own surface.
       expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
-      const geometry = (scrollHeight: number, scrollTop: number) => {
-        Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
-        Object.defineProperty(tree, 'clientHeight', { value: 300, configurable: true });
-        Object.defineProperty(tree, 'scrollTop', { value: scrollTop, configurable: true });
-        tree.dispatchEvent(new Event('scroll'));
-      };
-      const fades = () => [tree.classList.contains('is-fade-start'), tree.classList.contains('is-fade-end')];
-      geometry(300, 0);
-      expect(fades()).toEqual([false, false]);
-      geometry(900, 0);
-      expect(fades()).toEqual([false, true]);
-      geometry(900, 300);
-      expect(fades()).toEqual([true, true]);
-      geometry(900, 600);
-      expect(fades()).toEqual([true, false]);
+      expect(tree).not.toHaveAttribute('appScrollFade');
     });
 
-    it('scrolls the sheet inside itself on the wide layout and fades only the content', async () => {
+    it('scrolls the sheet inside itself on the wide layout, under its bar', async () => {
       const view = await setup();
       const sheet = view.container.querySelector('article.bd__sheet') as HTMLElement;
       const body = sheet.querySelector(':scope > .bd__sheetBody') as HTMLElement;
-      // The bar stays on top; the body holds the rest of the content, so the card keeps
-      // its background unmasked.
+      // The bar stays on top; the body holds the rest of the content and the card edge
+      // cuts it.
       expect(Array.from(sheet.children).map((el) => el.tagName.toLowerCase())).toEqual(['app-sheet-bar', 'div']);
       expect(body.querySelector('.bd__figs')).toBeTruthy();
-      Object.defineProperty(body, 'scrollHeight', { value: 1200, configurable: true });
-      Object.defineProperty(body, 'clientHeight', { value: 800, configurable: true });
-      Object.defineProperty(body, 'scrollTop', { value: 0, configurable: true });
-      body.dispatchEvent(new Event('scroll'));
-      expect(body).toHaveClass('is-fade-end');
-      expect(body).not.toHaveClass('is-fade-start');
-      expect(sheet).not.toHaveClass('is-fade-end');
+      expect(body).not.toHaveAttribute('appScrollFade');
     });
 
     it('scrolls a row into view when it gets the keyboard focus', async () => {

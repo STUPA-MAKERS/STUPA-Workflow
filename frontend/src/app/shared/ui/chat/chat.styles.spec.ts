@@ -42,10 +42,8 @@ describe('chat styles', () => {
     );
   });
 
-  it('fades the top of the phone log only while messages lie above it', () => {
-    expect(rule(':host(.chat--phone) .chat__log.is-fade-start')).toMatch(
-      /mask-image: linear-gradient\(to bottom, transparent, #000 var\(--chat-log-fade-top, var\(--space-5\)\)\);/,
-    );
+  it('cuts the phone log at its edge and never fades it', () => {
+    expect(css).not.toMatch(/mask-image/);
   });
 
   it('never scrolls the log sideways', () => {

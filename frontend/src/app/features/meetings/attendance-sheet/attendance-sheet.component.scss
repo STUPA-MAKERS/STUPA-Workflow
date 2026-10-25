@@ -1,5 +1,4 @@
 @use 'breakpoints' as bp;
-@use 'scroll-fade' as fade;
 
 :host {
   display: contents;
@@ -49,15 +48,10 @@
 }
 
 .as__scroll {
-  --as-fade: var(--space-5);
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   padding: 0 var(--space-1) var(--space-2);
-}
-/* An end fades only while more content lies past it (`appScrollFade` sets the classes). */
-.as__scroll {
-  @include fade.fade-y(var(--as-fade));
 }
 
 .as__rows,

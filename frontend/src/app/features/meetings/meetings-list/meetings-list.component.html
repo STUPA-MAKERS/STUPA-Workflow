@@ -61,7 +61,6 @@
         appPullRefresh
         [pullRefreshBusy]="timeline.listBusy()"
         (appPullRefresh)="timeline.refreshList()"
-        appScrollFade="y"
         [attr.aria-busy]="timeline.reloadingList() || null"
       >
         @if (timeline.loadingList()) {
