@@ -8,9 +8,9 @@ from uuid import UUID
 
 from sqlalchemy import and_, or_, select
 
-from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.policy import expand, gremium_ids_with
 from app.modules.auth.principal import Principal
 from app.modules.livevote.keepers import keeper_summaries
 from app.modules.livevote.models import Meeting
@@ -274,9 +274,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         # gates on the detail flags, so a list flag that differs offers an action
         # that the API refuses.
         async def ids_for(perm: str) -> set[UUID]:
-            if admin_bypass(principal, perm):
-                return set(all_gids)
-            return await gremium_ids_for(self.session, principal, perm)
+            return expand(await gremium_ids_with(self.session, principal, perm), all_gids)
 
         manage_ids = await ids_for("session.manage")
         write_ids = manage_ids | await ids_for("protocol.write")

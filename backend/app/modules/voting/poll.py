@@ -197,14 +197,12 @@ class PollService:
     async def can_create(self, gremium_id: UUID, principal: Principal) -> bool:
         """Tell whether the principal creates a poll in this Gremium.
 
-        The admin role (``admin_bypass`` with ``vote.manage``) or the gremium
-        permission ``vote.manage`` (scope-capped through ``gremium_ids_for``).
+        The admin role or the gremium permission ``vote.manage``, both scope-capped
+        (``policy.has_gremium_permission``).
         """
-        from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
+        from app.modules.auth.policy import has_gremium_permission
 
-        if admin_bypass(principal, "vote.manage"):
-            return True
-        return gremium_id in await gremium_ids_for(self.session, principal, "vote.manage")
+        return await has_gremium_permission(self.session, principal, "vote.manage", gremium_id)
 
     async def create(self, payload: PollCreate, principal: Principal, *, now: datetime) -> VoteOut:
         """Create the poll of a Gremium, as a draft or open at once.

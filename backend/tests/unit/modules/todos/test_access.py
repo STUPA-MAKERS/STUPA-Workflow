@@ -7,6 +7,7 @@ from typing import Any
 
 import pytest
 
+from app.modules.auth import policy
 from app.modules.auth.principal import Principal
 from app.modules.todos import access as access_mod
 from app.modules.todos.access import BoardAccess, ReadScope
@@ -18,15 +19,17 @@ G2 = uuid.UUID(int=12)
 
 @pytest.fixture
 def grants(monkeypatch: pytest.MonkeyPatch) -> dict[str, set[uuid.UUID]]:
-    """The gremien per permission that ``gremium_ids_for`` answers."""
+    """The gremien per permission that ``policy.held_gremium_ids`` answers."""
     table: dict[str, set[uuid.UUID]] = {"todo.write": {G1}, "todo.configure": set()}
     calls: list[str] = []
 
-    async def _ids(_session: Any, _principal: Principal, perm: str) -> set[uuid.UUID]:
+    async def _ids(
+        _session: Any, _principal: Principal, perm: str, _now: object = None
+    ) -> set[uuid.UUID]:
         calls.append(perm)
         return set(table.get(perm, set()))
 
-    monkeypatch.setattr(access_mod, "gremium_ids_for", _ids)
+    monkeypatch.setattr(policy, "held_gremium_ids", _ids)
     table["_calls"] = calls  # type: ignore[assignment]
     return table
 

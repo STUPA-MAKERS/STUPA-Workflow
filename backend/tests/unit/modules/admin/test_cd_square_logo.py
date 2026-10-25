@@ -38,11 +38,12 @@ from app.modules.admin.cd_logos import (
     check_square_logo,
 )
 from app.modules.admin.cd_resolver import resolve_cd_variant_by_key
-from app.modules.admin.gremium_roles import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.admin.image_size import raster_dimensions
 from app.modules.admin.models import CdVariantLogo
 from app.modules.admin.router import get_cd_variant_service
 from app.modules.admin.service.cd_variants import SquareLogoRef
+from app.modules.auth import policy
+from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,
@@ -450,9 +451,9 @@ async def test_gremium_view_scope_is_the_set_form(monkeypatch: pytest.MonkeyPatc
     view_all = Principal(sub="u", permissions={GREMIUM_VIEW_ALL})
     member = Principal(sub="u")
     capped = Principal(sub="u", scope_permissions=frozenset({"budget.write"}))
-    assert await gremium_roles.gremium_view_scope(None, view_all) is None  # type: ignore[arg-type]
-    assert await gremium_roles.gremium_view_scope(None, member) == {gid}  # type: ignore[arg-type]
-    assert await gremium_roles.gremium_view_scope(None, capped) == set()  # type: ignore[arg-type]
+    assert await policy.gremium_view_scope(None, view_all) is None  # type: ignore[arg-type]
+    assert await policy.gremium_view_scope(None, member) == {gid}  # type: ignore[arg-type]
+    assert await policy.gremium_view_scope(None, capped) == set()  # type: ignore[arg-type]
 
 
 # --- 6. routes --------------------------------------------------------------

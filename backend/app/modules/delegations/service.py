@@ -44,11 +44,12 @@ from sqlalchemy import or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for, gremium_member_ids
+from app.modules.admin.gremium_roles import gremium_member_ids
 from app.modules.admin.models import Gremium, GremiumMembership, GremiumRole
 from app.modules.audit.actions import AuditAction
 from app.modules.audit.service import record as audit_record
 from app.modules.auth.models import Principal as PrincipalRow
+from app.modules.auth.policy import has_gremium_permission, holds_gremium_permission
 from app.modules.auth.principal import Principal
 from app.modules.delegations.models import (
     DelegationSubstitute,
@@ -311,7 +312,7 @@ class DelegationService:
             return
         if gremium_id in await substitute_gremien_for_sub(self.session, actor.sub):
             return
-        if gremium_id in await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM):
+        if await holds_gremium_permission(self.session, actor, _POOL_MANAGE_PERM, gremium_id):
             return
         raise ForbiddenError("Not allowed to view this gremium's delegation roster.")
 
@@ -321,9 +322,7 @@ class DelegationService:
         This is the same rule as `PermissionOps.can_manage` of the meeting module.
         The scope cap applies to both paths.
         """
-        if admin_bypass(actor, _POOL_MANAGE_PERM):
-            return True
-        return gremium_id in await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM)
+        return await has_gremium_permission(self.session, actor, _POOL_MANAGE_PERM, gremium_id)
 
     def _revocable(
         self, meeting: Meeting, now: datetime, *, lead: bool = False, own: bool = True
@@ -1008,8 +1007,7 @@ class DelegationService:
     async def _require_pool_manage(self, gremium_id: UUID, actor: Principal) -> None:
         if actor.has(_ADMIN_PERM):
             return
-        allowed = await gremium_ids_for(self.session, actor, _POOL_MANAGE_PERM)
-        if gremium_id not in allowed:
+        if not await holds_gremium_permission(self.session, actor, _POOL_MANAGE_PERM, gremium_id):
             raise ForbiddenError(
                 "Managing the substitute pool requires admin.delegations "
                 "or the gremium's session.manage permission."

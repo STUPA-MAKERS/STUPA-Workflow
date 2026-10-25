@@ -480,10 +480,12 @@ def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     monkeypatch.setattr("app.modules.flow.service.FlowService", _FakeFlow)
     _FakeFlow.cast_gids = set()
 
-    async def _gremium_ids_for(_session: Any, _principal: Any, perm: str) -> set[Any]:
+    async def _held_gremium_ids(
+        _session: Any, _principal: Any, perm: str, _now: object = None
+    ) -> set[Any]:
         return set(_FakeFlow.cast_gids) if perm == "vote.cast" else set()
 
-    monkeypatch.setattr("app.modules.admin.gremium_roles.gremium_ids_for", _gremium_ids_for)
+    monkeypatch.setattr("app.modules.auth.policy.held_gremium_ids", _held_gremium_ids)
     return _FakeFlow
 
 

@@ -43,7 +43,7 @@ from app.deps import (
 )
 from app.modules.admin.branding import Branding
 from app.modules.admin.cd_logos import LogoSlot
-from app.modules.admin.gremium_roles import GremiumRoleService, can_view_gremium
+from app.modules.admin.gremium_roles import GremiumRoleService
 from app.modules.admin.oidc_mappings import OidcMappingService
 from app.modules.admin.principal_merge import PrincipalMergeService
 from app.modules.admin.principal_revoke import PrincipalRevokeService
@@ -110,6 +110,7 @@ from app.modules.admin.service.cd_variants import SquareLogoRef
 from app.modules.admin.site_config_service import SiteConfigService
 from app.modules.applications.guest_settings import GuestSettingsService
 from app.modules.auth.login_settings import LoginSettingsService
+from app.modules.auth.policy import can_view_gremium
 from app.modules.livevote.open_window import MeetingSettingsService
 from app.modules.notifications.auto import AutoMailer, get_auto_mailer
 from app.shared.antiabuse import body_cap

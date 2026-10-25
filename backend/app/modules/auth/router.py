@@ -353,9 +353,9 @@ async def _session_manage_gremien(db: DbSession, principal: Principal) -> list[U
     source as `MeetingService.can_manage`. The frontend gate for "create meeting"
     and the server decision therefore stay congruent.
     """
-    from app.modules.admin.gremium_roles import gremium_ids_for
+    from app.modules.auth.policy import held_gremium_ids
 
-    return sorted(await gremium_ids_for(db, principal, "session.manage"), key=str)
+    return sorted(await held_gremium_ids(db, principal, "session.manage"), key=str)
 
 
 async def _gremium_permissions(

@@ -14,7 +14,7 @@ from uuid import UUID, uuid4
 
 import pytest
 
-from app.modules.admin import gremium_roles
+from app.modules.auth import policy
 from app.modules.auth.principal import Principal
 from app.modules.auth.rbac import vote_group_key
 from app.modules.voting.service import VotingService
@@ -40,10 +40,10 @@ def rights(monkeypatch: pytest.MonkeyPatch) -> dict[str, set[UUID]]:
     """Stub the gremium rights per permission."""
     state: dict[str, set[UUID]] = {}
 
-    async def _ids_for(_s: Any, _p: Principal, perm: str) -> set[UUID]:
+    async def _ids_for(_s: Any, _p: Principal, perm: str, _now: object = None) -> set[UUID]:
         return set(state.get(perm, set()))
 
-    monkeypatch.setattr(gremium_roles, "gremium_ids_for", _ids_for)
+    monkeypatch.setattr(policy, "held_gremium_ids", _ids_for)
     return state
 
 
