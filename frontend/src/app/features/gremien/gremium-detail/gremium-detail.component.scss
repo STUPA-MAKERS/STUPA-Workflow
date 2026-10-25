@@ -136,8 +136,12 @@
   .gd__body {
     padding-top: var(--space-4);
   }
+  // The pager runs down to the bottom bar, so a swipe below a short tab moves it too; the
+  // page keeps the room of the main area below its content.
   .gd__pager {
     --tab-pager-bleed: var(--space-4);
     --tab-pager-page-top: var(--space-4);
+    --tab-pager-page-bottom: var(--main-pad-bottom, 0px);
+    margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
   }
 }

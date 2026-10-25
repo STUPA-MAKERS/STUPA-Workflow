@@ -283,9 +283,12 @@
     flex: 1 1 0;
     min-height: 0;
   }
+  // The page of the tab pager is the scroller of the log, and it ends at the bottom bar, so
+  // the composer sticks to the foot of the page, not the height of the bar above it.
   .td__panel--log .td__chat {
     --chat-log-inset-top: calc(4px + var(--space-5));
     --chat-log-fade-top: 0px;
+    --chat-composer-bottom: 0px;
   }
   .td__panel--details {
     padding: var(--space-5) 0 var(--main-pad-bottom, 0px);
