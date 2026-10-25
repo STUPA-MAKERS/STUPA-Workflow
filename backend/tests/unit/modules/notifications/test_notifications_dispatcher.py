@@ -44,10 +44,10 @@ async def test_dispatch_notify_calls_service(monkeypatch: pytest.MonkeyPatch) ->
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             captured["session"] = session
 
-        async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw):
             captured["action"] = action
             captured["kw"] = kw
             return 1
@@ -81,10 +81,10 @@ async def test_dispatch_notify_links_a_guest_to_the_applicant_page(
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw):
             captured["kw"] = kw
             return 1
 
@@ -103,10 +103,10 @@ async def test_dispatch_skips_non_notify(monkeypatch: pytest.MonkeyPatch) -> Non
     called: list[bool] = []
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             called.append(True)
 
-        async def handle_notify_action(self, *a, **k):  # noqa: ANN002, ANN003
+        async def handle_notify_action(self, *a, **k):
             called.append(True)
             return 1
 
@@ -120,10 +120,10 @@ async def test_dispatch_notify_merges_context(monkeypatch: pytest.MonkeyPatch) -
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw):
             captured["kw"] = kw
             return 1
 
@@ -144,19 +144,19 @@ async def test_dispatch_task_notify_sends_kind_mail(
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             pass
 
-        async def send_kind_mail(self, recipients, **kw):  # noqa: ANN001, ANN003
+        async def send_kind_mail(self, recipients, **kw):
             captured["recipients"] = recipients
             captured["kw"] = kw
             return True
 
-    async def fake_actionable(session, *, application_id, state):  # noqa: ANN001
+    async def fake_actionable(session, *, application_id, state):
         captured["application_id"] = application_id
         return ["team@x.de"]
 
-    async def fake_state_actionable(session, state):  # noqa: ANN001
+    async def fake_state_actionable(session, state):
         return True
 
     import app.modules.notifications.recipients as recipients_mod
@@ -189,14 +189,14 @@ async def test_dispatch_task_notify_skips_non_actionable_state(
     captured: dict[str, object] = {}
 
     class FakeService:
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             pass
 
-        async def send_kind_mail(self, recipients, **kw):  # noqa: ANN001, ANN003
+        async def send_kind_mail(self, recipients, **kw):
             captured["recipients"] = recipients
             return True
 
-    async def fake_state_actionable(session, state):  # noqa: ANN001
+    async def fake_state_actionable(session, state):
         return False
 
     import app.modules.notifications.recipients as recipients_mod
@@ -221,10 +221,10 @@ class _CapturingService:
 
     captured: dict[str, object] = {}
 
-    def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+    def __init__(self, session, *, queue, settings) -> None:
         pass
 
-    async def handle_notify_action(self, action, **kw):  # noqa: ANN001, ANN003
+    async def handle_notify_action(self, action, **kw):
         type(self).captured.update(kw)
         return 1
 
@@ -252,9 +252,9 @@ async def test_applicant_only_notify_uses_the_application_language(
     from tests._support.notifications_fakes import FakeQueue, FakeResolver
 
     class _Service(NotificationService):
-        def __init__(self, session, *, queue, settings) -> None:  # noqa: ANN001
+        def __init__(self, session, *, queue, settings) -> None:
             super().__init__(session, queue=queue, settings=settings)
-            self.resolver = FakeResolver(["applicant@example.org"])  # type: ignore[assignment]
+            self.resolver = FakeResolver(["applicant@example.org"])
 
     monkeypatch.setattr(mod, "NotificationService", _Service)
     state_id = uuid.uuid4()
@@ -390,14 +390,14 @@ async def test_unconfirmed_application_gets_no_flow_mail(
     sent: list[str] = []
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, *a, **k) -> int:  # noqa: ANN002, ANN003
+        async def handle_notify_action(self, *a, **k) -> int:
             sent.append("notify")
             return 1
 
-        async def send_kind_mail(self, *a, **k) -> bool:  # noqa: ANN002, ANN003
+        async def send_kind_mail(self, *a, **k) -> bool:
             sent.append("task")
             return True
 
@@ -415,10 +415,10 @@ async def test_notify_for_a_missing_application_still_runs(
     sent: list[object] = []
 
     class FakeService:
-        def __init__(self, *a, **k) -> None:  # noqa: ANN002, ANN003
+        def __init__(self, *a, **k) -> None:
             pass
 
-        async def handle_notify_action(self, action, **kw) -> int:  # noqa: ANN001, ANN003
+        async def handle_notify_action(self, action, **kw) -> int:
             sent.append(kw["application_type_id"])
             return 1
 

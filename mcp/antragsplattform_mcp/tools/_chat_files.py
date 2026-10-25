@@ -16,6 +16,7 @@ module: it is not in a tool result.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 from ..client import ApiError
@@ -34,13 +35,11 @@ async def _discard(ids: list[str], token: str | None) -> None:
     if token is None:
         return
     for attachment_id in ids:
-        try:
+        with contextlib.suppress(ApiError):
             await api().delete(
                 f"/apply/attachments/{attachment_id}",
                 headers={DRAFT_TOKEN_HEADER: token},
             )
-        except ApiError:
-            pass
 
 
 async def post_message(

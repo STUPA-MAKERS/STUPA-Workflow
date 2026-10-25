@@ -175,7 +175,7 @@ async def test_the_reporter_reads_and_answers_only_the_public_thread(
     async with maker() as session:
         ticket = await session.get(Ticket, uuid.UUID(ticket_id))
         assert ticket is not None
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         await TicketService(session, files=files).anonymize(ticket, actor="test")
         await session.commit()
         authors = (

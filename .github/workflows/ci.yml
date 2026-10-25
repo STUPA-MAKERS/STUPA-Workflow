@@ -394,8 +394,30 @@ jobs:
       - run: pip install -e '.[dev]'
       - name: Ruff lint
         run: ruff check .
+      - name: basedpyright
+        run: basedpyright
       - name: Pytest
         run: pytest -q
+
+  # The admin CLI (admin-cli/) has no tests. This job runs the same lint and type
+  # check as the other Python packages, so the CLI keeps one configuration with them.
+  admin-cli:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin-cli
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: admin-cli/pyproject.toml
+      - run: pip install -e '.[dev]'
+      - name: Ruff lint
+        run: ruff check .
+      - name: basedpyright
+        run: basedpyright
 
   compose:
     runs-on: ubuntu-latest

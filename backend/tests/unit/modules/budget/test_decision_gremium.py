@@ -158,7 +158,7 @@ async def test_assign_budget_refused_in_a_budget_vote_state() -> None:
     state = State(kind="vote", config={"gremiumSource": "budget"})
     app = _app_in(uuid.uuid4())
     sess = fake_session(result(app))
-    sess._gets = [state]  # noqa: SLF001 - the State lookup goes through `get`
+    sess._gets = [state]  # the State lookup goes through `get`
     with pytest.raises(ConflictError) as err:
         await BudgetTreeService(sess).assign_budget(
             app.id, AssignBudgetRequest(budgetId=None)
@@ -170,6 +170,6 @@ async def test_assign_budget_allowed_in_a_fixed_vote_state() -> None:
     state = State(kind="vote", config={"gremiumId": str(uuid.uuid4())})
     app = _app_in(uuid.uuid4())
     sess = fake_session(result(app))
-    sess._gets = [state]  # noqa: SLF001
+    sess._gets = [state]
     out = await BudgetTreeService(sess).assign_budget(app.id, AssignBudgetRequest(budgetId=None))
     assert out.budget_id is None

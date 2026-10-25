@@ -52,7 +52,7 @@ def _row(**over: object) -> SimpleNamespace:
     return SimpleNamespace(**base)
 
 
-def _run(coro):  # noqa: ANN001, ANN202 — test helper
+def _run(coro):  # test helper
     return asyncio.run(coro)
 
 

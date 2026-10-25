@@ -475,7 +475,7 @@ async def test_transfer_errors() -> None:
     async def _parallel(obj: Any) -> None:
         obj.board_id = uuid.uuid4()
 
-    session.refresh = _parallel  # type: ignore[method-assign]
+    session.refresh = _parallel
     with pytest.raises(ConflictError) as moved:
         await service.transfer(c.id, _transfer(t), USER)
     assert moved.value.code == "card_moved"
@@ -491,7 +491,7 @@ async def test_transfer_locks_the_boards_in_id_order() -> None:
     async def _lock(board_id: uuid.UUID) -> None:
         seen.append(board_id)
 
-    service._lock_board = _lock  # type: ignore[method-assign]
+    service._lock_board = _lock
     session.scalars_q[:] = [[column(low.id)], [], [], [], []]
     await service.transfer(c.id, _transfer(low), USER)
     assert seen == [low.id, b.id]
@@ -594,7 +594,7 @@ async def test_a_write_after_a_parallel_transfer_answers_card_moved() -> None:
     async def _transferred(obj: Any) -> None:
         obj.board_id = elsewhere.id
 
-    session.refresh = _transferred  # type: ignore[method-assign]
+    session.refresh = _transferred
     with pytest.raises(ConflictError) as moved:
         await service.move(c.id, _move(col), USER)
     assert moved.value.code == "card_moved"
@@ -645,9 +645,9 @@ def test_place_tells_whether_it_respread() -> None:
     col = column(b.id)
     live = [card(b, col, rank="b"), card(b, col, rank="d")]
     moved = card(b, col, rank="")
-    assert svc_mod._place(live, 1, moved) is False  # pyright: ignore[reportPrivateUsage]
+    assert svc_mod._place(live, 1, moved) is False
     live[1].rank = "b"
-    assert svc_mod._place(live, 1, moved) is True  # pyright: ignore[reportPrivateUsage]
+    assert svc_mod._place(live, 1, moved) is True
 
 
 LONG = "z" * MAX_LENGTH
@@ -677,15 +677,15 @@ def test_append_keeps_short_ranks_and_rebalances_long_ones() -> None:
     col = column(b.id)
     live = [card(b, col, rank="b"), card(b, col, rank="c")]
     new = [card(b, col, rank=""), card(b, col, rank="")]
-    svc_mod._append(live, new)  # pyright: ignore[reportPrivateUsage]
+    svc_mod._append(live, new)
     assert [x.rank for x in live] == ["b", "c"]
     assert "c" < new[0].rank < new[1].rank
     live[1].rank = LONG
-    svc_mod._append(live, new)  # pyright: ignore[reportPrivateUsage]
+    svc_mod._append(live, new)
     ranks = [x.rank for x in (*live, *new)]
     assert ranks == sorted(ranks) and len(set(ranks)) == 4
     assert all(len(r) <= 2 for r in ranks)
-    svc_mod._append([], new[:1])  # pyright: ignore[reportPrivateUsage]
+    svc_mod._append([], new[:1])
     assert new[0].rank == "i"
 
 

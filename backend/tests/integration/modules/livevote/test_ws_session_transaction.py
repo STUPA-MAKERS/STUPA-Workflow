@@ -93,7 +93,7 @@ async def test_cast_ends_the_transaction(maker: async_sessionmaker[AsyncSession]
         async def _tally(vote: Any) -> None:
             published.append(vote)
 
-        conn.publisher.vote_tally = _tally  # type: ignore[method-assign]
+        conn.publisher.vote_tally = _tally
         await conn._handle_cast({"type": "cast", "voteId": str(vote_id), "choice": "yes"})
         assert [m for m in conn.ws.sent if m["type"] == "error"] == []  # type: ignore[attr-defined]
         assert session.in_transaction() is False

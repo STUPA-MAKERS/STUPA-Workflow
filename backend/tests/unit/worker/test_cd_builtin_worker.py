@@ -78,7 +78,7 @@ async def test_job_gives_up_after_the_last_try(monkeypatch: pytest.MonkeyPatch) 
 def test_default_sessionmaker_is_the_app_one(monkeypatch: pytest.MonkeyPatch) -> None:
     sentinel = object()
     monkeypatch.setattr(cd_builtin, "get_sessionmaker", lambda: sentinel)
-    assert cd_builtin._sessionmaker({}) is sentinel  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+    assert cd_builtin._sessionmaker({}) is sentinel
 
 
 class _Redis:

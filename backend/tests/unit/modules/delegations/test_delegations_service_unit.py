@@ -104,7 +104,7 @@ def _payload(delegate_id: Any, *, voting: bool = False) -> DelegationCreate:
     return DelegationCreate(meetingId=MEETING_ID, delegateId=delegate_id, delegateVoting=voting)
 
 
-def _names(*rows: tuple[Any, str | None, str | None]):  # noqa: ANN202
+def _names(*rows: tuple[Any, str | None, str | None]):
     return result(*rows)
 
 
@@ -192,8 +192,8 @@ def _happy_db(
         _names((me.id, "Me", None), (delegate.id, "Other", None)),
     )
     db.get_results = [meeting or _meeting(), gremium or _gremium()]
-    db._me = me  # type: ignore[attr-defined]
-    db._delegate = delegate  # type: ignore[attr-defined]
+    db._me = me
+    db._delegate = delegate
     return db
 
 

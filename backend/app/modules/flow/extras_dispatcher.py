@@ -72,7 +72,7 @@ class FlowExtrasActionDispatcher:
                     await self._assign_budget_from_applicant_gremium(action)
                 elif action.type == "assignBudgetFromMap":
                     await self._assign_budget_from_map(action)
-            except Exception:  # noqa: BLE001 — an action failure must not undo the
+            except Exception:  # an action failure must not undo the
                 # committed state change nor block the transition's remaining actions.
                 logger.exception(
                     "flow action %s failed (key=%s) — skipped",

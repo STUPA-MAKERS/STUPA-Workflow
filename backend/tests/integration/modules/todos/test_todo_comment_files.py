@@ -156,7 +156,7 @@ async def test_the_erasure_of_a_personal_board_removes_the_comment_files(
             201,
         )
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         await erase_todos(session, me_id, files=files, actor="dpo")
         # The objects stay until the commit, so a rollback keeps every file whole.
         assert storage.blobs != {}
@@ -165,7 +165,7 @@ async def test_the_erasure_of_a_personal_board_removes_the_comment_files(
         row = await session.get(Attachment, draft)
         assert row is not None and row.storage_key in storage.blobs
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         keys = await erase_todos(session, me_id, files=files, actor="dpo")
         await session.commit()
         await files.remove_objects(keys)

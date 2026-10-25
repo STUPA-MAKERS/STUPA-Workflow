@@ -311,7 +311,7 @@ async def test_finalize_dual_render(session: AsyncSession) -> None:
         session,
         storage=cast("ObjectStorage", storage),
         typst=cast("TypstClient", typst),
-        mail_queue=mail_queue,  # pyright: ignore[reportArgumentType]
+        mail_queue=mail_queue,
     )
 
     await svc.finalize(protocol.id, now=datetime.now(UTC))

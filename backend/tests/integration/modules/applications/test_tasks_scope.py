@@ -122,7 +122,7 @@ async def _member(
     return row
 
 
-async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:  # noqa: PLR0915
+async def _seed(maker: async_sessionmaker[AsyncSession]) -> _World:
     world = _World()
     tag = uuid.uuid4().hex[:8]
     async with maker() as session:

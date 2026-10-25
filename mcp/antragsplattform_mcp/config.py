@@ -8,6 +8,7 @@ rights at the RBAC permissions of the logged-in user, intersected with the scope
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 from dataclasses import dataclass
@@ -21,7 +22,7 @@ CLIENT_ID = "antragsplattform-mcp"
 # must set that variable.
 try:
     from ._baked import BASE_URL as _BAKED_URL  # type: ignore[import-not-found]
-except Exception:  # noqa: BLE001
+except Exception:
     _BAKED_URL = ""
 
 # Ask for the full curated set by default. The server caps the grant at the rights of the
@@ -43,7 +44,7 @@ class Config:
     scope: str
 
     @classmethod
-    def from_env(cls) -> "Config":
+    def from_env(cls) -> Config:
         # The environment variable wins. Otherwise use the URL baked in at download time.
         base = (os.environ.get("ANTRAGSPLATTFORM_URL", "").strip() or _BAKED_URL).strip()
         if not base:
@@ -72,11 +73,9 @@ class Config:
         # does NOT tighten a directory that already exists and may be world-listable. The
         # chmod below enforces 0700 in that case.
         root.mkdir(parents=True, exist_ok=True, mode=0o700)
-        try:
+        # Best effort: a non-owner or an exotic file system can reject chmod. The
+        # token files themselves go to disk with mode 0600 through os.open and
+        # os.replace, so the secrets stay safe.
+        with contextlib.suppress(OSError):
             os.chmod(root, 0o700)
-        except OSError:
-            # Best effort: a non-owner or an exotic file system can reject chmod. The
-            # token files themselves go to disk with mode 0600 through os.open and
-            # os.replace, so the secrets stay safe.
-            pass
         return root / f"token-{key}.json"

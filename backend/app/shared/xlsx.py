@@ -202,7 +202,7 @@ def build_applications_workbook(
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl always returns an active sheet
+    assert ws is not None  # openpyxl always returns an active sheet
     ws.title = "Anträge"
     _header_row(ws, headers)
 
@@ -249,7 +249,7 @@ def build_expenses_workbook(items: Iterable[Any], locale: str = "de") -> bytes:
     ]
     wb = Workbook()
     ws = wb.active
-    assert ws is not None  # noqa: S101 - openpyxl always returns an active sheet
+    assert ws is not None  # openpyxl always returns an active sheet
     ws.title = "Buchungen"
     _header_row(ws, headers)
     for e in items:
@@ -288,7 +288,7 @@ def build_auskunft_workbook(
 
     wb = Workbook()
     ws_account = wb.active
-    assert ws_account is not None  # noqa: S101 - openpyxl always returns an active sheet
+    assert ws_account is not None  # openpyxl always returns an active sheet
     ws_account.title = "Konto"
     acc_headers = ["Feld", "Wert"]
     _header_row(ws_account, acc_headers)

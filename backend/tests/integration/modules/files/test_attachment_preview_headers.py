@@ -134,7 +134,7 @@ def _api(
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
+        object_storage: ObjectStorage = storage
         return FilesService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files

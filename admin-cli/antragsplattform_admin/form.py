@@ -70,7 +70,7 @@ class FormController:
         self._context.invalidate()
         try:
             form.on_submit(form)
-        except Exception as error:  # noqa: BLE001 — a submit must never kill the UI
+        except Exception as error:  # a submit must never kill the UI
             self._context.error(f"{type(error).__name__}: {error}")
 
     def move(self, delta: int) -> None:

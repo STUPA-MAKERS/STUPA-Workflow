@@ -260,7 +260,7 @@ async def test_square_upload_replaces_the_old_row_and_object() -> None:
         flushes.append((len(sess.deleted), len(sess.added)))
         await plain_flush()
 
-    sess.flush = tracking_flush  # type: ignore[method-assign]
+    sess.flush = tracking_flush
     out = await s.upload_logo(
         variant.id, jpeg(400, 400), slot="square", filename="neu.jpg", actor="a"
     )

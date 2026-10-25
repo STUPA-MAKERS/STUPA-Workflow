@@ -40,7 +40,7 @@ from app.modules.media.refs import is_image_path
 try:  # marko is optional here. The primary regex protection works without it.
     import marko as _marko  # pyright: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - primary regex protection works without marko
-    _marko = None  # type: ignore[assignment]
+    _marko = None
 
 
 # RCE defense in depth.

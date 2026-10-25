@@ -35,12 +35,13 @@ line-length = 100
 extend-exclude = ["vendor", "packages"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF100"]
 
 [tool.basedpyright]
 pythonVersion = "3.13"
 typeCheckingMode = "standard"
 reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = "error"
 exclude = ["vendor", "packages", ".venv", "tests/fixtures"]
 
 [tool.pytest.ini_options]

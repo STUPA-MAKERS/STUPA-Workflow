@@ -89,7 +89,7 @@ async def process_poll_reminders(ctx: dict[str, Any], now: datetime | None = Non
                     reminder=True,
                 ):
                     sent += 1
-            except Exception:  # noqa: BLE001 - one bad poll must not stop the run
+            except Exception:  # one bad poll must not stop the run
                 logger.exception("poll_reminder mail failed for %s", vote.id)
                 continue
             vote.reminded_at = moment

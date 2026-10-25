@@ -43,7 +43,7 @@ async def session(
     await eng.dispose()
 
 
-async def _status(session: AsyncSession, vote_id) -> tuple[str, datetime | None]:  # noqa: ANN001
+async def _status(session: AsyncSession, vote_id) -> tuple[str, datetime | None]:
     vote = await session.get(Vote, vote_id)
     assert vote is not None
     await session.refresh(vote)

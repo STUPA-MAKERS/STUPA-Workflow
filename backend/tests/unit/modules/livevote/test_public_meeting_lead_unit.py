@@ -292,7 +292,7 @@ async def test_apply_public_rules() -> None:
             m,  # type: ignore[arg-type]
             MeetingPatch(guestsMode="watch"),
             lead,
-            NOW,  # type: ignore[arg-type]
+            NOW,
         )
     assert err.value.code == "guest_vote_open"
     # Switch off removes the guests.
@@ -300,7 +300,7 @@ async def test_apply_public_rules() -> None:
         m,  # type: ignore[arg-type]
         MeetingPatch(publicJoin=False),
         lead,
-        NOW,  # type: ignore[arg-type]
+        NOW,
     )
     assert m.public_join is False and off is not None and off.counts is True
     # Watch while off: only the mode changes.
@@ -308,7 +308,7 @@ async def test_apply_public_rules() -> None:
         m,  # type: ignore[arg-type]
         MeetingPatch(guestsMode="watch"),
         lead,
-        NOW,  # type: ignore[arg-type]
+        NOW,
     )
     assert m.guests_mode == "watch" and watch is not None
 

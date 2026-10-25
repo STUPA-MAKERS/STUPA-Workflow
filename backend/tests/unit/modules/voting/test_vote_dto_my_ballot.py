@@ -21,7 +21,7 @@ OPENED = datetime(2026, 10, 1, 10, 0, tzinfo=UTC)
 CLOSED = datetime(2026, 10, 1, 10, 5, tzinfo=UTC)
 
 
-def _row(*, meeting_id, gremium):  # noqa: ANN001, ANN202
+def _row(*, meeting_id, gremium):
     return SimpleNamespace(
         id=uuid4(),
         meeting_id=meeting_id,

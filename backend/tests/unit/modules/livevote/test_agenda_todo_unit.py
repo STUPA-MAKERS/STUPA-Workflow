@@ -57,7 +57,7 @@ def _service(session: ScriptedSession, status: str = "live") -> tuple[AgendaServ
 
     service._meeting = _meeting  # type: ignore[method-assign]
     service._next_position = _next  # type: ignore[method-assign]
-    service._audit = _audit  # type: ignore[method-assign]
+    service._audit = _audit
     return service, audits
 
 
@@ -96,7 +96,7 @@ def test_the_route_adds_a_todo_item(monkeypatch: pytest.MonkeyPatch) -> None:
                 id=MEETING,
                 gremiumId=GREMIUM,
                 title="GV",
-                status="live",  # type: ignore[arg-type]
+                status="live",
                 createdAt=datetime(2026, 6, 8, tzinfo=UTC),
                 canWrite=True,
             )

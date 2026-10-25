@@ -89,7 +89,7 @@ def test_rollup_committed() -> None:
     assert out["other"] == Decimal("5")   # separate subtree
 
 
-def _node(  # noqa: ANN001
+def _node(
     nid, parent, gremium, key, path, name="N", currency="EUR", active=True,
     color=None, accepted=(), denied=(), fiscal_start_month=1, fiscal_start_day=1,
     hidden_in_budget=False, view_gremium_id=None, decision_gremium_id=None,

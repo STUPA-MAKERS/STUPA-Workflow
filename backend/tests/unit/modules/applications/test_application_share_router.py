@@ -41,7 +41,7 @@ class _Rows:
     def __init__(self, rows: list[object]) -> None:
         self._rows = rows
 
-    def __iter__(self):  # noqa: ANN204
+    def __iter__(self):
         return iter(self._rows)
 
     def all(self) -> list[object]:

@@ -40,7 +40,7 @@ from tests.unit.modules.budget.test_tree_service_cov import (
 _CLOSED_AT = datetime(2026, 3, 1, tzinfo=UTC)
 
 
-def _closed_fy(**kw):  # noqa: ANN003, ANN202
+def _closed_fy(**kw):
     fy = _fy(**kw)
     fy.closed_at = _CLOSED_AT
     fy.closed_by = "kasse"

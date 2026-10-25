@@ -224,7 +224,7 @@ async def test_get_returns_row() -> None:
 async def test_execute_applicant_dispatches_anonymize(monkeypatch) -> None:
     calls: list[tuple[UUID, str, object, bool]] = []
 
-    async def fake_anonymize(_self, application_id, *, files, actor, commit):  # type: ignore[no-untyped-def]
+    async def fake_anonymize(_self, application_id, *, files, actor, commit):
         # Here files is None and commit is False, which proves the dispatch path.
         calls.append((application_id, actor, files, commit))
 

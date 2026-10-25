@@ -108,7 +108,7 @@ async def test_mirror_writes_the_archive_objects_and_removes_the_rest() -> None:
     service = _sessionless()
     service.attachments = attachments  # type: ignore[assignment]
     with arch.open_tar(_tar_bytes({"kept.pdf": b"new", "fresh.pdf": b"new"})) as tar:
-        await service._mirror_objects(tar)  # noqa: SLF001
+        await service._mirror_objects(tar)
     assert attachments.objects == {"kept.pdf": b"new", "fresh.pdf": b"new"}
     assert attachments.removed == ["stale.pdf"]
 
@@ -121,7 +121,7 @@ async def test_mirror_survives_an_object_it_cannot_remove() -> None:
     service = _sessionless()
     service.attachments = attachments  # type: ignore[assignment]
     with arch.open_tar(_tar_bytes({"fresh.pdf": b"new"})) as tar:
-        await service._mirror_objects(tar)  # noqa: SLF001
+        await service._mirror_objects(tar)
     assert attachments.objects["fresh.pdf"] == b"new"
 
 
@@ -140,30 +140,28 @@ async def test_a_missing_binary_is_reported_as_a_missing_binary() -> None:
     """The image must not be able to fail silently on a missing pg_dump."""
     service = _sessionless()
     with pytest.raises(BackupError, match="is not installed in this image"):
-        await service._run(  # noqa: SLF001
-            ["definitely-not-a-real-binary-9f3a"], what="pg_dump"
-        )
+        await service._run(["definitely-not-a-real-binary-9f3a"], what="pg_dump")
 
 
 @pytest.mark.asyncio
 async def test_a_non_zero_exit_fails_the_run() -> None:
     service = _sessionless()
     with pytest.raises(BackupError, match="pg_dump failed"):
-        await service._run(["false"], what="pg_dump")  # noqa: SLF001
+        await service._run(["false"], what="pg_dump")
 
 
 @pytest.mark.asyncio
 async def test_pg_restore_tolerates_a_non_zero_exit() -> None:
     """`--clean` warns for every object the target lacks, which sets a non-zero code."""
     service = _sessionless()
-    await service._run(["false"], what="pg_restore", tolerate_nonzero=True)  # noqa: SLF001
+    await service._run(["false"], what="pg_restore", tolerate_nonzero=True)
 
 
 @pytest.mark.asyncio
 async def test_a_run_that_overruns_its_timeout_is_killed() -> None:
     service = _sessionless(backup_subprocess_timeout_seconds=1)
     with pytest.raises(BackupError, match="timed out"):
-        await service._run(["sleep", "30"], what="pg_dump")  # noqa: SLF001
+        await service._run(["sleep", "30"], what="pg_dump")
 
 
 # -------------------------------------------------------------------- import route
@@ -185,11 +183,11 @@ class _ImportSession:
 
     async def flush(self) -> None:
         for row in self.pending:
-            if row.id is None:  # type: ignore[comparison-overlap]
+            if row.id is None:
                 row.id = uuid4()
-            if row.created_at is None:  # type: ignore[comparison-overlap]
+            if row.created_at is None:
                 row.created_at = CREATED_AT
-            if row.pinned is None:  # type: ignore[comparison-overlap]
+            if row.pinned is None:
                 row.pinned = False
         self.pending.clear()
 

@@ -372,7 +372,7 @@ async def test_purge_expired_none_rowcount() -> None:
     async def _exec(_stmt: Any) -> Any:
         return SimpleNamespace(rowcount=None)
 
-    session.execute = _exec  # type: ignore[method-assign]
+    session.execute = _exec
     assert await wret._purge_expired(_maker(session), NOW) == (0, 0)
 
 

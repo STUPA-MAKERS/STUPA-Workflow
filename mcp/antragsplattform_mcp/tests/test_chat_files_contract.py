@@ -78,8 +78,8 @@ from app.modules.tickets.schemas import (  # noqa: E402
     TicketBlockedSender,
     TicketDetail,
     TicketNoteOut,
-    TicketReporter,
     TicketRef,
+    TicketReporter,
 )
 from app.modules.todos.router import get_todo_service  # noqa: E402
 from app.modules.todos.schemas import TodoCommentOut  # noqa: E402
@@ -118,7 +118,7 @@ PNG = bytes.fromhex(
 class _Drafts:
     """The draft store of `POST /apply/attachments` with the real MIME check."""
 
-    class files:  # noqa: N801 - the route reads `drafts.files.max_bytes`
+    class files:  # the route reads `drafts.files.max_bytes`
         max_bytes = 10 * 1024 * 1024
 
     def __init__(self) -> None:

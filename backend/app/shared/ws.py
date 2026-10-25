@@ -74,10 +74,10 @@ async def _neutralize_close(websocket: WebSocket) -> None:
     absorbs the second close.
     """
 
-    async def _noop(code: int = 1000, reason: str | None = None) -> None:  # noqa: ARG001
+    async def _noop(code: int = 1000, reason: str | None = None) -> None:
         return None
 
-    websocket.close = _noop  # type: ignore[method-assign]
+    websocket.close = _noop
 
 
 async def resolve_ws_principal(

@@ -96,7 +96,7 @@ async def _broadcast_meeting_state(ctx: dict[str, Any], protocol_id: UUID) -> No
     )
     try:
         await RedisBroker(redis).publish(meeting_channel(meeting.id), event.dump())
-    except Exception as exc:  # noqa: BLE001 - broadcast is not render-critical
+    except Exception as exc:  # broadcast is not render-critical
         logger.warning(
             "meeting_state broadcast failed (protocol=%s): %s", protocol_id, exc
         )
@@ -139,7 +139,7 @@ async def render_protocol(ctx: dict[str, Any], protocol_id: str) -> str:
         await _revert_to_draft(ctx, pid)
         await _broadcast_meeting_state(ctx, pid)
         return "dead"
-    except Exception as exc:  # noqa: BLE001 - permanent (e.g. a malformed formula)
+    except Exception as exc:  # permanent (e.g. a malformed formula)
         logger.error(
             "protocol render failed permanently (protocol=%s): %s", protocol_id, exc
         )
@@ -208,7 +208,7 @@ async def heal_public_protocols(ctx: dict[str, Any]) -> str:
                 result = await _service(ctx, session).backfill_public(
                     gremium_id, retry_failed=False
                 )
-        except Exception:  # noqa: BLE001 - one gremium must not stop the others
+        except Exception:  # one gremium must not stop the others
             logger.exception("public heal failed (gremium=%s)", gremium_id)
             failed += 1
             continue

@@ -802,7 +802,7 @@ def test_parse_invoice_currency_unsupported(fake: _FakeService) -> None:
     async def _raise(data: bytes, *, filename: str | None) -> InvoiceParseResult:
         raise UnsupportedInvoiceCurrencyError("USD")
 
-    fake.parse_invoice_file = _raise  # type: ignore[assignment]
+    fake.parse_invoice_file = _raise
     resp = _client(fake).post(
         "/api/invoices/parse",
         files={"file": ("r.pdf", b"%PDF-1.4 fake", "application/pdf")},
@@ -816,7 +816,7 @@ def test_parse_invoice_not_zugferd(fake: _FakeService) -> None:
     async def _raise(data: bytes, *, filename: str | None) -> InvoiceParseResult:
         raise NotZugferdError("no xml")
 
-    fake.parse_invoice_file = _raise  # type: ignore[assignment]
+    fake.parse_invoice_file = _raise
     resp = _client(fake).post(
         "/api/invoices/parse",
         files={"file": ("r.pdf", b"%PDF-1.4 fake", "application/pdf")},

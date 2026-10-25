@@ -687,7 +687,7 @@ async def _run_deliver_magic_link(
 
     seen: dict[str, Any] = {}
 
-    async def _request_magic_link(db, settings, *, email, application_id, deliver):  # noqa: ANN001
+    async def _request_magic_link(db, settings, *, email, application_id, deliver):
         seen["email"] = email
         seen["application_id"] = application_id
         # Call the injected deliver once to cover the inner closure.
@@ -744,7 +744,7 @@ async def test_deliver_comment_mails_invokes_send(
 
     captured: dict[str, Any] = {}
 
-    async def _send(  # noqa: ANN001
+    async def _send(
         session,
         *,
         queue,
@@ -902,7 +902,7 @@ def test_request_erasure_202(
     monkeypatch.setattr(ar, "ErasureRequestService", _ErasureFake)
     notified: dict[str, Any] = {}
 
-    async def _notify(*, queue, settings, request_id, subject_type):  # noqa: ANN001
+    async def _notify(*, queue, settings, request_id, subject_type):
         notified["request_id"] = request_id
         notified["subject_type"] = subject_type
 
@@ -957,7 +957,7 @@ def _create_app_for_post() -> tuple[FastAPI, _CreateServiceFake]:
     svc = _CreateServiceFake()
     application.dependency_overrides[get_applications_service] = lambda: svc
 
-    async def _no_mail(settings, email, application_id, pool):  # noqa: ANN001, ANN202
+    async def _no_mail(settings, email, application_id, pool):
         return None
 
     application.dependency_overrides[get_magic_link_sender] = lambda: _no_mail

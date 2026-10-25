@@ -367,7 +367,7 @@ async def test_the_mention_mail_reaches_the_new_mentions_only(session: AsyncSess
     settings = load_settings()
     sent = await send_comment_mentions(
         session,
-        queue=queue,  # type: ignore[arg-type]
+        queue=queue,
         settings=settings,
         comment_id=comment.id,
         # "other" is no longer mentioned, the author is the actor, "meet" opted out.
@@ -388,7 +388,7 @@ async def test_the_mention_mail_reaches_the_new_mentions_only(session: AsyncSess
     assert (
         await send_comment_mentions(
             session,
-            queue=queue,  # type: ignore[arg-type]
+            queue=queue,
             settings=settings,
             comment_id=uuid.uuid4(),
             recipients=[w.ids["vote"]],
@@ -414,7 +414,7 @@ async def test_the_ticket_mention_mail_links_the_note(session: AsyncSession) -> 
     queue = _Queue()
     sent = await send_ticket_mentions(
         session,
-        queue=queue,  # type: ignore[arg-type]
+        queue=queue,
         settings=load_settings(),
         note_id=note.id,
         recipients=[w.ids["vote"], w.ids["reader"]],
@@ -459,7 +459,7 @@ async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSessio
     assert (
         await send_comment_mentions(
             session,
-            queue=queue,  # type: ignore[arg-type]
+            queue=queue,
             settings=settings,
             comment_id=comment.id,
             recipients=[w.ids["vote"]],
@@ -477,7 +477,7 @@ async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSessio
         assert (
             await send_ticket_mentions(
                 session,
-                queue=queue,  # type: ignore[arg-type]
+                queue=queue,
                 settings=settings,
                 note_id=note_id,
                 recipients=ids,
@@ -487,7 +487,7 @@ async def test_the_mention_mails_skip_what_they_cannot_send(session: AsyncSessio
     assert (
         await send_comment_mentions(
             session,
-            queue=queue,  # type: ignore[arg-type]
+            queue=queue,
             settings=settings,
             comment_id=comment.id,
             recipients=[w.ids["other"]],

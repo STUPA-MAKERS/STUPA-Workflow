@@ -103,7 +103,7 @@ async def anonymize_tickets(ctx: dict[str, Any], now: datetime | None = None) ->
                 )
                 await session.commit()
                 done += 1
-        except Exception:  # noqa: BLE001 - one bad row must not stop the run
+        except Exception:  # one bad row must not stop the run
             logger.exception("ticket anonymization failed for %s", ticket_id)
     if done:
         logger.info("anonymized %d ticket(s)", done)

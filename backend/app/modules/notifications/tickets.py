@@ -198,7 +198,7 @@ async def notify_ticket_created(
                 idempotency_parts=(TICKET_CREATED_KEY, str(ticket.id)),
                 link=ticket_link(settings, ticket.id),
             )
-    except Exception:  # noqa: BLE001 - a mail must never break the report
+    except Exception:  # a mail must never break the report
         logger.exception("ticket_created mail failed")
         return False
 
@@ -250,7 +250,7 @@ async def notify_ticket_received(
                 lang=language if language in ("de", "en") else "de",
                 link=link,
             )
-    except Exception:  # noqa: BLE001 - a mail must never break the report
+    except Exception:  # a mail must never break the report
         logger.exception("ticket_received mail failed")
         return False
 
@@ -293,7 +293,7 @@ async def notify_ticket_note(
             if note.author_id == ticket.reporter_principal_id:
                 return await _mail_team(session, queue, settings, ticket, note, message)
             return await _mail_reporter(session, queue, settings, ticket, note, message)
-    except Exception:  # noqa: BLE001 - a mail must never break the message
+    except Exception:  # a mail must never break the message
         logger.exception("ticket note mail failed")
         return False
 

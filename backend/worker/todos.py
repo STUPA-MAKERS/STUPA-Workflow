@@ -187,7 +187,7 @@ async def process_todo_due(ctx: dict[str, Any], now: datetime | None = None) -> 
                     due=tomorrow,
                 ):
                     sent += 1
-            except Exception:  # noqa: BLE001 - one bad card must not stop the run
+            except Exception:  # one bad card must not stop the run
                 logger.exception("todo_due mail failed for %s", card.id)
                 continue
             card.due_reminded_on = tomorrow

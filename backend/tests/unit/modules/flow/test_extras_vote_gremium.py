@@ -133,7 +133,7 @@ async def test_add_to_next_session_without_snapshot_skips() -> None:
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", uuid4())]
     )
-    assert session._scalar == []  # noqa: SLF001 - no meeting lookup followed
+    assert session._scalar == []  # no meeting lookup followed
 
 
 async def test_add_to_next_session_empty_gremium_id_skips() -> None:
@@ -141,7 +141,7 @@ async def test_add_to_next_session_empty_gremium_id_skips() -> None:
     await FlowExtrasActionDispatcher(_maker(session)).dispatch(
         [_action("addToNextSession", uuid4(), gremiumId="")]
     )
-    assert len(session._scalar) == 1  # noqa: SLF001 - the meeting was never looked up
+    assert len(session._scalar) == 1  # the meeting was never looked up
 
 
 # --- R6 ------------------------------------------------------------------------------

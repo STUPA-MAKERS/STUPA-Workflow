@@ -101,7 +101,7 @@ async def _anonymize_due(
                 )
                 await session.commit()
             count += 1
-        except Exception:  # noqa: BLE001 - a bad single row must not abort the run
+        except Exception:  # a bad single row must not abort the run
             logger.exception("retention anonymize failed (app=%s)", application_id)
     return count
 

@@ -8,7 +8,7 @@ audit_entry row and pass NO RBAC guard. Such rows carry ``admin-cli`` in
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, LiteralString
 
 from .db import Db
 
@@ -108,7 +108,8 @@ def list_roles_simple(db: Db) -> list[dict[str, Any]]:
 
 def create_role(db: Db, key: str, name_de: str | None) -> int:
     return db.execute(
-        "INSERT INTO role (id, key, name_i18n) VALUES (gen_random_uuid(), %s, jsonb_build_object('de', %s::text))",
+        "INSERT INTO role (id, key, name_i18n) "
+        "VALUES (gen_random_uuid(), %s, jsonb_build_object('de', %s::text))",
         (key, name_de or key),
     )
 
@@ -141,7 +142,8 @@ def set_role_permissions(db: Db, role_id: str, permissions: list[str]) -> None:
     perms = sorted(set(permissions))
     if not perms:
         return
-    values = ",".join(["(%s, %s)"] * len(perms))
+    placeholders: list[LiteralString] = ["(%s, %s)"] * len(perms)
+    values = ",".join(placeholders)
     params: list[Any] = []
     for perm in perms:
         params += [role_id, perm]

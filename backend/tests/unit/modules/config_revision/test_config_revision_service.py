@@ -30,7 +30,7 @@ from tests._support.auth_fakes import fake_session, result
 
 
 def _rev(**kw: object) -> ConfigRevision:
-    row = ConfigRevision(**kw)  # type: ignore[arg-type]
+    row = ConfigRevision(**kw)
     if getattr(row, "id", None) is None:
         row.id = uuid.uuid4()
     return row
