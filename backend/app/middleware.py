@@ -5,9 +5,12 @@
   the CSP is a strict `default-src 'none'`. The edge nginx gives the SPA its own
   CSP. The TLS-terminating proxy sets HSTS.
 - `CsrfMiddleware`: double-submit token for cookie-authenticated write requests.
-  A bearer-token request is not CSRF-able and stays exempt. A request without an
-  auth cookie stays exempt too. The token is a non-HttpOnly cookie that the
-  frontend mirrors into the `X-CSRF-Token` header.
+  A request with a principal access token (`Bearer apat_…`) stays exempt, because
+  that token then authenticates and the cookie does not. A request without an auth
+  cookie stays exempt too. Any other bearer header does not exempt a request that
+  carries an auth cookie, because the cookie can still authenticate it. The token is
+  a non-HttpOnly cookie that the frontend mirrors into the header that
+  `Settings.csrf_header_name` names.
 
 The app registers no CORSMiddleware on purpose. Cross-origin access stays off.
 """
@@ -23,6 +26,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
+from app.modules.auth import oauth
 from app.modules.auth.sessions import SESSION_COOKIE_MAX_AGE, principal_sid
 from app.settings import Settings, get_settings
 from app.shared.antiabuse import client_ip, get_rate_limiter
@@ -82,7 +86,7 @@ def _has_auth_cookie(request: Request, settings: Settings) -> bool:
     """Return True when the request carries an auth cookie (session or applicant).
 
     Only those requests are CSRF-relevant. The browser sends a cookie cross-site
-    on its own. A bearer token is not CSRF-able, so this function ignores it.
+    on its own. `_has_principal_bearer` decides about the bearer header.
     """
     return bool(
         request.cookies.get(settings.session_cookie_name)
@@ -91,13 +95,24 @@ def _has_auth_cookie(request: Request, settings: Settings) -> bool:
     )
 
 
+def _has_principal_bearer(request: Request) -> bool:
+    """Return True when `Authorization` carries a principal access token (`apat_…`).
+
+    `get_current_principal` then reads the token and never the session cookie, so
+    the request is not CSRF-able. Any other bearer value can sit next to a cookie
+    that authenticates, so it gives no exemption.
+    """
+    auth = request.headers.get("authorization", "")
+    return auth.startswith("Bearer ") and oauth.is_access_token(auth[7:])
+
+
 class CsrfMiddleware(BaseHTTPMiddleware):
     """Double-submit CSRF protection.
 
-    For an unsafe method with an auth cookie and no bearer header, the
-    `X-CSRF-Token` header must match the CSRF cookie. The compare runs in constant
-    time. The middleware sets the CSRF cookie on any response that lacks it, so the
-    frontend can mirror it.
+    For an unsafe method with an auth cookie and no principal access token, the
+    header that `Settings.csrf_header_name` names must match the CSRF cookie. The
+    compare runs in constant time. The middleware sets the CSRF cookie on any
+    response that lacks it, so the frontend can mirror it.
     """
 
     def __init__(self, app: object, settings: Settings | None = None) -> None:
@@ -124,8 +139,8 @@ class CsrfMiddleware(BaseHTTPMiddleware):
         enforce = (
             settings.csrf_enabled
             and request.method not in _SAFE_METHODS
-            and not request.headers.get("authorization", "").startswith("Bearer ")
             and _has_auth_cookie(request, settings)
+            and not _has_principal_bearer(request)
         )
         if enforce:
             cookie = request.cookies.get(settings.csrf_cookie_name)
