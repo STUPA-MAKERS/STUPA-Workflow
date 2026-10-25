@@ -352,8 +352,12 @@
     margin-inline: calc(-1 * var(--space-4));
     padding-inline: var(--space-4);
   }
+  // The pager runs down to the bottom bar, so a swipe below a short tab moves it too; the
+  // page keeps the room of the main area below its content.
   .ad:not(.ad--split) .ad__tabs {
     --tab-pager-bleed: var(--space-4);
+    --tab-pager-page-bottom: var(--main-pad-bottom, 0px);
+    margin-bottom: calc(-1 * var(--main-pad-bottom, 0px));
   }
   .ad:not(.ad--split) app-tabs.ad__tabs {
     margin-inline: calc(-1 * var(--space-4));
