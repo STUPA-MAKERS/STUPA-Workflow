@@ -11,25 +11,16 @@ gremium exists.
 
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.models import Gremium, GremiumMembership
+from app.modules.admin.models import Gremium
 from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.auth.principal import Principal
 from app.shared.errors import NotFoundError
 
 GREMIUM_NOT_FOUND = "gremium_not_found"
-
-
-def membership_active_clause(now: datetime) -> ColumnElement[bool]:
-    """Return the clause of a membership that is valid at ``now`` (half-open term)."""
-    return ((GremiumMembership.valid_from.is_(None)) | (GremiumMembership.valid_from <= now)) & (
-        (GremiumMembership.valid_until.is_(None)) | (GremiumMembership.valid_until > now)
-    )
 
 
 def views_all(principal: Principal) -> bool:

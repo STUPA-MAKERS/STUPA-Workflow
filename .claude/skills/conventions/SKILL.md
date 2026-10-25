@@ -72,7 +72,7 @@ The non-negotiables. Source of truth: this skill, `.github/pull_request_template
 ## Alembic migrations
 
 - New revision = **hash id** (`cd backend && alembic revision -m "..."`), NOT the old `000N` prefix and
-  **no `--rev-id`**. The `0001…0017` chain stays as-is. Only new revisions get hash ids.
+  **no `--rev-id`**. The `0001…0048` chain stays as-is. Only new revisions get hash ids.
 - `alembic heads` MUST show exactly one head. `alembic upgrade head` MUST be green. Single-head is the
   one intended merge-conflict point.
 - Revision ids MUST be ≤ 32 chars (`alembic_version varchar(32)`). A longer id passes `alembic heads`
@@ -93,7 +93,7 @@ The non-negotiables. Source of truth: this skill, `.github/pull_request_template
 `errors.py` problem+json · `guards.py` guard evaluator (no eval) · `jsonlogic.py` JsonLogic for
 form visibleIf/compute · `config_schemas.py` camelCase base · `permissions.py` permission catalog ·
 `paging.py` pagination · `ratelimit.py` rate limiting · `altcha.py`/`antiabuse.py` captcha ·
-`i18n.py` locale · `xlsx.py` spreadsheet export · `ssrf.py` SSRF guard of the outgoing requests (webhooks, Gravatar; 100 % branch gate) · `filenames.py` upload display/storage names and
+`i18n.py` locale · `search.py` trigram/ILIKE fuzzy search of the list services · `xlsx.py` spreadsheet export · `ssrf.py` SSRF guard of the outgoing requests (webhooks, Gravatar; 100 % branch gate) · `filenames.py` upload display/storage names and
 `Content-Disposition` (see `be-files`).
 
 **Related:** every `be-*` skill, `frontend`, `deploy`.

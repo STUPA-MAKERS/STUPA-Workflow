@@ -23,8 +23,8 @@ from app.modules.applications.service.service_base import (
 from app.modules.auth.principal import Principal
 from app.modules.budget.tree_models import Budget
 from app.modules.flow.models import State
-from app.search import dialect_of, trigram_rank
 from app.shared.paging import Page
+from app.shared.search import dialect_of, trigram_rank
 
 if TYPE_CHECKING:
     from app.modules.flow.service import FlowService

@@ -69,8 +69,6 @@ export class GuestSettingsComponent {
   private readonly auth = inject(AuthService);
   private readonly i18n = inject(I18nService);
 
-  protected readonly maxDays = MAX_LINK_TTL_DAYS;
-
   protected readonly form: SettingsForm<GuestSettings, Draft> = settingsForm<GuestSettings, Draft, Body>({
     allowed: () => this.auth.can('admin.deadlines'),
     load: () => this.api.getGuestSettings(),

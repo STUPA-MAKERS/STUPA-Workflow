@@ -1647,7 +1647,7 @@ describe('MeetingsComponent — methods', () => {
       http.expectOne('/api/protocols/p-1').flush(PROTOCOL);
       http
         .expectOne('/api/protocols/p-1/finalize')
-        .flush({ detail: 'LaTeX-Fehler' }, { status: 400, statusText: 'Bad Request' });
+        .flush({ detail: 'Render-Fehler' }, { status: 400, statusText: 'Bad Request' });
       expect(cmp.finalizing()).toBe(false);
     });
 

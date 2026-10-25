@@ -28,7 +28,7 @@ from app.modules.files.models import Attachment
 from app.modules.forms.models import FormField
 from app.shared.guards import GuardContext
 
-#: Form field type to `compare` value type (`guards.COMPARE_TYPES`).
+#: Form field type to `compare` value type: number, currency, date, text or bool.
 _FIELD_TYPE_MAP: dict[str, str] = {
     "number": "number",
     "currency": "currency",

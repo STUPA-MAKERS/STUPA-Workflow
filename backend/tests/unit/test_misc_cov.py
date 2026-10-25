@@ -2,7 +2,7 @@
 
 The tests drive the branches of five modules that no other suite reaches.
 
-`app.search`: Postgres trigram and the ILIKE fallback. One column against several
+`app.shared.search`: Postgres trigram and the ILIKE fallback. One column against several
 columns. `dialect_of` with and without a bound engine. An empty query.
 
 `app.deps`: the OAuth bearer path (`apat_`) with an invalid, inactive or expired token.
@@ -40,7 +40,6 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from app import deps, middleware
-from app import search as search_mod
 from app.deps import (
     Principal,
     get_current_principal,
@@ -75,6 +74,7 @@ from app.modules.applications.router import (
 )
 from app.modules.applications.schemas import ApplicationListItem, StateOut
 from app.settings import Settings, get_settings, load_settings
+from app.shared import search as search_mod
 from app.shared.errors import ForbiddenError, UnauthorizedError
 from app.shared.ratelimit import RateLimitResult
 

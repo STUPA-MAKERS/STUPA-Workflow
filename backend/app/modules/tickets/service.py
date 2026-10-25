@@ -75,7 +75,6 @@ from app.modules.tickets.schemas import (
     TicketRef,
     TicketReporter,
 )
-from app.search import escape_like
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.mentions import (
     check_mentions,
@@ -91,6 +90,7 @@ from app.shared.people import (
     permission_holders,
     person_of,
 )
+from app.shared.search import escape_like
 
 #: ``T-0040``, ``t0040``, ``0040`` and ``40`` all name ticket 40.
 _NUMBER_RE = re.compile(r"^(?:t-?)?0*(\d{1,9})$", re.IGNORECASE)

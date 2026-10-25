@@ -3,7 +3,7 @@
 The tests cover four areas.
 
 1. The upload policy `sniff_cd_logo`: SVG and PDF pass here, because these bytes
-   only reach the LaTeX renderer. A mismatched magic byte is rejected.
+   only reach the typst renderer. A mismatched magic byte is rejected.
 2. The asset name that typst sees: plain, unique per logo row and with the
    extension of the SNIFFED type.
 3. `CdVariantService`: CRUD, the immutable key, the 409 on a delete while a
@@ -418,7 +418,7 @@ async def test_add_vendored_logo_unknown_variant_404() -> None:
 
 @pytest.mark.parametrize(("data", "mime"), [(SVG, "image/svg+xml"), (PDF, "application/pdf")])
 async def test_upload_logo_accepts_svg_and_pdf(data: bytes, mime: str) -> None:
-    """These bytes only reach LaTeX, never the browser, so the allowlist keeps them."""
+    """These bytes only reach typst, never the browser, so the allowlist keeps them."""
     row = variant_row()
     storage = FakeStorage()
     s, sess = svc([*audit_results()], gets=[row], storage=storage)

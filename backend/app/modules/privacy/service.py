@@ -768,10 +768,6 @@ class AuskunftService:
         }
 
 
-def _fmt_dt(value: datetime | None) -> str:
-    return value.strftime("%Y-%m-%d %H:%M") if value is not None else ""
-
-
 def build_auskunft_workbook(
     *,
     email: str,
@@ -801,10 +797,8 @@ def build_auskunft_workbook(
     from io import BytesIO
 
     from openpyxl import load_workbook
-    from openpyxl.styles import Font
-    from openpyxl.utils import get_column_letter
 
-    from app.shared.xlsx import _safe
+    from app.shared.xlsx import _append, _autosize, _fmt_dt, _header_row
     from app.shared.xlsx import build_auskunft_workbook as _build_base
 
     base = _build_base(
@@ -820,24 +814,16 @@ def build_auskunft_workbook(
         headers: Sequence[str],
         rows: Sequence[Sequence[Any]],
     ) -> None:
-        """Add a sheet and neutralize formula injection in every cell.
+        """Add a sheet with the helpers of the shared base sheets.
 
-        Applicant text such as a comment body or a filename can start a formula. The
-        shared base sheets get the same protection from ``app.shared.xlsx._safe``.
+        Applicant text such as a comment body or a filename can start a formula.
+        ``app.shared.xlsx._append`` neutralizes formula injection in every cell.
         """
         ws = wb.create_sheet(title=title)
-        ws.append([_safe(h) for h in headers])
-        for cell in ws[1]:
-            cell.font = Font(bold=True)
-        ws.freeze_panes = "A2"
+        _header_row(ws, headers)
         for row in rows:
-            ws.append([_safe(cell) for cell in row])
-        widths = [len(str(h)) for h in headers]
-        for r in ws.iter_rows(min_row=2, values_only=True):
-            for i, cell in enumerate(r):
-                widths[i] = max(widths[i], len(str(cell)) if cell is not None else 0)
-        for i, width in enumerate(widths, start=1):
-            ws.column_dimensions[get_column_letter(i)].width = min(width + 2, 60)
+            _append(ws, row)
+        _autosize(ws, headers)
 
     _add_sheet(
         "Kommentare",

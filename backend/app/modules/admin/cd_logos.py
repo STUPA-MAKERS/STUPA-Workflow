@@ -72,7 +72,6 @@ VENDORED_LOGO_NAMES: Final[tuple[VendoredLogoName, ...]] = (
 #: ``square`` is the 1:1 logo that the app shows for a Gremium in the browser. The
 #: render path never reads it.
 LogoSlot = Literal["title", "footer", "square"]
-LOGO_SLOTS: Final[tuple[LogoSlot, ...]] = ("title", "footer", "square")
 
 #: The slots that the render path reads.
 RenderSlot = Literal["title", "footer"]
@@ -80,7 +79,6 @@ RENDER_SLOTS: Final[tuple[RenderSlot, ...]] = ("title", "footer")
 
 #: The document shape that the variant builds on.
 CdBaseVariant = Literal["report", "protocol"]
-CD_BASE_VARIANTS: Final[tuple[CdBaseVariant, ...]] = ("report", "protocol")
 
 
 ALLOWED_CD_LOGO_MIME: Final[frozenset[str]] = frozenset(
@@ -108,7 +106,7 @@ SQUARE_LOGO_MAX_PX: Final[int] = 4096
 SQUARE_LOGO_TOLERANCE: Final[float] = 0.01
 
 #: Extension per accepted type. The asset name takes the extension from the
-#: SNIFFED type, never from the uploaded file name. LaTeX picks its image driver
+#: SNIFFED type, never from the uploaded file name. Typst picks the image format
 #: by extension, so a wrong one breaks the render.
 _MIME_EXTENSION: Final[dict[str, str]] = {
     "image/png": ".png",

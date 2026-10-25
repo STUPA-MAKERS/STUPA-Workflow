@@ -58,17 +58,6 @@ def is_self_or_descendant_path(ancestor_path: str, node_path: str) -> bool:
     return node_path == ancestor_path or is_descendant_path(ancestor_path, node_path)
 
 
-def intervals_overlap(
-    a_start: date, a_end: date, b_start: date, b_end: date
-) -> bool:
-    """Check whether two closed date intervals `[start, end]` overlap.
-
-    The test is `a.start <= b.end AND b.start <= a.end`. A gap between fiscal
-    years is allowed. Only an overlap is forbidden.
-    """
-    return a_start <= b_end and b_start <= a_end
-
-
 def fiscal_year_delete_blocker(
     has_bookings: bool, has_allocations: bool, has_applications: bool
 ) -> str | None:

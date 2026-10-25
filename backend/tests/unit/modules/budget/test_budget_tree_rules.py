@@ -39,14 +39,6 @@ def test_descendant_paths() -> None:
     assert not r.is_self_or_descendant_path("VS", "WS")
 
 
-def test_intervals_overlap() -> None:
-    """Two intervals overlap unless one lies fully before or after the other."""
-    d = date
-    assert r.intervals_overlap(d(2026, 1, 1), d(2026, 6, 1), d(2026, 5, 1), d(2026, 12, 1))
-    assert not r.intervals_overlap(d(2026, 1, 1), d(2026, 6, 1), d(2026, 7, 1), d(2026, 12, 1))
-    assert not r.intervals_overlap(d(2026, 7, 1), d(2026, 12, 1), d(2026, 1, 1), d(2026, 6, 1))
-
-
 def test_as_amount() -> None:
     assert r.as_amount(None) == Decimal("0")
     assert r.as_amount(Decimal("5")) == Decimal("5")

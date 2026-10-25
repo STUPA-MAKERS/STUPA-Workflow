@@ -72,15 +72,6 @@ _PROBLEM_JSON: dict[str, Any] = {
 }
 
 
-def _cookie_kwargs(settings: SettingsDep) -> dict[str, object]:
-    return {
-        "httponly": True,
-        "secure": settings.cookie_secure,
-        "samesite": "lax",
-        "path": "/",
-    }
-
-
 def _is_loopback_redirect(redirect_uri: str) -> bool:
     """Allow only http loopback redirects, the native-app pattern of RFC 8252."""
     try:
@@ -157,7 +148,7 @@ def authorize(
         settings.oauth_tx_cookie_name,
         tx,
         max_age=_TX_MAX_AGE,
-        **_cookie_kwargs(settings),  # type: ignore[arg-type]
+        **sessions.cookie_kwargs(settings),  # type: ignore[arg-type]
     )
     return resp
 

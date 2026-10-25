@@ -547,7 +547,7 @@ async def test_finalize_uses_meeting_closed_at_end_time() -> None:
 
 async def test_finalize_non_retryable_render_error_400() -> None:
     proto = _protocol()
-    typst = FakeTypst(error=TypstError("bad latex", retryable=False))
+    typst = FakeTypst(error=TypstError("bad markup", retryable=False))
     session = FakeSession(
         store={MID: _meeting(), GID: _gremium()},
         results=[result(proto), result()],

@@ -118,7 +118,6 @@ export class ReportDialogComponent {
   env: () => ReportEnv = currentEnv;
 
   protected readonly accept = UPLOAD_ACCEPT;
-  protected readonly maxTitle = MAX_TITLE;
 
   readonly kind = signal<TicketKind>('bug');
   readonly title = signal('');

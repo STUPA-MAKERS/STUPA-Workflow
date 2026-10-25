@@ -42,15 +42,21 @@ src/
       ws/            Live-vote WebSocket service (RxJS)
       i18n/          I18nService (DE/EN, fallback DE) + `t` pipe
       theme/         ThemeService (system + toggle, persisted)
+      …              branding, cache, loading bar, PWA, touch and motion helpers
     shared/
-      ui/            App building blocks (empty state, page header, skeleton)
-      formly/        Formly binding to the UI kit (field type `input`)
+      ui/            App building blocks (chat, history, page header, skeleton, …)
+      formly/        Formly binding to the UI kit (field types)
+      forms/         form helpers: Formly mapping, JsonLogic, answer view, server errors
+      markdown/      Markdown view, links and image upload
+      pipes/         shared pipes (money)
     layout/          ShellComponent (frame), nav rail, phone bottom bar, account menu,
                      public top bar, branded footer, rail marks
     pages/           Home, Dashboard, Applications, Budget/Expenses/Invoices, Tasks,
-                     Account, Admin (Forms/Flow/Gremien/Roles/…), 403, 404, error page
+                     Tickets, To-dos, Account, Admin (Forms/Flow/Gremien/Roles/…), 403, 404,
+                     error page
     features/        apply/ (Wizard, Confirmation, Timeline, Altcha), meetings/,
                      voting/ (live vote, beamer), public-meeting/ (guest join `/j/:code`),
+                     public-protocols/, gremien/, help/ (help menu, tickets), todos/,
                      search/ (search palette)
     app.config.ts    Composition root (providers, interceptor chain, init)
     app.routes.ts    Routing (feature routes lazy, permission-gated)
@@ -71,8 +77,7 @@ tokens, the breakpoints and the binding UI rules, see **[DESIGN_SYSTEM.md](./DES
   Open Font License. The kit ships the `woff2` files in `vendor/ui-kit/src/assets/fonts`, and
   `angular.json` copies them to `/assets/fonts`. The CSP allows only fonts from the own
   origin, so do not load fonts from a CDN. Change the tokens `--font-sans` and `--font-mono`
-  to use another face. **DIN stays PDF only** (requirements N1, Q15b). There is no DIN web
-  font.
+  to use another face. **DIN stays PDF only.** There is no DIN web font.
 - **Icons:** `app-icon` draws line icons as inline SVG. The app loads no icon font.
 - **Logos:** The official STUPA CD assets come from Nextcloud and hold the mark and the word
   mark. Use STUPA logos only. Do not use the logo of the university. The word mark has a light

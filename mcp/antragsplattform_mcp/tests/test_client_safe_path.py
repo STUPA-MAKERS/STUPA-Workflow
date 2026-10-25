@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from .client import ApiError, _safe_path
+from antragsplattform_mcp.client import ApiError, _safe_path
 
 
 def test_legitimate_paths_unchanged() -> None:

@@ -30,6 +30,18 @@ from app.modules.auth.models import (
     ApplicantSession,
     AuthSession,
 )
+from app.settings import Settings
+
+
+def cookie_kwargs(settings: Settings) -> dict[str, object]:
+    """Return the attributes of every auth cookie: HttpOnly, Lax, path `/`, Secure per config."""
+    return {
+        "httponly": True,
+        "secure": settings.cookie_secure,
+        "samesite": "lax",
+        "path": "/",
+    }
+
 
 _APPLICANT_SALT = "applicant-session"
 _OIDC_TX_SALT = "oidc-tx"

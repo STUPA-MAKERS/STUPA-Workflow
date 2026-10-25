@@ -85,10 +85,10 @@ from app.modules.todos.schemas import (
     TodoMine,
     TodoMineItem,
 )
-from app.search import dialect_of, escape_like, trigram_rank
 from app.shared.errors import ConflictError, ForbiddenError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 from app.shared.people import DELETED_PERSON, PersonRef, person_refs
+from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The local calendar of the due dates ("due within 7 days", "due tomorrow").
 BERLIN = ZoneInfo("Europe/Berlin")

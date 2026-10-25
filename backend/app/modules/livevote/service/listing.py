@@ -25,7 +25,7 @@ from app.modules.livevote.service.paging import (
 from app.modules.livevote.service.permissions import PermissionOps
 from app.modules.livevote.service.votes import VoteReadOps
 from app.modules.protocol.models import Protocol
-from app.search import dialect_of, trigram_rank
+from app.shared.search import dialect_of, trigram_rank
 
 
 class ListingOps(PermissionOps, VoteReadOps):

@@ -93,7 +93,7 @@ async def test_render_protocol_exhausted_reverts_to_draft() -> None:
 async def test_render_protocol_permanent_error_reverts_to_draft() -> None:
     """Roll back at once on a typst 4xx compile error, because that error is permanent."""
     proto = _protocol()
-    typst = FakeTypst(error=TypstError("bad latex", status=400, retryable=False))
+    typst = FakeTypst(error=TypstError("bad markup", status=400, retryable=False))
     session = FakeSession(
         store={}, results=[result(proto), result(), result(proto)]
     )

@@ -62,7 +62,7 @@ def sniff_raster_image(data: bytes) -> str | None:
     """Sniff the raster image type from the magic bytes.
 
     ``admin.cd_logos`` reuses this sniffer and adds the SVG and PDF cases that
-    only the LaTeX renderer accepts. Do not widen the set here.
+    only the typst renderer accepts. Do not widen the set here.
 
     Returns:
         The sniffed MIME type. ``None`` means unknown or not in the whitelist,

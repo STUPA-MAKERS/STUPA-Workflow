@@ -20,9 +20,9 @@ from app.modules.budget.tree_models import (
 )
 from app.modules.budget.tree_rules import _SEP
 from app.modules.budget.tree_schemas import ExpenseCreate, ExpenseOut, ExpenseUpdate
-from app.search import dialect_of, trigram_rank
 from app.shared.errors import NotFoundError, ValidationProblem
 from app.shared.paging import Page
+from app.shared.search import dialect_of, trigram_rank
 
 
 class ExpenseOps(BudgetTreeServiceBase):

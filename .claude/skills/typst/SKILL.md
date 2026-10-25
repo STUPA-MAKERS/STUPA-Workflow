@@ -1,6 +1,6 @@
 ---
 name: typst
-description: Internal-only protocol Markdown→PDF render service (`typst/`) — FastAPI + the typst CLI, the HSRT design from the hsrtreport-typst submodule, a Markdown→JSON converter and a data-driven Typst template that reproduces the former pytex layout. Single POST /render route, variants protocol-stupa/protocol-asta/protocol, uploaded logos over multipart. Use when working on protocol PDF rendering, the /render contract, the template/layout, fonts/logos, the Dockerfile, or the backend TypstClient in typst/ and backend/app/modules/pdf.
+description: Internal-only protocol Markdown→PDF render service (`typst/`) — FastAPI + the typst CLI, the HSRT design from the hsrtreport-typst submodule, a Markdown→JSON converter and a data-driven Typst template that reproduces the pytex (LaTeX) reference layout. Single POST /render route, variants protocol-stupa/protocol-asta/protocol, uploaded logos over multipart. Use when working on protocol PDF rendering, the /render contract, the template/layout, fonts/logos, the Dockerfile, or the backend TypstClient in typst/ and backend/app/modules/pdf.
 ---
 
 # typst render service — `typst`
@@ -28,10 +28,10 @@ description: Internal-only protocol Markdown→PDF render service (`typst/`) —
 - `GET /health` → `{"status": "ok"}`.
 
 **Conventions & gotchas:**
-- **The layout is calibrated, not guessed.** Every block-to-block gap comes from `gap-after-text` / `gap-after` in `protocol.typ`, measured from pytex output with `pdftotext -bbox` and pixel scans. Blocks carry NO spacing of their own (`set block(above: 0pt, below: 0pt)`, `par.spacing: 0pt`). `tests/test_integration.py` pins anchor positions — a template change that moves them fails CI.
-- **Box icons are per-glyph:** LaTeX `\vcenter`ed each FontAwesome glyph, so `icons.<name>.top` holds a measured offset. pytex asked for `vote-yea`, `clipboard-check`, `clock`, which FontAwesome 4 lacks — those places have no icon on purpose (tally box, Aufgabe box, the space before a `{{time}}`).
-- **Deliberate fixes over pytex:** public `datalines` reach the title page; `€` in a callout; bold in a vote question; `:::antrag` fences dropped; `~~strike~~`; ISO date → `15.06.2026, 18:30`; the title-page label column widens for a long label.
-- **Page breaks can differ from pytex** (TeX's page builder shrinks glue on full pages; Typst never shrinks). Boxes are unbreakable, like the LaTeX minipage.
+- **The layout is calibrated, not guessed.** Every block-to-block gap comes from `gap-after-text` / `gap-after` in `protocol.typ`, measured from the pytex (LaTeX) reference output with `pdftotext -bbox` and pixel scans. Blocks carry NO spacing of their own (`set block(above: 0pt, below: 0pt)`, `par.spacing: 0pt`). `tests/test_integration.py` pins anchor positions — a template change that moves them fails CI.
+- **Box icons are per-glyph:** the LaTeX reference `\vcenter`s each FontAwesome glyph, so `icons.<name>.top` holds a measured offset. The reference names `vote-yea`, `clipboard-check`, `clock`, which FontAwesome 4 lacks — those places have no icon on purpose (tally box, Aufgabe box, the space before a `{{time}}`).
+- **Deliberate differences from the reference:** public `datalines` reach the title page; `€` in a callout; bold in a vote question; `:::antrag` fences dropped; `~~strike~~`; ISO date → `15.06.2026, 18:30`; the title-page label column widens for a long label.
+- **Page breaks can differ from the reference** (TeX's page builder shrinks glue on full pages; Typst never shrinks). Boxes are unbreakable, like the LaTeX minipage of the reference.
 - **Images (be-media):** only `![alt](/api/media/images/<uuid>)` with an uploaded asset `img-<uuid>.<png|jpg|gif|webp>` shows an image (`image` node with `asset`; a paragraph of only that image is a `figure`: centered, ≤ text width, ≤ 12 cm high, never above its natural size). Every other image (URL, relative path, `data:`, missing asset) prints its alt text. `convert_body(markdown, meta, assets)` gets the asset names from `build_document`. typst 0.15 reads PNG, JPEG, GIF and WEBP (animations: the first frame). The asset caps leave room for the logos plus the 48 images of the backend budget.
 - **Typst version:** pinned in `Dockerfile` and the CI `typst` job (keep both in step). The flake dev shell may ship another version; the layout tests pass on 0.14 and 0.15.
 - **Egress-less:** compose puts `typst` on `typst_net` only (`internal: true`), read-only rootfs, tmpfs `/tmp`, `cap_drop: ALL`.

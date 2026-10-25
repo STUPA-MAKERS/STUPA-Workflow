@@ -164,7 +164,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     import redis.asyncio as aioredis
 
     livevote_redis = aioredis.from_url(settings.redis_url)
-    app.state._livevote_redis = livevote_redis
     app.state.broker = RedisBroker(livevote_redis)
     app.state.locker = RedisLocker(livevote_redis)
     app.state.meeting_publisher = BrokerPublisher(app.state.broker)

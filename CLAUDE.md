@@ -77,7 +77,7 @@ Components:
 - **mcp** — MCP server (`mcp/`): act on the platform through its API as the logged-in user, PKCE
   browser grant
 - **typst** — internal Markdown→PDF render service (`typst/`), data-driven Typst template,
-  calibrated pytex layout, variants
+  layout calibrated to the pytex reference, variants
 - **deploy** — docker-compose production stack (`deploy/`) behind an external Caddy reverse
   proxy (the TLS edge), services, networking
 

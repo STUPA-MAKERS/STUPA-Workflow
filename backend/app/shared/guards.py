@@ -61,9 +61,6 @@ _DATE_OPS: frozenset[str] = _NUMERIC_OPS
 _TEXT_OPS: frozenset[str] = frozenset({"==", "!=", "in"})
 _BOOL_OPS: frozenset[str] = frozenset({"=="})
 
-#: Value types of a comparable field, derived from the form-field type.
-COMPARE_TYPES: frozenset[str] = frozenset({"number", "currency", "date", "text", "bool"})
-
 #: Leaf operators with a string value (role, Gremium, budget or field key). The save
 #: gate ``validate_guard`` checks the value type of these and of the bool operators,
 #: because a list crashes at runtime as unhashable in ``in frozenset``.

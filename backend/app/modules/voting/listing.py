@@ -32,9 +32,9 @@ from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.voting.election import own_ballot
 from app.modules.voting.models import Ballot, Vote, VotedMarker
 from app.modules.voting.schemas import MyBallot, VoteKind, VoteListItem, VoteStatus
-from app.search import escape_like
 from app.shared.config_schemas import VoteConfig
 from app.shared.paging import Page
+from app.shared.search import escape_like
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

@@ -1,6 +1,6 @@
 ---
 name: be-search
-description: Global search behind the command palette. One GET /api/search?q= fans out to nine sources (applications, meetings, invoices, expenses, cost centres, Gremien, people, tickets, to-dos). Each source reuses the gate and the listing of its own module, so a hit is never more than the module list shows. Covers SearchService, SearchHit/SearchResults, HIT_URL, PER_KIND, the trigram/ILIKE helper app/search.py (trigram_rank, escape_like, dialect_of) and the frontend command palette. Use when working on the global search, a new search source, hit titles/subtitles/URLs, or trigram ranking in backend/app/modules/search and backend/app/search.py.
+description: Global search behind the command palette. One GET /api/search?q= fans out to nine sources (applications, meetings, invoices, expenses, cost centres, Gremien, people, tickets, to-dos). Each source reuses the gate and the listing of its own module, so a hit is never more than the module list shows. Covers SearchService, SearchHit/SearchResults, HIT_URL, PER_KIND, the trigram/ILIKE helper app/shared/search.py (trigram_rank, escape_like, dialect_of) and the frontend command palette. Use when working on the global search, a new search source, hit titles/subtitles/URLs, or trigram ranking in backend/app/modules/search and backend/app/shared/search.py.
 ---
 
 # Global search — `backend/app/modules/search`
@@ -10,9 +10,9 @@ description: Global search behind the command palette. One GET /api/search?q= fa
 **Key files:**
 - `router.py` — `GET /search`. It needs a principal (401 otherwise) and caps `q` at 200 characters (a DoS bound for the trigram scan) and `lang` at 8.
 - `service.py` — `SearchService.search` and one private source per kind (`_applications`, `_meetings`, `_invoices`, `_expenses`, `_budgets`, `_gremien`, `_principals`, `_tickets`, `_todos`). The module constants: `PER_KIND = 5`, `MIN_QUERY_LENGTH = 2`, `UNTITLED`, `UNNAMED` and `GREMIUM_SUBTITLE` (each de/en), `HIT_URL`.
-- `schemas.py` — `SearchKind` (`Literal` of the eight kinds), `SearchHit` (`kind`, `id`, `title`, `subtitle`, `url`, `archived`), `SearchResults` (`hits`, `truncated`, `failed`).
-- `../../search.py` (`app/search.py`, shared) — `trigram_rank(q, columns, dialect=...)` gives `(where, rank)`: Postgres `word_similarity` with the threshold 0.3 (GIN trigram indexes), any other dialect an `ILIKE` with the constant rank `0.0`. `escape_like` escapes `\`, `%` and `_`. `dialect_of(session)` gives `postgresql` without a bound engine. Other list services (applications, budget, principals) use the same helper.
-- Frontend: `frontend/src/app/features/search/` — `command-palette.component` (groups by `kind`, "Seiten" from `page-index.service`, highlight, archived mark, the truncated note), `command-palette.service`, `shortcut.ts`.
+- `schemas.py` — `SearchKind` (`Literal` of the nine kinds), `SearchHit` (`kind`, `id`, `title`, `subtitle`, `url`, `archived`), `SearchResults` (`hits`, `truncated`, `failed`).
+- `../../shared/search.py` (`app/shared/search.py`) — `trigram_rank(q, columns, dialect=...)` gives `(where, rank)`: Postgres `word_similarity` with the threshold 0.3 (GIN trigram indexes), any other dialect an `ILIKE` with the constant rank `0.0`. `escape_like` escapes `\`, `%` and `_`. `dialect_of(session)` gives `postgresql` without a bound engine. Other list services (applications, budget, principals) use the same helper.
+- Frontend: `frontend/src/app/features/search/` — `command-palette.component` (groups by `kind`, "Seiten" from `page-index.service`, highlight, archived mark, the truncated note), `command-palette.service`. The shortcut keys come from the ui-kit (`searchShortcutKeys`).
 
 **Sources and their gates:**
 - `application` — `ApplicationsService.list_applications`. With `application.read` or `application.read_all` every application, else the own ones plus the committee read scope. Without a global read, no search over the PII field values of another application (`hide_pii_in_search`). Archived rows are included (`archived=None`) and carry `archived: true`. Subtitle: the state label in `lang`.
