@@ -24,7 +24,10 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
   handlers and the OpenAPI rewrite). Never return a bare string or the default `detail` of FastAPI.
 - **RBAC enforced server-side** — check the permission in the backend, not just in FE gating. Roles and
   owner come from the session, never the request body. Object-owner ≠ caller is the most common leak.
-  See `[[admin-domain-rules]]`.
+  See `[[admin-domain-rules]]`. Where each check goes: global permission → route gate
+  (`require_principal("perm")`); gremium permission → `app/modules/auth/policy.py`; object rule →
+  bare gate plus an entry in `OBJECT_CHECK_ROUTES` (`backend/tests/unit/test_route_gates.py`).
+  Details in `be-auth`.
 - **Strictly typed inputs** — Enums/`Literal` instead of free strings. Validate query/body/path via
   Pydantic/`Annotated`. No open `str` status fields. Python ≥3.13, fully annotated, no bare `Any`
   (basedpyright runs in `standard` mode).

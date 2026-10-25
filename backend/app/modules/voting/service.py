@@ -119,15 +119,15 @@ async def holds_gremium_vote_role(
 ) -> bool:
     """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
 
-    Both go through ``gremium_ids_for``, so the OAuth scope cap applies (F16). The
-    read rule of a vote without a meeting (``VotingService.assert_can_read``) uses
-    this part alone, because that rule checks the admin role before, with a read
-    right instead of ``vote.manage``.
+    Both go through ``policy.holds_gremium_permission``, so the OAuth scope cap
+    applies. The read rule of a vote without a meeting
+    (``VotingService.assert_can_read``) uses this part alone, because that rule
+    checks the admin role before, with a read right instead of ``vote.manage``.
     """
-    from app.modules.admin.gremium_roles import gremium_ids_for
+    from app.modules.auth.policy import holds_gremium_permission
 
     for perm in ("vote.manage", "session.manage"):
-        if gremium_id in await gremium_ids_for(session, principal, perm):
+        if await holds_gremium_permission(session, principal, perm, gremium_id):
             return True
     return False
 
@@ -145,7 +145,7 @@ async def manages_votes_in_gremium(
     ``PermissionOps.can_manage_votes`` adds the session lead and the protokollant of
     a meeting to it. No global permission grants the right.
     """
-    from app.modules.admin.gremium_roles import admin_bypass
+    from app.modules.auth.policy import admin_bypass
 
     if admin_bypass(principal, "vote.manage"):
         return True
@@ -819,7 +819,7 @@ class VotingService:
                 or is not the gremium of the application
                 (``eligible_group_mismatch``) (422).
         """
-        from app.modules.admin.gremium_roles import admin_bypass
+        from app.modules.auth.policy import admin_bypass
 
         if payload.config.guests_vote:
             # Only a meeting vote of a public meeting has guests (#17).
@@ -1371,7 +1371,7 @@ class VotingService:
         if poll_mod.is_poll(vote):
             # A poll of a Gremium is no application vote: the global application
             # rights do not reach it. Only the admin role passes globally.
-            from app.modules.admin.gremium_roles import admin_bypass
+            from app.modules.auth.policy import admin_bypass
 
             if admin_bypass(principal, "application.read"):
                 return
@@ -1526,7 +1526,7 @@ class VotingService:
             meeting_id=meeting_id, eligible_group=eligible_group
         )
         if gremium_id is None:
-            from app.modules.admin.gremium_roles import admin_bypass
+            from app.modules.auth.policy import admin_bypass
 
             return admin_bypass(principal, "vote.manage")
         return await manages_votes_in_gremium(self.session, gremium_id, principal)
@@ -1555,7 +1555,7 @@ class VotingService:
                 meeting_id=None, eligible_group=vote.eligible_group
             )
             if gremium_id is None:
-                from app.modules.admin.gremium_roles import admin_bypass
+                from app.modules.auth.policy import admin_bypass
 
                 return admin_bypass(principal, "vote.manage")
             return await poll_mod.PollService(self).can_create(gremium_id, principal)

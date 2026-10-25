@@ -25,8 +25,8 @@ from uuid import UUID
 from sqlalchemy import ColumnElement, Text, and_, case, false, func, or_, select, true
 from sqlalchemy import cast as sql_cast
 
-from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.admin.models import Gremium
+from app.modules.auth.policy import admin_bypass, held_gremium_ids
 from app.modules.auth.rbac import VOTE_GROUP_PREFIX
 from app.modules.livevote.models import Meeting, MeetingAgendaItem
 from app.modules.voting.election import own_ballot
@@ -83,7 +83,7 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
         if g.startswith(VOTE_GROUP_PREFIX)
     }
     for perm in ("vote.manage", "session.manage"):
-        keys |= {str(gid) for gid in await gremium_ids_for(session, principal, perm)}
+        keys |= {str(gid) for gid in await held_gremium_ids(session, principal, perm)}
     standalone_ok = (
         and_(Vote.meeting_id.is_(None), Vote.eligible_group.in_(sorted(keys)))
         if keys

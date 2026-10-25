@@ -31,7 +31,6 @@ from dataclasses import dataclass
 from sqlalchemy import ColumnElement, String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import gremium_view_scope
 from app.modules.admin.models import Gremium
 from app.modules.applications.access import (
     READ_ALL_PERMISSION,
@@ -40,6 +39,7 @@ from app.modules.applications.access import (
 )
 from app.modules.applications.models import Application
 from app.modules.applications.service.service_base import _title_of
+from app.modules.auth.policy import gremium_view_scope
 from app.modules.auth.principal import Principal
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget, BudgetExpense, Invoice

@@ -1,6 +1,6 @@
 """Who sees which gremium in the tab "Gremien".
 
-The gate is ``can_view_gremium`` of the admin module, the same rule as the route of
+The gate is ``can_view_gremium`` of ``app.modules.auth.policy``, the same rule as the route of
 the square logo: the global permission ``gremium.view_all`` (``Principal.has``, so
 the admin role and the OAuth scope cap apply), or an active membership now. The
 membership path obeys the scope cap too, so a token without the ``read`` scope sees
@@ -17,8 +17,8 @@ from uuid import UUID
 from sqlalchemy import ColumnElement
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.admin.gremium_roles import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.admin.models import Gremium, GremiumMembership
+from app.modules.auth.policy import GREMIUM_VIEW_ALL, can_view_gremium
 from app.modules.auth.principal import Principal
 from app.shared.errors import NotFoundError
 

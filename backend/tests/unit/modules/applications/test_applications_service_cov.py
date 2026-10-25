@@ -444,9 +444,6 @@ class _FakeFlow:
     # The `start_confirmed` calls as (application id, dispatcher).
     started: list[tuple[Any, Any]] = []
     available: list[Any] = []
-    # The gremien where the principal holds the gremium permission `vote.cast`
-    # (`gremium_ids_for` in `list_tasks`).
-    cast_gids: set[Any] = set()
 
     def __init__(self, session: object, dispatcher: object = None) -> None:
         self.session = session
@@ -478,12 +475,6 @@ def _patch_forms(monkeypatch: pytest.MonkeyPatch) -> type[_FakeForms]:
 @pytest.fixture
 def _patch_flow(monkeypatch: pytest.MonkeyPatch) -> type[_FakeFlow]:
     monkeypatch.setattr("app.modules.flow.service.FlowService", _FakeFlow)
-    _FakeFlow.cast_gids = set()
-
-    async def _gremium_ids_for(_session: Any, _principal: Any, perm: str) -> set[Any]:
-        return set(_FakeFlow.cast_gids) if perm == "vote.cast" else set()
-
-    monkeypatch.setattr("app.modules.admin.gremium_roles.gremium_ids_for", _gremium_ids_for)
     return _FakeFlow
 
 

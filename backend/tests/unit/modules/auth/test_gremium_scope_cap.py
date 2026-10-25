@@ -20,8 +20,8 @@ from uuid import UUID, uuid4
 import pytest
 
 from app.modules.admin import gremium_roles as gremium_roles_mod
-from app.modules.admin.gremium_roles import admin_bypass, gremium_ids_for
 from app.modules.auth import oauth
+from app.modules.auth.policy import admin_bypass, held_gremium_ids
 from app.modules.auth.principal import Principal
 from app.modules.livevote.models import Meeting
 from app.modules.livevote.service import MeetingService
@@ -85,13 +85,13 @@ def test_admin_bypass_respects_the_scope() -> None:
     assert admin_bypass(Principal(sub="m"), "session.manage") is False
 
 
-async def test_gremium_ids_for_caps_by_scope(chair: None) -> None:
+async def test_held_gremium_ids_caps_by_scope(chair: None) -> None:
     db = fake_session()
-    assert await gremium_ids_for(db, Principal(sub="c"), "session.manage") == {GID}
-    assert await gremium_ids_for(db, _scoped("read"), "session.manage") == set()
-    assert await gremium_ids_for(db, _scoped("meetings:write"), "session.manage") == {GID}
-    assert await gremium_ids_for(db, _scoped("meetings:write"), "vote.manage") == set()
-    assert await gremium_ids_for(db, _scoped("votes:write"), "vote.manage") == {GID}
+    assert await held_gremium_ids(db, Principal(sub="c"), "session.manage") == {GID}
+    assert await held_gremium_ids(db, _scoped("read"), "session.manage") == set()
+    assert await held_gremium_ids(db, _scoped("meetings:write"), "session.manage") == {GID}
+    assert await held_gremium_ids(db, _scoped("meetings:write"), "vote.manage") == set()
+    assert await held_gremium_ids(db, _scoped("votes:write"), "vote.manage") == {GID}
 
 
 async def test_read_token_of_a_chair_cannot_run_the_meeting(chair: None) -> None:
