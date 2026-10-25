@@ -51,7 +51,7 @@ def test_oauth_tx_wrong_secret_returns_none() -> None:
 
 
 def test_oauth_tx_missing_required_fields_returns_none() -> None:
-    # Signed, but the required fields redirect_uri and code_challenge are missing.
+    """Return None for a signed value without redirect_uri and code_challenge."""
     blob = _serializer(_SECRET, _OAUTH_TX_SALT).dumps({"client_id": "c"})
     assert load_oauth_tx(_SECRET, blob, 600) is None
 

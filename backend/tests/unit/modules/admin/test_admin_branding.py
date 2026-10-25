@@ -20,8 +20,11 @@ from app.modules.admin.branding import (
 )
 
 
-# `iVBORw0KGgo=` is exactly the 8-byte PNG signature, so the magic-byte check passes.
 def _png(url: str = "data:image/png;base64,iVBORw0KGgo=") -> dict:
+    """Return a PNG data URL.
+
+    `iVBORw0KGgo=` is exactly the 8-byte PNG signature, so the magic-byte check passes.
+    """
     return {"url": url, "filename": "logo.png", "mime": "image/png", "size": 1024}
 
 
@@ -63,11 +66,15 @@ def test_http_and_absolute_logo_urls_allowed() -> None:
 
 
 def test_favicon_ico_allowed() -> None:
-    # The 4-byte ICO header 00 00 01 00 gives the base64 string "AAABAA==".
+    """Allow an ICO favicon.
+
+    The 4-byte ICO header 00 00 01 00 gives the base64 string "AAABAA==". The MIME alias
+    of image/x-icon is accepted too.
+    """
     BrandingAsset(
         url="data:image/x-icon;base64,AAABAA==",
         filename="favicon.ico",
-        mime="image/vnd.microsoft.icon",  # alias of image/x-icon, so it is accepted
+        mime="image/vnd.microsoft.icon",
         size=10,
     )
 
@@ -82,11 +89,12 @@ def test_rejects_non_whitelisted_mime(mime: str) -> None:
 
 
 def test_rejects_inline_svg_data_url() -> None:
+    """Reject an inline SVG data URL, also with a deliberately wrong MIME."""
     with pytest.raises(ValidationError):
         BrandingAsset(
             url="data:image/svg+xml;base64,PHN2Zz4=",
             filename="l.svg",
-            mime="image/png",  # deliberately wrong: the check blocks an inline SVG anyway
+            mime="image/png",
             size=10,
         )
 

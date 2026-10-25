@@ -45,7 +45,6 @@ def _svc(*results: Any, gets: tuple[Any, ...] = ()) -> GremienService:
     return GremienService(fake_session(*results, gets=gets), TZ)
 
 
-# ------------------------------------------------------------------ helpers
 def test_month_helpers() -> None:
     assert svc.month_key((2026, 5)) == "2026-05"
     assert svc.parse_month("2026-05") == (2026, 5)
@@ -85,15 +84,18 @@ def test_cursor_round_trip() -> None:
 
 @pytest.mark.parametrize(
     "cursor",
-    # bad base64, negative, "x|5", "nopipe", beyond the offset cap
     ["%%%", svc.encode_cursor(-1), "eHw1", "bm9waXBl", svc.encode_cursor(1_000_001)],
 )
 def test_cursor_refused(cursor: str) -> None:
+    """Refuse a bad cursor.
+
+    The rows are bad base64, a negative offset, "x|5", "nopipe" and an offset beyond
+    the cap.
+    """
     with pytest.raises(BadRequestError):
         svc.decode_cursor(cursor)
 
 
-# ------------------------------------------------------------------ overview
 async def test_overview_without_membership_is_empty() -> None:
     assert await _svc(result()).overview(ME) == []
 
@@ -184,7 +186,7 @@ async def test_overview_view_all_marks_foreign_gremien() -> None:
     assert rows[0].next_meeting is not None and rows[0].next_meeting.id == earlier.id
 
 
-# ------------------------------------------------------------------ members
+#: ------------------------------------------------------------------ members
 NOW = datetime.now(UTC)
 PAST = datetime(2020, 1, 1, tzinfo=UTC)
 
@@ -237,12 +239,16 @@ async def test_members_former() -> None:
     assert not any(r.is_self for r in rows)
 
 
-# ------------------------------------------------------------------ meetings
 async def test_meetings_empty() -> None:
     assert await _svc(result()).meetings(G1) == []
 
 
 async def test_meetings_counts_the_roster() -> None:
+    """Count the roster per meeting.
+
+    The planned meeting has the window "now", so it counts the member and the one who
+    starts in June.
+    """
     closed = _meeting(
         G1,
         "closed",
@@ -271,12 +277,10 @@ async def test_meetings_counts_the_roster() -> None:
     first, second = await service.meetings(G1)
     assert (first.agenda_item_count, first.present_count, first.member_count) == (4, 2, 3)
     assert first.protocol_status == "final"
-    # The planned meeting has the window "now": the member and the one who starts in June.
     assert (second.agenda_item_count, second.present_count, second.member_count) == (0, 0, 2)
     assert second.protocol_status is None
 
 
-# ------------------------------------------------------------------ attendance
 async def test_attendance_matrix_rows() -> None:
     me_id, guest_id, old_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     service = _svc(
@@ -317,7 +321,6 @@ async def test_attendance_unknown_principal_row() -> None:
     assert out.rows[0].display_name is None and not out.rows[0].is_self
 
 
-# ------------------------------------------------------------------ member attendance
 async def test_member_attendance_unknown_principal() -> None:
     with pytest.raises(NotFoundError) as err:
         await _svc().member_attendance(G1, uuid.uuid4(), "2026-05")
@@ -360,7 +363,6 @@ async def test_member_attendance_states() -> None:
     ]
 
 
-# ------------------------------------------------------------------ decisions
 @pytest.fixture
 def open_scope(monkeypatch: pytest.MonkeyPatch) -> None:
     async def _scope(_session: Any, _principal: Any) -> Any:

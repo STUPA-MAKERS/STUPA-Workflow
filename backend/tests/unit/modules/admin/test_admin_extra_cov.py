@@ -89,8 +89,8 @@ def _id_on_flush(db) -> None:
 
 
 def test_sanitize_perms() -> None:
+    """The helper drops a duplicate and an unknown key, then keeps the catalog order."""
     assert _sanitize_perms(None) == []
-    # The helper drops a duplicate and an unknown key, then keeps the catalog order.
     out = _sanitize_perms(["vote.cast", "bogus", "session.manage", "vote.cast"])
     assert out == [p for p in GREMIUM_PERMISSIONS if p in {"vote.cast", "session.manage"}]
     assert "bogus" not in out
@@ -109,9 +109,13 @@ def test_role_out_forced_flag_and_empty_name() -> None:
 
 
 async def test_active_gremium_roles_and_permission_helpers() -> None:
+    """Read the active gremium roles and the permission helpers on top of them.
+
+    ``active_gremium_roles`` reads rows of (gremium_id, role). A role with permissions
+    None must not match.
+    """
     gid = uuid4()
     role = _role(gid, key="vorstand", perms=["session.manage", "vote.cast"])
-    # active_gremium_roles: execute returns rows of (gremium_id, role).
     db = fake_session(result((gid, role)))
     pairs = await active_gremium_roles(db, "sub-1", now=_dt("2026-06-01"))
     assert pairs == [(gid, role)]
@@ -120,7 +124,6 @@ async def test_active_gremium_roles_and_permission_helpers() -> None:
     assert await gremium_ids_with_permission(db2, "sub-1", "session.manage") == {gid}
     db3 = fake_session(result((gid, role)))
     assert await gremium_ids_with_permission(db3, "sub-1", "protocol.write") == set()
-    # A role with permissions None must not match.
     role_none = _role(gid, key="x", perms=None)
     role_none.permissions = cast("list[str]", None)
     db4 = fake_session(result((gid, role_none)))
@@ -136,8 +139,9 @@ async def test_active_gremium_roles_default_now() -> None:
 
 
 async def test_ensure_forced_roles_adds_when_missing() -> None:
+    """Add every forced role when no key is present."""
     gid = uuid4()
-    db = fake_session(result())  # scalars(present keys) -> empty
+    db = fake_session(result())
     svc = GremiumRoleService(db)
     added = await svc.ensure_forced_roles(gid)
     assert added is True
@@ -147,8 +151,9 @@ async def test_ensure_forced_roles_adds_when_missing() -> None:
 
 
 async def test_ensure_forced_roles_idempotent_when_all_present() -> None:
+    """Add nothing when every forced key already exists."""
     gid = uuid4()
-    db = fake_session(result(*FORCED_ROLE_KEYS))  # every key already exists
+    db = fake_session(result(*FORCED_ROLE_KEYS))
     svc = GremiumRoleService(db)
     added = await svc.ensure_forced_roles(gid)
     assert added is False
@@ -157,21 +162,23 @@ async def test_ensure_forced_roles_idempotent_when_all_present() -> None:
 
 
 async def test_list_roles_backfills_then_commits() -> None:
+    """Backfill the forced roles on a listing and commit, because a role was added.
+
+    Queue: no present key for ``ensure_forced_roles``, then the roles that now exist.
+    """
     gid = uuid4()
-    # 1) ensure_forced_roles scalars(present) -> empty, so it adds and commits.
-    # 2) scalars(rows) -> the roles that now exist.
     r1 = _role(gid, key="vorstand")
     db = fake_session(result(), result(r1))
     svc = GremiumRoleService(db)
     out = await svc.list_roles(gid)
-    assert db.committed == 1  # because the backfill added a role
+    assert db.committed == 1
     assert [o.key for o in out] == ["vorstand"]
 
 
 async def test_list_roles_no_backfill_no_commit() -> None:
+    """Commit nothing when the present keys cover every forced role."""
     gid = uuid4()
     r1 = _role(gid, key="manager")
-    # The present keys cover every forced role, so the service adds nothing and commits nothing.
     db = fake_session(result(*FORCED_ROLE_KEYS), result(r1))
     svc = GremiumRoleService(db)
     out = await svc.list_roles(gid)
@@ -180,20 +187,26 @@ async def test_list_roles_no_backfill_no_commit() -> None:
 
 
 async def test_create_role_conflict_on_duplicate_key() -> None:
+    """Refuse a key that exists in the gremium already."""
     gid = uuid4()
     existing = _role(gid, key="reviewer")
-    db = fake_session(result(existing))  # scalars(existing) -> first() is not None
+    db = fake_session(result(existing))
     svc = GremiumRoleService(db)
     with pytest.raises(ConflictError):
         await svc.create_role(gid, GremiumRoleCreate(key="reviewer"), "admin")
 
 
 async def test_create_role_success_sanitizes_perms() -> None:
+    """Create one GremiumRole with sanitized permissions.
+
+    Queue: no existing role, then the audit lock and the audit prev-hash. The audit row
+    is also in ``db.added``.
+    """
     gid = uuid4()
     db = fake_session(
-        result(),  # scalars(existing) -> none
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
+        result(),
+        result(),
+        result(),
     )
     _id_on_flush(db)
     svc = GremiumRoleService(db)
@@ -207,7 +220,6 @@ async def test_create_role_success_sanitizes_perms() -> None:
     assert "bogus" not in out.permissions
     assert set(out.permissions) == {"vote.cast", "session.manage"}
     assert db.committed == 1
-    # The service adds exactly one GremiumRole. The audit row is also in db.added.
     assert sum(isinstance(o, GremiumRole) for o in db.added) == 1
 
 
@@ -219,8 +231,9 @@ async def test_update_role_not_found() -> None:
 
 
 async def test_update_role_updates_name_and_perms() -> None:
+    """Update the name and the permissions. The audit runs execute twice."""
     role = _role(key="custom", perms=["vote.cast"])
-    db = fake_session(result(), result(), gets=[role])  # audit runs execute twice
+    db = fake_session(result(), result(), gets=[role])
     svc = GremiumRoleService(db)
     out = await svc.update_role(
         role.id,
@@ -233,11 +246,11 @@ async def test_update_role_updates_name_and_perms() -> None:
 
 
 async def test_update_role_keeps_fields_when_none() -> None:
+    """A None name and None permissions keep both fields."""
     role = _role(key="custom", perms=["vote.cast"])
     role.name_i18n = {"de": "Alt"}
     db = fake_session(result(), result(), gets=[role])
     svc = GremiumRoleService(db)
-    # name None and permissions None skip both update branches.
     out = await svc.update_role(role.id, GremiumRoleUpdate(), "admin")
     assert out.name == {"de": "Alt"}
     assert out.permissions == ["vote.cast"]
@@ -259,20 +272,25 @@ async def test_delete_role_forced_blocked() -> None:
 
 
 async def test_delete_role_in_use_blocked() -> None:
+    """Refuse to delete a role that a membership uses."""
     role = _role(key="custom")
-    db = fake_session(result(uuid4()), gets=[role])  # scalars(in_use) -> first() is not None
+    db = fake_session(result(uuid4()), gets=[role])
     svc = GremiumRoleService(db)
     with pytest.raises(ConflictError, match="in use"):
         await svc.delete_role(role.id, "admin")
 
 
 async def test_delete_role_success() -> None:
+    """Delete an unused role.
+
+    Queue: no membership, no mapping, then the audit lock and the audit prev-hash.
+    """
     role = _role(key="custom")
     db = fake_session(
-        result(),  # scalars(in_use) -> empty
-        result(),  # scalars(mapped) -> empty
-        result(),  # audit advisory lock
-        result(),  # audit prev-hash
+        result(),
+        result(),
+        result(),
+        result(),
         gets=[role],
     )
     svc = GremiumRoleService(db)
@@ -282,9 +300,9 @@ async def test_delete_role_success() -> None:
 
 
 async def test_list_memberships() -> None:
+    """A row without a principal row (outer join) gives no name and no e-mail."""
     gid, pid, other = uuid4(), uuid4(), uuid4()
     m = _membership(pid, gid, _dt("2020-01-01"), None)
-    # A row without a principal row (outer join) gives no name and no e-mail.
     n = _membership(other, gid, _dt("2020-01-01"), None)
     db = fake_session(result((m, "Max", "max@example.org", True), (n, None, None, None)))
     svc = GremiumRoleService(db)
@@ -337,7 +355,7 @@ def test_branding_helper_none_and_row() -> None:
 
 
 async def test_get_no_versions() -> None:
-    # _active -> None gives version 0 and the default branding.
+    """Without an active version the config is version 0 with the default branding."""
     db = fake_session(result())
     out = await SiteConfigService(db).get()
     assert out.version == 0
@@ -355,12 +373,17 @@ async def test_get_reads_the_active_version() -> None:
 async def test_save_writes_a_new_active_version(
     revisions: list[dict[str, object]],
 ) -> None:
+    """A save writes a new active version.
+
+    Queue: ``_latest``, ``_active`` (the source of help and tickets), the update that
+    deactivates the old version, and ``_active`` of the final read.
+    """
     active = _scv(5, active=True, branding=Branding(appName="Alt").model_dump(by_alias=True))
     db = fake_session(
-        result(active),  # _latest
-        result(active),  # _active -> the source of help and tickets
-        result(),  # execute(update active=False)
-        result(active),  # get._active
+        result(active),
+        result(active),
+        result(),
+        result(active),
     )
     _id_on_flush(db)
     await SiteConfigService(db).save(Branding(appName="Neu", accentColor="#0075BF"), "admin")
@@ -383,14 +406,17 @@ def test_branding_accent_color_shape() -> None:
 
 
 async def test_public_with_active_and_without() -> None:
+    """Serve the public config with and without an active version.
+
+    Without a settings row the guest defaults apply: links without an expiry. The upload
+    limits of the wizard come from the settings.
+    """
     active = _scv(9, active=True, branding=Branding(appName="P").model_dump(by_alias=True))
     db = fake_session(result(active))
     out = await SiteConfigService(db).public()
     assert out.version == 9
     assert out.branding.app_name == "P"
-    # Without a settings row the guest defaults apply: links without an expiry.
     assert out.link_ttl_days is None
-    # The upload limits of the wizard come from the settings.
     limits = out.model_dump(by_alias=True)["attachmentLimits"]
     assert limits == {
         "maxFileBytes": 10 * 1024 * 1024,
@@ -398,19 +424,19 @@ async def test_public_with_active_and_without() -> None:
         "maxDraftBytes": 50 * 1024 * 1024,
     }
 
-    db2 = fake_session(result())  # _active -> None
+    db2 = fake_session(result())
     out2 = await SiteConfigService(db2).public()
     assert out2.version == 0
 
 
 async def test_manifest_uses_config_names() -> None:
+    """The manifest takes the trimmed config names and merges in the static fields."""
     branding = Branding(appName="  My Platform  ", appShortName="  MP  ")
     active = _scv(1, active=True, branding=branding.model_dump(by_alias=True))
     db = fake_session(result(active))
     man = await SiteConfigService(db).manifest()
     assert man["name"] == "My Platform"
     assert man["short_name"] == "MP"
-    # The manifest also merges in the static fields.
     assert man["display"] == "standalone"
     assert man["id"] == "/"
     assert "icons" in man
@@ -440,7 +466,7 @@ async def test_manifest_dark_scheme_takes_the_dark_bar_colours() -> None:
 
 
 async def test_manifest_falls_back_to_defaults_when_blank() -> None:
-    # An empty or whitespace name falls back to the default.
+    """An empty or whitespace name falls back to the default."""
     branding = Branding(appName="   ", appShortName="")
     active = _scv(1, active=True, branding=branding.model_dump(by_alias=True))
     db = fake_session(result(active))
@@ -450,15 +476,19 @@ async def test_manifest_falls_back_to_defaults_when_blank() -> None:
 
 
 async def test_manifest_no_active_config_uses_defaults() -> None:
-    db = fake_session(result())  # _active -> None
+    """Without an active config the manifest uses the default names."""
+    db = fake_session(result())
     man = await SiteConfigService(db).manifest()
     assert man["name"] == DEFAULT_APP_NAME
     assert man["short_name"] == DEFAULT_APP_SHORT_NAME
 
 
 async def test_manifest_colours_are_the_bottom_bar_surface() -> None:
-    # Chrome paints the navigation bar of the installed app with theme_color or
-    # background_color, depending on the version, so both take the bottom bar surface.
+    """Both manifest colours take the bottom bar surface.
+
+    Chrome paints the navigation bar of the installed app with theme_color or
+    background_color, depending on the version.
+    """
     db = fake_session(result())
     man = await SiteConfigService(db).manifest()
     assert man["theme_color"] == man["background_color"] == "#e6e9e5"
@@ -468,9 +498,6 @@ def test_module_constants_consistency() -> None:
     assert set(gr.FORCED_ROLE_DEFAULT_PERMS) == set(FORCED_ROLE_KEYS)
     for perms in gr.FORCED_ROLE_DEFAULT_PERMS.values():
         assert all(p in GREMIUM_PERMISSIONS for p in perms)
-
-
-# -- help & tickets ("Hilfe & Tickets") ----------------------------------------------
 
 
 def test_public_branding_hides_the_help_and_ticket_settings() -> None:

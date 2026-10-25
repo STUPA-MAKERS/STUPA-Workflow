@@ -226,6 +226,11 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     metadata and `0002_seed` writes the five rows, so the raw DDL of the revision
     is a no-op there. An installed database has neither. This test rebuilds that
     state — free-text column back, tables gone — and then runs `_UPGRADE`.
+
+    An installed database carries the old free text on every Gremium. Both slots of every
+    variant survive, which a per-logo guard would not do: it would keep the title row
+    only. The rebuild leaves the tables at revision ec167d091656, so the test re-applies
+    the square slot of a3f9c2d71e4b, and the tests that run later see the head schema.
     """
     import importlib.util
     from pathlib import Path
@@ -246,7 +251,6 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
             conn.execute(text(stmt))
         conn.execute(text("DROP TABLE cd_variant_logo"))
         conn.execute(text("DROP TABLE cd_variant"))
-        # An installed database carries the old free text on every Gremium.
         conn.execute(text("UPDATE gremium SET cd_variant = slug"))
 
     with engine.begin() as conn:
@@ -272,8 +276,6 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
                 "WHERE table_name = 'gremium' AND column_name = 'cd_variant')"
             )
         ).scalar_one()
-    # Both slots of every variant survive. A per-logo guard would have kept the
-    # title row only.
     assert [tuple(r) for r in logos] == [
         ("asta", "footer", "ASTA"),
         ("asta", "title", "ASTA"),
@@ -289,8 +291,6 @@ def test_upgrade_from_an_installed_database(engine: Engine) -> None:
     assert ("asta", "asta") in [tuple(r) for r in backfilled]
     assert old_column is False
 
-    # The rebuild left the tables at revision ec167d091656. Re-apply the square
-    # slot of a3f9c2d71e4b, so the tests that run later see the head schema.
     with engine.begin() as conn:
         conn.execute(
             text("ALTER TABLE cd_variant_logo DROP CONSTRAINT IF EXISTS ck_cd_variant_logo_slot")

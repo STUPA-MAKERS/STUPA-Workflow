@@ -76,6 +76,11 @@ async def _audit_id(session: AsyncSession, action: AuditAction, target_id: str) 
 
 
 async def test_budget_revert_requires_budget_book(session: AsyncSession) -> None:
+    """Require budget.book for a budget revert.
+
+    audit.revert alone is not enough. Without budget.book the booking still stands, so
+    no money moves. With budget.book the same revert runs through.
+    """
     svc = BudgetTreeService(session, actor="tester")
     g = Gremium(name="FS", slug=f"fs-{_suffix()}")
     session.add(g)
@@ -94,15 +99,12 @@ async def test_budget_revert_requires_budget_book(session: AsyncSession) -> None
         session, AuditAction.BUDGET_EXPENSE_CREATE, str(booked.id)
     )
 
-    # audit.revert alone is NOT enough. The permission budget.book is missing.
     with pytest.raises(ForbiddenError):
         await RevertService(session).revert(
             audit_id, "u", _principal("audit.revert")
         )
-    # The booking still stands. No money moves without the permission.
     assert await session.get(Budget, top.id) is not None
 
-    # With budget.book the same revert runs through.
     await RevertService(session).revert(
         audit_id, "u", _principal("audit.revert", "budget.book")
     )
@@ -111,6 +113,7 @@ async def test_budget_revert_requires_budget_book(session: AsyncSession) -> None
 async def test_budget_node_revert_requires_budget_structure(
     session: AsyncSession,
 ) -> None:
+    """Require budget.structure for a node revert; a wrong permission is refused."""
     svc = BudgetTreeService(session, actor="tester")
     g = Gremium(name="FS", slug=f"fs-{_suffix()}")
     session.add(g)
@@ -122,7 +125,7 @@ async def test_budget_node_revert_requires_budget_structure(
 
     with pytest.raises(ForbiddenError):
         await RevertService(session).revert(
-            audit_id, "u", _principal("audit.revert", "budget.book")  # wrong permission
+            audit_id, "u", _principal("audit.revert", "budget.book")
         )
     assert await session.get(Budget, node.id) is not None
 
@@ -140,7 +143,9 @@ async def _seeded_form_change(
     The revert of the second version is the operation under test.
 
     Returns:
-        The application type id and the id of the audit entry for that version.
+        The application type id and the id of the audit entry for that version. The
+        entry is the one whose data.revisionId points to the newest config_revision of
+        the form entity.
     """
     g = Gremium(name="G", slug=f"g-{_suffix()}")
     session.add(g)
@@ -167,7 +172,6 @@ async def _seeded_form_change(
         ),
         "tester",
     )
-    # The newest config_revision of the form entity is the change to revert.
     revisions = ConfigRevisionService(session)
     head = await revisions.head(ENTITY_FORM, str(at.id))
     assert head is not None
@@ -178,7 +182,6 @@ async def _seeded_form_change(
             .order_by(AuditEntry.id.desc())
         )
     ).scalars()
-    # Find the audit entry whose data.revisionId points to head.
     for entry in audit:
         if str((entry.data or {}).get("revisionId") or "") == str(head.id):
             return str(at.id), entry.id
@@ -186,6 +189,7 @@ async def _seeded_form_change(
 
 
 async def test_config_revert_requires_form_configure(session: AsyncSession) -> None:
+    """Require form.configure for a config revert."""
     _, audit_id = await _seeded_form_change(session)
 
     with pytest.raises(ForbiddenError):
@@ -193,7 +197,6 @@ async def test_config_revert_requires_form_configure(session: AsyncSession) -> N
             audit_id, "u", _principal("audit.revert")
         )
 
-    # With form.configure the config revert runs through.
     await RevertService(session).revert(
         audit_id, "u", _principal("audit.revert", "form.configure")
     )

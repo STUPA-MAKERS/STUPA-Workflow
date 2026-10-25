@@ -85,6 +85,10 @@ async def test_query_filters_by_action(session: AsyncSession) -> None:
 
 
 async def test_query_cursor_keyset_paginates(session: AsyncSession) -> None:
+    """Page through the cursor by keyset, newest first (id desc).
+
+    The pages do not overlap, and the last page ends the list.
+    """
     svc = AuditService(session)
     for _ in range(5):
         await svc.record(actor="a", action=AuditAction.LOGIN)
@@ -92,40 +96,46 @@ async def test_query_cursor_keyset_paginates(session: AsyncSession) -> None:
 
     first, has_more = await svc.query_cursor(limit=2)
     assert len(first) == 2 and has_more is True
-    # newest first (id desc)
     assert first[0].id > first[1].id
 
     second, has_more2 = await svc.query_cursor(limit=2, before=first[-1].id)
     assert len(second) == 2 and has_more2 is True
-    assert second[0].id < first[-1].id  # a real keyset, no overlap
+    assert second[0].id < first[-1].id
 
     third, has_more3 = await svc.query_cursor(limit=2, before=second[-1].id)
-    assert len(third) == 1 and has_more3 is False  # the end of the list
+    assert len(third) == 1 and has_more3 is False
 
 
 async def test_resolve_actor_names_and_list_actors(session: AsyncSession) -> None:
+    """Resolve actor names and list the actors.
+
+    The rows include an actor with an email only and the system actor. The list holds
+    only actors that are not None, each with a resolved name.
+    """
     from app.modules.auth.models import Principal
 
     session.add(Principal(sub="u-1", display_name="User One", email="u1@x.test"))
-    session.add(Principal(sub="u-2", email="u2@x.test"))  # email only
+    session.add(Principal(sub="u-2", email="u2@x.test"))
     svc = AuditService(session)
     await svc.record(actor="u-1", action=AuditAction.LOGIN)
     await svc.record(actor="u-2", action=AuditAction.LOGIN)
-    await svc.record(actor=None, action=AuditAction.EXPORT)  # the system actor
+    await svc.record(actor=None, action=AuditAction.EXPORT)
     await session.commit()
 
     names = await svc.resolve_actor_names(["u-1", "u-2", "unknown", None])
     assert names == {"u-1": "User One", "u-2": "u2@x.test"}
 
     actors = await svc.list_actors()
-    # only actors that are not None, each with a resolved name
     assert ("u-1", "User One") in actors
     assert ("u-2", "u2@x.test") in actors
     assert all(sub is not None for sub, _ in actors)
 
 
 async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -> None:
-    """Resolve UUIDs embedded in `data` to names. Unknown and non-UUID values are absent."""
+    """Resolve UUIDs embedded in `data` to names. Unknown and non-UUID values are absent.
+
+    The scan runs recursively over lists and nested dicts and skips non-UUID values.
+    """
     import uuid as _uuid
 
     from app.modules.admin.models import Gremium
@@ -135,7 +145,6 @@ async def test_resolve_data_ids_resolves_embedded_uuids(session: AsyncSession) -
     await session.flush()
     unknown = str(_uuid.uuid4())
 
-    # The scan runs recursively over lists and nested dicts and skips non-UUID values.
     resolved = await AuditService(session).resolve_data_ids(
         [
             {"gremiumId": str(g.id), "note": "kein-uuid"},
@@ -204,7 +213,7 @@ async def test_concurrent_records_keep_chain_intact(
             )
             assert len(entries) == 2
             assert entries[0].prev_hash is None
-            assert entries[1].prev_hash == entries[0].hash  # a real link
+            assert entries[1].prev_hash == entries[0].hash
             assert entries[0].hash != entries[1].hash
             assert (await AuditService(s).verify_chain()).valid is True
     finally:

@@ -61,11 +61,15 @@ async def test_store_a_valid_check(session: AsyncSession) -> None:
 async def test_store_the_first_break_of_a_tampered_chain(
     session: AsyncSession, engine: Engine
 ) -> None:
+    """Store the first break of a tampered chain.
+
+    The test tampers past the append-only trigger, as a superuser with direct DB access
+    could.
+    """
     svc = AuditService(session)
     first = await svc.record(actor="a", action=AuditAction.LOGIN)
     await svc.record(actor="b", action=AuditAction.LOGIN)
     await session.commit()
-    # Tamper past the append-only trigger, as a superuser with direct DB access could.
     with engine.begin() as conn:
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(
@@ -86,6 +90,7 @@ async def test_latest_is_none_before_the_first_check(session: AsyncSession) -> N
 
 
 async def test_the_store_keeps_only_the_newest_rows(session: AsyncSession) -> None:
+    """Keep only the newest rows: the two newest seeded rows and the new one."""
     svc = AuditService(session)
     base = datetime(2026, 1, 1, tzinfo=UTC)
     for i in range(5):
@@ -111,12 +116,17 @@ async def test_the_store_keeps_only_the_newest_rows(session: AsyncSession) -> No
             .order_by(AuditVerification.started_at)
         )
     ).all()
-    assert kept == [3, 4]  # the two newest seeded rows survive next to the new one
+    assert kept == [3, 4]
     latest = await svc.latest_verification()
     assert latest is not None and latest.trigger == "restore"
 
 
 async def test_many_manual_runs_keep_a_failed_cron_check(session: AsyncSession) -> None:
+    """Keep a failed cron check after many manual runs.
+
+    The failed check stays, because it is evidence. The newest check of each trigger
+    stays too.
+    """
     svc = AuditService(session)
     base = datetime(2026, 1, 1, tzinfo=UTC)
     failed = AuditVerification(
@@ -143,8 +153,8 @@ async def test_many_manual_runs_keep_a_failed_cron_check(session: AsyncSession) 
         await svc.verify_and_store(trigger="manual", triggered_by="reader")
 
     ids = set(await session.scalars(select(AuditVerification.id)))
-    assert failed.id in ids  # the failed check is evidence and stays
-    assert restore.id in ids  # the newest check of its trigger stays
+    assert failed.id in ids
+    assert restore.id in ids
     manual = await session.scalar(
         select(func.count())
         .select_from(AuditVerification)
@@ -157,17 +167,22 @@ async def test_many_manual_runs_keep_a_failed_cron_check(session: AsyncSession) 
 async def test_the_prune_keeps_the_first_failed_check_of_each_break(
     session: AsyncSession,
 ) -> None:
+    """Keep the first failed check of each break.
+
+    The rows are (valid, broken_at, reason) per day, and every row is a cron check. Day 0
+    is the first detection of break A and day 2 repeats it. Day 3 is the first detection
+    of break B and day 4 repeats it. Days 1, 5 and 6 are valid.
+    """
     svc = AuditService(session)
     base = datetime(2026, 1, 1, tzinfo=UTC)
-    # (valid, broken_at, reason) per day; every row is a cron check.
     plan: list[tuple[bool, int | None, str | None]] = [
-        (False, 1, "prev_hash_mismatch"),  # 0: first detection of break A
-        (True, None, None),  # 1
-        (False, 1, "prev_hash_mismatch"),  # 2: repeat of break A
-        (False, 2, "hash_mismatch"),  # 3: first detection of break B
-        (False, 2, "hash_mismatch"),  # 4: repeat of break B
-        (True, None, None),  # 5
-        (True, None, None),  # 6
+        (False, 1, "prev_hash_mismatch"),
+        (True, None, None),
+        (False, 1, "prev_hash_mismatch"),
+        (False, 2, "hash_mismatch"),
+        (False, 2, "hash_mismatch"),
+        (True, None, None),
+        (True, None, None),
     ]
     session.add_all(
         AuditVerification(
@@ -197,11 +212,16 @@ async def test_the_prune_keeps_the_first_failed_check_of_each_break(
 async def test_a_permanently_broken_chain_keeps_the_store_bounded(
     session: AsyncSession, engine: Engine
 ) -> None:
+    """Keep the store bounded for a chain that stays broken.
+
+    The test tampers past the append-only trigger, so nothing can repair the chain. The
+    store keeps the newest 100 cron checks and the first detection. The repeats past
+    them go.
+    """
     svc = AuditService(session)
     first = await svc.record(actor="a", action=AuditAction.LOGIN)
     await svc.record(actor="b", action=AuditAction.LOGIN)
     await session.commit()
-    # Tamper past the append-only trigger. Nothing can repair the chain after this.
     with engine.begin() as conn:
         conn.execute(text("SET LOCAL session_replication_role = replica"))
         conn.execute(
@@ -215,13 +235,13 @@ async def test_a_permanently_broken_chain_keeps_the_store_bounded(
         assert row.valid is False
 
     rows = (await session.scalars(select(AuditVerification))).all()
-    # The newest 100 cron checks and the first detection. The repeats past them go.
     assert len(rows) == VERIFICATION_KEEP + 1
     assert detection.id in {r.id for r in rows}
     assert all(r.valid is False for r in rows)
 
 
 async def test_a_manual_run_refuses_inside_the_cooldown(session: AsyncSession) -> None:
+    """Refuse a manual run inside the cooldown. The cron does not wait for it."""
     svc = AuditService(session)
     first = await svc.run_manual_verification(triggered_by="admin-1")
     assert first.trigger == "manual"
@@ -229,7 +249,6 @@ async def test_a_manual_run_refuses_inside_the_cooldown(session: AsyncSession) -
     with pytest.raises(RateLimitedError):
         await svc.run_manual_verification(triggered_by="admin-1")
 
-    # The cron does not wait for the cooldown.
     cron = await svc.verify_and_store(trigger="cron")
     assert cron.trigger == "cron"
     count = await session.scalar(select(func.count()).select_from(AuditVerification))
@@ -239,6 +258,10 @@ async def test_a_manual_run_refuses_inside_the_cooldown(session: AsyncSession) -
 async def test_a_manual_run_refuses_while_a_check_holds_the_lock(
     session: AsyncSession, engine: Engine
 ) -> None:
+    """Refuse a manual run while a check holds the lock.
+
+    The refused run releases its transaction, so a new run gets the lock.
+    """
     with engine.connect() as conn:
         conn.execute(text(f"SELECT pg_advisory_lock({_VERIFY_LOCK_KEY})"))
         try:
@@ -248,7 +271,6 @@ async def test_a_manual_run_refuses_while_a_check_holds_the_lock(
             conn.execute(text(f"SELECT pg_advisory_unlock({_VERIFY_LOCK_KEY})"))
     count = await session.scalar(select(func.count()).select_from(AuditVerification))
     assert count == 0
-    # The refused run released its transaction; a new run gets the lock.
     row = await AuditService(session).run_manual_verification(triggered_by="admin-1")
     assert row.valid is True
 
@@ -256,15 +278,20 @@ async def test_a_manual_run_refuses_while_a_check_holds_the_lock(
 @pytest.mark.parametrize(
     ("trigger", "valid", "reason"),
     [
-        ("nightly", True, None),  # unknown trigger
-        ("cron", False, "deleted_row"),  # unknown reason
-        ("cron", True, "hash_mismatch"),  # a valid chain has no reason
-        ("cron", False, None),  # a broken chain names its reason
+        ("nightly", True, None),
+        ("cron", False, "deleted_row"),
+        ("cron", True, "hash_mismatch"),
+        ("cron", False, None),
     ],
 )
 def test_table_checks_reject_bad_rows(
     engine: Engine, trigger: str, valid: bool, reason: str | None
 ) -> None:
+    """Reject bad rows by table check.
+
+    The rows have an unknown trigger, an unknown reason, a valid chain with a reason, and
+    a broken chain without a reason.
+    """
     with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(

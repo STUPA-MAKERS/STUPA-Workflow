@@ -103,6 +103,13 @@ async def _top_with_fy(
 async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
     session: AsyncSession,
 ) -> None:
+    """Delete the expense on a booking revert and keep the invoice status.
+
+    A booking does not pay the invoice, so a user marks it paid. The revert removes the
+    booking and does not change the invoice status. The test cleans up at the end,
+    because nothing empties the DB between integration tests, and a leftover open
+    invoice would corrupt the global invoice counter of another test.
+    """
     svc = BudgetTreeService(session, actor="tester")
     top, fy_id = await _top_with_fy(session, svc)
     inv = await svc.create_invoice(
@@ -120,8 +127,7 @@ async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
         actor="tester",
     )
     inv_row = await session.get(Invoice, inv.id)
-    assert inv_row is not None and inv_row.status == "open"  # a booking does not pay it
-    # A user marks the invoice paid. The revert of the booking keeps that status.
+    assert inv_row is not None and inv_row.status == "open"
     await svc.update_invoice(inv.id, InvoiceUpdate(status="paid"))
 
     audit_id = await _audit_id(
@@ -129,12 +135,10 @@ async def test_revert_booking_deletes_expense_and_keeps_invoice_status(
     )
     await RevertService(session).revert(audit_id, "admin")
 
-    assert await session.get(BudgetExpense, booked.id) is None  # the booking is gone
+    assert await session.get(BudgetExpense, booked.id) is None
     await session.refresh(inv_row)
-    assert inv_row.status == "paid"  # the revert does not change the invoice status
+    assert inv_row.status == "paid"
 
-    # Clean up. Nothing empties the DB between integration tests. A leftover open
-    # invoice would corrupt the global invoice counter of another test.
     await session.delete(inv_row)
     await session.commit()
 
@@ -200,6 +204,7 @@ async def test_revert_node_update_restores_prior_name(session: AsyncSession) -> 
 async def test_revert_node_update_stale_when_changed_after(
     session: AsyncSession,
 ) -> None:
+    """Refuse a stale node revert: a later rename makes the old entry stale."""
     svc = BudgetTreeService(session, actor="tester")
     g = await _gremium(session)
     node = await svc.create_node(
@@ -207,7 +212,6 @@ async def test_revert_node_update_stale_when_changed_after(
     )
     await svc.update_node(node.id, BudgetNodeUpdate(name="Neu"))
     audit_id = await _audit_id(session, AuditAction.BUDGET_NODE_UPDATE, str(node.id))
-    # A second rename after the change to revert makes the old entry stale.
     await svc.update_node(node.id, BudgetNodeUpdate(name="Neuer"))
     with pytest.raises(ConflictError) as ei:
         await RevertService(session).revert(audit_id, "admin")
@@ -243,13 +247,13 @@ async def test_revert_first_allocation_removes_row(session: AsyncSession) -> Non
 async def test_revert_allocation_stale_when_changed_after(
     session: AsyncSession,
 ) -> None:
+    """Refuse a stale allocation revert: a later set makes the old entry stale."""
     svc = BudgetTreeService(session, actor="tester")
     top, fy_id = await _top_with_fy(session, svc)
     await svc.set_allocation(top.id, fy_id, AllocationSet(allocated=Decimal("1000")))
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_ALLOCATION_SET, str(top.id)
     )
-    # A second set after the change to revert makes the old entry stale.
     await svc.set_allocation(top.id, fy_id, AllocationSet(allocated=Decimal("900")))
     with pytest.raises(ConflictError) as ei:
         await RevertService(session).revert(audit_id, "admin")
@@ -282,6 +286,7 @@ async def test_revert_expense_update_restores_prior_amount(
 async def test_revert_expense_update_stale_when_changed_after(
     session: AsyncSession,
 ) -> None:
+    """Refuse a stale expense revert: a later amount change makes the entry stale."""
     svc = BudgetTreeService(session, actor="tester")
     top, fy_id = await _top_with_fy(session, svc)
     booked = await svc.book_expense(
@@ -294,7 +299,6 @@ async def test_revert_expense_update_stale_when_changed_after(
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_UPDATE, str(booked.id)
     )
-    # A second amount change after the change to revert makes the entry stale.
     await svc.update_expense(booked.id, ExpenseUpdate(amount=Decimal("90")))
     with pytest.raises(ConflictError) as ei:
         await RevertService(session).revert(audit_id, "admin")
@@ -302,6 +306,7 @@ async def test_revert_expense_update_stale_when_changed_after(
 
 
 async def test_revert_delete_action_is_not_revertable(session: AsyncSession) -> None:
+    """Refuse the revert of a delete action such as budget_expense_delete."""
     svc = BudgetTreeService(session, actor="tester")
     top, fy_id = await _top_with_fy(session, svc)
     booked = await svc.book_expense(
@@ -310,7 +315,7 @@ async def test_revert_delete_action_is_not_revertable(session: AsyncSession) -> 
         ),
         actor="tester",
     )
-    await svc.delete_expense(booked.id)  # writes budget_expense_delete (not revertable)
+    await svc.delete_expense(booked.id)
     audit_id = await _audit_id(
         session, AuditAction.BUDGET_EXPENSE_DELETE, str(booked.id)
     )
@@ -403,6 +408,11 @@ async def _fire_draft_to_review(
 async def test_revert_status_change_moves_back_and_redo(
     session: AsyncSession,
 ) -> None:
+    """Move a status change back and redo it.
+
+    The revert writes an inverse StatusEvent without a transition. The redo reverts the
+    revert entry itself, which moves back to the review state.
+    """
     app_type, states = await _seed_flow(session)
     app = await _fire_draft_to_review(session, app_type, states)
     after_fire = await session.get(Application, app.id)
@@ -413,7 +423,6 @@ async def test_revert_status_change_moves_back_and_redo(
     reverted = await session.get(Application, app.id)
     assert reverted is not None and reverted.current_state_id == states["draft"].id
 
-    # The revert wrote an inverse StatusEvent without a transition.
     rev_events = (
         await session.execute(
             select(StatusEvent).where(
@@ -426,7 +435,6 @@ async def test_revert_status_change_moves_back_and_redo(
     ).scalars().all()
     assert len(rev_events) == 1
 
-    # Redo: revert the revert entry itself, which moves back to the review state.
     redo_id = await _audit_id(session, AuditAction.STATUS_CHANGE, str(app.id))
     assert redo_id != audit_id
     await RevertService(session).revert(redo_id, "admin")
@@ -437,10 +445,10 @@ async def test_revert_status_change_moves_back_and_redo(
 async def test_revert_status_change_stale_when_moved_on(
     session: AsyncSession,
 ) -> None:
+    """Refuse a stale status revert after the application moves on by hand."""
     app_type, states = await _seed_flow(session)
     app = await _fire_draft_to_review(session, app_type, states)
     audit_id = await _audit_id(session, AuditAction.STATUS_CHANGE, str(app.id))
-    # The application moves on to another state by hand, so the old change is stale.
     app_row = await session.get(Application, app.id)
     assert app_row is not None
     app_row.current_state_id = states["draft"].id

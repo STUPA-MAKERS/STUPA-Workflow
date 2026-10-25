@@ -46,6 +46,7 @@ async def maker(migrated: tuple[str, str]) -> AsyncIterator[async_sessionmaker[A
 async def test_conversion_of_the_seed(
     engine: Engine, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Convert the seed: slot and position stay, and the vendored name becomes the file name."""
     with engine.connect() as conn:
         before = [tuple(r) for r in conn.execute(text(_LOGOS)).fetchall()]
     storage = FakeStorage()
@@ -77,5 +78,4 @@ async def test_conversion_of_the_seed(
     assert len(storage.put_calls) == 9
     assert name == "STUPA"
     assert audits >= 5
-    # Same slot and position, the vendored name is now the file name.
     assert [(k, s, p, None, f"{v}.svg", "image/svg+xml") for k, s, p, v, _, _ in before] == after

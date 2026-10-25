@@ -45,6 +45,7 @@ async def session(
 async def test_revert_out_of_the_vote_state_cancels_its_votes(
     session: AsyncSession,
 ) -> None:
+    """Cancel the votes on a revert out of the vote state; a draft of the restored state stays."""
     flow = await seed_vote_flow(session, start="review")
     await FlowService(session).fire(flow.app_id, flow.transitions["start"], manager())
     entry_id = (
@@ -59,7 +60,6 @@ async def test_revert_out_of_the_vote_state_cancels_its_votes(
         )
     ).scalar_one()
     running = await add_vote(session, flow, opens_at=NOW)
-    # A draft of the restored state stays.
     kept = await add_vote(session, flow, status="draft", opens_state="review")
     publisher = RecordingPublisher()
 

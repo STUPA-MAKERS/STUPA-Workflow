@@ -2,9 +2,9 @@
 
 A gremium role grants `session.manage`, `protocol.write`, `vote.manage` and
 `protocol.finalize` per gremium. These keys never enter `principal.permissions`, so
-`Principal.has` cannot cap them. Before the fix a token with only the `read` scope could
-still manage a meeting, write the minutes and run the votes of its owner's gremien.
-The minute-taker path had the same gap.
+`Principal.has` cannot cap them. Without an explicit cap, a token with only the `read`
+scope could still manage a meeting, write the minutes and run the votes of its
+owner's gremien. The minute-taker path needs the same cap.
 
 These tests pin the cap on every path: the gremium lookup, the minute-taker path, the
 admin bypass and the batched flags of the meeting list.
@@ -105,7 +105,10 @@ async def test_read_token_of_a_chair_cannot_run_the_meeting(chair: None) -> None
 
 
 async def test_read_token_of_the_minute_taker_cannot_write(nobody: None) -> None:
-    # The scope check runs before the minute-taker lookup, so no query is queued.
+    """Refuse a write with the read token of the minute taker.
+
+    The scope check runs before the minute-taker lookup, so no query is queued.
+    """
     svc = MeetingService(fake_session())
     token = _scoped("read", sub="protokoll")
     meeting = _meeting(protokollant_id=PID)
@@ -121,13 +124,16 @@ async def test_minute_taker_session_still_writes(nobody: None) -> None:
 
 
 async def test_meetings_write_token_of_a_chair_manages(chair: None) -> None:
+    """Let the meetings:write token of a chair manage.
+
+    `vote.manage` needs `votes:write`, but the manager path still grants it.
+    """
     svc = MeetingService(fake_session())
     token = _scoped("meetings:write")
     meeting = _meeting()
     assert await svc.can_manage(GID, token) is True
     assert await svc.can_write(meeting, token) is True
     assert await svc.can_finalize(meeting, token) is True
-    # `vote.manage` needs `votes:write`; the manager path still grants it.
     assert await svc.can_manage_votes(meeting, token) is True
 
 
@@ -152,13 +158,16 @@ async def test_finalize_needs_the_write_access(monkeypatch: pytest.MonkeyPatch) 
 
 
 async def test_admin_read_token_sees_all_but_cannot_manage(nobody: None) -> None:
+    """Let an admin read token see all gremien without management rights.
+
+    `read` holds `meeting.view_all`, so the admin keeps the cross-gremium view.
+    """
     svc = MeetingService(fake_session())
     token = _scoped("read", roles=["admin"])
     meeting = _meeting()
     assert await svc.can_manage(GID, token) is False
     assert await svc.can_write(meeting, token) is False
     assert await svc.can_finalize(meeting, token) is False
-    # `read` holds `meeting.view_all`, so the admin keeps the cross-gremium view.
     assert await svc._visible_gremium_ids(token) is None
 
 
@@ -180,10 +189,12 @@ def _row() -> Meeting:
 
 
 async def test_listing_flags_follow_the_scope_cap(chair: None) -> None:
-    """The batched list flags apply the same cap as the detail flags."""
+    """The batched list flags apply the same cap as the detail flags.
+
+    The queue holds the protocol rows, gremium names, protocol names, principal id and
+    votes. The gremium lookups are patched, and `vote.cast` is empty for a scoped token.
+    """
     m = _row()
-    # proto rows, gremium names, prot names, principal id, votes. The gremium
-    # lookups are patched, `vote.cast` is empty for a scoped token.
     db = fake_session(result(), result(), result(), result(PID), result())
     out = await MeetingService(db)._decorate([m], _scoped("read", sub="protokoll"))
     flags = out[0]
@@ -217,9 +228,7 @@ def _flags(out: Any) -> tuple[bool, bool, bool, bool]:
 @pytest.mark.parametrize(
     ("scopes", "expected"),
     [
-        # `votes:write` lets the admin bypass for `vote.manage` through, and nothing more.
         (("read", "votes:write"), (False, False, True, False)),
-        # `meetings:write` carries the meeting lead, which includes the votes.
         (("read", "meetings:write"), (True, True, True, True)),
         (("read",), (False, False, False, False)),
     ],
@@ -231,7 +240,8 @@ async def test_list_and_detail_flags_agree_for_a_scoped_admin(
 
     An admin token without a gremium membership: the router gates the vote routes on
     the detail `canManageVotes`, so a list flag that differs offers an action that the
-    API refuses.
+    API refuses. `votes:write` lets the admin bypass for `vote.manage` through, and
+    nothing more. `meetings:write` carries the meeting lead, which includes the votes.
     """
     token = _scoped(*scopes, sub="a", roles=["admin"])
     m = _row()

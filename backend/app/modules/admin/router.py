@@ -792,7 +792,7 @@ async def create_global_flow(
 ) -> FlowVersionOut:
     """Create the global flow as a new version (applies to ALL application types).
 
-    The gate accepts EITHER ``flow.configure`` OR ``admin.types`` (#g7). It is an
+    The gate accepts EITHER ``flow.configure`` OR ``admin.types``. It is an
     any-of gate and not a switch to ``flow.configure`` alone, for two reasons.
 
     1. ``flow.configure`` is the permission the flow editor route gates on. Without

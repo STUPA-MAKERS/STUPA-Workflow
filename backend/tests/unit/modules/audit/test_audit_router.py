@@ -121,6 +121,11 @@ def test_list_requires_audit_read_permission() -> None:
 
 
 def test_list_returns_entries_with_hex_hashes_and_cursor() -> None:
+    """List entries with hex hashes and a cursor.
+
+    The cursor is the id of the last item, and the sub resolves to a display name. The
+    router passes the fields through, and the genesis entry has no prev hash.
+    """
     service = _FakeService()
     service.items = [_entry(2, prev=bytes([1]) * 32), _entry(1, prev=None)]
     service.has_more = True
@@ -131,14 +136,14 @@ def test_list_returns_entries_with_hex_hashes_and_cursor() -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["hasMore"] is True
-    assert body["nextCursor"] == 1  # id of last item
+    assert body["nextCursor"] == 1
     first, second = body["items"]
     assert first["hash"] == "02" * 32
     assert first["prevHash"] == "01" * 32
     assert first["targetType"] == "application"
-    assert first["actorName"] == "Admin One"  # the sub resolves to a display name
-    assert first["revertable"] is True  # passed through by the router
-    assert second["prevHash"] is None  # Genesis
+    assert first["actorName"] == "Admin One"
+    assert first["revertable"] is True
+    assert second["prevHash"] is None
     assert second["revertable"] is False
 
 
@@ -173,14 +178,16 @@ def test_list_passes_cursor_filters_to_service() -> None:
 
 
 def test_list_rejects_naive_since_with_422() -> None:
-    # A naive since or until value must not reach the timestamptz query.
-    # The asyncpg driver raises a DataError there, which gives 500. AwareDatetime
-    # rejects the value with 422 instead.
+    """A naive since or until value must not reach the timestamptz query.
+
+    The asyncpg driver raises a DataError there, which gives 500. AwareDatetime rejects
+    the value with 422 instead, so the query is never reached.
+    """
     service = _FakeService()
     client = _client(service, _principal("audit.read"))
     resp = client.get("/api/admin/audit", params={"since": "2026-06-01T00:00:00"})
     assert resp.status_code == 422
-    assert service.cursor_kwargs is None  # the query is never reached
+    assert service.cursor_kwargs is None
 
 
 def test_list_rejects_naive_until_with_422() -> None:
@@ -335,6 +342,6 @@ def test_latest_verification_is_null_before_the_first_check() -> None:
 
 
 def test_latest_verification_requires_audit_read() -> None:
-    # audit.verify alone does not open the stored result; the tile reads with audit.read.
+    """Require audit.read for the latest verification; audit.verify alone is not enough."""
     client = _client(_FakeService(), _principal("audit.verify"))
     assert client.get("/api/admin/audit/verify/latest").status_code == 403

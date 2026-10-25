@@ -67,6 +67,10 @@ async def test_defaults_update_audit_and_public_ttl(
     maker: async_sessionmaker[AsyncSession],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Update the defaults, audit the change and serve the public TTL.
+
+    The audit entry holds the change. It has no revision, so it is not revertable.
+    """
     with _client(migrated, settings, monkeypatch, _ADMIN) as client:
         got = client.get("/api/admin/guest-settings")
         assert got.status_code == 200, got.text
@@ -92,7 +96,6 @@ async def test_defaults_update_audit_and_public_ttl(
         assert public["linkTtlDays"] == 30
         assert client.get("/api/admin/guest-settings").json()["linkTtlDays"] == 30
 
-    # The audit entry holds the change. It has no revision, so it is not revertable.
     async with maker() as session:
         entry = (
             await session.scalars(
@@ -173,6 +176,7 @@ async def test_routes_need_admin_deadlines(
     settings: Settings,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Gate the routes by admin.deadlines; the public site config needs no login."""
     with _client(migrated, settings, monkeypatch, _OTHER) as client:
         assert client.get("/api/admin/guest-settings").status_code == 403
         put = client.put(
@@ -181,7 +185,6 @@ async def test_routes_need_admin_deadlines(
         assert put.status_code == 403
     with _client(migrated, settings, monkeypatch, None) as client:
         assert client.get("/api/admin/guest-settings").status_code == 401
-        # The public site config needs no login.
         public = client.get("/api/site-config").json()
         assert public["confirmTtlHours"] == 12
         assert public["linkTtlDays"] is None

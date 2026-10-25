@@ -94,7 +94,6 @@ def _build_client(
     return TestClient(app, follow_redirects=False)
 
 
-# oauth_router
 def test_authorize_oidc_disabled_404() -> None:
     client = _build_client(DISABLED)
     resp = client.get(
@@ -346,13 +345,13 @@ def test_consent_request_invalid_tx_400() -> None:
 
 
 def test_consent_request_marks_held_scopes() -> None:
+    """Mark ``read`` (application.read) and ``votes:write`` (vote.manage) as held."""
     client = _build_client(ENABLED, principal=_mcp_principal())
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx())
     body = client.get("/api/oauth/consent-request").json()
     assert body["clientId"] == CLIENT_ID
     assert body["canUseMcp"] is True
     scopes = {s["key"]: s["held"] for s in body["requestedScopes"]}
-    # read → application.read and votes:write → vote.manage, both held.
     assert scopes["read"] is True
     assert scopes["votes:write"] is True
     assert body["defaultLifetime"] == oauth.DEFAULT_LIFETIME
@@ -360,7 +359,7 @@ def test_consent_request_marks_held_scopes() -> None:
 
 
 def test_consent_request_unheld_scope() -> None:
-    # A principal without admin permissions does not hold admin:write.
+    """A principal without admin permissions does not hold admin:write."""
     p = Principal(sub="u", permissions={"mcp.use"})
     client = _build_client(ENABLED, principal=p)
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope="admin:write"))
@@ -395,13 +394,13 @@ def test_consent_no_tx_400() -> None:
 
 
 def test_consent_deny_returns_access_denied_redirect() -> None:
+    """A denial redirects with ``access_denied`` and deletes the tx cookie."""
     client = _build_client(ENABLED)
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx())
     resp = client.post("/api/oauth/consent", json={"approve": False})
     assert resp.status_code == 200
     assert "error=access_denied" in resp.json()["redirect"]
     assert "state=s1" in resp.json()["redirect"]
-    # The server deletes the tx cookie.
     assert "ap_oauth_tx=" in resp.headers.get("set-cookie", "")
 
 
@@ -421,9 +420,12 @@ def test_consent_approve_missing_mcp_use_403() -> None:
 
 
 def test_consent_approve_no_valid_scopes_400() -> None:
+    """Answer 400 when no chosen scope was requested.
+
+    The request asked only for "read", so the unrequested "budget:write" leaves no scope.
+    """
     client = _build_client(ENABLED, principal=_mcp_principal())
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope="read"))
-    # The request asked only for "read". The unrequested "budget:write" leaves no scope → 400.
     resp = client.post(
         "/api/oauth/consent", json={"approve": True, "scopes": ["budget:write"]}
     )
@@ -431,7 +433,8 @@ def test_consent_approve_no_valid_scopes_400() -> None:
 
 
 def test_consent_approve_principal_not_found_400() -> None:
-    db = fake_session(result())  # _principal_row_id → None
+    """Answer 400 when ``_principal_row_id`` finds no row."""
+    db = fake_session(result())
     client = _build_client(ENABLED, db=db, principal=_mcp_principal())
     client.cookies.set(ENABLED.oauth_tx_cookie_name, _issue_tx(scope="read"))
     resp = client.post(
@@ -441,7 +444,8 @@ def test_consent_approve_principal_not_found_400() -> None:
 
 
 def test_consent_approve_success_mints_code(monkeypatch: pytest.MonkeyPatch) -> None:
-    db = fake_session(result("pid-row"))  # _principal_row_id → pid
+    """Mint a code for the principal row that ``_principal_row_id`` finds."""
+    db = fake_session(result("pid-row"))
 
     async def _create(db: object, **kw: object) -> str:
         assert kw["scope"] == "read"
@@ -463,6 +467,7 @@ def test_consent_approve_success_mints_code(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_consent_never_mints_code_without_expiry(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The lifetime "never" mints a code with ``access_ttl_seconds`` None."""
     db = fake_session(result("pid-row"))
     seen: dict[str, object] = {}
 
@@ -480,7 +485,6 @@ def test_consent_never_mints_code_without_expiry(monkeypatch: pytest.MonkeyPatch
         json={"approve": True, "scopes": ["read"], "lifetime": "never"},
     )
     assert resp.status_code == 200
-    # "never" → access_ttl_seconds None: the token pair never expires.
     assert seen["access_ttl_seconds"] is None
 
 
@@ -502,12 +506,14 @@ def test_consent_approve_success_without_state(monkeypatch: pytest.MonkeyPatch) 
 
 
 def test_list_grants_no_principal_row_empty() -> None:
-    db = fake_session(result())  # _principal_row_id → None
+    """List no grant when ``_principal_row_id`` finds no row."""
+    db = fake_session(result())
     client = _build_client(ENABLED, db=db)
     assert client.get("/api/oauth/grants").json() == []
 
 
 def test_list_grants_returns_rows() -> None:
+    """List the grants. A never-expiring grant without ``created_at`` gives nulls."""
     created = datetime(2026, 1, 1, tzinfo=UTC)
     row_full = SimpleNamespace(
         id="g1", client_id=CLIENT_ID, scope="read", created_at=created,
@@ -525,14 +531,14 @@ def test_list_grants_returns_rows() -> None:
     assert body[0]["accessExpiresAt"] is not None
     assert body[0]["refreshExpiresAt"] is not None
     assert body[0]["createdAt"] is not None
-    # never-expire and no created_at → None.
     assert body[1]["createdAt"] is None
     assert body[1]["accessExpiresAt"] is None
     assert body[1]["refreshExpiresAt"] is None
 
 
 def test_revoke_grant_not_found_when_missing() -> None:
-    db = fake_session(result("pid"), result())  # pid found, row None
+    """Answer 404 when the principal exists but the grant does not."""
+    db = fake_session(result("pid"), result())
     client = _build_client(ENABLED, db=db)
     assert client.delete("/api/oauth/grants/gx").status_code == 404
 
@@ -545,8 +551,8 @@ def test_revoke_grant_not_found_when_foreign() -> None:
 
 
 def test_revoke_grant_not_found_when_no_pid() -> None:
+    """Answer 404 when the grant exists but the principal row does not."""
     own = SimpleNamespace(id="gx", principal_id="pid", revoked_at=None)
-    # pid None but row exists → pid is None branch → 404.
     db = fake_session(result(), result(own))
     client = _build_client(ENABLED, db=db)
     assert client.delete("/api/oauth/grants/gx").status_code == 404
@@ -574,7 +580,8 @@ def test_revoke_grant_already_revoked_no_commit() -> None:
 
 
 def test_revoke_all_grants_no_pid_noop() -> None:
-    db = fake_session(result())  # _principal_row_id → None
+    """Revoke nothing when ``_principal_row_id`` finds no row."""
+    db = fake_session(result())
     client = _build_client(ENABLED, db=db)
     assert client.delete("/api/oauth/grants").status_code == 204
     assert db.committed == 0
@@ -608,7 +615,6 @@ def test_protected_resource_metadata() -> None:
     assert body["scopes_supported"] == sorted(oauth.SCOPES.keys())
 
 
-# oauth_service
 async def test_create_authorization_code_persists_and_returns_clear() -> None:
     db = fake_session()
     code = await oauth_service.create_authorization_code(
@@ -697,14 +703,17 @@ async def test_exchange_code_pkce_fail() -> None:
 
 
 async def test_exchange_code_success_with_ttl() -> None:
+    """Redeem the code with an atomic claim. The consent TTL wins over ``access_ttl``.
+
+    The claim is ``UPDATE ... WHERE used_at IS NULL RETURNING id``. The first execute is
+    the SELECT of the row, the second the claim, which returns the id.
+    """
     verifier = "a" * 64
     row = SimpleNamespace(
         id="code-id", used_at=None, expires_at=NOW + timedelta(hours=1),
         client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # An atomic `UPDATE ... WHERE used_at IS NULL RETURNING id` redeems the code.
-    # execute 1 = SELECT (row), execute 2 = claim → one row (id), so the code is claimed.
     db = fake_session(result(row), result(row.id))
     issued = await oauth_service.exchange_code(
         db, code="c", code_verifier=verifier, redirect_uri=LOOPBACK,
@@ -712,27 +721,31 @@ async def test_exchange_code_success_with_ttl() -> None:
     )
     assert issued.access_token.startswith("apat_")
     assert issued.refresh_token.startswith("aprt_")
-    assert issued.expires_in == 3600  # the consent TTL wins, not the access_ttl argument
+    assert issued.expires_in == 3600
     token_row = db.added[0]
     assert token_row.access_expires_at == NOW + timedelta(seconds=3600)
     assert token_row.refresh_expires_at == NOW + timedelta(seconds=86400)
 
 
 async def test_exchange_code_success_never_expires() -> None:
+    """A code without a consent TTL gives a token pair without an expiry.
+
+    The second execute is the atomic claim.
+    """
     verifier = "b" * 64
     row = SimpleNamespace(
         id="code-id", used_at=None, expires_at=NOW + timedelta(hours=1),
         client_id=CLIENT_ID, redirect_uri=LOOPBACK, code_challenge=_challenge(verifier),
         access_ttl_seconds=None, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row), result(row.id))  # execute 2 = atomic claim
+    db = fake_session(result(row), result(row.id))
     issued = await oauth_service.exchange_code(
         db, code="c", code_verifier=verifier, redirect_uri=LOOPBACK,
         client_id=CLIENT_ID, now=NOW, access_ttl=7200, refresh_ttl=86400,
     )
     assert issued.expires_in is None
     token_row = db.added[0]
-    assert token_row.access_expires_at is None  # _expiry(None) → None
+    assert token_row.access_expires_at is None
     assert token_row.refresh_expires_at is None
 
 
@@ -747,13 +760,16 @@ async def test_refresh_tokens_not_found() -> None:
 
 
 async def test_refresh_tokens_revoked() -> None:
-    # A resubmitted rotated token points to a replay. The service revokes the
-    # whole family (principal_id + client_id) and then returns invalid_grant.
+    """A resubmitted rotated token points to a replay, so the whole family goes.
+
+    The service revokes the family (principal_id and client_id) and returns
+    ``invalid_grant``. The first execute is the SELECT of the revoked row, the second the
+    family revoke. No new token pair goes out.
+    """
     row = SimpleNamespace(
         id="tok-id", revoked_at=NOW, client_id=CLIENT_ID, refresh_expires_at=None,
         principal_id="pid",
     )
-    # execute 1 = SELECT (revoked row), execute 2 = family revoke UPDATE (result ignored).
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
@@ -761,7 +777,6 @@ async def test_refresh_tokens_revoked() -> None:
             access_ttl=3600, refresh_ttl=86400,
         )
     assert "invalid or revoked" in exc.value.description
-    # No new token pair went out and the family revoke query ran.
     assert db.added == []
     assert len(db.statements) == 2
 
@@ -792,13 +807,16 @@ async def test_refresh_tokens_expired() -> None:
 
 
 async def test_refresh_tokens_success_rotation() -> None:
+    """Rotate the token with an atomic claim and issue a fresh pair.
+
+    The claim is ``UPDATE ... WHERE revoked_at IS NULL RETURNING id``. The executes are
+    the SELECT of the row, the SELECT of the active principal and the claim.
+    """
     row = SimpleNamespace(
         id="tok-id", revoked_at=None, client_id=CLIENT_ID,
         refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    # An atomic `UPDATE ... WHERE revoked_at IS NULL RETURNING id` rotates.
-    # 1 = SELECT (row), 2 = SELECT (active principal), 3 = rotation claim → one row (id).
     db = fake_session(
         result(row), result(SimpleNamespace(active=True)), result(row.id)
     )
@@ -806,7 +824,6 @@ async def test_refresh_tokens_success_rotation() -> None:
         db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
         access_ttl=3600, refresh_ttl=86400,
     )
-    # The claim returned a row, so the old token rotated and a fresh pair went out.
     assert len(db.statements) == 3
     assert issued.expires_in == 3600
     assert db.added[0].refresh_expires_at == NOW + timedelta(seconds=86400)
@@ -829,7 +846,10 @@ async def test_refresh_tokens_success_never_expires() -> None:
 
 
 async def test_refresh_tokens_inactive_principal_rejected() -> None:
-    """A deactivated principal gets `invalid_grant` and no fresh token pair."""
+    """A deactivated principal gets `invalid_grant` and no fresh token pair.
+
+    The old token does not rotate.
+    """
     row = SimpleNamespace(
         revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
@@ -842,7 +862,7 @@ async def test_refresh_tokens_inactive_principal_rejected() -> None:
         )
     assert exc.value.error == "invalid_grant"
     assert "inactive" in exc.value.description
-    assert row.revoked_at is None  # not rotated
+    assert row.revoked_at is None
 
 
 async def test_refresh_tokens_principal_missing_rejected() -> None:
@@ -851,7 +871,7 @@ async def test_refresh_tokens_principal_missing_rejected() -> None:
         revoked_at=None, client_id=CLIENT_ID, refresh_expires_at=NOW + timedelta(days=30),
         access_ttl_seconds=3600, principal_id="pid", scope="read",
     )
-    db = fake_session(result(row), result())  # second execute: no row
+    db = fake_session(result(row), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
             db, refresh_token="rt", client_id=CLIENT_ID, now=NOW,
@@ -899,14 +919,14 @@ async def test_resolve_access_token_never_expires() -> None:
     assert out == ("pid", "read")
 
 
-# mcp_router
 def test_mcp_config_requires_mcp_use_401() -> None:
     client = _build_client(ENABLED, no_principal_override=True)
     assert client.get("/api/mcp/config").status_code == 401
 
 
 def test_mcp_config_forbidden_without_perm_403() -> None:
-    p = Principal(sub="u", permissions={"application.read"})  # no mcp.use
+    """Answer 403 without ``mcp.use``."""
+    p = Principal(sub="u", permissions={"application.read"})
     client = _build_client(ENABLED, principal=p)
     assert client.get("/api/mcp/config").status_code == 403
 
@@ -929,7 +949,7 @@ def test_mcp_package_not_available_404(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_mcp_package_streams_tarball(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Build a minimal source package that also holds an excluded __pycache__ directory.
+    """Build a minimal source package that also holds an excluded __pycache__ directory."""
     pkg = tmp_path / "mcp"
     (pkg / "antragsplattform_mcp").mkdir(parents=True)
     (pkg / "pyproject.toml").write_text("[project]\nname='x'\n")
@@ -1036,6 +1056,7 @@ def test_package_dir_container_mount(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_package_dir_upward_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Search the parents upward: the first parent does not match, the second does."""
     s = load_settings(
         database_url="postgresql+asyncpg://x/y",
         session_secret="session-secret-0123456",
@@ -1049,7 +1070,6 @@ def test_package_dir_upward_search(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         return d == found
 
     monkeypatch.setattr(mcp_router_mod, "_is_pkg", _is_pkg)
-    # The first parent does not match (loop continue, branch 55->53). The second matches.
     monkeypatch.setattr(
         mcp_router_mod.Path,
         "resolve",
@@ -1071,10 +1091,10 @@ def test_package_dir_nowhere_returns_none(monkeypatch: pytest.MonkeyPatch) -> No
     assert mcp_router_mod._package_dir(s) is None
 
 
-# router.py: /auth/me helpers and the callback oauth-tx branch
 def test_callback_with_oauth_tx_redirects_to_finish(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Redirect to ``/api/oauth/finish`` while an OAuth AS login is in progress."""
     async def _ok(*a: object, **k: object) -> tuple[str, PrincipalRow]:
         return "signed-sid", PrincipalRow(sub="u1")
 
@@ -1082,7 +1102,6 @@ def test_callback_with_oauth_tx_redirects_to_finish(
     client = _build_client(ENABLED, no_principal_override=True)
     tx = sessions.issue_oidc_tx(ENABLED.session_secret, "st", "v", "n")
     client.cookies.set(ENABLED.oidc_tx_cookie_name, tx)
-    # An OAuth AS login is in progress (ap_oauth_tx set) → redirect to /api/oauth/finish.
     client.cookies.set(ENABLED.oauth_tx_cookie_name, "anything")
     resp = client.get("/api/auth/callback?code=c&state=st")
     assert resp.status_code == 307
@@ -1090,7 +1109,11 @@ def test_callback_with_oauth_tx_redirects_to_finish(
 
 
 async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Call the me helpers directly with rows that match (lines 234-241, 257)."""
+    """Call the me helpers directly with rows that match.
+
+    ``_gremien_for`` reads the member ids, then the gremium rows. A ``read`` token caps
+    the gremium permission away.
+    """
     from app.modules.admin import gremium_roles as gr
 
     gid = "11111111-1111-1111-1111-111111111111"
@@ -1105,7 +1128,6 @@ async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr(gr, "gremium_ids_with_permission", _ids_with_perm)
 
     gremium_row = SimpleNamespace(id=gid, name="StuPa", slug="stupa")
-    # _gremien_for: gremium_member_ids → {gid}, then the SELECT rows.
     db = fake_session(result(gremium_row))
     out = await router_mod._gremien_for(db, "u1")
     assert len(out) == 1
@@ -1113,13 +1135,16 @@ async def test_me_gremien_helpers_with_rows(monkeypatch: pytest.MonkeyPatch) -> 
 
     out2 = await router_mod._session_manage_gremien(fake_session(), Principal(sub="u1"))
     assert out2 == [gid]
-    # A `read` token caps the gremium permission away.
     capped = Principal(sub="u1", scope_permissions=frozenset({"application.read"}))
     assert await router_mod._session_manage_gremien(fake_session(), capped) == []
 
 
 async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`/auth/me` lists the gremium keys per gremium, capped by the token scope."""
+    """`/auth/me` lists the gremium keys per gremium, capped by the token scope.
+
+    The keys come in catalog order without unknown keys. A role without keys keeps
+    the gremium.
+    """
     from app.modules.admin import gremium_roles as gr
 
     async def _roles(db: object, sub: str, *a: object) -> list[tuple[str, object]]:
@@ -1130,7 +1155,6 @@ async def test_me_gremium_permissions_scope_capped(monkeypatch: pytest.MonkeyPat
 
     monkeypatch.setattr(gr, "active_gremium_roles", _roles)
     full = await router_mod._gremium_permissions(fake_session(), Principal(sub="u1"))
-    # Catalog order, unknown keys dropped, a role without keys keeps the gremium.
     assert full == {"g1": ["session.manage", "vote.cast"], "g2": []}
     capped = Principal(sub="u1", scope_permissions=oauth.scope_permissions(["read"]))
     assert await router_mod._gremium_permissions(fake_session(), capped) == {
@@ -1150,18 +1174,21 @@ async def test_me_gremien_for_empty(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Show the scoped budget only to a member of a Gremium that roots a budget.
+
+    No member Gremium gives False at once. A member with a budget hit gives True, a
+    member without a budget root False.
+    """
     from app.modules.admin import gremium_roles as gr
 
     gid = "22222222-2222-2222-2222-222222222222"
 
-    # no member Gremium → False (early return).
     async def _none(db: object, sub: str, *a: object) -> set[str]:
         return set()
 
     monkeypatch.setattr(gr, "gremium_member_ids", _none)
     assert await router_mod._has_scoped_budget_view(fake_session(), "u1") is False
 
-    # member plus a budget hit (scalar) → True.
     async def _some(db: object, sub: str, *a: object) -> set[str]:
         return {gid}
 
@@ -1170,7 +1197,6 @@ async def test_has_scoped_budget_view_branches(monkeypatch: pytest.MonkeyPatch) 
     db.scalar_results.append("budget-id")
     assert await router_mod._has_scoped_budget_view(db, "u1") is True
 
-    # member but no budget root → False (scalar None).
     db2 = fake_session()
     assert await router_mod._has_scoped_budget_view(db2, "u1") is False
 
@@ -1227,7 +1253,7 @@ async def test_deliver_magic_link_inner_deliver_sends(
     """The inner `deliver` of `_deliver_magic_link` calls send_magic_link.
 
     The mocked `request_magic_link` calls the `deliver` argument, so the body of the
-    inner closure runs (lines 257-259).
+    inner closure runs.
     """
     db = fake_session()
 
@@ -1253,7 +1279,6 @@ async def test_deliver_magic_link_inner_deliver_sends(
         session: object, settings: object, *, email: str, application_id: object,
         deliver: object,
     ) -> None:
-        # Call the inner deliver closure, so lines 257-259 run.
         await deliver("r@x.de", "https://link")  # type: ignore[operator]
 
     monkeypatch.setattr(router_mod, "get_sessionmaker", lambda: _ACM)
@@ -1266,10 +1291,10 @@ async def test_deliver_magic_link_inner_deliver_sends(
     assert db.committed == 1
 
 
-# service.py: deactivated account
 async def test_oidc_callback_deactivated_account_forbidden(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Refuse the login when the upsert finds a deactivated row."""
     settings = ENABLED
 
     async def _exchange(s: Settings, *, code: str, verifier: str) -> dict[str, str]:
@@ -1283,7 +1308,7 @@ async def test_oidc_callback_deactivated_account_forbidden(
 
     deactivated = PrincipalRow(sub="s1")
     deactivated.active = False
-    db = fake_session(result(deactivated))  # the upsert finds a deactivated row
+    db = fake_session(result(deactivated))
     with pytest.raises(ForbiddenError):
         await service.oidc_callback(db, settings, code="c", verifier="v", nonce="n")
 
@@ -1294,7 +1319,8 @@ async def test_oidc_callback_email_verified_bootstrap(
     """An active account with `email_verified` starts a session.
 
     The callback runs `ensure_admin_for_principal`, `ensure_member_for_principal` and
-    `sync_principal_memberships`.
+    `sync_principal_memberships`. The principal is new, and the memberships follow the
+    fresh group claim.
     """
     settings = ENABLED
 
@@ -1324,29 +1350,29 @@ async def test_oidc_callback_email_verified_bootstrap(
     monkeypatch.setattr(service, "ensure_member_for_principal", _ensure_member)
     monkeypatch.setattr(service, "sync_principal_memberships", _sync)
 
-    db = fake_session(result())  # new principal
+    db = fake_session(result())
     cookie, row = await service.oidc_callback(
         db, settings, code="c", verifier="v", nonce="n"
     )
     assert cookie
-    # The callback syncs the gremium memberships to the fresh group claim.
     assert seen == {"email_verified": True, "member": True, "groups": ["g"]}
 
 
-# rbac.py: vote.cast membership group
 async def test_resolve_principal_membership_grants_vote_group() -> None:
     """An active Gremium role with `vote.cast` adds a namespaced vote key to groups.
 
     The cast key is `vote:<gremium_id>` (`vote_group_key`), not the bare UUID
     string. A matching OIDC group claim must never satisfy the Gremium cast permission.
+
+    Queue: no role assignments, then the membership rows. The groups stay empty, so the
+    resolver skips the GroupMapping query.
     """
     row = PrincipalRow(sub="u9", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "44444444-4444-4444-4444-444444444444"
     db = fake_session(
-        result(),  # no RoleAssignments
-        # groups stays empty, so the code skips the GroupMapping query
-        result((gid, ["vote.cast", "vote.manage"])),  # membership_rows
+        result(),
+        result((gid, ["vote.cast", "vote.manage"])),
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert rbac.vote_group_key(gid) in p.groups
@@ -1354,13 +1380,16 @@ async def test_resolve_principal_membership_grants_vote_group() -> None:
 
 
 async def test_resolve_principal_membership_without_vote_cast() -> None:
-    """A membership without `vote.cast` adds no group (else branch, line 113)."""
+    """A membership without `vote.cast` adds no group.
+
+    Queue: no role assignments, then a membership without ``vote.cast``.
+    """
     row = PrincipalRow(sub="u10", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
     gid = "55555555-5555-5555-5555-555555555555"
     db = fake_session(
-        result(),  # no RoleAssignments
-        result((gid, ["vote.manage"])),  # membership without vote.cast
+        result(),
+        result((gid, ["vote.manage"])),
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert gid not in p.groups
@@ -1374,7 +1403,7 @@ async def test_resolve_principal_membership_perms_none() -> None:
     gid = "66666666-6666-6666-6666-666666666666"
     db = fake_session(
         result(),
-        result((gid, None)),  # perms None
+        result((gid, None)),
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert gid not in p.groups
@@ -1386,6 +1415,9 @@ async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
     The test covers a valid assignment with a Gremium (groups.add) and a valid assignment
     without one (no add). It also covers an expired assignment (else branch of
     `_assignment_valid`). A global GroupMapping adds its role and no Gremium scope.
+
+    Queue: the assignments, the group mappings, the role permissions, the role keys and
+    the membership rows. The groups hold the assignment Gremium and the OIDC group.
     """
     row = PrincipalRow(sub="u12", email=None, display_name=None, oidc_groups=["grpA"])
     row.id = "pid"  # type: ignore[assignment]
@@ -1403,14 +1435,14 @@ async def test_resolve_principal_with_assignment_and_group_mappings() -> None:
     map_a = GroupMapping(oidc_group="grpA", role_id="r3")
     map_b = GroupMapping(oidc_group="grpA", role_id="r4")
     db = fake_session(
-        result(valid_g, valid_no_g, expired),  # assignments
-        result(map_a, map_b),                  # group mappings
-        result("application.read"),            # role permissions
-        result("member"),                      # role keys
-        result(),                              # membership rows
+        result(valid_g, valid_no_g, expired),
+        result(map_a, map_b),
+        result("application.read"),
+        result("member"),
+        result(),
     )
     p = await rbac.resolve_principal(db, row, NOW)
-    assert p.groups == {str(gid), "grpA"}  # assignment Gremium and OIDC group
+    assert p.groups == {str(gid), "grpA"}
     assert p.permissions == {"application.read"}
 
 
@@ -1418,6 +1450,9 @@ async def test_resolve_principal_naive_validity_window() -> None:
     """Naive `valid_from` and `valid_until` hit the `_as_aware` branch (line 32).
 
     A database column without a time zone returns naive datetimes.
+
+    Queue: the assignment, no group mappings, the role permissions, the role keys and
+    no membership rows.
     """
     row = PrincipalRow(sub="u13", email=None, display_name=None, oidc_groups=None)
     row.id = "pid"  # type: ignore[assignment]
@@ -1430,10 +1465,10 @@ async def test_resolve_principal_naive_validity_window() -> None:
     )
     db = fake_session(
         result(naive),
-        result(),                       # no GroupMappings
+        result(),
         result("application.read"),
         result("member"),
-        result(),                       # membership rows
+        result(),
     )
     p = await rbac.resolve_principal(db, row, NOW)
     assert str(gid) in p.groups

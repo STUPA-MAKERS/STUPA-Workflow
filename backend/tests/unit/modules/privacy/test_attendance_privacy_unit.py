@@ -50,6 +50,10 @@ def _principal() -> Principal:
 
 
 async def test_erase_clears_the_attendance_note() -> None:
+    """Clear the attendance note on erasure.
+
+    Only the rows with a reason change, so an older (self, absent) row is left alone.
+    """
     principal = _principal()
     db: Any = _RecordingSession(gets=[principal])
     await PrincipalService(db).erase(principal.id, actor="admin")
@@ -62,12 +66,12 @@ async def test_erase_clears_the_attendance_note() -> None:
     assert len(updates) == 1
     sql = str(updates[0].compile(dialect=postgresql.dialect()))
     assert "SET note=" in sql
-    # Only the rows with a reason change, so an older (self, absent) row is left alone.
     assert "note IS NOT NULL" in sql
     assert "principal_id" in sql
 
 
 async def test_auskunft_lists_the_attendance_with_the_note() -> None:
+    """List the attendance with the note in the export, also without an applicant."""
     principal = _principal()
     meeting = Meeting(id=uuid4(), gremium_id=uuid4(), title="StuPa 3", date=date(2026, 9, 1))
     rec = MeetingAttendance(
@@ -78,7 +82,7 @@ async def test_auskunft_lists_the_attendance_with_the_note() -> None:
         note="Krank",
     )
     db: Any = _RecordingSession(
-        scalars=[result()],  # no applicant
+        scalars=[result()],
         scalar=[principal],
         execute=[result((rec, meeting))],
     )
@@ -103,6 +107,7 @@ async def test_auskunft_without_principal_has_no_attendance() -> None:
 
 
 def test_workbook_has_an_attendance_sheet() -> None:
+    """Add an attendance sheet that neutralizes a formula in the free-text reason."""
     meeting_id = uuid4()
     raw = build_auskunft_workbook(
         email="m@example.org",
@@ -116,7 +121,6 @@ def test_workbook_has_an_attendance_sheet() -> None:
                 "meetingDate": date(2026, 9, 1),
                 "status": "excused",
                 "source": "self",
-                # A reason is free text: the sheet neutralizes a formula.
                 "note": "=HYPERLINK(1)",
             },
             {

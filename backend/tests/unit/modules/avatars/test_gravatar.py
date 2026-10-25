@@ -71,11 +71,12 @@ def test_url_uses_the_fixed_host_and_asks_for_a_404() -> None:
         (WEBP, "image/webp"),
         (b"<svg xmlns='http://www.w3.org/2000/svg'/>", None),
         (b"<html></html>", None),
-        (b"\x00\x00\x01\x00", None),  # an icon is not an avatar
+        (b"\x00\x00\x01\x00", None),
         (b"", None),
     ],
 )
 def test_sniff_accepts_raster_images_only(data: bytes, mime: str | None) -> None:
+    """Accept raster images only; an icon is not an avatar."""
     assert sniff_avatar(data) == mime
 
 
@@ -88,6 +89,10 @@ def test_etag_comes_from_the_bytes_only() -> None:
 
 
 async def test_found_image_is_returned_and_the_request_is_pinned() -> None:
+    """Return a found image and pin the request.
+
+    The client connects to the checked IP and keeps the host for routing and TLS.
+    """
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -98,7 +103,6 @@ async def test_found_image_is_returned_and_the_request_is_pinned() -> None:
     assert result.kind == "found"
     assert result.image == AvatarImage(mime="image/png", data=PNG)
     request = seen[0]
-    # The client connects to the checked IP and keeps the host for routing and TLS.
     assert request.url.host == "192.0.73.2"
     assert request.url.path == f"/avatar/{DIGEST}"
     assert request.url.params["s"] == "128"

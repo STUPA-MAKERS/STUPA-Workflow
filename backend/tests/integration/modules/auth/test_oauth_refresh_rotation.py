@@ -83,13 +83,17 @@ def _kw(refresh: str, client_id: str, now: datetime) -> dict[str, object]:
 async def test_concurrent_refresh_only_one_wins(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Let only one of two concurrent refreshes win.
+
+    Both sessions read the row while it is not yet revoked. Without the atomic guard both
+    would mint a pair and fork the token family. Only one active row is left, the freshly
+    rotated pair.
+    """
     principal_id, client_id, refresh = await _seed_principal_with_token(maker)
     now = datetime.now(UTC)
 
     winners = 0
     losers = 0
-    # Both sessions read the row while it is not yet revoked. Without the atomic guard
-    # both would mint a pair and fork the token family.
     async with maker() as s1, maker() as s2:
         for s in (s1, s2):
             pre = (
@@ -120,7 +124,6 @@ async def test_concurrent_refresh_only_one_wins(
     assert winners == 1, "exactly one refresh may rotate the token family"
     assert losers == 1, "the second refresh must be rejected as invalid_grant"
 
-    # Only one active row is left, the freshly rotated pair. The family did not fork.
     async with maker() as check:
         live = (
             await check.execute(
@@ -136,9 +139,14 @@ async def test_concurrent_refresh_only_one_wins(
 async def test_reuse_of_rotated_token_revokes_family(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Revoke the family on the reuse of a rotated token.
+
+    A legitimate rotation turns the old token into a new pair. A replay of the old,
+    revoked token gives invalid_grant and revokes the family. The revoke cascades to the
+    fresh token, so no active row is left, and a rotation with that token fails as well.
+    """
     principal_id, client_id, refresh = await _seed_principal_with_token(maker)
 
-    # A legitimate rotation turns the old token into a new pair.
     async with maker() as s:
         issued = await oauth_service.refresh_tokens(
             s, **_kw(refresh, client_id, datetime.now(UTC))  # type: ignore[arg-type]
@@ -146,7 +154,6 @@ async def test_reuse_of_rotated_token_revokes_family(
         await s.commit()
         new_refresh = issued.refresh_token
 
-    # A replay of the old and now revoked token gives invalid_grant and revokes the family.
     async with maker() as s:
         with pytest.raises(oauth.OAuthError) as exc:
             await oauth_service.refresh_tokens(
@@ -155,7 +162,6 @@ async def test_reuse_of_rotated_token_revokes_family(
         assert exc.value.error == "invalid_grant"
         await s.commit()
 
-    # The revoke cascades to the fresh token of the family, so no active row is left.
     async with maker() as check:
         live = (
             await check.execute(
@@ -167,7 +173,6 @@ async def test_reuse_of_rotated_token_revokes_family(
         ).scalars().all()
         assert live == []
 
-    # A rotation with the previously fresh token therefore fails as well.
     async with maker() as s:
         with pytest.raises(oauth.OAuthError):
             await oauth_service.refresh_tokens(

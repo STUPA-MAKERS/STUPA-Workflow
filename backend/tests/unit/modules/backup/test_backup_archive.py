@@ -35,9 +35,6 @@ def _tar_with(objects: dict[str, bytes], dump: bytes = b"DUMP") -> io.BytesIO:
     return target
 
 
-# ------------------------------------------------------------------------ manifest
-
-
 def test_manifest_round_trips_through_json() -> None:
     manifest = arch.ArchiveManifest(
         app_version="1.2.3",
@@ -83,9 +80,6 @@ def test_manifest_tolerates_a_non_dict_extra() -> None:
     assert arch.ArchiveManifest.from_json(raw).extra == {}
 
 
-# ----------------------------------------------------------------------------- keys
-
-
 def test_recipient_and_identity_parse_from_their_string_forms() -> None:
     identity = _identity()
     recipient = arch.recipient_from_str(str(identity.to_public()))
@@ -113,9 +107,6 @@ def test_recipient_rejects_a_value_that_is_not_a_key() -> None:
 def test_identity_rejects_a_file_with_no_key() -> None:
     with pytest.raises(arch.ArchiveError, match="no usable private key"):
         arch.identity_from_str("# only a comment\n\n")
-
-
-# ------------------------------------------------------------------------------ tar
 
 
 def test_tar_holds_the_dump_the_objects_and_the_manifest() -> None:
@@ -208,9 +199,6 @@ def test_reading_a_missing_member_fails_clearly(name: str) -> None:
             arch.extract_dump(tar, io.BytesIO())
         else:
             arch.read_manifest(tar)
-
-
-# ----------------------------------------------------------------------- encryption
 
 
 def test_archive_round_trips_through_age() -> None:

@@ -269,13 +269,15 @@ def test_delete_logo_204_and_404(app: FastAPI, client: TestClient) -> None:
 
 
 def test_logo_download_is_always_an_attachment(app: FastAPI, client: TestClient) -> None:
-    """A stored SVG must never come back inline — that would be XSS in the app origin."""
+    """A stored SVG must never come back inline — that would be XSS in the app origin.
+
+    The newline is gone, and the quote stays only in the percent-encoded exact name.
+    """
     _as(app, "admin.cd_variants")
     response = client.get(f"/api/admin/cd-variant-logos/{LOGO_ID}/file")
     assert response.status_code == 200
     assert response.content == SVG
     assert response.headers["content-type"] == "application/octet-stream"
-    # The newline is gone; the quote stays only in the percent-encoded exact name.
     assert response.headers["content-disposition"] == (
         "attachment; filename=\"wap_pen.svg\"; filename*=UTF-8''wap%22pen.svg"
     )

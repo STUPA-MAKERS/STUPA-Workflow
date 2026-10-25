@@ -36,10 +36,10 @@ from app.shared.errors import NotFoundError
 
 pytestmark = pytest.mark.integration
 
-# A client id of this test alone. The integration suite shares one Postgres, and
-# `test_oauth_code_double_spend` asserts the number of token rows for the real MCP
-# client. Minting tokens under that id here would make an unrelated test fail. The
-# service takes any id, because only the router pins it to `oauth_mcp_client_id`.
+#: A client id of this test alone. The integration suite shares one Postgres, and
+#: `test_oauth_code_double_spend` asserts the number of token rows for the real MCP
+#: client. Minting tokens under that id here would make an unrelated test fail. The
+#: service takes any id, because only the router pins it to `oauth_mcp_client_id`.
 _CLIENT = "antragsplattform-mcp-admin-revoke-test"
 _REDIRECT = "http://127.0.0.1:7777/callback"
 _VERIFIER = "v" * 64
@@ -148,10 +148,15 @@ async def _grant_id(session: AsyncSession, owner: PrincipalRow) -> uuid.UUID:
 async def test_admin_lists_and_revokes_the_grant_of_another_principal(
     session: AsyncSession,
 ) -> None:
+    """List and revoke the grant of another principal as admin.
+
+    The token authenticates before the revoke. After it, the check that the runtime uses
+    refuses the token, the grant leaves the admin list, and the audit log holds the
+    revoke.
+    """
     owner = await _agent_owner(session)
     token = await _issue_token(session, owner)
 
-    # The token authenticates before the revoke.
     before = await deps.get_current_principal(_request(token), session, SETTINGS)
     assert before is not None and before.sub == owner.sub
 
@@ -167,14 +172,12 @@ async def test_admin_lists_and_revokes_the_grant_of_another_principal(
 
     await revoke_oauth_grant_admin(item.id, session, _admin_principal())
 
-    # The same check the runtime uses now refuses the token.
     after = await deps.get_current_principal(_request(token), session, SETTINGS)
     assert after is None
     assert await oauth_service.resolve_access_token(
         session, token=token, now=datetime.now(UTC)
     ) is None
 
-    # The grant leaves the admin list and the audit log holds the revoke.
     empty = await list_oauth_grants_admin(session, _admin_principal(), GrantListQuery())
     assert empty.total == 0
     entry = (
@@ -196,6 +199,7 @@ async def test_admin_revoke_of_an_unknown_grant_raises_not_found(
 
 
 async def test_admin_revoke_is_idempotent(session: AsyncSession) -> None:
+    """Revoke idempotently: the second call revokes nothing and writes no entry."""
     owner = await _agent_owner(session)
     token = await _issue_token(session, owner)
     grant_id = await _grant_id(session, owner)
@@ -211,5 +215,4 @@ async def test_admin_revoke_is_idempotent(session: AsyncSession) -> None:
             select(AuditEntry).where(AuditEntry.target_id == str(grant_id))
         )
     ).scalars().all()
-    # The second call revokes nothing, so it writes no second entry.
     assert len(entries) == 1

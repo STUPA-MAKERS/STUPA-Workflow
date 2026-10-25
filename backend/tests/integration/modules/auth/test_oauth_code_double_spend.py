@@ -51,6 +51,11 @@ async def maker(
 async def test_concurrent_exchange_only_one_wins(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Let only one of two concurrent code exchanges win.
+
+    Both sessions see used_at IS NULL, the classic read-before-write race. There is no
+    double spend: exactly one token family exists in the database.
+    """
     async with maker() as setup:
         principal = PrincipalRow(
             sub=f"sub-{uuid.uuid4()}", email="u@example.com", active=True
@@ -84,7 +89,6 @@ async def test_concurrent_exchange_only_one_wins(
     winners = 0
     losers = 0
     async with maker() as s1, maker() as s2:
-        # Both sessions see used_at IS NULL. This is the classic read-before-write race.
         for s in (s1, s2):
             pre = (
                 await s.execute(
@@ -112,7 +116,6 @@ async def test_concurrent_exchange_only_one_wins(
     assert winners == 1, "exactly one exchange may mint a token family"
     assert losers == 1, "the second exchange must be rejected as invalid_grant"
 
-    # There is no double spend. Exactly one token family exists in the database.
     async with maker() as check:
         tokens = (
             await check.execute(select(OAuthToken).where(OAuthToken.client_id == _CLIENT))

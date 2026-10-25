@@ -61,10 +61,13 @@ def _quiet(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def test_the_erasure_anonymizes_the_reported_tickets() -> None:
+    """Anonymize the reported tickets on erasure.
+
+    The first result is the comment lookup of ``lock_personal_todos``, which runs before
+    the first audit entry of the erasure.
+    """
     principal = Principal(id=uuid.uuid4(), sub="kc", email="u@x.org", active=True)
     ticket = _ticket(reporter_principal_id=principal.id)
-    # The first result is the comment lookup of ``lock_personal_todos``, which runs
-    # before the first audit entry of the erasure.
     db = fake_session(gets=[principal], scalars=[result(), result(ticket)])
     files = FakeFiles()
     await PrincipalService(db).erase(
@@ -137,6 +140,7 @@ async def test_the_export_lists_the_tickets_of_the_account() -> None:
 
 
 async def test_the_export_lists_the_own_ticket_messages() -> None:
+    """List the own ticket messages: the attendance first, then the messages and files."""
     from app.modules.tickets.models import TicketNote
     from tests._support.privacy_fakes import FakeResult
 
@@ -154,7 +158,6 @@ async def test_the_export_lists_the_own_ticket_messages() -> None:
     db = fake_session(
         scalars=[result(), result(ticket)],
         scalar=[principal],
-        # The attendance comes first, then the messages and their files.
         execute=[
             FakeResult(),
             FakeResult([(note, 12)]),
@@ -303,6 +306,11 @@ async def test_the_reported_tickets_without_a_reporter_are_none() -> None:
 
 
 async def test_the_reported_tickets_match_the_bare_e_mail() -> None:
+    """Match the reported tickets by the bare e-mail.
+
+    The erasure locks the tickets like add_note and the retention cron, so a note cannot
+    bind files while the ticket is anonymized.
+    """
     ticket = _ticket(reporter_email="x@example.org")
     session = ScriptedSession(scalars=[[ticket]])
     files = FakeFiles()
@@ -317,8 +325,6 @@ async def test_the_reported_tickets_match_the_bare_e_mail() -> None:
     assert "reporter_email" in query
     assert "reporter_principal_id =" not in query
     assert "anonymized_at IS NULL" in query
-    # The erasure locks the tickets like add_note and the retention cron, so a note
-    # cannot bind files while the ticket is anonymized.
     assert query.endswith("ORDER BY ticket.id FOR UPDATE")
     assert ticket.reporter_email is None
     assert ticket.anonymized_at is not None

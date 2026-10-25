@@ -61,8 +61,6 @@ from tests.unit.modules.admin.test_cd_variants import (
     variant_row,
 )
 
-# --- image builders ---------------------------------------------------------
-
 
 def png(width: int, height: int) -> bytes:
     return (
@@ -109,27 +107,25 @@ def webp_vp8x(width: int, height: int) -> bytes:
     return _riff(b"VP8X", body)
 
 
-# --- 1. header parser -------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("data", "size"),
     [
         (png(512, 300), (512, 300)),
         (jpeg(640, 480), (640, 480)),
-        (jpeg(256, 256, sof=0xC2), (256, 256)),  # progressive
+        (jpeg(256, 256, sof=0xC2), (256, 256)),
         (webp_vp8(300, 299), (300, 299)),
         (webp_vp8l(1024, 1024), (1024, 1024)),
         (webp_vp8x(4000, 4000), (4000, 4000)),
     ],
 )
 def test_raster_dimensions_reads_the_header(data: bytes, size: tuple[int, int]) -> None:
+    """Read width and height from the header, also for a progressive JPEG."""
     assert raster_dimensions(data) == size
 
 
 def test_jpeg_skips_fill_bytes_and_standalone_markers() -> None:
+    """Skip a fill byte and an RST marker in front of the APP0 segment."""
     data = jpeg(300, 300)
-    # A fill byte and an RST marker in front of the APP0 segment.
     data = data[:2] + b"\xff" + b"\xff\xd0" + data[2:]
     assert raster_dimensions(data) == (300, 300)
 
@@ -139,29 +135,34 @@ def test_jpeg_skips_fill_bytes_and_standalone_markers() -> None:
     [
         b"",
         b"GIF89a" + b"\x00" * 30,
-        png(1, 1)[:20],  # truncated IHDR
-        b"\x89PNG\r\n\x1a\n" + b"\x00" * 4 + b"IDAT" + b"\x00" * 16,  # no IHDR first
-        b"\xff\xd8",  # SOI only
-        b"\xff\xd8\x00\x00",  # not a marker
-        b"\xff\xd8\xff\xda\x00\x02",  # scan before any frame
-        b"\xff\xd8\xff\xd9",  # end of image before any frame
-        b"\xff\xd8\xff\xe0\x00",  # truncated length
-        b"\xff\xd8\xff\xe0\x00\x01",  # length below 2
-        b"\xff\xd8\xff\xc0\x00\x11\x08\x01",  # truncated frame header
-        b"\xff\xd8\xff\xe0\x00\x02",  # segment that ends the data
-        _riff(b"VP8 ", b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),  # no start code
-        _riff(b"VP8 ", b"\x00"),  # truncated VP8
-        _riff(b"VP8L", b"\x00\x00\x00\x00\x00"),  # wrong signature
-        _riff(b"VP8L", b"\x2f"),  # truncated VP8L
-        _riff(b"VP8X", b"\x00"),  # truncated VP8X
-        _riff(b"ALPH", b"\x00" * 16),  # unknown first chunk
+        png(1, 1)[:20],
+        b"\x89PNG\r\n\x1a\n" + b"\x00" * 4 + b"IDAT" + b"\x00" * 16,
+        b"\xff\xd8",
+        b"\xff\xd8\x00\x00",
+        b"\xff\xd8\xff\xda\x00\x02",
+        b"\xff\xd8\xff\xd9",
+        b"\xff\xd8\xff\xe0\x00",
+        b"\xff\xd8\xff\xe0\x00\x01",
+        b"\xff\xd8\xff\xc0\x00\x11\x08\x01",
+        b"\xff\xd8\xff\xe0\x00\x02",
+        _riff(b"VP8 ", b"\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"),
+        _riff(b"VP8 ", b"\x00"),
+        _riff(b"VP8L", b"\x00\x00\x00\x00\x00"),
+        _riff(b"VP8L", b"\x2f"),
+        _riff(b"VP8X", b"\x00"),
+        _riff(b"ALPH", b"\x00" * 16),
     ],
 )
 def test_raster_dimensions_refuses_a_broken_header(data: bytes) -> None:
+    """Refuse a broken header.
+
+    The PNG rows have a truncated IHDR or no IHDR first. The JPEG rows have only SOI, no
+    marker, a scan or an end of image before any frame, a truncated length, a length
+    below 2, a truncated frame header, or a segment that ends the data. The WebP rows
+    have no start code, a truncated VP8, a wrong VP8L signature, a truncated VP8L or
+    VP8X, or an unknown first chunk.
+    """
     assert raster_dimensions(data) is None
-
-
-# --- 2. upload policy -------------------------------------------------------
 
 
 @pytest.mark.parametrize(
@@ -169,10 +170,11 @@ def test_raster_dimensions_refuses_a_broken_header(data: bytes) -> None:
     [
         (png(512, 512), "image/png"),
         (jpeg(256, 256), "image/jpeg"),
-        (webp_vp8l(1000, 1009), "image/webp"),  # 0.9 % off still counts as square
+        (webp_vp8l(1000, 1009), "image/webp"),
     ],
 )
 def test_check_square_logo_accepts_a_raster_square(data: bytes, mime: str) -> None:
+    """Accept a raster square. An image that is 0.9 % off still counts as square."""
     assert check_square_logo(data) == mime
 
 
@@ -224,13 +226,14 @@ def test_check_square_logo_refuses_a_huge_square() -> None:
     assert _code(exc) == "logo_too_many_px"
 
 
-# --- 3. service: upload -----------------------------------------------------
-
-
 async def test_first_square_upload_takes_position_zero() -> None:
+    """Give the first square upload position zero.
+
+    The execute calls are the lock, the logo list without a square row, and the audit
+    write.
+    """
     variant = variant_row()
     storage = FakeStorage()
-    # The lock, the logo list (no square row), then the audit write.
     s, sess = svc([res(), res(), *audit_results()], gets=[variant], storage=storage)
     out = await s.upload_logo(
         variant.id, png(512, 512), slot="square", filename="quadrat.png", actor="a"
@@ -242,6 +245,11 @@ async def test_first_square_upload_takes_position_zero() -> None:
 
 
 async def test_square_upload_replaces_the_old_row_and_object() -> None:
+    """Replace the old square row and its object.
+
+    The delete is flushed before the new row is added, so the partial unique index never
+    sees two square rows.
+    """
     variant = variant_row()
     old = logo_row(
         variant_id=variant.id,
@@ -267,8 +275,6 @@ async def test_square_upload_replaces_the_old_row_and_object() -> None:
     )
     assert out.slot == "square" and out.mime == "image/jpeg"
     assert sess.deleted == [old]
-    # The delete is flushed before the new row is added, so the partial unique
-    # index never sees two square rows.
     assert flushes[0] == (1, 0)
     assert storage.removed == ["cd-logos/old/q.png"]
 
@@ -303,9 +309,6 @@ async def test_square_upload_refuses_svg_that_a_title_logo_accepts() -> None:
             filename="x.svg",
             actor="a",
         )
-
-
-# --- 4. inline lookups and resolver ----------------------------------------
 
 
 def _square(**kw: Any) -> CdVariantLogo:
@@ -397,9 +400,6 @@ async def test_resolver_never_hands_the_square_slot_to_the_renderer() -> None:
     assert resolved.assets == {}
 
 
-# --- 5. who may see a Gremium ----------------------------------------------
-
-
 async def test_can_view_gremium_with_view_all_skips_the_membership(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -420,23 +420,27 @@ async def test_can_view_gremium_for_admin() -> None:
 async def test_can_view_gremium_by_membership(
     monkeypatch: pytest.MonkeyPatch, member: bool
 ) -> None:
+    """Grant the view by membership.
+
+    A token whose scope holds the key, but without the permission, falls back to the
+    membership.
+    """
     gid = uuid.uuid4()
 
     async def ids(*_a: Any, **_k: Any) -> set[uuid.UUID]:
         return {gid} if member else {uuid.uuid4()}
 
     monkeypatch.setattr(gremium_roles, "gremium_member_ids", ids)
-    # A token whose scope holds the key, without the permission, falls back to the membership.
     principal = Principal(sub="u", scope_permissions=frozenset({GREMIUM_VIEW_ALL}))
     assert await can_view_gremium(None, principal, gid) is member  # type: ignore[arg-type]
 
 
 async def test_can_view_gremium_refuses_a_capped_token(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refuse a scoped admin token without the key, even for its own gremium."""
     async def boom(*_a: Any, **_k: Any) -> set[uuid.UUID]:
         raise AssertionError("membership must not be read")
 
     monkeypatch.setattr(gremium_roles, "gremium_member_ids", boom)
-    # A scoped admin token without the key sees no gremium, not even its own.
     principal = Principal(sub="u", roles=["admin"], scope_permissions=frozenset({"budget.write"}))
     assert not await can_view_gremium(None, principal, uuid.uuid4())  # type: ignore[arg-type]
 
@@ -455,8 +459,6 @@ async def test_gremium_view_scope_is_the_set_form(monkeypatch: pytest.MonkeyPatc
     assert await policy.gremium_view_scope(None, member) == {gid}  # type: ignore[arg-type]
     assert await policy.gremium_view_scope(None, capped) == set()  # type: ignore[arg-type]
 
-
-# --- 6. routes --------------------------------------------------------------
 
 GREMIUM_ID = uuid.uuid4()
 LOGO_ID = uuid.uuid4()

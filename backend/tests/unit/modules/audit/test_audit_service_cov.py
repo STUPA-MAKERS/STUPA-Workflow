@@ -38,8 +38,11 @@ async def test_query_cursor_no_filters_under_limit() -> None:
 
 
 async def test_query_cursor_all_filters_and_has_more() -> None:
-    """All filter branches read `limit+1` rows, so `has_more` is True and the list trims."""
-    rows = ["e3", "e2", "e1"]  # limit=2, so three rows are read
+    """All filter branches read `limit+1` rows, so `has_more` is True and the list trims.
+
+    With limit=2, the query reads three rows.
+    """
+    rows = ["e3", "e2", "e1"]
     db = fake_session(result(*rows))
     items, has_more = await AuditService(db).query_cursor(
         action="login",
@@ -63,8 +66,11 @@ async def test_query_cursor_exactly_limit_has_no_more() -> None:
 
 
 async def test_resolve_actor_names_empty_input_short_circuits() -> None:
-    """Only None or empty subs give an empty map without a database access."""
-    db = fake_session()  # no results needed
+    """Only None or empty subs give an empty map without a database access.
+
+    The fake session has no results, because no query may run.
+    """
+    db = fake_session()
     out = await AuditService(db).resolve_actor_names([None, None])
     assert out == {}
 
@@ -81,29 +87,37 @@ async def test_resolve_actor_names_prefers_display_name_else_email() -> None:
 
 
 async def test_resolve_target_labels_empty_and_invalid_targets() -> None:
-    """A None type or id and a non-UUID id are skipped, so no query runs and the map is empty."""
+    """A None type or id and a non-UUID id are skipped, so no query runs and the map is empty.
+
+    The rows have no target_type, no target_id, and an id that is not a UUID. The last
+    row raises ValueError, and the loop continues.
+    """
     db = fake_session()
     out = await AuditService(db).resolve_target_labels(
         [
-            (None, "x"),  # no target_type
-            ("application", None),  # no target_id
-            ("application", "export-2026.csv"),  # not a UUID, so ValueError continues
+            (None, "x"),
+            ("application", None),
+            ("application", "export-2026.csv"),
         ]
     )
     assert out == {}
 
 
 async def test_resolve_target_labels_application_title_branches() -> None:
-    """An application keeps a valid title. An empty or non-string title is ignored."""
+    """An application keeps a valid title. An empty or non-string title is ignored.
+
+    The valid title is trimmed. A whitespace-only title, a missing title and a non-string
+    title are ignored. Data None hits the `(data or {})` fallback.
+    """
     ok = _uuid(1)
     blank = _uuid(2)
     missing = _uuid(3)
     rows = [
-        (ok, {"title": "  Mein Antrag  "}),  # taken with the whitespace trimmed
-        (blank, {"title": "   "}),  # only whitespace, so ignored
-        (missing, {}),  # no title, so ignored
-        (_uuid(4), {"title": 123}),  # not a string, so ignored
-        (_uuid(5), None),  # data None hits the (data or {}) fallback
+        (ok, {"title": "  Mein Antrag  "}),
+        (blank, {"title": "   "}),
+        (missing, {}),
+        (_uuid(4), {"title": 123}),
+        (_uuid(5), None),
     ]
     db = fake_session(result(*rows))
     out = await AuditService(db).resolve_target_labels(
@@ -119,11 +133,13 @@ async def test_resolve_target_labels_application_title_branches() -> None:
 
 
 async def test_resolve_target_labels_gremium_and_webhook_fill() -> None:
-    """Both `fill` branches run: it sets a label and skips an empty label."""
+    """Both `fill` branches run: it sets a label and skips an empty label.
+
+    The execute calls run in this order: gremium, then webhook.
+    """
     g_ok = _uuid(10)
     g_empty = _uuid(11)
     w_ok = _uuid(12)
-    # The execute calls run in this order: gremium, then webhook.
     gremium_rows = [(g_ok, "Vorstand"), (g_empty, "")]
     webhook_rows = [(w_ok, "Slack")]
     db = fake_session(result(*gremium_rows), result(*webhook_rows))
@@ -141,16 +157,19 @@ async def test_resolve_target_labels_gremium_and_webhook_fill() -> None:
 
 
 async def test_resolve_target_labels_application_type_i18n_branches() -> None:
-    """The i18n label prefers 'de', otherwise the first value. Empty or non-dict gives None."""
+    """The i18n label prefers 'de', otherwise the first value. Empty or non-dict gives None.
+
+    The rows are: 'de' present, only another language, an empty dict, and not a dict.
+    """
     a_de = _uuid(20)
     a_other = _uuid(21)
     a_empty = _uuid(22)
     a_nondict = _uuid(23)
     rows = [
-        (a_de, {"de": "Antrag", "en": "Application"}),  # de wins
-        (a_other, {"en": "Only EN"}),  # no de, so the first value wins
-        (a_empty, {}),  # an empty dict gives None, so no label
-        (a_nondict, None),  # not a dict, so None and no label
+        (a_de, {"de": "Antrag", "en": "Application"}),
+        (a_other, {"en": "Only EN"}),
+        (a_empty, {}),
+        (a_nondict, None),
     ]
     db = fake_session(result(*rows))
     out = await AuditService(db).resolve_target_labels(
@@ -168,14 +187,17 @@ async def test_resolve_target_labels_application_type_i18n_branches() -> None:
 
 
 async def test_resolve_target_labels_role_i18n_then_key_fallback() -> None:
-    """A role prefers the i18n label, otherwise `key`. Without both there is no entry."""
+    """A role prefers the i18n label, otherwise `key`. Without both there is no entry.
+
+    The rows are: an i18n label, an empty i18n with a key, and neither.
+    """
     r_i18n = _uuid(30)
     r_key = _uuid(31)
     r_none = _uuid(32)
     rows = [
-        (r_i18n, {"de": "Administrator"}, "admin"),  # i18n wins
-        (r_key, {}, "treasurer"),  # empty i18n falls back to key
-        (r_none, None, None),  # nothing, so no label
+        (r_i18n, {"de": "Administrator"}, "admin"),
+        (r_key, {}, "treasurer"),
+        (r_none, None, None),
     ]
     db = fake_session(result(*rows))
     out = await AuditService(db).resolve_target_labels(
@@ -282,9 +304,12 @@ async def test_resolve_target_labels_flow_global_id_is_not_resolvable() -> None:
 
 
 async def test_resolve_target_labels_unknown_type_no_query() -> None:
-    """An unknown type parses, but no block resolves it."""
+    """An unknown type parses, but no block resolves it.
+
+    No block matches, so no execute runs.
+    """
     unknown = _uuid(60)
-    db = fake_session()  # no block matches, so no execute runs
+    db = fake_session()
     out = await AuditService(db).resolve_target_labels([("session", str(unknown))])
     assert out == {}
 
@@ -338,9 +363,11 @@ async def test_resolve_target_labels_all_types_together() -> None:
 
 
 async def test_list_actors_resolves_names() -> None:
-    """The result holds distinct subs with resolved names. A None sub is filtered out."""
-    # The first execute serves scalars().all() for the subs. The second execute runs
-    # inside resolve_actor_names and returns the name rows.
+    """The result holds distinct subs with resolved names. A None sub is filtered out.
+
+    The first execute serves scalars().all() for the subs. The second execute runs inside
+    resolve_actor_names and returns the name rows.
+    """
     subs = ["sub-1", "sub-2", None]
     name_rows = [
         sub_ref("sub-1", "Alice", "alice@example.org"),
@@ -359,8 +386,11 @@ async def test_list_actors_empty_log() -> None:
 
 
 async def test_resolve_data_ids_no_uuids_short_circuits() -> None:
-    """Without a UUID-shaped value the method returns early with an empty map."""
-    db = fake_session()  # no query expected
+    """Without a UUID-shaped value the method returns early with an empty map.
+
+    No query may run.
+    """
+    db = fake_session()
     out = await AuditService(db).resolve_data_ids([{"k": "nicht-uuid", "n": 7}, None])
     assert out == {}
 
@@ -374,8 +404,13 @@ async def test_resolve_data_ids_all_entity_branches() -> None:
 
     The execute calls follow this order: application, gremium, budget, meeting, webhook,
     vote, attachment, principal, role, application_type and fiscal_year.
+
+    The application `a1` wins and appears again in later tables as the duplicate. The
+    webhook table has no hits. The principal rows cover a name, the email fallback and no
+    label. The role and application_type rows cover the i18n fallbacks. The fiscal_year
+    label is the year as a string.
     """
-    a1 = _uuid(1)  # application, wins and appears again in later tables (dedup)
+    a1 = _uuid(1)
     a_blank, a_missing, a_nonstr, a_nodata = _uuid(2), _uuid(3), _uuid(4), _uuid(5)
     g_ok, g_empty = _uuid(10), _uuid(11)
     bud, meet, vote, attach = _uuid(20), _uuid(30), _uuid(40), _uuid(50)
@@ -385,39 +420,39 @@ async def test_resolve_data_ids_all_entity_branches() -> None:
     fy = _uuid(90)
 
     db = fake_session(
-        result(  # application: title trimmed. blank, missing, non-string, None ignored
+        result(
             (a1, {"title": "  Antrag  "}),
             (a_blank, {"title": "   "}),
             (a_missing, {}),
             (a_nonstr, {"title": 123}),
             (a_nodata, None),
         ),
-        result((g_ok, "Vorstand"), (g_empty, ""), (a1, "DupG")),  # fill: ok, empty, dup
-        result((bud, "Budget X")),  # budget
-        result((meet, "Sitzung")),  # meeting
-        result(),  # webhook: no hits
-        result((vote, "Frage?")),  # vote
-        result((attach, "f.pdf")),  # attachment
-        result(  # principal: name, email fallback, none, dup
+        result((g_ok, "Vorstand"), (g_empty, ""), (a1, "DupG")),
+        result((bud, "Budget X")),
+        result((meet, "Sitzung")),
+        result(),
+        result((vote, "Frage?")),
+        result((attach, "f.pdf")),
+        result(
             id_ref(p_name, "Carol", "c@e"),
             id_ref(p_email, None, "d@e"),
             id_ref(p_none, None, None),
             id_ref(a1, "DupP", "x@e"),
         ),
-        result(  # role: i18n, key fallback, none, dup
+        result(
             (r_i18n, {"de": "Administrator"}, "admin"),
             (r_key, {}, "treas"),
             (r_none, None, None),
             (a1, {"de": "DupR"}, "k"),
         ),
-        result(  # application_type: de, first value, empty, non-dict, dup
+        result(
             (t_de, {"de": "Antrag"}),
             (t_other, {"en": "EN only"}),
             (t_empty, {}),
             (t_nondict, None),
             (a1, {"de": "DupT"}),
         ),
-        result((fy, 2026), (a1, 2030)),  # fiscal_year: year string, dup
+        result((fy, 2026), (a1, 2030)),
     )
 
     out = await AuditService(db).resolve_data_ids(
@@ -445,6 +480,8 @@ async def test_revertable_flags_classifies_actions() -> None:
 
     A config change needs a predecessor, which the batch lookup provides. A budget change
     needs the recorded previous state. A delete and an unknown action never revert.
+
+    Predecessor lookup of the config snapshots: rev_a has one, rev_b is the first.
     """
     rev_a, prev_a, rev_b = _uuid(1), _uuid(2), _uuid(3)
     entries = [
@@ -464,7 +501,6 @@ async def test_revertable_flags_classifies_actions() -> None:
         AuditEntry(id=10, action="budget_expense_delete", data={}),
         AuditEntry(id=11, action="login", data={}),
     ]
-    # Predecessor lookup of the config snapshots: rev_a has one, rev_b is the first.
     db = fake_session(result((rev_a, prev_a), (rev_b, None)))
     flags = await AuditService(db).revertable_flags(entries)
     assert flags == {
