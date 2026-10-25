@@ -6,9 +6,8 @@ coverage. This gate is stricter than the overall gate. The overall gate uses
 
 The script reads `coverage.xml` and the module list from `[tool.coverage_critical]` in
 `pyproject.toml`. Run `coverage xml` first to write the report. A module whose path has
-no class in the report counts as absent, and the script skips it. The gate therefore
-stays green until a follow-up task adds the module. After that the gate applies again on
-its own.
+no class in the report counts as absent, and the script skips it, so the gate stays green
+for that module. When the module has classes in the report, the gate applies again.
 
 CLI: `python -m scripts.coverage_critical [coverage.xml] [pyproject.toml]`
 Exit 0 = pass or nothing to check. Exit 1 = a module is below the minimum.

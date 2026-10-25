@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-# From tests/unit/, parents[2] is backend and parents[3] is the repo root that holds deploy/.
+#: The role SQL; from tests/unit/, parents[3] is the repo root that holds deploy/.
 _SQL = (
     Path(__file__).resolve().parents[3] / "deploy" / "db" / "roles.sql"
 ).read_text(encoding="utf-8")
@@ -22,9 +22,12 @@ def test_roles_sql_exists_and_nonempty() -> None:
 
 
 def test_separate_service_users_created() -> None:
+    """Create separate service users.
+
+    The migration user must stay separate from the runtime user.
+    """
     for role in ("migrator", "app", "audit_writer"):
         assert f"rolname = '{role}'" in _SQL, f"role {role} not provisioned"
-    # The migration user must stay separate from the runtime user.
     assert "CREATE ROLE migrator LOGIN" in _SQL
     assert "CREATE ROLE app LOGIN" in _SQL
 

@@ -50,7 +50,10 @@ def _service(session: FakeSession) -> NotificationService:
 
 
 async def test_create_template_race_maps_to_conflict() -> None:
-    # _get_template_by_key sees no collision on the read, but the commit loses the race.
+    """Map a lost race on create to a conflict.
+
+    ``_get_template_by_key`` sees no collision on the read, but the commit loses the race.
+    """
     session = RaceSession(scalars=[[]])
     with pytest.raises(ConflictError):
         await _service(session).create_template(
@@ -62,8 +65,11 @@ async def test_create_template_race_maps_to_conflict() -> None:
 
 
 async def test_upsert_template_insert_race_maps_to_conflict() -> None:
-    # The catalogue key status_update is allowed. The read finds nothing, so the insert
-    # branch runs. Its commit then loses the race against a concurrent insert.
+    """Map a lost race in the insert branch of the upsert to a conflict.
+
+    The catalogue key status_update is allowed. The read finds nothing, so the insert branch
+    runs. Its commit then loses the race against a concurrent insert.
+    """
     session = RaceSession(scalars=[[]])
     with pytest.raises(ConflictError):
         await _service(session).upsert_template(
@@ -77,8 +83,11 @@ async def test_upsert_template_insert_race_maps_to_conflict() -> None:
 
 
 async def test_upsert_template_update_race_reraises() -> None:
-    # Update branch on an existing row: a UNIQUE violation here is not a key conflict.
-    # The service must not answer with a false 409, so the IntegrityError passes through.
+    """Pass the IntegrityError of the update branch through.
+
+    On an existing row, a UNIQUE violation is not a key conflict. The service must not
+    answer with a false 409.
+    """
     existing = MailTemplate(
         key="status_update",
         subject_i18n={"de": "alt"},

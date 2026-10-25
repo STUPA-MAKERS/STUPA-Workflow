@@ -588,8 +588,9 @@ async def test_add_note_needs_an_account_row() -> None:
 
 
 async def test_add_note_checks_and_binds_its_files(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Check and bind the files of a note; with files the ticket row is locked against the
-    retention cron.
+    """Check and bind the files of a note.
+
+    With files the ticket row is locked against the retention cron.
     """
     calls: list[tuple[str, dict[str, Any]]] = []
 

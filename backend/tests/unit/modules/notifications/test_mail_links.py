@@ -96,7 +96,11 @@ def test_layout_without_a_link_has_no_button() -> None:
 
 
 async def test_send_kind_mail_adds_the_link_to_text_and_html() -> None:
-    session = FakeSession(scalars=[[], []])  # no opt-out, no DB template
+    """Add the link to the text and the HTML part.
+
+    The session has no opt-out and no DB template.
+    """
+    session = FakeSession(scalars=[[], []])
     queue = FakeQueue()
     svc = NotificationService(session, queue=queue, settings=SETTINGS)  # type: ignore[arg-type]
     link = meeting_link(SETTINGS, ID)

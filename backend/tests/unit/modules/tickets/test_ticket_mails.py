@@ -1,5 +1,7 @@
-"""Unit tests of the ticket mails (``ticket_created``, ``ticket_received``, ``ticket_message``,
-``ticket_answer``)."""
+"""Unit tests of the ticket mails.
+
+The mails are ``ticket_created``, ``ticket_received``, ``ticket_message`` and ``ticket_answer``.
+"""
 
 from __future__ import annotations
 
@@ -151,6 +153,10 @@ async def test_created_names_the_account_of_the_reporter(
     branding: dict[str, Branding],
     managers: list[tuple[uuid.UUID, str | None, str | None]],
 ) -> None:
+    """Name the account of the reporter in the mail to the team.
+
+    An account row that is gone leaves the address, else nothing.
+    """
     account = PrincipalRow(id=uuid.uuid4(), sub="s", email="acc@x.org", display_name="Ada")
     nameless = PrincipalRow(id=uuid.uuid4(), sub="t", email="n@x.org", display_name=None)
     managers.append((uuid.uuid4(), "M", "m@x.org"))
@@ -160,7 +166,6 @@ async def test_created_names_the_account_of_the_reporter(
         session.put(ticket, row)
         assert await _created(session, ticket.id) is True
         assert sent[-1]["context"]["reporter"] == expected
-    # An account row that is gone leaves the address, else nothing.
     ticket = _ticket(reporter_principal_id=uuid.uuid4(), reporter_email=None)
     session = ScriptedSession(scalar=[None])
     session.put(ticket)
@@ -195,6 +200,10 @@ async def test_created_never_raises(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_received_confirms_in_the_language_of_the_report(
     sent: list[dict[str, Any]], branding: dict[str, Branding]
 ) -> None:
+    """Confirm the report in its own language.
+
+    A report without a session stays one-way, so the mail has no link.
+    """
     branding["value"] = Branding(help=HelpSettings(wikiUrl="https://wiki.example.org/b"))
     for context, lang in (({"language": "en"}, "en"), ({"language": "fr"}, "de"), (None, "de")):
         ticket = _ticket(context=context)
@@ -204,13 +213,16 @@ async def test_received_confirms_in_the_language_of_the_report(
         assert sent[-1]["lang"] == lang
         assert sent[-1]["to"] == ["gast@x.org"]
         assert sent[-1]["context"]["wikiUrl"] == "https://wiki.example.org/b"
-        # A report without a session stays one-way: no link.
         assert sent[-1]["link"] is None
 
 
 async def test_received_leaves_out_the_title_of_a_report_without_a_session(
     sent: list[dict[str, Any]], branding: dict[str, Branding]
 ) -> None:
+    """Leave out the title of a report without a session.
+
+    An account reads the ticket again in the tab, so its mail links the ticket.
+    """
     from jinja2.sandbox import SandboxedEnvironment
 
     guest = _ticket(title="Klick hier: https://evil.example")
@@ -224,7 +236,6 @@ async def test_received_leaves_out_the_title_of_a_report_without_a_session(
     assert await _received(session, member.id) is True
     assert sent[-1]["to"] == ["m@x.org"]
     assert sent[-1]["context"]["title"] == "Wie?"
-    # An account reads the ticket again in the tab, so its mail links it.
     assert sent[-1]["link"].url.endswith(f"/tickets/{member.id}")
     env = SandboxedEnvironment()
     for lang, quoted, tab in (("de", "„Wie?“", "„Tickets“"), ("en", '"Wie?"', '"Tickets"')):
@@ -262,8 +273,6 @@ def test_the_default_sessionmaker_is_the_app_one(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(mails, "get_sessionmaker", lambda: sentinel)
     assert mails._maker(None) is sentinel
 
-
-# -- messages on a ticket -----------------------------------------------------------
 
 REPORTER = uuid.uuid4()
 STAFF = uuid.uuid4()
@@ -338,8 +347,11 @@ async def test_a_message_without_an_assignee_goes_to_every_holder(
     managers: list[tuple[uuid.UUID, str | None, str | None]],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The assignee lost ticket.manage, so the whole team gets the mail; the reporter
-    # never gets the own message, even as a holder.
+    """Send a message to every holder of ``ticket.manage`` when no assignee can read it.
+
+    The assignee lost ``ticket.manage``, so the whole team gets the mail. The reporter never
+    gets the own message, even as a holder. A message of files only names its files.
+    """
     ticket = _account_ticket(assignee_id=uuid.uuid4())
     note = _note(ticket, REPORTER, body="  ")
     reporter = PrincipalRow(id=REPORTER, sub="r", email="REX@x.org", display_name=None)
@@ -367,7 +379,6 @@ async def test_a_message_without_an_assignee_goes_to_every_holder(
     (mail,) = sent
     assert mail["to"] == ["mia@x.org"]
     assert mail["context"]["reporter"] == "REX@x.org"
-    # A message of files only names its files.
     assert mail["context"]["message"] == "screen.png, screen.png"
 
 
@@ -388,6 +399,11 @@ async def test_a_message_of_the_reporter_without_recipients_sends_nothing(
 async def test_a_public_answer_of_the_team_goes_to_the_reporter(
     sent: list[dict[str, Any]],
 ) -> None:
+    """Send a public answer of the team to the reporter.
+
+    The mail holds the name of the team member only, because the e-mail of a team member
+    must never reach the reporter.
+    """
     ticket = _account_ticket(context={"language": "en"})
     note = _note(ticket, STAFF, body="Oben rechts.")
     staff = PrincipalRow(id=STAFF, sub="s", email="mia@x.org", display_name="Mia")
@@ -398,7 +414,6 @@ async def test_a_public_answer_of_the_team_goes_to_the_reporter(
     assert mail["to"] == ["rex@x.org"]
     assert mail["kind"] == "ticket_answer"
     assert mail["lang"] == "en"
-    # The name only: the e-mail of a team member never reaches the reporter.
     assert mail["context"] == {
         "number": "T-0005",
         "title": "Wie?",
@@ -435,7 +450,10 @@ async def test_an_answer_of_a_nameless_or_gone_author_has_no_name(
 async def test_an_answer_without_a_live_reporter_account_sends_nothing(
     sent: list[dict[str, Any]], reporter: dict[str, Any] | None
 ) -> None:
-    # A deactivated or merged account cannot open the link, so it gets no text.
+    """Send nothing when the reporter account is not live.
+
+    A deactivated or merged account cannot open the link, so it gets no mail.
+    """
     ticket = _account_ticket()
     note = _note(ticket, STAFF)
     session = ScriptedSession()

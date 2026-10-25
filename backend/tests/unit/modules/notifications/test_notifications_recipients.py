@@ -97,8 +97,9 @@ def test_admin_role_key_matches_principal_has_bypass() -> None:
 
 
 def test_permission_stmt_includes_admin_bypass_via_constant() -> None:
-    """Build the admin bypass from the central constant, with the active flag and the validity
-    window.
+    """Build the admin bypass from the central constant.
+
+    The bypass checks the active flag and the validity window.
     """
     sql = _sql("application.transition")
     assert f"key = '{ADMIN_ROLE_KEY}'" in sql
@@ -224,8 +225,9 @@ def test_firable_actor_is_applicant_via_created_by() -> None:
 
 
 def test_firable_admin_with_only_unsatisfied_guards_excluded() -> None:
-    """Drop an admin whose guard gates all fail, so admins get no task mail without a firable
-    transition.
+    """Drop an admin whose guard gates all fail.
+
+    An admin gets no task mail without a firable transition.
     """
     admin = _candidate(sub="adm", email="admin@x.de", roles=frozenset({ADMIN_ROLE_KEY}))
     out = firable_candidates(
@@ -275,8 +277,9 @@ def test_firable_empty_transitions_empty() -> None:
 
 
 async def test_candidates_batch_resolution_roles_groups_committees() -> None:
-    """Resolve roles, groups and committees in batches; an assignment scope counts as a group
-    key, as in ``resolve_principal``.
+    """Resolve roles, groups and committees in batches.
+
+    An assignment scope counts as a group key, as in ``resolve_principal``.
     """
     pid1, pid2 = uuid.uuid4(), uuid.uuid4()
     g_scope, g_member = uuid.uuid4(), uuid.uuid4()
@@ -426,7 +429,9 @@ async def test_actionable_no_requires_action_transitions_empty() -> None:
 async def test_actionable_excludes_admin_without_firable_guard(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Mail only a principal whose guard fires; the admin with an unsatisfied guard drops out.
+    """Mail only a principal whose guard fires.
+
+    The admin with an unsatisfied guard drops out.
     """
     captured: dict[str, Any] = {}
 

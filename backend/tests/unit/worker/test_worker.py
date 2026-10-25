@@ -24,16 +24,19 @@ async def test_ping_returns_pong() -> None:
 
 
 def test_worker_settings_registers_tasks() -> None:
+    """Register every task and every cron job of the worker.
+
+    The cron jobs are the nightly budget rollup, the deadline scan every minute, the hourly
+    task reminders, the daily DSGVO retention, the nightly backup, the hourly draft purge,
+    the nightly audit-chain check, the hourly heal of the public protocols, the daily ticket
+    anonymization and the daily to-do archive.
+    """
     assert ping in WorkerSettings.functions
     assert refresh_budget_stats in WorkerSettings.functions
     assert process_deadlines in WorkerSettings.functions
     assert process_retention in WorkerSettings.functions
     assert purge_draft_attachments in WorkerSettings.functions
     assert WorkerSettings.redis_settings is not None
-    # Nightly budget rollup, deadline scan every minute, hourly task reminders,
-    # daily DSGVO retention, the nightly backup, the hourly draft purge and the
-    # nightly audit-chain check, the hourly heal of the public protocols and the
-    # daily ticket anonymization and the daily to-do archive.
     assert len(WorkerSettings.cron_jobs) == 10
     from worker.todos import archive_done_todos
 
@@ -70,8 +73,11 @@ class _SessionCM:
 
 @pytest.mark.asyncio
 async def test_refresh_budget_stats_uses_injected_sessionmaker() -> None:
+    """Refresh the budget stats through the injected sessionmaker.
+
+    ``BudgetStatsService.refresh`` runs two REFRESH statements and one commit.
+    """
     session = FakeSession()
     ctx: dict[str, Any] = {"budget_sessionmaker": lambda: _SessionCM(session)}
     assert await refresh_budget_stats(ctx) == "ok"
-    # `BudgetStatsService.refresh` runs two REFRESH statements and one commit.
     assert session.committed == 1

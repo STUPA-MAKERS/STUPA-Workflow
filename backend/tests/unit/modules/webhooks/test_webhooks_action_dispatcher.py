@@ -68,7 +68,7 @@ async def test_webhook_action_without_webhook_id_skipped() -> None:
 
 
 async def test_webhook_action_invalid_webhook_id_skipped() -> None:
-    # An invalid webhookId raises ValueError. The dispatcher skips the action in silence.
+    """Skip the action in silence when the webhookId is invalid (ValueError)."""
     session = FakeSession()
     queue = FakeWebhookQueue()
     await _disp(session, queue).dispatch([_action("webhook", webhookId="not-a-uuid")])
@@ -77,7 +77,7 @@ async def test_webhook_action_invalid_webhook_id_skipped() -> None:
 
 
 async def test_webhook_action_missing_hook_skipped() -> None:
-    # A webhookId that points to no webhook skips the action in silence.
+    """Skip the action in silence when the webhookId points to no webhook."""
     session = FakeSession(scalars=[[]])
     queue = FakeWebhookQueue()
     await _disp(session, queue).dispatch(
@@ -88,8 +88,9 @@ async def test_webhook_action_missing_hook_skipped() -> None:
 
 
 async def test_webhook_action_delivers_to_referenced_hook() -> None:
+    """Deliver to the referenced webhook; ``_existing_keys`` is empty, so no dedup applies."""
     hook = _hook()
-    session = FakeSession(scalars=[[]])  # _existing_keys is empty, so no dedup
+    session = FakeSession(scalars=[[]])
     session.store[hook.id] = hook
     queue = FakeWebhookQueue()
     action = _action("webhook", webhookId=str(hook.id))

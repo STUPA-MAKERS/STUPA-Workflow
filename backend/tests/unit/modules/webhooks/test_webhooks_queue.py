@@ -35,8 +35,9 @@ async def test_enqueue_passes_idempotent_job_id() -> None:
 
 
 async def test_enqueue_deduped_when_job_exists() -> None:
+    """Dedupe the enqueue when the job exists; arq returns None for such a job."""
     did = uuid.uuid4()
-    pool = _Pool(returns=None)  # arq returns None for a job that already exists
+    pool = _Pool(returns=None)
     await ArqWebhookQueue(pool).enqueue(did)
     assert pool.calls[0][0] == "deliver_webhook"
 

@@ -59,9 +59,6 @@ async def _set_public(maker: async_sessionmaker[AsyncSession], enabled: bool) ->
         )
 
 
-# -- report ----------------------------------------------------------------------
-
-
 async def test_an_anonymous_report_answers_the_number_only(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
@@ -96,12 +93,15 @@ async def test_an_anonymous_report_needs_an_email(api: Api) -> None:
 async def test_an_anonymous_report_is_refused_while_public_reports_are_off(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Refuse an anonymous report while public reports are off.
+
+    A session still reports.
+    """
     await _set_public(maker, False)
     with TestClient(api.app) as client:
         resp = client.post("/api/tickets", json={**_REPORT, "email": "a@example.org"})
         assert resp.status_code == 403
         assert resp.json()["code"] == "tickets_public_disabled"
-        # A session still reports.
         await add_principal(maker, sub=PLAIN.sub, email=PLAIN.email)
         api.login(PLAIN)
         assert client.post("/api/tickets", json=_REPORT).status_code == 201
@@ -229,9 +229,6 @@ async def test_a_report_with_attachments_needs_the_token_and_own_drafts(
         assert (await session.scalars(select(Ticket))).all() == []
 
 
-# -- RBAC ------------------------------------------------------------------------
-
-
 @pytest.mark.parametrize(
     ("method", "path"),
     [
@@ -260,9 +257,6 @@ async def test_a_token_without_the_tickets_scope_gets_403(api: Api) -> None:
     api.login(Principal(sub="agent", roles=["admin"], scope_permissions=frozenset({"mcp.use"})))
     with TestClient(api.app) as client:
         assert client.get("/api/tickets").status_code == 403
-
-
-# -- list, counts, assignees -----------------------------------------------------
 
 
 async def test_the_list_filters_and_pages(
@@ -354,12 +348,14 @@ async def test_the_assignees_are_the_active_holders_by_name(
     assert str(nameless) not in {p["principalId"] for p in body}
 
 
-# -- detail, patch ---------------------------------------------------------------
-
-
 async def test_the_detail_holds_notes_events_attachments_and_links(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """Return the notes, events, attachments and links in the detail.
+
+    One transaction gives every server default the same now(), so explicit times keep the
+    order of the two notes independent of their random ids.
+    """
     me = await add_principal(maker, sub=ADMIN.sub, email=ADMIN.email, name="Ada", role="admin")
     other = await add_principal(maker, name="Otto", role="admin")
     seed = await seed_guest_flow(maker)
@@ -384,8 +380,6 @@ async def test_the_detail_holds_notes_events_attachments_and_links(
         )
         session.add(ticket)
         await session.flush()
-        # One transaction gives every server default the same now(); explicit times
-        # keep the order of the two notes from depending on their random ids.
         noted = datetime.now(UTC)
         session.add_all(
             [
@@ -579,9 +573,6 @@ async def test_assign_and_unassign(api: Api, maker: async_sessionmaker[AsyncSess
         "from": {"principalId": str(me), "displayName": MANAGER.email},
         "to": None,
     }
-
-
-# -- notes -----------------------------------------------------------------------
 
 
 async def test_notes_belong_to_their_author(

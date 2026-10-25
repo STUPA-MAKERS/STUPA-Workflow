@@ -33,7 +33,7 @@ def test_sign_binds_timestamp_and_body() -> None:
 
 
 def test_signature_changes_with_timestamp() -> None:
-    # Replay protection: the same body with a new timestamp gives another signature.
+    """Give another signature for the same body with a new timestamp, for replay protection."""
     secret, body = b"shared", canonical_body({"event": "status_changed"})
     assert sign(secret, 1000, body) != sign(secret, 2000, body)
 
@@ -50,6 +50,7 @@ def test_sign_verifiable_by_receiver() -> None:
 
 
 def test_build_headers_shape() -> None:
+    """Build the headers; the signature binds the timestamp that the header sends."""
     headers = build_headers(
         b"secret", b'{"x":1}', event="application_approved", timestamp=1700000000
     )
@@ -57,5 +58,4 @@ def test_build_headers_shape() -> None:
     assert headers[SIGNATURE_HEADER].startswith("sha256=")
     assert headers[TIMESTAMP_HEADER] == "1700000000"
     assert headers[EVENT_HEADER] == "application_approved"
-    # The signature binds the timestamp that the header sends.
     assert headers[SIGNATURE_HEADER] == sign(b"secret", 1700000000, b'{"x":1}')

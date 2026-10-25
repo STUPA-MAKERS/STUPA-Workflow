@@ -2,6 +2,14 @@
 
 This module sets the required environment variables before it imports the app. Settings
 fails at import time without them. The module also provides the test clients.
+
+The unit suite runs with anti-abuse off, because rate limiting would try one Redis connect per
+POST, and that connect fails. Altcha stays off anyway without a secret. The hardening tests turn
+both on through their own settings or overrides.
+
+The integration fixtures start real backing services with testcontainers. They run only under
+``-m integration``, which needs Docker. Without Docker, the test skips instead of errors. The
+unit suite (default addopts) never touches them.
 """
 
 import os
@@ -9,9 +17,6 @@ import os
 os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://app:pw@localhost/antrag_test")
 os.environ.setdefault("SESSION_SECRET", "test-session-secret")
 os.environ.setdefault("MAGIC_LINK_SECRET", "test-magic-link-secret")
-# The unit suite runs with anti-abuse off. Rate limiting would otherwise try one Redis
-# connect per POST, and that connect fails. Altcha stays off anyway without a secret.
-# The hardening tests turn both on through their own settings or overrides.
 os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
 
 from collections.abc import Iterator
@@ -77,11 +82,6 @@ def error_client() -> TestClient:
     router.add_api_route("/raise/unhandled", boom, methods=["GET"])
     app.include_router(router)
     return TestClient(app, raise_server_exceptions=False)
-
-
-# Integration fixtures. They start real backing services with
-# testcontainers and run only under `-m integration`, which needs Docker. Without Docker
-# the test skips instead of errors. The unit suite (default addopts) never touches them.
 
 
 @pytest.fixture(scope="session")

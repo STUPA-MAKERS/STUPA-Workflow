@@ -67,11 +67,14 @@ class FakeTypst:
     """Fake typst client. It returns fixed PDF bytes or raises a given error."""
 
     def __init__(self, *, pdf: bytes = b"%PDF-1.4 fake", error: Exception | None = None) -> None:
+        """Set up the call records.
+
+        The fake records the corporate-design config and the logo assets of each call. A
+        render without a CD variant records ``None`` for both.
+        """
         self.pdf = pdf
         self.error = error
         self.calls: list[tuple[str, str | None]] = []
-        # The corporate-design config and the logo assets of each call. A render
-        # without a CD variant records `None` for both.
         self.configs: list[Mapping[str, object] | None] = []
         self.assets: list[Mapping[str, bytes] | None] = []
 

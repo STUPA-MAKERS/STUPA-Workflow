@@ -86,7 +86,7 @@ def test_partial_unique_one_active_form_version() -> None:
 
 
 def test_partial_unique_one_active_flow_version() -> None:
-    # There are no per-type flows. Exactly one global flow stays active.
+    """Keep exactly one global flow active, because there are no per-type flows."""
     idx = _index("flow_version", "uq_flow_version_one_active_global")
     assert idx.unique
     assert "active" in str(idx.dialect_options["postgresql"]["where"])
@@ -126,9 +126,12 @@ def test_role_permission_composite_pk() -> None:
 
 
 def test_versioned_unique_constraints() -> None:
+    """Check the unique constraints of the versioned tables.
+
+    The global flow is unique by ``version`` alone.
+    """
     for table, cols in [
         ("form_version", {"application_type_id", "version"}),
-        # The global flow is unique by `version` alone.
         ("flow_version", {"version"}),
         ("submission_version", {"application_id", "version"}),
         ("form_field", {"form_version_id", "key"}),
@@ -145,8 +148,10 @@ def test_versioned_unique_constraints() -> None:
 
 
 def test_circular_fk_uses_alter() -> None:
-    # application_type ↔ form_version: circular FK through use_alter.
-    # flow_version does not bind to a type.
+    """Break the circular foreign key between application_type and form_version with use_alter.
+
+    flow_version does not bind to a type.
+    """
     circular = [
         c
         for c in _table("application_type").constraints

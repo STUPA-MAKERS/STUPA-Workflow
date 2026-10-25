@@ -446,8 +446,9 @@ def _target(session: ScriptedSession, **kw: Any) -> tuple[Any, Any, Any]:
 
 
 async def test_transfer_errors() -> None:
-    """Refuse the invalid transfers; both boards are locked in id order before the card is read
-    again.
+    """Refuse the invalid transfers.
+
+    Both boards are locked in id order before the card is read again.
     """
     session, b, col, c, service = _setup()
     t, first, _done = _target(session)
@@ -821,8 +822,9 @@ async def test_links() -> None:
 
 
 async def test_comments(people: dict[uuid.UUID, PersonRef]) -> None:
-    """Write, edit and delete comments; the board is locked before the card, as in every to-do
-    write.
+    """Write, edit and delete comments.
+
+    The board is locked before the card, as in every to-do write.
     """
     people[OTHER] = PersonRef(principal_id=OTHER, display_name="Otto")
     session, _b, _col, c, service = _setup()

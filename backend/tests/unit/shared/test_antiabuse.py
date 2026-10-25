@@ -125,8 +125,9 @@ def test_payload_cap_413() -> None:
 
 
 def test_rate_limit_ip_blocks_with_retry_after() -> None:
-    """Block over the IP limit with Retry-After; each request uses another mail, so only the IP
-    limit applies.
+    """Block over the IP limit with Retry-After.
+
+    Each request uses another mail, so only the IP limit applies.
     """
     settings = _settings(rl_magic_link_ip_per_hour=5, rl_magic_link_mail_per_hour=99)
     limiter = InMemoryRateLimiter(now=lambda: 0.0)

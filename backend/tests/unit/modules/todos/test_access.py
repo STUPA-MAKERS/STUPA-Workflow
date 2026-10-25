@@ -64,6 +64,10 @@ async def test_me_is_cached_per_sub() -> None:
 
 
 async def test_can_read_per_kind(grants: dict[str, Any]) -> None:
+    """Check the read access for each board kind.
+
+    The gremium lookup runs once per permission.
+    """
     access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
     user = _p(permissions={"platform.manage"})
     assert await access.can_read(board(gremium_id=G1), user)
@@ -75,7 +79,6 @@ async def test_can_read_per_kind(grants: dict[str, Any]) -> None:
     assert await access.can_read(team, user)
     assert not await access.can_read(board(kind="team", gremium_id=None, permission=None), user)
     assert not await access.can_read(team, _p())
-    # The gremium lookup runs once per permission.
     assert grants["_calls"] == ["todo.write"]
 
 
@@ -100,6 +103,10 @@ async def test_a_token_without_the_scope_reads_nothing(grants: dict[str, Any]) -
 
 
 async def test_can_configure_per_kind(grants: dict[str, Any]) -> None:
+    """Check the configure access for each board kind.
+
+    Configure without the write scope gives no access.
+    """
     access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
     user = _p(permissions={"platform.manage"})
     assert not await access.can_configure(board(gremium_id=G1), user)
@@ -110,7 +117,6 @@ async def test_can_configure_per_kind(grants: dict[str, Any]) -> None:
     assert await access.can_configure(board(kind="personal", gremium_id=None, owner_id=ME), user)
     team = board(kind="team", gremium_id=None, permission="platform.manage")
     assert await access.can_configure(team, user)
-    # Configure without write scope: no.
     writer = _p(scope_permissions=frozenset({"todo.write"}))
     assert not await access.can_configure(team, writer)
 
@@ -166,16 +172,18 @@ _TEAM = {"kind": "team", "gremium_id": None, "permission": "platform.manage"}
 async def test_a_global_key_reads_every_shared_board_and_no_foreign_personal_one(
     grants: dict[str, Any], key: str, writes: bool
 ) -> None:
+    """Let a global key read every shared board but no foreign personal board.
+
+    Neither key configures a board. The own personal board keeps the owner rule.
+    """
     access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
     holder = _p(permissions={key})
     for shared in (board(gremium_id=G2), board(**_TEAM)):
         assert await access.can_read(shared, holder)
         assert await access.can_write(shared, holder) is writes
-        # Neither key configures a board.
         assert not await access.can_configure(shared, holder)
     assert not await access.can_read(board(**_PERSONAL_OTHER), holder)
     assert not await access.can_write(board(**_PERSONAL_OTHER), holder)
-    # The own personal board keeps the owner rule.
     assert await access.can_write(board(**_PERSONAL_MINE), holder)
 
 
@@ -194,9 +202,7 @@ async def test_the_native_writer_writes_and_a_plain_member_does_not(
 @pytest.mark.parametrize(
     ("scope", "reads", "writes"),
     [
-        # `read` holds `todo.read_all`: reads, never writes.
         (frozenset({"todo.read_all"}), True, False),
-        # `todos:write` holds `todo.all`.
         (frozenset({"todo.write", "todo.configure", "todo.all"}), True, True),
         (frozenset({"vote.manage"}), False, False),
     ],
@@ -204,11 +210,16 @@ async def test_the_native_writer_writes_and_a_plain_member_does_not(
 async def test_the_scope_caps_the_global_keys(
     grants: dict[str, Any], scope: frozenset[str], reads: bool, writes: bool
 ) -> None:
+    """Cap the global keys with the token scope.
+
+    The ``read`` scope holds ``todo.read_all``, so it reads and never writes. The
+    ``todos:write`` scope holds ``todo.all``. A team board through a global key also needs
+    its own permission in the scope.
+    """
     access = BoardAccess(ScriptedSession(scalar=[ME]))  # type: ignore[arg-type]
     token = _p(permissions={"todo.all", "todo.read_all"}, scope_permissions=scope)
     assert await access.can_read(board(gremium_id=G2), token) is reads
     assert await access.can_write(board(gremium_id=G2), token) is writes
-    # A team board through a global key also needs its own permission in the scope.
     assert not await access.can_read(board(**_TEAM), token)
     assert not await access.can_write(board(**_TEAM), token)
     wide = _p(
@@ -221,6 +232,10 @@ async def test_the_scope_caps_the_global_keys(
 async def test_an_admin_read_token_reads_every_gremium_board_but_writes_none(
     grants: dict[str, Any],
 ) -> None:
+    """Let an admin read token read every gremium board but write none.
+
+    The team board "Plattform" (``ticket.manage``) stays closed to a ``read`` token.
+    """
     access = BoardAccess(
         ScriptedSession(scalar=[ME], scalars=[["ticket.manage", "platform.manage"]])  # type: ignore[arg-type]
     )
@@ -231,7 +246,6 @@ async def test_an_admin_read_token_reads_every_gremium_board_but_writes_none(
     assert await access.can_read(board(gremium_id=G2), token)
     assert not await access.can_write(board(gremium_id=G2), token)
     assert not await access.can_read(board(**_PERSONAL_MINE), token)
-    # The team board "Plattform" (``ticket.manage``) stays closed to a ``read`` token.
     plattform = board(kind="team", gremium_id=None, permission="ticket.manage")
     assert not await access.can_read(plattform, token)
     assert await access.can_read(board(**_TEAM), token)
@@ -244,7 +258,10 @@ async def test_an_admin_read_token_reads_every_gremium_board_but_writes_none(
 async def test_the_read_scope_of_a_global_key_holds_every_shared_board(
     grants: dict[str, Any], key: str
 ) -> None:
-    # No team-permission query: every team board is in the scope already.
+    """Put every shared board in the read scope of a global key.
+
+    No team-permission query runs, because every team board is in the scope already.
+    """
     session = ScriptedSession(scalar=[ME])
     scope = await BoardAccess(session).scope(_p(permissions={key}))  # type: ignore[arg-type]
     assert scope == ReadScope(all_gremien=True, owner_id=ME, all_teams=True)

@@ -88,6 +88,11 @@ async def test_the_archive_cron_waits_for_a_move(
 async def test_the_agenda_path_locks_the_board_before_the_meeting(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Lock the board before the meeting on the agenda path.
+
+    A card create takes the board lock first, then writes a link that references the
+    meeting.
+    """
     from datetime import date, timedelta
 
     from app.modules.livevote.agenda_service import AgendaService
@@ -117,7 +122,6 @@ async def test_the_agenda_path_locks_the_board_before_the_meeting(
             return item.title
 
     async with maker() as creator:
-        # A card create: the board lock, then a link that references the meeting.
         await creator.execute(
             text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": bid}
         )
@@ -141,6 +145,11 @@ async def test_the_agenda_path_locks_the_board_before_the_meeting(
 async def test_two_ticket_closes_lock_the_boards_in_one_order(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Lock the boards in one order when two tickets close at once.
+
+    Ticket 1 has its older card on the high board, ticket 2 on the low board. Both closes
+    wait for the low board, so neither holds the high one yet.
+    """
     from app.modules.tickets.models import Ticket
     from app.modules.todos.hooks import TicketTodoBridge
     from app.modules.todos.models import TodoLink
@@ -158,7 +167,6 @@ async def test_two_ticket_closes_lock_the_boards_in_one_order(
             await session.flush()
             tickets.append(ticket.id)
         await session.commit()
-        # Ticket 1 has its older card on the high board, ticket 2 on the low board.
         for ticket_id, boards in ((tickets[0], (high, low)), (tickets[1], (low, high))):
             for board_id in boards:
                 payload = CardCreate.model_validate({"boardId": str(board_id), "title": "K"})
@@ -171,7 +179,6 @@ async def test_two_ticket_closes_lock_the_boards_in_one_order(
             await TicketTodoBridge(session).complete(ticket_id, lead)
 
     async with maker() as holder:
-        # Both closes wait for the low board, so neither holds the high one yet.
         await holder.execute(text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": low})
         closes = [asyncio.create_task(close(t)) for t in tickets]
         await asyncio.sleep(0.3)
@@ -269,6 +276,10 @@ async def test_two_identical_links_and_labels_give_one_409(
 async def test_a_column_delete_reads_the_done_flag_after_the_lock(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Read the done flag after the lock when a column is deleted.
+
+    A parallel ``isDone`` patch of the first column holds the lock.
+    """
     me, me_id = await add_person(maker, "Ada")
     board, columns = await _personal(maker, me_id)
     first = columns[0]
@@ -278,7 +289,6 @@ async def test_a_column_delete_reads_the_done_flag_after_the_lock(
             return await TodoService(session).delete_column(board.id, first.id, me)
 
     async with maker() as holder:
-        # A parallel ``isDone`` patch of the first column holds the lock.
         await holder.execute(
             text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": board.id}
         )
@@ -308,6 +318,11 @@ async def test_a_column_delete_reads_the_done_flag_after_the_lock(
 async def test_two_cards_on_two_boards_link_each_other_at_once(
     maker: async_sessionmaker[AsyncSession],
 ) -> None:
+    """Let two cards on two boards link each other at the same time.
+
+    The link a1 -> b1 holds a1 the way ``add_link`` does. The link b1 -> a1 must not wait
+    for it, because its foreign key check needs only KEY SHARE on a1.
+    """
     admin, _admin_id = await add_person(maker, "Admin")
     lead = Principal(sub=admin.sub, roles=["admin"])
     _, board_a = await add_gremium(maker, "StuPa")
@@ -327,8 +342,6 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
             return len((await TodoService(session).add_link(b1, "todo", a1, lead)).links)
 
     async with maker() as holder:
-        # The link a1 -> b1 holds a1 the way ``add_link`` does. The link b1 -> a1
-        # must not wait for it: its foreign key check needs only KEY SHARE on a1.
         service = TodoService(holder)
         await service._card(a1, lead, lock=True)
         linked = await asyncio.wait_for(asyncio.create_task(link_b_to_a()), 5)
@@ -340,6 +353,10 @@ async def test_two_cards_on_two_boards_link_each_other_at_once(
 async def test_a_write_that_waits_for_a_transfer_answers_card_moved(
     maker: async_sessionmaker[AsyncSession], write: str
 ) -> None:
+    """Answer ``card_moved`` to a write that waits for a transfer.
+
+    The transfer holds the source board while the other write waits for it.
+    """
     me, me_id = await add_person(maker, "Ada")
     board, columns = await _personal(maker, me_id)
     gid, target = await add_gremium(maker, "StuPa")
@@ -360,7 +377,6 @@ async def test_a_write_that_waits_for_a_transfer_answers_card_moved(
             return await service.patch(card_id, CardPatch(version=1, title="Neu"), me)
 
     async with maker() as holder:
-        # The transfer holds the source board while the other write waits for it.
         await holder.execute(
             text("SELECT id FROM todo_board WHERE id = :b FOR UPDATE"), {"b": board.id}
         )

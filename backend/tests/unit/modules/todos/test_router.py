@@ -401,13 +401,16 @@ class _Broker:
 
 
 def test_a_write_pings_its_board_after_the_route(env: _Env) -> None:
+    """Ping the board after the write route.
+
+    The pings are drained, so a read after it sends nothing.
+    """
     broker = _Broker()
     env.app.state.broker = broker
     env.service.ping_on.add("move")
     assert env.client.post(f"/api/todos/cards/{CID}/move", json={"columnId": str(XID)}).is_success
     ping = {"type": "card", "boardId": str(BID), "cardId": str(CID)}
     assert broker.sent == [(f"todo-board:{BID}", ping)]
-    # The pings are drained: a read after it sends nothing.
     assert env.client.get(f"/api/todos/cards/{CID}").is_success
     assert len(broker.sent) == 1
 

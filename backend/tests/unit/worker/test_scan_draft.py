@@ -99,6 +99,10 @@ async def test_clean_draft_is_stored() -> None:
 
 @pytest.mark.parametrize("clean", [True, False])
 async def test_row_removed_during_the_scan_is_skipped(clean: bool) -> None:
+    """Skip a row that is removed during the scan.
+
+    The deleter owns the object, so the scan removes nothing.
+    """
     session = _StaleSession()
     att = _draft(session)
     storage = FakeStorage()
@@ -107,7 +111,6 @@ async def test_row_removed_during_the_scan_is_skipped(clean: bool) -> None:
     )
     assert stored is False
     assert session.rolled_back == 1
-    # The deleter owns the object. The scan removes nothing.
     assert storage.removed == []
 
 

@@ -16,12 +16,15 @@ from app.shared.guards import (
 
 
 def test_is_in_vote_gremium_needs_a_member_of_the_snapshot() -> None:
+    """Require a member of the snapshot.
+
+    Without a vote Gremium nobody is a member, so the guard fails closed.
+    """
     member = GuardContext(vote_gremium_id="g-1", actor_committees=frozenset({"g-1"}))
     other = GuardContext(vote_gremium_id="g-1", actor_committees=frozenset({"g-2"}))
     no_vote = GuardContext(vote_gremium_id=None, actor_committees=frozenset({"g-1"}))
     assert eval_guard({"isInVoteGremium": True}, member) is True
     assert eval_guard({"isInVoteGremium": True}, other) is False
-    # Fail closed: without a vote Gremium nobody is a member of it.
     assert eval_guard({"isInVoteGremium": True}, no_vote) is False
     assert eval_guard({"isInVoteGremium": False}, other) is True
 

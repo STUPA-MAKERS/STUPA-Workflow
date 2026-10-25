@@ -182,6 +182,7 @@ async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
 
 async def test_arq_queue_dedup_logs_when_none(caplog: pytest.LogCaptureFixture) -> None:
     """Take the dedup path without an error when arq returns None for an existing job id."""
+
     class FakePool:
         async def enqueue_job(self, *a, **k):
             return None

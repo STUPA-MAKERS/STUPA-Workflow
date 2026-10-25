@@ -27,8 +27,8 @@ NOW = datetime(2026, 6, 7, 12, 0, tzinfo=UTC)
 
 class FakeResult:
     def __init__(self, items: list[Any]) -> None:
+        """Keep the items; ``rowcount`` feeds DELETE and UPDATE statements."""
         self._items = items
-        # `rowcount` feeds DELETE and UPDATE statements.
         self.rowcount = len(items)
 
     def scalars(self) -> FakeResult:
@@ -56,7 +56,8 @@ class FakeSession:
         return self._scalar
 
     async def get(self, _model: Any, _ident: Any) -> Any:
-        return None  # no guest settings row: the defaults apply
+        """Return no guest settings row, so the defaults apply."""
+        return None
 
     async def commit(self) -> None:
         self.committed += 1
@@ -148,6 +149,8 @@ async def test_close_meeting_vote_broadcasts_vote_closed(
 
     Only the REST router fires this broadcast otherwise. Without it, the beamer view and
     the voters stay on "open".
+
+    One broadcast goes to the meeting channel of the vote.
     """
     meeting_id = uuid4()
     closed = SimpleNamespace(
@@ -179,7 +182,6 @@ async def test_close_meeting_vote_broadcasts_vote_closed(
     ctx = _ctx([FakeSession([[vote]])])
     ctx["redis"] = _FakeRedis()
     assert await wd._close_one(ctx, vote.id, NOW) is True
-    # One broadcast goes to the meeting channel of the vote.
     assert len(published) == 1
     assert str(meeting_id) in published[0][0]
 
@@ -270,7 +272,11 @@ async def test_close_conflict_skips(patched: None, monkeypatch: pytest.MonkeyPat
 async def test_close_with_blocked_branch_counts_as_closed(
     patched: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A blocked result branch still closes the vote. The cron does not retry it."""
+    """A blocked result branch still closes the vote. The cron does not retry it.
+
+    Another test may disable the app loggers (alembic ``fileConfig``), so the test records
+    the warning call itself instead of the log output.
+    """
     closed = SimpleNamespace(
         id=uuid4(),
         meeting_id=None,
@@ -286,8 +292,6 @@ async def test_close_with_blocked_branch_counts_as_closed(
             return closed
 
     monkeypatch.setattr(wd, "VotingService", _Blocked)
-    # Another test may disable the app loggers (alembic `fileConfig`), so record the
-    # warning call itself instead of the log output.
     warnings: list[str] = []
     monkeypatch.setattr(wd.logger, "warning", lambda msg, *_a: warnings.append(msg))
     vote = SimpleNamespace(id=uuid4())
@@ -362,13 +366,19 @@ async def test_vote_failure_does_not_abort_cycle(
 
 @freeze_time(FROZEN)
 async def test_process_deadlines_orchestrates_all(patched: None) -> None:
+    """Run the vote, auto-transition and discard steps in order.
+
+    The order is the vote scan, the vote lock, the auto-transition scan and the discard.
+
+    The sessions of the maker follow this order. The auto-transition scan finds no
+    application, and the discard finds no unconfirmed guest application.
+    """
     vote = SimpleNamespace(id=uuid4())
-    # Call order of the maker: vote-scan, vote-lock, auto-transition scan, discard.
     sessions = [
-        FakeSession([[vote.id]]),      # vote scan
-        FakeSession([[vote]]),         # vote lock
-        FakeSession([[]]),             # auto-transition scan → no applications
-        FakeSession([[]]),             # discard of unconfirmed guest applications → none
+        FakeSession([[vote.id]]),
+        FakeSession([[vote]]),
+        FakeSession([[]]),
+        FakeSession([[]]),
     ]
     out = await wd.process_deadlines(_ctx(sessions))
     assert out == "votes=1 auto=0 discarded=0 todos=0 polls=0"

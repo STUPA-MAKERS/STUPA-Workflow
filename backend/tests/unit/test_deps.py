@@ -93,11 +93,11 @@ def test_require_applicant_ok() -> None:
     assert require_applicant("view")(applicant=a) is a
 
 
-# get_current_applicant: a signed opaque sid maps to a server-side session row.
 def _applicant_row(
     *, sid: str = "as1", application_id: str = "a1", scope: str = "edit",
     expired: bool = False, revoked: bool = False,
 ) -> ApplicantSession:
+    """Build an applicant session row; a signed opaque sid maps to such a server-side row."""
     now = datetime.now(UTC)
     row = ApplicantSession(
         sid=sid,
@@ -124,7 +124,7 @@ async def test_get_current_applicant_bearer() -> None:
 
 
 async def test_get_current_applicant_query_param_not_accepted() -> None:
-    # The code rejects `?t=` on purpose. A token in the query string leaks.
+    """Reject the ``?t=`` query parameter, because a token in the query string leaks."""
     req = _request(query=f"t={_cookie()}")
     assert await get_current_applicant(req, fake_session(), _settings()) is None
 
@@ -147,7 +147,7 @@ async def test_get_current_applicant_invalid_token() -> None:
 
 
 async def test_get_current_applicant_forged_secret_no_row() -> None:
-    # Core regression: a correctly signed sid without a database row gives None.
+    """Resolve a correctly signed sid without a database row to None."""
     req = _request(headers={"Authorization": f"Bearer {_cookie('forged')}"})
     assert await get_current_applicant(req, fake_session(result()), _settings()) is None
 
@@ -187,8 +187,11 @@ async def test_get_current_principal_orphan_session(monkeypatch: pytest.MonkeyPa
 
 
 async def test_get_current_principal_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolve the principal of a valid session.
+
+    The session was checked at the IdP a moment ago, so the renewal is not due.
+    """
     async def _sess(*a: object, **k: object) -> AuthSession:
-        # Checked at the IdP a moment ago, so the renewal is not due.
         return AuthSession(sid="s", principal_id="pid", revalidated_at=datetime.now(UTC))
 
     async def _resolve(*a: object, **k: object) -> Principal:
@@ -205,12 +208,12 @@ async def test_get_current_principal_ok(monkeypatch: pytest.MonkeyPatch) -> None
 
 
 async def test_get_current_principal_deactivated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Do not resolve a deactivated principal (active=False)."""
     async def _sess(*a: object, **k: object) -> AuthSession:
         return AuthSession(sid="s", principal_id="pid")
 
     monkeypatch.setattr(deps.sessions, "load_principal_session", _sess)
     req = _request(cookies={_settings().session_cookie_name: "x"})
-    # A deactivated principal (active=False) does not resolve.
     principal = await get_current_principal(
         req, fake_session(result(SimpleNamespace(active=False))), _settings()
     )

@@ -45,6 +45,11 @@ def _card(client: TestClient, board_id: str, title: str, **kw: Any) -> dict[str,
 async def test_all_boards_lists_every_readable_board_with_all_live_cards(
     api: Api, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """List every readable board with all its live cards.
+
+    A write changes the tag. A ``todo.read_all`` holder reads every shared board, writes
+    none and sees no foreign personal board.
+    """
     stupa, stupa_board = await add_gremium(maker, "StuPa")
     asta, asta_board = await add_gremium(maker, "AStA")
     _fsi, fsi_board = await add_gremium(maker, "FSI")
@@ -86,7 +91,6 @@ async def test_all_boards_lists_every_readable_board_with_all_live_cards(
         etag = client.get(ALL).headers["ETag"]
         assert client.get(ALL, headers={"If-None-Match": etag}).status_code == 304
         _card(client, str(team_board), "Ticket")
-        # A write changes the tag.
         assert client.get(ALL, headers={"If-None-Match": etag}).status_code == 200
         rows = _ok(client.get(ALL))
         assert [c["title"] for c in rows[0]["cards"]] == ["Privat"]
@@ -105,8 +109,6 @@ async def test_all_boards_lists_every_readable_board_with_all_live_cards(
         assert counts == {"Offen": 2, "In Arbeit": 0, "Wartet": 0, "Erledigt": 1}
         assert [c["title"] for c in rows[3]["cards"]] == ["Ticket"]
 
-        # A todo.read_all holder reads every shared board, writes none, and sees no
-        # foreign personal board.
         api.login(Principal(sub=reader.sub, permissions={"todo.read_all"}))
         read = _ok(client.get(ALL))
         assert [b["name"] for b in read] == ["Meine To-Dos", "AStA", "FSI", "StuPa", "Plattform"]

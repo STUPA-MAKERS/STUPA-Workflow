@@ -19,7 +19,8 @@ from tests._support.webhooks_fakes import FakeSession
 from worker.webhook import _sessionmaker, deliver_webhook, on_startup
 
 SETTINGS = load_settings()
-_URL = "https://93.184.216.34/h"  # IP literal: the SSRF guard makes no DNS lookup
+#: An IP literal, so the SSRF guard makes no DNS lookup.
+_URL = "https://93.184.216.34/h"
 
 
 class _SessionCM:
@@ -97,5 +98,5 @@ async def test_on_startup_sets_settings() -> None:
 
 
 def test_sessionmaker_default() -> None:
-    # Without an injected maker, `_sessionmaker` falls back to the global sessionmaker.
+    """Fall back to the global sessionmaker without an injected maker."""
     assert _sessionmaker({}) is not None
