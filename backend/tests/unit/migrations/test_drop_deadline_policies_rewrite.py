@@ -73,7 +73,10 @@ def test_rewrite_guard(guard: dict[str, Any], expected: Any) -> None:  # noqa: A
     validate_guard(new_guard)
 
 
-@pytest.mark.parametrize("guard", [None, {}, FIELD, {"and": [FIELD, {"not": ROLE}]}])
+@pytest.mark.parametrize(
+    "guard",
+    [None, {}, FIELD, {"and": [FIELD, {"not": ROLE}]}, {"hasField": "deadlinePassed"}],
+)
 def test_guard_without_operator_is_unchanged(guard: Any) -> None:  # noqa: ANN401
     assert MIG.rewrite_guard(guard) == (guard, False)
 
@@ -87,6 +90,28 @@ def test_rewrite_transition_makes_every_touched_transition_manual() -> None:
     # A "not passed" guard on an automatic transition must not start to fire.
     assert MIG.rewrite_transition(before) == {**before, "guard": None, "automatic": False}
     assert MIG.rewrite_transition(plain) == plain
+
+
+class _Conn:
+    """Answer the transition SELECT with `rows` and record every later statement."""
+
+    def __init__(self, rows: list[tuple[str, Any]]) -> None:
+        self.rows = rows
+        self.updates: list[dict[str, Any]] = []
+
+    def execute(self, _stmt: Any, params: dict[str, Any]) -> Any:  # noqa: ANN401
+        if "op" in params:
+            return type("R", (), {"fetchall": lambda _self: self.rows})()
+        self.updates.append(params)
+        return None
+
+
+def test_rewrite_transitions_skips_a_guard_that_only_names_the_operator() -> None:
+    # The SELECT matches by text, so a field called `deadlinePassed` comes back too.
+    # Its transition keeps its guard and its `automatic` flag.
+    conn = _Conn([("t1", {"hasField": "deadlinePassed"}), ("t2", {"deadlinePassed": True})])
+    MIG._rewrite_transitions(conn)  # noqa: SLF001
+    assert conn.updates == [{"g": None, "id": "t2"}]
 
 
 def test_rewrite_transition_adds_no_guard_key() -> None:

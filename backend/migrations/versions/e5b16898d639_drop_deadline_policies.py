@@ -158,7 +158,9 @@ def _rewrite_transitions(conn: sa.Connection) -> None:
         {"op": _OP},
     ).fetchall()
     for tid, guard in rows:
-        new_guard, _ = rewrite_guard(guard)
+        new_guard, touched = rewrite_guard(guard)
+        if not touched:
+            continue
         conn.execute(
             sa.text(
                 "UPDATE transition SET guard = CAST(:g AS jsonb), automatic = false "
@@ -205,7 +207,8 @@ _UPGRADE: tuple[str, ...] = (
     "WHERE events && ARRAY['deadline_approaching', 'deadline_passed']::text[]",
     "DELETE FROM mail_template WHERE key = 'deadline_approaching' AND NOT EXISTS "
     "(SELECT 1 FROM transition WHERE actions @> "
-    "'[{\"templateKey\": \"deadline_approaching\"}]'::jsonb)",
+    "'[{\"templateKey\": \"deadline_approaching\"}]'::jsonb OR actions @> "
+    "'[{\"template_key\": \"deadline_approaching\"}]'::jsonb)",
     "DELETE FROM notification_preference WHERE kind = 'deadline'",
     "DROP TABLE IF EXISTS deadline",
     "DROP TABLE IF EXISTS deadline_policy",
