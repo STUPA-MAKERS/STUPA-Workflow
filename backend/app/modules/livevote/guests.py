@@ -78,12 +78,12 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("app.livevote.guests")
 
-# The code alphabet leaves out 0/O, 1/I/L: a person types the code from the beamer.
+#: The code alphabet leaves out 0/O, 1/I/L: a person types the code from the beamer.
 CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 6
-# A rejected or removed guest may ask again after this time.
+#: A rejected or removed guest may ask again after this time.
 RETRY_AFTER = timedelta(minutes=3)
-# The own state refreshes `last_seen_at` at most once in this interval.
+#: The own state refreshes `last_seen_at` at most once in this interval.
 _SEEN_INTERVAL = timedelta(seconds=60)
 _CODE_ATTEMPTS = 20
 
@@ -140,11 +140,14 @@ class GuestService:
         *,
         base_url: str = "",
     ) -> None:
+        """Bind the service to a session.
+
+        `publisher` sends the broadcasts. `base_url` is the public base of the join link.
+        """
         self.session = session
         self.publisher = publisher
         self.base_url = base_url.rstrip("/")
 
-    # -- shared helpers -----------------------------------------------------------
 
     async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
         stmt = select(Meeting).where(Meeting.id == meeting_id)
@@ -228,7 +231,10 @@ class GuestService:
         return by_status.get("admitted", 0), by_status.get("pending", 0)
 
     async def publish(self, meeting_id: UUID, events: GuestEvents) -> None:
-        """Send the broadcasts of a committed change (best effort, a fault only logs)."""
+        """Send the broadcasts of a committed change (best effort, a fault only logs).
+
+        A failed broadcast does not fail the change, because the broadcast is best effort.
+        """
         if self.publisher is None:
             return
         try:
@@ -247,7 +253,7 @@ class GuestService:
                     admitted=admitted,
                     pending=pending,
                 )
-        except Exception:  # the broadcast is best effort
+        except Exception:
             logger.warning("guest broadcast failed (meeting=%s)", meeting_id)
 
     async def _audit(
@@ -263,7 +269,6 @@ class GuestService:
             data={"meetingId": str(meeting.id), "gremiumId": str(meeting.gremium_id), **data},
         )
 
-    # -- meeting settings (called by the meeting lifecycle, no commit) ----------------
 
     async def ensure_code(self, meeting: Meeting) -> None:
         """Give the meeting a join code when it has none."""
@@ -431,7 +436,6 @@ class GuestService:
             )
         ) or 0
 
-    # -- the meeting lead ---------------------------------------------------------------
 
     async def list(self, meeting_id: UUID) -> list[MeetingGuestOut]:
         """List the guests: the open requests first, then the others."""
@@ -577,6 +581,7 @@ class GuestService:
         return outs
 
     def join_url(self, code: str) -> str:
+        """Return the absolute join URL of a code."""
         return f"{self.base_url}/j/{code}"
 
     def _link(self, code: str) -> JoinLinkOut:
@@ -612,7 +617,6 @@ class GuestService:
         await self.publish(meeting_id, events)
         return self._link(code)
 
-    # -- the guest (public routes) ---------------------------------------------------------
 
     async def meeting_by_code(self, code: str, *, for_update: bool = False) -> Meeting:
         """Find the open public meeting of a join code.
@@ -637,6 +641,7 @@ class GuestService:
         return meeting
 
     async def head(self, code: str) -> PublicMeetingHead:
+        """Return the public head of the meeting with this join code."""
         return await self._head(await self.meeting_by_code(code))
 
     async def _head(self, meeting: Meeting) -> PublicMeetingHead:
@@ -677,6 +682,13 @@ class GuestService:
     ) -> tuple[GuestMe, str | None]:
         """Ask to join a public meeting.
 
+        A row lock on the meeting serializes the number of the pseudonym per meeting.
+
+        One device holds one token. A device that joins another meeting leaves its old
+        meeting: its request or its seat ends, and its name goes at once, as on "Sitzung
+        verlassen". The old meeting learns about it, so its lead list and the socket of the
+        device follow. The old row lets go of the token.
+
         Returns:
             The own state and a new token for the cookie, or None when the device
             keeps its token.
@@ -688,7 +700,6 @@ class GuestService:
             RateLimitedError: A rejected or removed device asks again within 3 minutes
                 (``retry_later``).
         """
-        # The lock serializes the number of the pseudonym per meeting.
         meeting = await self.meeting_by_code(code, for_update=True)
         events = GuestEvents()
         other_events = GuestEvents()
@@ -727,16 +738,11 @@ class GuestService:
                 if existing.meeting_id == meeting.id:
                     self._check_retry(existing, now)
                 elif existing.status in ("pending", "admitted"):
-                    # The device leaves the other meeting: one device, one token. Its
-                    # request or its seat ends, and its name goes at once, as on
-                    # "Sitzung verlassen". The other meeting learns about it, so its
-                    # lead list and the socket of the device follow.
                     existing.status = "left"
                     existing.decided_at = now
                     existing.display_name = None
                     other_meeting = existing.meeting_id
                     other_events.updated.append((self._out(existing), None))
-                # One device, one token: the old row lets go of it.
                 existing.token_hash = None
             new_token_value = new_token()
             seq = (
@@ -852,14 +858,16 @@ class GuestService:
     ) -> BallotAccepted:
         """Cast the ballot of an admitted guest.
 
+        The row lock reads the state of the guest again at the cast and serializes it with a
+        removal by the lead, like the account check of the member channel. The broadcast
+        after the cast is best effort.
+
         Raises:
             ForbiddenError: The guest is not admitted (``guest_not_admitted``), or the
                 guests only watch (``guests_watch_only``), or the vote is for members
                 only (``vote_members_only``).
             NotFoundError: The vote is not a vote of a public item of this meeting.
         """
-        # The row lock reads the state of the guest again at the cast and serializes it
-        # with a removal by the lead, like the account check of the member channel.
         meeting, guest = await self.resolve(code, token, for_update=True)
         if guest.status != "admitted":
             raise ForbiddenError("Only an admitted guest votes.", code="guest_not_admitted")
@@ -876,7 +884,7 @@ class GuestService:
         if self.publisher is not None:
             try:
                 await self.publisher.vote_tally(await voting.get(vote_id))
-            except Exception:  # the broadcast is best effort
+            except Exception:
                 logger.warning("vote_tally broadcast failed (vote=%s)", vote_id)
         return accepted
 
@@ -895,7 +903,6 @@ class GuestService:
         )
         return await self._public_item(item_id)
 
-    # -- the guest view ----------------------------------------------------------------
 
     async def _me(self, meeting: Meeting, guest: MeetingGuest, now: datetime) -> GuestMe:
         view = await self._view(meeting, guest) if guest.status == "admitted" else None
@@ -910,6 +917,11 @@ class GuestService:
         )
 
     async def _view(self, meeting: Meeting, guest: MeetingGuest) -> GuestView:
+        """Build the guest view of a meeting.
+
+        The view never holds the text of a non-public item, and no text before the start,
+        because the minute-taker can prepare the text of a planned meeting.
+        """
         items = (
             (
                 await self.session.execute(
@@ -939,8 +951,6 @@ class GuestService:
                 title=titles.get(item.application_id) if item.application_id else item.title,
                 kind="application" if item.application_id else "freetext",
                 nonPublic=item.non_public,
-                # Never the text of a non-public item, and no text before the start:
-                # the minute-taker can prepare the text of a planned meeting.
                 body=None if item.non_public or meeting.status == "planned" else item.body,
                 done=item.done_at is not None and not item.non_public,
             )
@@ -970,6 +980,10 @@ class GuestService:
     async def _votes(
         self, meeting: Meeting, guest: MeetingGuest, public_ids: list[UUID]
     ) -> list[GuestVote]:
+        """Build the votes that a guest sees.
+
+        A guest sees names only: no account id and no `sub` of the lead.
+        """
         if not public_ids:
             return []
         rows = (
@@ -1027,7 +1041,6 @@ class GuestService:
                     myBallot=mine,
                     canCast=can_cast,
                     kind=view.kind,
-                    # A guest sees names only: no account id, no `sub` of the lead.
                     election=view.election.public() if view.election is not None else None,
                     electionResult=(
                         view.election_result.public()

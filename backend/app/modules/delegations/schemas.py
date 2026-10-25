@@ -54,9 +54,9 @@ class DelegationOut(_CamelModel):
     delegate_voting: bool = Field(serialization_alias="delegateVoting")
     via_pool: bool = Field(serialization_alias="viaPool")
     created_at: datetime = Field(serialization_alias="createdAt")
-    # True while the meeting is planned and has not started.
+    #: True while the meeting is planned and has not started.
     revocable: bool
-    # Direction seen from the caller: outgoing or incoming. None means not involved (admin).
+    #: Direction seen from the caller: outgoing or incoming. None means not involved (admin).
     direction: str | None = None
 
 
@@ -73,6 +73,7 @@ class SubstituteCreate(_CamelModel):
 
 
 class SubstituteOut(_CamelModel):
+    """A substitute pool entry, with the member name for a member-bound entry."""
     id: UUID
     gremium_id: UUID = Field(serialization_alias="gremiumId")
     member_id: UUID | None = Field(default=None, serialization_alias="memberId")
@@ -88,9 +89,9 @@ class RecipientOut(_CamelModel):
 
     principal_id: UUID = Field(serialization_alias="principalId")
     display_name: str | None = Field(default=None, serialization_alias="displayName")
-    # True when the substitute pool legitimizes the recipient. No lead-time deadline.
+    #: True when the substitute pool legitimizes the recipient. No lead-time deadline.
     via_pool: bool = Field(serialization_alias="viaPool")
-    # True for a gremium member. False marks an external recipient.
+    #: True for a gremium member. False marks an external recipient.
     is_member: bool = Field(serialization_alias="isMember")
 
 
@@ -99,7 +100,7 @@ class MeetingDelegationContext(_CamelModel):
 
     meeting_id: UUID = Field(serialization_alias="meetingId")
     gremium_id: UUID = Field(serialization_alias="gremiumId")
-    # Feature gates: the gremium switch and the global vote-delegation flag.
+    #: Feature gates: the gremium switch and the global vote-delegation flag.
     allow_vote_delegation: bool = Field(serialization_alias="allowVoteDelegation")
     voting_delegation_enabled: bool = Field(
         serialization_alias="votingDelegationEnabled"
@@ -107,15 +108,15 @@ class MeetingDelegationContext(_CamelModel):
     delegation_allow_external: bool = Field(
         serialization_alias="delegationAllowExternal"
     )
-    # Deadline in UTC for a delegation from outside the pool. None means the meeting
-    # has no date and only the status gate applies. A pool delegation runs until the
-    # meeting starts.
+    #: Deadline in UTC for a delegation from outside the pool. None means the meeting
+    #: has no date and only the status gate applies. A pool delegation runs until the
+    #: meeting starts.
     deadline: datetime | None = None
     deadline_passed: bool = Field(serialization_alias="deadlinePassed")
     meeting_started: bool = Field(serialization_alias="meetingStarted")
-    # True when the caller is a voting member and may delegate here.
+    #: True when the caller is a voting member and may delegate here.
     can_delegate: bool = Field(serialization_alias="canDelegate")
-    # The own outgoing delegation, at most one, and the incoming delegations.
+    #: The own outgoing delegation, at most one, and the incoming delegations.
     my_delegation: DelegationOut | None = Field(
         default=None, serialization_alias="myDelegation"
     )
@@ -126,12 +127,12 @@ class MeetingDelegationContext(_CamelModel):
 class VoteDelegationStatus(_CamelModel):
     """Delegation view of one vote for the caller, shown in the vote-cast banner."""
 
-    # The own vote for this ballot is delegated away. A cast would return 403.
+    #: The own vote for this ballot is delegated away. A cast would return 403.
     blocked: bool
     delegated_to_name: str | None = Field(
         default=None, serialization_alias="delegatedToName"
     )
-    # True when the caller casts a delegated vote. The UI shows an "as substitute" badge.
+    #: True when the caller casts a delegated vote. The UI shows an "as substitute" badge.
     exercising: bool
     delegated_by_name: str | None = Field(
         default=None, serialization_alias="delegatedByName"

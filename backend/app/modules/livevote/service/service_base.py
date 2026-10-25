@@ -29,9 +29,9 @@ if TYPE_CHECKING:
 
     from app.modules.livevote.service.pubsub import BrokerPublisher
 
-# Per meeting: the number of agenda items and the current item.
+#: Per meeting: the number of agenda items and the current item.
 AgendaSummary = tuple[int, CurrentAgendaItemOut | None]
-# Per meeting: the admitted and the pending guests.
+#: Per meeting: the admitted and the pending guests.
 GuestCounts = tuple[int, int]
 
 
@@ -39,6 +39,7 @@ class MeetingServiceBase:
     """Meeting operations bound to one `AsyncSession` and an optional publisher."""
 
     def __init__(self, session: AsyncSession, publisher: BrokerPublisher | None = None) -> None:
+        """Bind the service to a session and an optional publisher."""
         self.session = session
         self.publisher = publisher
 
@@ -62,6 +63,14 @@ class MeetingServiceBase:
         public_join_allowed: bool = True,
         window: OpenWindow | None = None,
     ) -> MeetingOut:
+        """Build the meeting view for one principal.
+
+        `canControl` marks the right to run the meeting: the protocol, the agenda items and
+        the status. The protokollant and the session manager hold it, and the frontend gates
+        the editor on this flag. The guest columns are read with `getattr`, because a read
+        model of an older caller may lack them. The join code and the open requests go to
+        the meeting lead only.
+        """
         periods, planned = keepers if keepers is not None else ([], None)
         return MeetingOut(
             id=meeting.id,
@@ -83,9 +92,6 @@ class MeetingServiceBase:
             protokollantId=meeting.protokollant_id,
             protokollantName=protokollant_name,
             isProtokollant=is_protokollant,
-            # `canControl` marks the right to run the meeting: the protocol, the
-            # agenda items, and the status. The protokollant and the session manager
-            # hold it. The frontend gates the editor on this flag.
             canControl=can_write,
             canManage=can_manage,
             canWrite=can_write,
@@ -95,10 +101,8 @@ class MeetingServiceBase:
             votes=votes or [],
             keeperPeriods=periods,
             plannedHandover=planned,
-            # `getattr`: a read model of an older caller may lack the guest columns.
             publicJoin=bool(getattr(meeting, "public_join", False)),
             guestsMode=getattr(meeting, "guests_mode", None) or "vote",
-            # The join code and the open requests go to the meeting lead only.
             joinCode=getattr(meeting, "join_code", None) if can_manage else None,
             admittedGuests=guests[0],
             pendingGuests=guests[1] if can_manage else 0,

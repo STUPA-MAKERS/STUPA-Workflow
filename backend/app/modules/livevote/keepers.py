@@ -26,13 +26,13 @@ from app.modules.livevote.agenda_service import agenda_order
 from app.modules.livevote.models import MeetingAgendaItem, ProtocolKeeperPeriod
 from app.modules.livevote.schemas import KeeperPeriodOut
 
-# The gremium permission that a protocol keeper needs.
+#: The gremium permission that a protocol keeper needs.
 KEEPER_PERMISSION = "protocol.write"
 
-# The gremium permission that gives a member the own vote (the cast gate of voting).
+#: The gremium permission that gives a member the own vote (the cast gate of voting).
 VOTE_PERMISSION = "vote.cast"
 
-# Per meeting: the running and ended periods in time order, and the planned one.
+#: Per meeting: the running and ended periods in time order, and the planned one.
 KeeperSummary = tuple[list[KeeperPeriodOut], KeeperPeriodOut | None]
 
 

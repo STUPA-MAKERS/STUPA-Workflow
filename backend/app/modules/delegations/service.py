@@ -79,19 +79,20 @@ from app.shared.errors import (
     ValidationProblem,
 )
 
-# Permission that grants the view and the management of foreign delegations.
+#: Permission that grants the view and the management of foreign delegations.
 _ADMIN_PERM = "admin.delegations"
-# Gremium-role permission that may manage the substitute pool. The same
-# permission makes the meeting lead (`can_manage`), who enters a substitution
-# during a live meeting.
+#: Gremium-role permission that may manage the substitute pool. The same
+#: permission makes the meeting lead (`can_manage`), who enters a substitution
+#: during a live meeting.
 _POOL_MANAGE_PERM = "session.manage"
-# Attendance states in which a member counts as missing. No record counts
-# as missing too.
+#: Attendance states in which a member counts as missing. No record counts
+#: as missing too.
 _MISSING_STATES = frozenset({"excused", "absent"})
-# Advisory-lock base key. It serializes the create per meeting, so a concurrent
-# insert cannot race the read-then-insert check of the no-chains rule. The lock
-# takes this key and a derivation of the meeting id as two int4 arguments.
-_CREATE_LOCK_KEY = 0x4445_4C45  # "DELE"
+#: Advisory-lock base key. It serializes the create per meeting, so a concurrent
+#: insert cannot race the read-then-insert check of the no-chains rule. The lock
+#: takes this key and a derivation of the meeting id as two int4 arguments. The
+#: value spells "DELE" in ASCII.
+_CREATE_LOCK_KEY = 0x4445_4C45
 
 
 def _escape_like(needle: str) -> str:
@@ -161,7 +162,7 @@ async def voting_delegation_check(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,  # signature consistency; delegations are session-bound
+    now: datetime,
 ) -> tuple[bool, str | None]:
     """Give the two-sided vote verdict for `sub`.
 
@@ -176,6 +177,9 @@ async def voting_delegation_check(
       The caller may then cast one delegated ballot next to the own ballot. That
       ballot runs under `delegator_sub`, so it is a transfer and not a duplicate.
       The caller can therefore vote even as an external user.
+
+    `now` keeps the signature equal to the other checks. A delegation is bound to a meeting, not to
+    a time.
 
     Returns:
         The blocked flag and the `sub` of the delegator. The second value is None
@@ -222,6 +226,7 @@ class DelegationService:
     """Delegation service bound to an `AsyncSession` and a `Settings` object."""
 
     def __init__(self, session: AsyncSession, settings: Settings) -> None:
+        """Bind the service to a session and the settings."""
         self.session = session
         self.settings = settings
 
@@ -364,6 +369,9 @@ class DelegationService:
 
         `lead_gremien` holds the gremien that the viewer leads. `admin` tells that
         the viewer may revoke every row.
+
+        A fresh row gets `created_at` from the database default only on the next select, so the view
+        uses the creation time until then.
         """
         lead_gremien = lead_gremien or set()
         ids: set[UUID] = set()
@@ -385,8 +393,6 @@ class DelegationService:
                 delegate_name=names.get(d.delegate_principal_id),
                 delegate_voting=d.delegate_voting,
                 via_pool=d.via_pool,
-                # For a fresh row the database default fills `created_at` only on
-                # the next select. Use the creation time until then.
                 created_at=d.created_at or now,
                 revocable=self._revocable(
                     meeting,
@@ -509,6 +515,11 @@ class DelegationService:
         themselves as B. The row stores the lead as `created_by` and
         `via_pool = true`.
 
+        Lock the meeting row before the status and attendance reads. The attendance writers hold a
+        share lock on this row and then look for a delegation. Thus a `present` report of A and this
+        entry for A cannot both commit. The missing member does not consent to this entry, so the
+        lead must not give the vote to themselves.
+
         Raises:
             ForbiddenError: The caller is not the meeting lead, the gremium does not
                 allow delegations, B is the lead, A may not vote, or B is not in
@@ -527,10 +538,6 @@ class DelegationService:
             raise ForbiddenError(
                 "Only the meeting lead may enter a substitution for another member."
             )
-        # Lock the meeting row before the status and attendance reads. The
-        # attendance writers hold a share lock on this row and then look for a
-        # delegation. Thus a `present` report of A and this entry for A cannot
-        # both commit.
         meeting = await self._meeting(payload.meeting_id, lock=True)
         if not gremium.allow_vote_delegation:
             raise ForbiddenError("Delegation is not enabled for this gremium.")
@@ -552,8 +559,6 @@ class DelegationService:
                 errors=[{"field": "delegateId", "msg": "must differ from delegator"}],
             )
         if delegate.sub == actor.sub:
-            # The missing member does not consent to this entry. Thus the lead
-            # must not give the vote to themselves.
             raise ForbiddenError("The meeting lead cannot name themselves as the substitute.")
         if not await _independently_eligible(self.session, delegator.id, gremium.id, now):
             raise ForbiddenError(
@@ -598,16 +603,16 @@ class DelegationService:
     ) -> MeetingDelegation:
         """Check the chain rules, then store the delegation and write the audit entry.
 
+        No chains: per meeting a principal is either delegator or recipient. A transaction-scoped
+        advisory lock serializes the insert per meeting, because without it a concurrent insert of A
+        to B and B to C could race the read-then-insert check. The second int4 argument of the lock
+        is a stable 32-bit derivation of the meeting id.
+
         Raises:
             ConflictError: The delegator already delegated for this meeting, or the
                 recipient already carries a delegated vote (409).
             ValidationProblem: The delegation would build a chain (422).
         """
-        # No chains: per meeting a principal is either delegator or recipient. A
-        # transaction-scoped advisory lock serializes the insert per meeting.
-        # Without the lock, a concurrent insert of A to B and B to C could race the
-        # read-then-insert check. The second int4 argument is a stable 32-bit
-        # derivation of the meeting id.
         meeting_lock_arg = int.from_bytes(meeting.id.bytes[:4], "big") - 0x8000_0000
         await self.session.execute(
             text("SELECT pg_advisory_xact_lock(:k1, :k2)").bindparams(
@@ -767,6 +772,8 @@ class DelegationService:
 
         The roster and the recipient names are PII and must not leak to outsiders.
 
+        Check the view rights before the roster and the personal data are built.
+
         Raises:
             NotFoundError: The meeting does not exist (404).
             ForbiddenError: The actor is not a member, a pool substitute or a
@@ -775,7 +782,6 @@ class DelegationService:
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-        # Check the view rights before the code builds the roster and the PII.
         await self._assert_can_view_gremium(gremium.id, actor)
         me = await self._principal_row(sub=actor.sub)
 
@@ -856,6 +862,9 @@ class DelegationService:
         substitutes of that member for the lead entry, see
         `_lead_recipients`.
 
+        Check the view rights before the recipient names are resolved. Escape the LIKE
+        metacharacters, so a `%` or `_` from the user is no wildcard.
+
         Raises:
             NotFoundError: The meeting does not exist (404).
             ForbiddenError: The actor is not a member, a pool substitute or a
@@ -865,7 +874,6 @@ class DelegationService:
         now = datetime.now(UTC)
         meeting = await self._meeting(meeting_id)
         gremium = await self._gremium(meeting.gremium_id)
-        # Check the view rights before the code resolves the recipient names.
         await self._assert_can_view_gremium(gremium.id, actor)
         if delegator_id is not None:
             return await self._lead_recipients(gremium.id, delegator_id, q, actor, now)
@@ -888,8 +896,6 @@ class DelegationService:
             if not needle or needle in (names.get(pid) or "").lower()
         ]
         if gremium.delegation_allow_external and needle:
-            # Escape the LIKE metacharacters, so a `%` or `_` from the user is no
-            # wildcard.
             pattern = f"%{_escape_like(needle)}%"
             rows = (
                 await self.session.execute(

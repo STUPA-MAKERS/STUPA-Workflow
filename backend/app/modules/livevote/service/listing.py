@@ -59,6 +59,8 @@ class ListingOps(PermissionOps, VoteReadOps):
         ``date_from`` and ``date_to`` limit the list to the meetings whose planned
         date is in this range (both ends included), for example one month of the
         calendar view. A meeting without a date is then not in the list.
+
+        Delegation recipients see their meetings even without a membership.
         """
         stmt = select(Meeting).order_by(Meeting.created_at.desc())
         if gremium_id is not None:
@@ -69,7 +71,6 @@ class ListingOps(PermissionOps, VoteReadOps):
             stmt = stmt.where(Meeting.date <= date_to)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            # Delegation recipients see their meetings even without a membership.
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         meetings = list((await self.session.execute(stmt)).scalars().all())
@@ -82,14 +83,15 @@ class ListingOps(PermissionOps, VoteReadOps):
         meeting. It is not the membership list. The visibility matches the timeline
         and the list: ``_visible_gremium_ids`` plus the individually delegated
         meetings.
+
+        Delegation recipients see their meetings even without a membership, so their Gremium
+        also belongs in the filter.
         """
         stmt = select(Meeting.gremium_id, Gremium.name).join(
             Gremium, Gremium.id == Meeting.gremium_id
         )
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            # Delegation recipients see their meetings even without a membership,
-            # so their Gremium also belongs in the filter.
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         rows = (await self.session.execute(stmt.distinct())).all()
@@ -118,18 +120,21 @@ class ListingOps(PermissionOps, VoteReadOps):
         relevance-sorted list, without a past and upcoming split and without a now
         marker. The buckets cannot carry a relevance rank. The visibility scope and
         the ``gremium_id`` filter stay. The cursor then carries an offset.
+
+        The timestamp of *now* is naive, because it compares with the date-based sort key.
+        The buckets follow the status, not only the time. ``live`` is always upcoming, so a
+        meeting that runs since the morning does not slip into the past. ``closed`` is
+        always past. The date decides for ``planned``. Delegation recipients see their
+        meetings even without a membership. The query loads one row past the limit to learn
+        whether a next page exists.
         """
         if q and q.strip():
             return await self._search_timeline(
                 principal, q=q.strip(), cursor=cursor, limit=limit, gremium_id=gremium_id
             )
         sort_ts = _sort_ts_expr()
-        # A naive "now" timestamp compares with the date-based sort key.
         now_ts = datetime.now(UTC).replace(tzinfo=None)
         cur = _decode_cursor(cursor)
-        # The buckets follow the status, not only the time. ``live`` is always
-        # upcoming, so a meeting that runs since the morning does not slip into the
-        # past. ``closed`` is always past. The date decides for ``planned``.
         is_upcoming = or_(
             Meeting.status == "live",
             and_(Meeting.status == "planned", sort_ts >= now_ts),
@@ -143,7 +148,6 @@ class ListingOps(PermissionOps, VoteReadOps):
             stmt = stmt.where(Meeting.gremium_id == gremium_id)
         visible = await self._visible_gremium_ids(principal)
         if visible is not None:
-            # Delegation recipients see "their" meetings even without membership.
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
         if direction == "upcoming":
@@ -158,7 +162,6 @@ class ListingOps(PermissionOps, VoteReadOps):
                 cts, cid = cur
                 stmt = stmt.where(or_(sort_ts < cts, and_(sort_ts == cts, Meeting.id < cid)))
             stmt = stmt.order_by(sort_ts.desc(), Meeting.id.desc())
-        # Load one row past the limit to learn whether a next page exists.
         rows = (await self.session.execute(stmt.limit(limit + 1))).all()
         has_more = len(rows) > limit
         rows = rows[:limit]
@@ -182,6 +185,10 @@ class ListingOps(PermissionOps, VoteReadOps):
         and the ``gremium_id`` filter stay identical to the keyset path. Only the
         bucket split and the now marker drop out. The cursor carries an offset here,
         because the relevance rank gives no keyset.
+
+        The id is a deterministic tiebreak after the relevance, which keeps the offset
+        paging stable. The query loads one row past the limit to learn whether a next page
+        exists.
         """
         offset = _decode_offset(cursor)
         where, rank = trigram_rank(
@@ -201,10 +208,7 @@ class ListingOps(PermissionOps, VoteReadOps):
         if visible is not None:
             delegated = await self._delegated_meeting_ids(principal.sub)
             stmt = stmt.where(or_(Meeting.gremium_id.in_(visible), Meeting.id.in_(delegated)))
-        # Most relevant first, with the id as a deterministic tiebreak. That keeps
-        # the offset paging stable.
         stmt = stmt.order_by(rank.desc(), Meeting.id.desc()).offset(offset)
-        # Load one row past the limit to learn whether a next page exists.
         rows = (await self.session.execute(stmt.limit(limit + 1))).scalars().all()
         has_more = len(rows) > limit
         page_rows = list(rows[:limit])
@@ -218,10 +222,28 @@ class ListingOps(PermissionOps, VoteReadOps):
         `list` and `list_timeline` share this helper. It loads everything in batches
         and creates no N+1 queries. It filters NO meetings: the visibility rule is
         module-wide, and the flags are per principal only.
+
+        Batched queries load the protocol ids, the Gremium names, the protokollant names and
+        the Gremium scopes of the principal once, to avoid N+1. Without the protokollant
+        names the timeline shows no protokollant, because ``protokollantName`` stays null
+        although the database holds the id. Public participation is allowed only in a
+        gremium without a quorum.
+
+        The flags follow the same rules as `PermissionOps.can_manage`, `can_write`,
+        `can_manage_votes` and `can_finalize`, batched. `votes_mgmt_ids` is the session lead
+        plus the gremium rule `manages_votes_in_gremium`; its `session.manage` part sits in
+        `manage_ids`. Each right has the admin bypass and applies the OAuth scope cap,
+        because a raw role read would hand a narrowly scoped token the full cross-gremium
+        view. Keep this method and `PermissionOps` in step: the router gates on the detail
+        flags, so a list flag that differs offers an action that the API refuses.
+
+        A management right never grants a ballot. Only an active gremium role with
+        `vote.cast` passes the cast gate, so `canVote` reads that roster for every
+        principal, the admin included. `PermissionOps.can_vote` applies the same rule to the
+        meeting detail.
         """
         if not meetings:
             return []
-        # One batched query for the protocol ids, to avoid N+1.
         proto_rows = (
             await self.session.execute(
                 select(Protocol.meeting_id, Protocol.id).where(
@@ -230,10 +252,7 @@ class ListingOps(PermissionOps, VoteReadOps):
             )
         ).all()
         proto_by_meeting = {meeting_id: pid for meeting_id, pid in proto_rows}
-        # Load the Gremium scopes of the principal once, to avoid one query per
-        # meeting. The admin bypass skips the Gremium query of each right.
         all_gids = {m.gremium_id for m in meetings}
-        # One batched query for the Gremium names, which the timeline shows.
         gremium_rows = (
             await self.session.execute(
                 select(Gremium.id, Gremium.name, Gremium.quorum_percent).where(
@@ -242,11 +261,7 @@ class ListingOps(PermissionOps, VoteReadOps):
             )
         ).all()
         gremium_names: dict[UUID, str] = {row[0]: row[1] for row in gremium_rows}
-        # Public participation only in a gremium without a quorum.
         quorum_gids = {row[0] for row in gremium_rows if len(row) > 2 and row[2] is not None}
-        # One batched query for the protokollant names. Without it the timeline
-        # shows no protokollant, because ``protokollantName`` stays null although
-        # the database holds the id.
         prot_ids = {m.protokollant_id for m in meetings if m.protokollant_id is not None}
         prot_names: dict[UUID, str | None] = (
             {
@@ -264,15 +279,6 @@ class ListingOps(PermissionOps, VoteReadOps):
             if prot_ids
             else {}
         )
-        # The same rules as `PermissionOps.can_manage`, `can_write`,
-        # `can_manage_votes` and `can_finalize`, batched. `votes_mgmt_ids` is the
-        # session lead plus the gremium rule `manages_votes_in_gremium` (its
-        # `session.manage` part sits in `manage_ids`). Each of these rules has
-        # the admin bypass. Each right applies the OAuth scope cap, the admin bypass
-        # included; a raw role read would hand a narrowly scoped token the full
-        # cross-gremium view. Keep this block and `PermissionOps` in step: the router
-        # gates on the detail flags, so a list flag that differs offers an action
-        # that the API refuses.
         async def ids_for(perm: str) -> set[UUID]:
             return expand(await gremium_ids_with(self.session, principal, perm), all_gids)
 
@@ -283,10 +289,6 @@ class ListingOps(PermissionOps, VoteReadOps):
         my_id = await self._principal_id(principal.sub)
         prot_writes = principal.scope_allows("protocol.write")
         prot_votes = principal.scope_allows("vote.manage")
-        # A management right never grants a ballot. Only an active gremium role with
-        # `vote.cast` passes the cast gate, so `canVote` reads that roster for every
-        # principal, the admin included. `PermissionOps.can_vote`
-        # applies the same rule to the meeting detail.
         vote_ids = await self._vote_cast_gremium_ids(principal)
         votes_by_meeting = await self._votes_for([m.id for m in meetings], principal)
         agenda_by_meeting = await self._agenda_summaries(meetings)

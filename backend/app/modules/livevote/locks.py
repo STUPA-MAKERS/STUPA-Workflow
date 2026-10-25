@@ -22,19 +22,21 @@ class Locker(Protocol):
     holds the lock exclusively.
     """
 
-    def acquire(
-        self, key: str, *, ttl_ms: int = ...
-    ) -> AbstractAsyncContextManager[bool]: ...
+    def acquire(self, key: str, *, ttl_ms: int = ...) -> AbstractAsyncContextManager[bool]:
+        """Try to take the lock of the key for at most `ttl_ms` milliseconds."""
+        ...
 
 
 class InMemoryLocker:
     """Process-local lock per key for the tests and a single process."""
 
     def __init__(self) -> None:
+        """Create an empty lock table."""
         self._locks: dict[str, asyncio.Lock] = {}
 
     @asynccontextmanager
     async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
+        """Hold the process-local lock of the key for the block."""
         lock = self._locks.setdefault(key, asyncio.Lock())
         await lock.acquire()
         try:
@@ -43,10 +45,10 @@ class InMemoryLocker:
             lock.release()
 
 
-# Token-safe release. Delete the key only while the lock still belongs to this
-# holder. A lock that another holder took after the TTL expired must survive.
-# The Lua compare-and-set is atomic, so no foreign `acquire` slips between GET
-# and DEL.
+#: Token-safe release. Delete the key only while the lock still belongs to this
+#: holder. A lock that another holder took after the TTL expired must survive.
+#: The Lua compare-and-set is atomic, so no foreign `acquire` slips between GET
+#: and DEL.
 _RELEASE_LUA = (
     "if redis.call('get', KEYS[1]) == ARGV[1] "
     "then return redis.call('del', KEYS[1]) else return 0 end"
@@ -62,10 +64,15 @@ class RedisLocker:
     """
 
     def __init__(self, client: object) -> None:
+        """Wrap a `redis.asyncio` client."""
         self._client = client
 
     @asynccontextmanager
     async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
+        """Hold the lock for the block and release it with a compare-and-set.
+
+        An expiring TTL covers the crash case.
+        """
         token = secrets.token_hex(16)
         got = await self._client.set(key, token, nx=True, px=ttl_ms)  # type: ignore[attr-defined]
         acquired = bool(got)
@@ -73,5 +80,4 @@ class RedisLocker:
             yield acquired
         finally:
             if acquired:
-                # Compare-and-set release. An expiring TTL covers the crash case.
                 await self._client.eval(_RELEASE_LUA, 1, key, token)  # type: ignore[attr-defined]

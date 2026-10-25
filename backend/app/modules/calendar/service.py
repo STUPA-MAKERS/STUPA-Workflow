@@ -18,7 +18,7 @@ from app.modules.admin.models import Gremium
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.livevote.models import Meeting
 
-# 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
+#: 32 bytes give about 43 URL-safe characters. An unguessable token needs no rate limit.
 _TOKEN_BYTES = 32
 
 

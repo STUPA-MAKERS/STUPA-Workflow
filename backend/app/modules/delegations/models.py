@@ -29,15 +29,20 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
-    """Delegation for a single meeting with an optional transfer of the voting right."""
+    """Delegation for a single meeting with an optional transfer of the voting right.
+
+    At most one takeover of the voting right exists per meeting and delegate, because a principal
+    casts exactly one ballot. A second voting delegation to the same person would lapse without a
+    message, because it is a transfer and not a duplicate.
+    """
 
     __tablename__ = "meeting_delegation"
 
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    # Denormalized copy of the gremium of the meeting. It removes the join from
-    # the hot voting-right check and from the "my delegations" queries.
+    #: Denormalized copy of the gremium of the meeting. It removes the join from
+    #: the hot voting-right check and from the "my delegations" queries.
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
@@ -48,20 +53,16 @@ class MeetingDelegation(UUIDPkMixin, CreatedAtMixin, Base):
         ForeignKey("principal.id", ondelete="CASCADE")
     )
     delegate_voting: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # True when the substitute pool legitimizes the delegation. Create then
-    # applies no lead-time deadline.
+    #: True when the substitute pool legitimizes the delegation. Create then
+    #: applies no lead-time deadline.
     via_pool: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # The `sub` of the creator, either self-service or admin. It anchors the audit.
+    #: The `sub` of the creator, either self-service or admin. It anchors the audit.
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
         UniqueConstraint(
             "meeting_id", "delegator_principal_id", name="uq_meeting_delegation_delegator"
         ),
-        # At most one takeover of the voting right per (meeting, delegate). A
-        # principal casts exactly one ballot. A second voting delegation to the
-        # same person would lapse without a message, because this is a transfer
-        # and not a duplicate.
         Index(
             "uq_meeting_delegation_voting_delegate",
             "meeting_id",
@@ -79,6 +80,9 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
 
     The substitute acts without the lead-time deadline. A NULL
     `member_principal_id` lets the substitute represent every member.
+
+    A partial unique index deduplicates the gremium-wide entries, because `UniqueConstraint` treats
+    NULL values as distinct.
     """
 
     __tablename__ = "delegation_substitute"
@@ -86,7 +90,7 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
     gremium_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("gremium.id", ondelete="CASCADE")
     )
-    # NULL marks a gremium-wide substitute that represents every member.
+    #: NULL marks a gremium-wide substitute that represents every member.
     member_principal_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="CASCADE"), nullable=True
     )
@@ -96,8 +100,6 @@ class DelegationSubstitute(UUIDPkMixin, CreatedAtMixin, Base):
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
-        # A partial unique index deduplicates the gremium-wide entries, because
-        # UniqueConstraint treats NULL values as distinct.
         UniqueConstraint(
             "gremium_id",
             "member_principal_id",

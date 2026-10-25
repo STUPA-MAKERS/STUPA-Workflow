@@ -39,6 +39,26 @@ class VoteReadOps(MeetingServiceBase):
 
         With a `principal` each vote carries `myBallot` and `representedCast` for that
         caller. Without one (a broadcast) both stay empty.
+
+        Rebuild the counts, the leading option and the failed reason per vote from the
+        ballots. This is the reload path; the live WebSocket path already carries these
+        values. One batched query keeps this free of N+1. An election counts ballots and
+        candidates (`tally_election`), a poll only counts (`tally_poll`).
+
+        A vote with guests expects the ballots of the admitted guests too, and counts the
+        guests who voted and left since then. A closed vote shows the attendance fixed at
+        the close; a cancelled vote and an older closed vote have none.
+
+        The substitute ballots of absent delegators per meeting and gremium top up the
+        reveal denominator. The voting service applies the same rule in
+        `open_tally_revealed`, so the two paths cannot drift. The query runs only when an
+        open, non-secret vote exists, because only then does the denominator feed a reveal
+        decision.
+
+        The reveal rule matches the voting service. A closed vote reveals. A non-secret vote
+        reveals when all expected ballots are in: the present members plus the substitutes
+        of absent delegators. In every other case the counts and the leading option stay
+        hidden, to prevent an interim leak.
         """
         if not meeting_ids:
             return {}
@@ -51,17 +71,11 @@ class VoteReadOps(MeetingServiceBase):
             .scalars()
             .all()
         )
-        # Rebuild the counts, the leading option, and the failed reason per vote from
-        # the ballots. This is the reload path. The live WebSocket path already carries
-        # these values. One batched query keeps this free of N+1.
         tallies = await self._vote_tallies(rows)
-        # An election counts ballots and candidates (`tally_election`).
         elections = await self._election_tallies([v for v in rows if is_election(v)])
-        # A poll only counts (`tally_poll`).
         polls = await self._poll_tallies([v for v in rows if is_poll(v)])
         present_by_meeting = await self._present_by_meeting(meeting_ids)
         guests_by_meeting = await self.admitted_guests_by_meeting(meeting_ids)
-        # A vote with guests counts the guests who voted and left since then too.
         guest_votes = [
             v.id
             for v in rows
@@ -69,11 +83,6 @@ class VoteReadOps(MeetingServiceBase):
             and bool((v.config if isinstance(v.config, dict) else {}).get("guestsVote"))
         ]
         late_guests = await self._departed_guest_voters(guest_votes) if guest_votes else {}
-        # The substitute ballots of absent delegators per meeting and gremium top up
-        # the reveal denominator. The voting service applies the same rule in
-        # `open_tally_revealed`, so the two paths cannot drift. The query runs only
-        # when an open, non-secret vote exists. Only then does the denominator feed a
-        # reveal decision. A closed or secret vote never reveals through it.
         needs_deleg = any(
             v.meeting_id is not None
             and v.status not in ("closed", "cancelled")
@@ -106,25 +115,16 @@ class VoteReadOps(MeetingServiceBase):
             members: int | None
             guests: int | None
             if v.status in ("closed", "cancelled"):
-                # The attendance fixed at the close. A cancelled vote and an
-                # older closed vote have none.
                 members = getattr(v, "present_members", None)
                 guests = getattr(v, "present_guests", None)
             else:
                 members = present_by_meeting.get(v.meeting_id, 0)
                 guests = guests_by_meeting.get(v.meeting_id, 0)
-            # A vote with guests expects the ballots of the admitted guests too, and
-            # keeps the guests who voted and left since then.
             present = present_by_meeting.get(v.meeting_id, 0)
             if config.guests_vote and v.status not in ("closed", "cancelled"):
                 extra = late_guests.get(v.id, 0)
                 guests = (guests or 0) + extra
                 present += guests_by_meeting.get(v.meeting_id, 0) + extra
-            # The reveal rule matches the voting service. A closed vote reveals. A
-            # non-secret vote reveals when all expected ballots are in. The expected
-            # ballots are the present members plus the substitutes of absent
-            # delegators. In every other case, hide the counts and the leading option
-            # to prevent an interim leak.
             if v.status == "closed":
                 revealed = True
             elif secret:

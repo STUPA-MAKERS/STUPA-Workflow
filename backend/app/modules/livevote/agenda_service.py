@@ -48,7 +48,7 @@ from app.modules.livevote.schemas import AgendaItemOut, AssignableApplicationOut
 from app.modules.protocol.models import Protocol
 from app.shared.errors import ConflictError, NotFoundError
 
-# The meeting states that accept a change of the agenda.
+#: The meeting states that accept a change of the agenda.
 _AGENDA_OPEN = frozenset({"planned", "live"})
 
 
@@ -77,6 +77,7 @@ class AgendaService:
     """Manage the agenda of a meeting: assign, remove and list applications."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a session."""
         self.session = session
 
     async def _meeting(self, meeting_id: UUID, *, for_update: bool = False) -> Meeting:
@@ -180,6 +181,10 @@ class AgendaService:
         return row
 
     async def list(self, meeting_id: UUID) -> list[AgendaItemOut]:
+        """List the agenda items of a meeting in their order.
+
+        A free-text item has no application and carries its own title.
+        """
         await self._meeting(meeting_id)
         rows = (
             await self.session.scalars(
@@ -220,7 +225,6 @@ class AgendaService:
                 if app is not None and app.current_state_id is not None
                 else None
             )
-            # A free-text item has no application and carries its own title.
             title = title_of(app.data) if app is not None else r.title
             out.append(
                 AgendaItemOut(
@@ -259,6 +263,10 @@ class AgendaService:
         A change writes `agenda_item_update` with the changed field names. The body
         counts only after the close.
 
+        The live minutes autosave every second, so only a correction after the close goes
+        into the audit log. An item that guests saw and voted on cannot become non-public
+        afterwards, or the guest view would have shown non-public content.
+
         Raises:
             NotFoundError: The meeting has no agenda item with this id.
             ConflictError: The meeting state does not allow the change.
@@ -273,8 +281,6 @@ class AgendaService:
         changed: list[str] = []
         if body is not None and body != row.body:
             row.body = body
-            # The live minutes autosave every second. Only a correction after the
-            # close goes into the audit log.
             if meeting.status == "closed":
                 changed.append("body")
         if renames and title is not None and title.strip() != row.title:
@@ -282,8 +288,6 @@ class AgendaService:
             changed.append("title")
         if non_public is not None and non_public != row.non_public:
             if non_public and await self._has_guest_vote(row.id):
-                # Guests saw and voted on this item. It cannot become non-public
-                # afterwards, or the guest view would have shown non-public content.
                 raise ConflictError(
                     "Guests voted on this agenda item; it cannot become non-public.",
                     code="guests_vote_on_item",
@@ -411,6 +415,7 @@ class AgendaService:
         return await self.list(meeting_id)
 
     async def assignable(self, meeting_id: UUID) -> list[AssignableApplicationOut]:
+        """List the applications of the Gremium in a vote state that are not on the agenda."""
         meeting = await self._meeting(meeting_id)
         existing = set(
             (
@@ -505,6 +510,9 @@ class AgendaService:
         own commit, so the state change and the new item stay atomic. A new item
         writes `agenda_item_add`. A missing `actor` marks a system add.
 
+        The read uses `populate_existing`, because the flow engine moved the state with a
+        bulk UPDATE in this transaction. The current state must come from the database.
+
         Returns:
             `True` when the method added an item, `False` when the application
             was already on the agenda.
@@ -531,8 +539,6 @@ class AgendaService:
             )
             return True
 
-        # `populate_existing`: the flow engine moved the state with a bulk UPDATE in
-        # this transaction. Read the current state from the database.
         app = await self.session.get(
             Application, application_id, populate_existing=True
         )
@@ -637,6 +643,9 @@ class AgendaService:
         The method locks the meeting row first. The vote open takes the same lock, so
         no vote can open on the item while the remove runs.
 
+        The voting service is imported locally, because it imports the flow engine, and the
+        flow engine imports this module.
+
         Raises:
             NotFoundError: The meeting does not exist.
             ConflictError: The meeting is closed (``meeting_closed``), or the item has
@@ -644,8 +653,6 @@ class AgendaService:
             ForbiddenError: The item has a draft or cancelled vote and
                 `may_delete_votes` is false.
         """
-        # Local import: the voting service imports the flow engine, and the flow
-        # engine imports this module.
         from app.modules.voting.service import VotingService
 
         meeting = await self._meeting(meeting_id, for_update=True)

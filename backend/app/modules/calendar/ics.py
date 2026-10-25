@@ -23,10 +23,10 @@ if TYPE_CHECKING:  # pragma: no cover - types only (icalendar imported lazily)
 
 _LOCAL_TZ = ZoneInfo("Europe/Berlin")
 
-# Duration of a timed meeting that has no valid end time.
+#: Duration of a timed meeting that has no valid end time.
 DEFAULT_DURATION = timedelta(hours=1)
 
-# VALARM reminder lead, relative to the start of the event.
+#: VALARM reminder lead, relative to the start of the event.
 _ALARM_LEAD_TIMED = timedelta(hours=-1)
 _ALARM_LEAD_ALLDAY = timedelta(days=-1)
 
@@ -68,6 +68,11 @@ def _local_to_utc(day: _date, clock: _time) -> datetime:
 def _build_event(
     event: MeetingEvent, *, domain: str, default_duration: timedelta
 ) -> Event:
+    """Build one VEVENT for a meeting.
+
+    An all-day event has DTSTART as a plain DATE and no DTEND, so it lasts one day. A timed event
+    uses the end time only when it is after the start time.
+    """
     from icalendar import Alarm, Event
 
     ical = Event()
@@ -78,12 +83,10 @@ def _build_event(
         ical.add("description", f"Gremium: {event.gremium_name}")
 
     if event.start_time is None:
-        # All-day: DTSTART as a plain DATE. Without DTEND the event lasts one day.
         ical.add("dtstart", event.date)
         lead = _ALARM_LEAD_ALLDAY
     else:
         start = _local_to_utc(event.date, event.start_time)
-        # Use the end time only when it is after the start time.
         if event.end_time is not None and event.end_time > event.start_time:
             end = _local_to_utc(event.date, event.end_time)
         else:

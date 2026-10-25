@@ -58,9 +58,11 @@ def meeting_window(
 
     A start after the end (a planned meeting in the future) moves to the end. A
     meeting without any time gets the window "now".
+
+    The function reads the meeting with `getattr`, because the protocol render also passes partial
+    meeting objects.
     """
     now = now or datetime.now(UTC)
-    # `getattr`: the protocol render also passes partial meeting objects.
     start = getattr(meeting, "started_at", None) or planned_start_utc(meeting, tz_name)
     closed_at = getattr(meeting, "closed_at", None)
     end = (closed_at or start or now) if getattr(meeting, "status", None) == "closed" else now

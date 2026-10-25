@@ -284,12 +284,13 @@ class PermissionOps(MeetingServiceBase):
         `meeting.view_all` permission is global, read-only, and purely additive. The
         server gates management, write access, and voting separately.
 
+        Both checks apply the OAuth scope cap. `Principal.has` grants the admin role every
+        in-scope right. A read of `principal.roles` here would return `None`, that is every
+        gremium, for a token scoped to far less.
+
         Returns:
             The visible gremium ids, or `None` for all gremien.
         """
-        # Both checks apply the OAuth scope cap. `Principal.has` grants the admin role
-        # every in-scope right. Reading `principal.roles` here would return `None` —
-        # every gremium — for a token scoped to far less.
         if principal.has("meeting.view_all") or admin_bypass(principal, "session.manage"):
             return None
         member = await gremium_member_ids(self.session, principal.sub)

@@ -25,15 +25,20 @@ class MeetingPublisher(Protocol):
     A vote that is not bound to a meeting produces no event.
     """
 
-    async def vote_opened(self, vote: VoteOut) -> None: ...
+    async def vote_opened(self, vote: VoteOut) -> None:
+        """Publish the open of a vote."""
 
-    async def vote_tally(self, vote: VoteOut) -> None: ...
+    async def vote_tally(self, vote: VoteOut) -> None:
+        """Publish the tally of a vote."""
 
-    async def vote_closed(self, vote: VoteClosed) -> None: ...
+    async def vote_closed(self, vote: VoteClosed) -> None:
+        """Publish the close of a vote."""
 
-    async def vote_cancelled(self, vote: VoteOut) -> None: ...
+    async def vote_cancelled(self, vote: VoteOut) -> None:
+        """Publish the cancel of a vote."""
 
-    async def vote_lot_drawn(self, vote: VoteOut) -> None: ...
+    async def vote_lot_drawn(self, vote: VoteOut) -> None:
+        """Publish the lot drawn for a vote."""
 
 
 class NullPublisher:
@@ -43,18 +48,23 @@ class NullPublisher:
     """
 
     async def vote_opened(self, vote: VoteOut) -> None:
+        """Drop the event."""
         return None
 
     async def vote_tally(self, vote: VoteOut) -> None:
+        """Drop the event."""
         return None
 
     async def vote_closed(self, vote: VoteClosed) -> None:
+        """Drop the event."""
         return None
 
     async def vote_cancelled(self, vote: VoteOut) -> None:
+        """Drop the event."""
         return None
 
     async def vote_lot_drawn(self, vote: VoteOut) -> None:
+        """Drop the event."""
         return None
 
 

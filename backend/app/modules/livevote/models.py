@@ -43,51 +43,51 @@ class Meeting(UUIDPkMixin, CreatedAtMixin, Base):
     )
     title: Mapped[str] = mapped_column(Text)
     date: Mapped[_date | None] = mapped_column(Date, nullable=True)
-    # Planned start time, not the time the meeting really starts.
+    #: Planned start time, not the time the meeting really starts.
     start_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
-    # Planned end time. Without it the iCal feed assumes a default duration of
-    # one hour from `start_time`. With it the value must be after `start_time`.
+    #: Planned end time. Without it the iCal feed assumes a default duration of
+    #: one hour from `start_time`. With it the value must be after `start_time`.
     end_time: Mapped[_time | None] = mapped_column(Time, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="planned")
-    # The real start. The transition from `planned` to `live` sets it once. It
-    # stays NULL for a meeting that started before the column existed: the audit log
-    # holds no start time for it. A reader then falls back to the planned start.
+    #: The real start. The transition from `planned` to `live` sets it once. It
+    #: stays NULL for a meeting that started before the column existed: the audit log
+    #: holds no start time for it. A reader then falls back to the planned start.
     started_at: Mapped[_datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # The transition to `closed`, which is terminal, sets this automatically. It
-    # gives the end line on the title page of the protocol.
+    #: The transition to `closed`, which is terminal, sets this automatically. It
+    #: gives the end line on the title page of the protocol.
     closed_at: Mapped[_datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
     active_application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="SET NULL"), nullable=True
     )
-    # The agenda item the room handles now. The protokollant or the session lead
-    # sets it, and the followers and the beamer read it over `meeting_state`. A
-    # deleted item clears the column. Unlike `active_application_id` this also
-    # covers free-text items.
+    #: The agenda item the room handles now. The protokollant or the session lead
+    #: sets it, and the followers and the beamer read it over `meeting_state`. A
+    #: deleted item clears the column. Unlike `active_application_id` this also
+    #: covers free-text items.
     current_agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting_agenda_item.id", ondelete="SET NULL", use_alter=True),
         nullable=True,
     )
     created_by: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The current Protokollant of the meeting. This person leads the live session
-    # and writes the protocol. While the meeting is live, it is the principal of the
-    # running `ProtocolKeeperPeriod`, and a handover changes it. A deleted
-    # principal sets the column to NULL.
+    #: The current Protokollant of the meeting. This person leads the live session
+    #: and writes the protocol. While the meeting is live, it is the principal of the
+    #: running `ProtocolKeeperPeriod`, and a handover changes it. A deleted
+    #: principal sets the column to NULL.
     protokollant_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
-    # Public participation: persons without an account join with the QR code
-    # and the meeting lead admits them. `guests_mode` tells if admitted guests vote
-    # (`vote`) or only follow the meeting (`watch`). It has an effect only while
-    # `public_join` is on.
+    #: Public participation: persons without an account join with the QR code
+    #: and the meeting lead admits them. `guests_mode` tells if admitted guests vote
+    #: (`vote`) or only follow the meeting (`watch`). It has an effect only while
+    #: `public_join` is on.
     public_join: Mapped[bool] = mapped_column(Boolean, server_default="false")
     guests_mode: Mapped[str] = mapped_column(Text, server_default="vote")
-    # The short code of the join link `/j/<code>`. The first switch-on of
-    # `public_join` creates it, and a rotation replaces it. It is unique among the
-    # meetings that are not closed.
+    #: The short code of the join link `/j/<code>`. The first switch-on of
+    #: `public_join` creates it, and a rotation replaces it. It is unique among the
+    #: meetings that are not closed.
     join_code: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     __table_args__ = (
@@ -113,6 +113,9 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
     only `present` or `excused`. Only the lead records `absent`. Each pair
     of meeting and principal has exactly one row. The unique constraint drives
     the upsert. `note` is the reason of an excuse. It is personal data.
+
+    A self-reported row is `present` or `excused`. The migration `self status` adds this check NOT
+    VALID, so the older (self, absent) rows stay as they are.
     """
 
     __tablename__ = "meeting_attendance"
@@ -133,8 +136,6 @@ class MeetingAttendance(UUIDPkMixin, TimestampMixin, Base):
             "status IN ('present','excused','absent')", name="attendance_status"
         ),
         CheckConstraint("source IN ('self','lead')", name="attendance_source"),
-        # A self-reported row is `present` or `excused`. Migration 'self status'
-        # adds it NOT VALID, so the older (self, absent) rows stay as they are.
         CheckConstraint(
             "source <> 'self' OR status IN ('present','excused')", name="self_status"
         ),
@@ -155,27 +156,27 @@ class MeetingAgendaItem(UUIDPkMixin, CreatedAtMixin, Base):
     meeting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("meeting.id", ondelete="CASCADE")
     )
-    # NULL marks a free-text agenda item with no application. The `title` column
-    # then holds the text of the item.
+    #: NULL marks a free-text agenda item with no application. The `title` column
+    #: then holds the text of the item.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # The to-do card that this item handles (an item of kind to-do). The item then
-    # has no application and carries the card title as its own `title`. A deleted
-    # card leaves a free-text item.
+    #: The to-do card that this item handles (an item of kind to-do). The item then
+    #: has no application and carries the card title as its own `title`. A deleted
+    #: card leaves a free-text item.
     todo_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("todo_card.id", ondelete="SET NULL"), nullable=True
     )
-    # Markdown body of this agenda item. It flows into the final protocol.
+    #: Markdown body of this agenda item. It flows into the final protocol.
     body: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, server_default="0")
-    # A non-public item becomes a placeholder in the public protocol PDF. The
-    # numbering of the agenda items stays the same.
+    #: A non-public item becomes a placeholder in the public protocol PDF. The
+    #: numbering of the agenda items stays the same.
     non_public: Mapped[bool] = mapped_column(Boolean, server_default="false")
-    # The done mark. A person sets it by hand ("TOP abhaken"), or the move to the next
-    # item sets it for the item that the room leaves. NULL means "not done".
-    # `done_by` holds the `sub` of the person who set it.
+    #: The done mark. A person sets it by hand ("TOP abhaken"), or the move to the next
+    #: item sets it for the item that the room leaves. NULL means "not done".
+    #: `done_by` holds the `sub` of the person who set it.
     done_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     done_by: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -220,7 +221,7 @@ class ProtocolKeeperPeriod(UUIDPkMixin, CreatedAtMixin, Base):
     principal_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("principal.id"))
     from_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     to_at: Mapped[_datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    # An explicit name: the generated one is longer than the 63 characters of Postgres.
+    #: An explicit name: the generated one is longer than the 63 characters of Postgres.
     from_agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
             "meeting_agenda_item.id",
@@ -229,7 +230,7 @@ class ProtocolKeeperPeriod(UUIDPkMixin, CreatedAtMixin, Base):
         ),
         nullable=True,
     )
-    # An explicit name: the generated one is longer than the 63 characters of Postgres.
+    #: An explicit name: the generated one is longer than the 63 characters of Postgres.
     to_agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey(
             "meeting_agenda_item.id",
@@ -284,14 +285,14 @@ class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
     seq: Mapped[int] = mapped_column(Integer)
     display_name: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(Text, server_default="pending")
-    # SHA-256 of the device token, never the token itself. NULL after the close.
+    #: SHA-256 of the device token, never the token itself. NULL after the close.
     token_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     requested_at: Mapped[_datetime] = mapped_column(DateTime(timezone=True))
     decided_at: Mapped[_datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # The meeting lead who decided last. Principal rows are never deleted, but a
-    # merge or an erasure must not fail on this reference.
+    #: The meeting lead who decided last. Principal rows are never deleted, but a
+    #: merge or an erasure must not fail on this reference.
     decided_by: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("principal.id", ondelete="SET NULL"), nullable=True
     )
@@ -317,12 +318,12 @@ class MeetingGuest(UUIDPkMixin, CreatedAtMixin, Base):
     )
 
 
-# The open window of a meeting: the earliest open is `open_lead_minutes` before the
-# planned start. Up to `confirm_lead_minutes` before the start the open needs an extra
-# confirmation. Both are defaults that the deadlines page changes.
+#: The open window of a meeting: the earliest open is `open_lead_minutes` before the
+#: planned start. Up to `confirm_lead_minutes` before the start the open needs an extra
+#: confirmation. Both are defaults that the deadlines page changes.
 DEFAULT_OPEN_LEAD_MINUTES = 60
 DEFAULT_CONFIRM_LEAD_MINUTES = 10
-# One week. A larger lead time makes the window useless.
+#: One week. A larger lead time makes the window useless.
 MAX_LEAD_MINUTES = 10080
 
 

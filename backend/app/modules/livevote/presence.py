@@ -56,5 +56,5 @@ class MeetingPresence:
         return sorted(seen.values(), key=str.casefold)
 
 
-# One registry per API process. The WebSocket connections live in that process.
+#: One registry per API process. The WebSocket connections live in that process.
 PRESENCE = MeetingPresence()

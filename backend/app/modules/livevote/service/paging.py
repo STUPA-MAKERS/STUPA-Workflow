@@ -14,9 +14,9 @@ from sqlalchemy import DateTime, cast, func
 from app.modules.livevote.models import Meeting
 from app.shared.errors import BadRequestError
 
-# Timeline sort and boundary key: the scheduled moment of the meeting. A missing
-# time means midnight. A missing date (an openly planned meeting) sorts the meeting
-# to the far future.
+#: Timeline sort and boundary key: the scheduled moment of the meeting. A missing
+#: time means midnight. A missing date (an openly planned meeting) sorts the meeting
+#: to the far future.
 _MIDNIGHT = _time(0, 0)
 _UNDATED_FALLBACK = _date(9999, 12, 31)
 
