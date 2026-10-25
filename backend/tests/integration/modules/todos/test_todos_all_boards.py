@@ -51,7 +51,7 @@ async def test_all_boards_lists_every_readable_board_with_all_live_cards(
     none and sees no foreign personal board.
     """
     stupa, stupa_board = await add_gremium(maker, "StuPa")
-    asta, asta_board = await add_gremium(maker, "AStA")
+    asta, _asta_board = await add_gremium(maker, "AStA")
     _fsi, fsi_board = await add_gremium(maker, "FSI")
     team_board = await add_team_board(maker, "ticket.manage")
     me, me_id = await add_person(maker, "Mara")

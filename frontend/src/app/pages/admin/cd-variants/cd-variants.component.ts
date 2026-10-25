@@ -97,7 +97,7 @@ function emptyForm(): VariantForm {
 
 
 /**
- * Corporate-design variants (board Admin-Dokument-Varianten): the logo sets a Gremium
+ * Corporate-design variants: the logo sets a Gremium
  * renders its documents with, and the square logo the app shows for a Gremium.
  *
  * A variant carries no color and no font. It holds an ordered list of logos per PDF slot
@@ -208,8 +208,6 @@ export class AdminCdVariantsComponent {
       error: () => this.usedBy.set(new Map()),
     });
   }
-
-  // --- reading -------------------------------------------------------------
 
   private reload(): void {
     this.loading.set(true);
@@ -347,8 +345,6 @@ export class AdminCdVariantsComponent {
     return this.expandedId() === id;
   }
 
-  // --- create / edit -------------------------------------------------------
-
   openCreate(): void {
     this.editingId.set(null);
     this.keyEdited.set(false);
@@ -427,8 +423,6 @@ export class AdminCdVariantsComponent {
     });
   }
 
-  // --- delete --------------------------------------------------------------
-
   askDelete(variant: CdVariant): void {
     this.deleteError.set(null);
     this.confirmDelete.set(variant);
@@ -456,8 +450,6 @@ export class AdminCdVariantsComponent {
       },
     });
   }
-
-  // --- logos ---------------------------------------------------------------
 
   openLogoDialog(variant: CdVariant, slot: CdLogoSlot = 'title'): void {
     this.revokePreview();

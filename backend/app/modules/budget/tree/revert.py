@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -172,7 +173,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
                     code="stale_revert",
                 )
 
-    async def _revert_node_update(self, budget_id: UUID, data: dict) -> None:
+    async def _revert_node_update(self, budget_id: UUID, data: dict[str, Any]) -> None:
         """Write back the prior values that the cost-center update recorded."""
         before = data.get("before")
         if not isinstance(before, dict) or not before:
@@ -188,7 +189,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
         await self.update_node(budget_id, BudgetNodeUpdate(**before))
 
     async def _revert_allocation_set(
-        self, budget_id: UUID, data: dict, reverted_audit_id: int
+        self, budget_id: UUID, data: dict[str, Any], reverted_audit_id: int
     ) -> None:
         """Restore the prior allocation value, or drop the row when there was none.
 
@@ -230,7 +231,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
                 budget_id, fiscal_year_id, AllocationSet(allocated=Decimal(previous))
             )
 
-    async def _revert_expense_update(self, expense_id: UUID, data: dict) -> None:
+    async def _revert_expense_update(self, expense_id: UUID, data: dict[str, Any]) -> None:
         """Write back the prior values that the booking update recorded.
 
         Every field that the audited action set must be unchanged, not only the amount.

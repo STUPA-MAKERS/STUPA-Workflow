@@ -38,7 +38,7 @@ interface RoleDraft {
 const NEW_ROLE_PERMISSIONS = ['vote.cast'];
 
 /**
- * The dialog that creates or edits one gremium role (board Verwaltung-Gremiumrolle-Dialog).
+ * The dialog that creates or edits one gremium role.
  *
  * The fields are the key (a new role only; it must match `ROLE_KEY_PATTERN`), the
  * German and English name and the rights of the fixed gremium catalogue. The OIDC

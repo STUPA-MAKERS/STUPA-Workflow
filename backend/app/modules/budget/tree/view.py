@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -16,7 +17,7 @@ from app.modules.budget.tree_schemas import BudgetTreeNodeOut
 from app.modules.flow.models import State
 
 
-def _natural_path_key(path_key: str) -> tuple:
+def _natural_path_key(path_key: str) -> tuple[Any, ...]:
     """Build the sort key for a natural path order.
 
     A numeric segment sorts as a number, so `VSM-10` comes after `VSM-9`. Every

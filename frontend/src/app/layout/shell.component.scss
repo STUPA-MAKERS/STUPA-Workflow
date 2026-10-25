@@ -1,7 +1,5 @@
-/* The frame has no top bar any more, except the public one, which scrolls away with the
-   page. Pages that offset sticky panels by the header height get 0 here.
-   The installed iOS app has the black-translucent status bar (index.html), so the page reaches
-   under it and the top chrome pads by the top inset; in a browser tab every inset is 0. */
+// The installed iOS app has the black-translucent status bar (index.html), so the page reaches
+// under it and the top chrome pads by the top inset.
 :host {
   --layout-header-height: 0px;
   --rail-width: 96px;
@@ -39,10 +37,8 @@
   min-width: 0;
 }
 
-/* The strip under the translucent status bar of an installed iOS app: the page colour,
-   above the content and the sticky bars, so a page that scrolls does not run under the
-   clock. Its height is the top inset, 0 in a browser tab. A dialog and its scrim lie
-   above it. */
+// A strip in the page colour under the translucent iOS status bar, so a scrolling page does
+// not run under the clock. Its height is the top inset, 0 in a browser tab.
 .frame--rail::before,
 .frame--phone::before {
   content: '';
@@ -54,9 +50,6 @@
   pointer-events: none;
 }
 
-/* Rail: a fixed column at the start edge; the body takes the rest. The column also holds
-   the left inset (landscape notch), and the rail keeps clear of the status bar and the
-   home bar of an installed app. */
 .frame--rail {
   display: grid;
   grid-template-columns: calc(var(--rail-width) + var(--app-left-safe-area)) minmax(0, 1fr);
@@ -69,10 +62,7 @@
   padding: var(--app-top-safe-area) 0 env(safe-area-inset-bottom, 0px) var(--app-left-safe-area);
 }
 
-/* The block padding is a pair of properties, so a page that runs edge to edge can pull exactly
-   this much back. `--pane-foot-gap` is the gap a pane page keeps above the window edge: the page
-   pulls the bottom padding back with `margin-bottom: calc(var(--pane-foot-gap) -
-   var(--main-pad-bottom))`. */
+// A pair of properties, so a page that runs edge to edge can pull exactly this much back.
 .main {
   --main-pad-top: calc(var(--space-8) + var(--app-top-safe-area));
   --main-pad-bottom: var(--space-8);
@@ -83,23 +73,17 @@
   padding-block: var(--main-pad-top) var(--main-pad-bottom);
   --pane-foot-gap: var(--layout-gutter);
 }
-/* Full width for route data `wide`: content with two sidebars, for example budget. */
 .main--wide {
   max-width: none;
 }
 
-/* Rail pages start closer to the top: the rail carries the brand, not the page. The top
-   gap is the page gutter, so a pane page has the same margin on every side: the gutter
-   at the top, at the end edge and (as `--pane-foot-gap`) at the bottom. */
 .frame--rail .main {
   --main-pad-top: calc(var(--layout-gutter) + var(--app-top-safe-area));
   padding-inline-end: max(var(--layout-gutter), var(--app-right-safe-area));
 }
 
-/* Phone: the body clears the fixed bottom bar and the gesture bar below it.
-   `--app-bottom-inset` tells fixed and sticky elements of a page (the meeting dock, a
-   selection bar) how far up the bar reaches; the bar already keeps the gesture area free,
-   so `--app-bottom-safe-area` is 0 for them. */
+// `--app-bottom-inset` tells fixed and sticky elements how far up the bar reaches. The bar
+// keeps the gesture area free, so `--app-bottom-safe-area` is 0 for them.
 .frame--phone {
   --app-bottom-inset: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom));
   --app-bottom-safe-area: 0px;
@@ -107,9 +91,8 @@
 .frame--phone .frame__body {
   padding-bottom: calc(var(--app-bottom-inset) + var(--app-fab-clearance, 0px));
 }
-/* Route data `fab`: a floating action button (56px high, 16px above the bottom bar) sits
-   over the foot of the page. The body ends 16px above the button, so the end of the page
-   is never under it. */
+// The floating action button is 56px high and 16px above the bottom bar; the body ends 16px
+// above it.
 .frame--fab {
   --app-fab-clearance: calc(56px + 2 * var(--space-4));
 }
@@ -120,32 +103,25 @@
     max(var(--space-4), var(--app-right-safe-area));
 }
 
-/* The public frame: the bar is above, so the content starts closer to it. The bar holds
-   the top inset (public-header), so the main region does not. */
 .frame--public .main {
   --main-pad-top: var(--space-6);
 }
 
-/* A page that fills the viewport (`PageFrameService.fill`): no footer below it, and only
-   the pane gap at the bottom, so the page ends just above the viewport edge. */
 .frame--rail .main.main--fill {
   --main-pad-bottom: var(--pane-foot-gap);
 }
 
-/* Beamer: nothing but the page. */
 .frame--bare .main {
   --main-pad-top: 0px;
   --main-pad-bottom: 0px;
 }
 
-/* Toasts sit above the phone bar instead of on it. */
 .frame--phone ~ app-toast ::ng-deep .toasts {
   inset-block-end: calc(var(--bottom-bar-height) + env(safe-area-inset-bottom) + var(--space-3));
 }
 
-/* Installed app (standalone): the signed-in pages drop the footer, as before the rail.
-   The safe-area reserve of the gesture bar then moves to the main content. The public
-   frame keeps its footer: an applicant who opens a link there still finds the imprint. */
+// The public frame keeps its footer, so an applicant who opens a link there still finds the
+// imprint.
 @media all and (display-mode: standalone) {
   .frame--rail .frame__footer,
   .frame--phone .frame__footer {

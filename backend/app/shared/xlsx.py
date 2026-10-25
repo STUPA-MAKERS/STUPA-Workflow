@@ -15,6 +15,10 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - types only
+    from uuid import UUID
+
+    from openpyxl.worksheet.worksheet import Worksheet
+
     from app.modules.applications.schemas import ApplicationListItem
     from app.modules.budget.tree_schemas import BudgetTreeNodeOut
 
@@ -32,7 +36,7 @@ def _num(value: Decimal | float | None) -> float | None:
 _FORMULA_PREFIXES: tuple[str, ...] = ("=", "+", "-", "@", "\t", "\r")
 
 
-def _safe(value: Any) -> Any:
+def _safe[T](value: T) -> T | str:
     """Neutralize formula injection.
 
     A string that starts with a dangerous character gets a leading apostrophe. The
@@ -45,12 +49,12 @@ def _safe(value: Any) -> Any:
     return value
 
 
-def _append(worksheet: Any, row: Sequence[Any]) -> None:
+def _append(worksheet: Worksheet, row: Sequence[object]) -> None:
     """Append a row with `ws.append` and protect every cell against formula injection."""
     worksheet.append([_safe(cell) for cell in row])
 
 
-def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
+def _autosize(worksheet: Worksheet, headers: Sequence[str]) -> None:
     """Fit each column width roughly to its longest cell."""
     widths = [len(str(h)) for h in headers]
     for row in worksheet.iter_rows(min_row=2, values_only=True):
@@ -62,7 +66,7 @@ def _autosize(worksheet: Any, headers: Sequence[str]) -> None:
         worksheet.column_dimensions[get_column_letter(i)].width = min(width + 2, 60)
 
 
-def _header_row(worksheet: Any, headers: Sequence[str]) -> None:
+def _header_row(worksheet: Worksheet, headers: Sequence[str]) -> None:
     from openpyxl.styles import Font
 
     worksheet.append(list(headers))
@@ -82,8 +86,8 @@ def _iter_nodes(
 def build_budget_workbook(
     roots: Sequence[BudgetTreeNodeOut],
     *,
-    fiscal_year_labels: dict[Any, str],
-    fiscal_year_id: Any | None = None,
+    fiscal_year_labels: Mapping[UUID, str],
+    fiscal_year_id: UUID | None = None,
 ) -> bytes:
     """Build the budget tree as `.xlsx` bytes, with one sheet per fiscal year.
 

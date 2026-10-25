@@ -103,7 +103,7 @@ export type PanSide = 'left' | 'right' | 'up' | 'down';
 const MIN_FIT_SCALE = 0.75;
 
 /**
- * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
+ * Flow editor as a visual drag-and-drop canvas.
  *
  * The editor places the states itself: ELK lays out each level from its structure
  * (`flow-elk.ts`) whenever it changes, and the lines run in right angles between the

@@ -33,7 +33,7 @@ export interface MoveChoice {
 }
 
 /**
- * "Verschieben" (frame 14): the phone moves a card with this bottom sheet instead of a
+ * "Verschieben": the phone moves a card with this bottom sheet instead of a
  * drag. The card detail and a long press on a tile open the same sheet. The columns as a
  * radio list with their counts, the place in the column as a segmented control
  * (Oben | Unten), then "Verschieben". With `canTransfer`, a row below the columns, "In

@@ -1,8 +1,5 @@
 @use '../../budget/finance-form';
 
-/* No preview of the pages: the receipt is one file card. So the form is one column, the
-   file card on top at the full width and the fields below it, also at the full width.
-   Two columns would leave the receipt column empty below the card. */
 .if__cols {
   flex-direction: column;
   flex-wrap: nowrap;
@@ -46,8 +43,6 @@
   flex: none;
   color: var(--color-text-muted);
 }
-/* A file name is not a copyable value: it shortens with an ellipsis, and the title
-   shows it in full. */
 .if__fileName {
   flex: 1 1 auto;
   min-width: 0;
@@ -70,7 +65,6 @@
   border-radius: var(--radius-lg);
   color: var(--color-text-muted);
 }
-/* The duplicate warning keeps the small size of the form notes around it. */
 .if__dup {
   font-size: var(--fs-small);
 }

@@ -65,7 +65,7 @@ export interface AgendaMove {
  * entry of the row menu.
  *
  * The row menu holds every agenda change (N21): rename (free text only), move up and
- * down, the non-public switch and the remove. Drag and drop also reorders (frame 7): the
+ * down, the non-public switch and the remove. Drag and drop also reorders: the
  * list is a drop list of `@angular/cdk/drag-drop`, with the lifted row and the dashed
  * drop box of the to-do board. A touch starts the drag only after a long press, so a
  * swipe still scrolls the agenda; the menu moves without a pointer. Only a
@@ -74,7 +74,7 @@ export interface AgendaMove {
  * closed vote stays on the agenda, so its remove is disabled with the reason. The remove
  * asks first ("TOP entfernen?"), because the text of the item goes with it.
  *
- * "To-Do anlegen" (frame 5) is in the menu of every item for a person with `todo.write`
+ * "To-Do anlegen" is in the menu of every item for a person with `todo.write`
  * in the gremium of the meeting, also on a closed meeting: it opens "Neues To-Do" on the
  * gremium board, linked to the TOP and to its application.
  *

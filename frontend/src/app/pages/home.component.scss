@@ -1,7 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'press';
 
-/* Centred in the free space of the public frame (the shell main is a flex column). */
 :host {
   display: flex;
   flex: 1 0 auto;
@@ -15,7 +14,6 @@
   gap: var(--space-6);
   width: min(55rem, 100%);
 }
-/* Three choices need the width of the protocol pages. */
 .home:has(.home__choices--three) {
   width: min(67.5rem, 100%);
   padding-block: var(--space-8);
@@ -40,9 +38,6 @@
   white-space: pre-line;
 }
 
-/* Two columns that collapse to one. Both choices keep the same width and the same
-   weight: the page cannot tell which kind of visitor it has, so it must not answer
-   that question for them. */
 .home__choices {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
@@ -103,7 +98,6 @@
   grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
 }
 
-/* "Zuletzt veröffentlicht": the newest public protocols, three in a row. */
 .home__latest {
   display: flex;
   flex-direction: column;

@@ -142,10 +142,12 @@ export const APPS_SHOWN = 5;
  * during every load. The content is not a `<main>`, because the shell already wraps the routed page
  * in one. Each bar has the colour of its cost centre, so a shared legend cannot match it; the bar
  * is only 6px high, so the whole row carries the tooltip.
+ *
+ * It is a pane page (`styles.scss`): the panes fill the free height and scroll by
+ * themselves.
  */
 @Component({
   selector: 'app-budget-dashboard',
-  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
   host: { '[class.pane-page]': 'wide()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -225,8 +227,6 @@ export class BudgetDashboardComponent {
     'expended',
     'available',
   ];
-
-  // ---------------------------------------------------------------- tree
 
   /** Tree without the hidden cost centres. `hiddenInBudget` removes the node and its
    *  subtree from the budget tab. This changes the display only: the values still count
@@ -402,8 +402,6 @@ export class BudgetDashboardComponent {
     this.expanded.update((s) => new Set([...s, ...add]));
   }
 
-  // ---------------------------------------------------------------- sheet
-
   /** The six figures of the selected cost centre. */
   readonly figures = computed<Figures>(() => {
     const ks = this.selectedKs();
@@ -502,8 +500,6 @@ export class BudgetDashboardComponent {
     });
   }
 
-  // ---------------------------------------------------------------- applications
-
   /** The applications of the selected cost centre and its subtree; `null` while loading. */
   readonly apps = signal<BudgetApplication[] | null>(null);
   readonly appsError = signal(false);
@@ -535,8 +531,6 @@ export class BudgetDashboardComponent {
   private resolveLabel(map: Record<string, string>): string {
     return map[this.i18n.locale()] || map['de'] || map['en'] || Object.values(map)[0] || '';
   }
-
-  // ---------------------------------------------------------------- overview (sunburst)
 
   readonly overviewOpen = signal(false);
   readonly overviewMetric = signal<SunburstMetric>('allocated');
@@ -573,8 +567,6 @@ export class BudgetDashboardComponent {
     this.overviewOpen.set(false);
     this.selectKs(id);
   }
-
-  // ---------------------------------------------------------------- selection + URL
 
   /**
    * The query params to resolve the selection from.

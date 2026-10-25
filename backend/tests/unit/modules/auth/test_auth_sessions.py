@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from uuid import uuid4
 
 from freezegun import freeze_time
 
@@ -39,7 +40,7 @@ async def test_create_applicant_session_adds_row_and_signs_sid() -> None:
     db = fake_session()
     exp = datetime.now(UTC) + timedelta(hours=12)
     cookie = await sessions.create_applicant_session(
-        db, secret=SECRET, application_id="app-1", scope="edit", expires_at=exp
+        db, secret=SECRET, application_id=uuid4(), scope="edit", expires_at=exp
     )
     assert len(db.added) == 1
     assert isinstance(db.added[0], ApplicantSession)
@@ -176,7 +177,7 @@ async def test_revoke_applicant_sessions_runs() -> None:
     The UPDATE sets revoked_at and raises no error.
     """
     db = fake_session()
-    await sessions.revoke_applicant_sessions(db, "app-1", now=datetime.now(UTC))
+    await sessions.revoke_applicant_sessions(db, uuid4(), now=datetime.now(UTC))
 
 
 def test_oidc_tx_roundtrip() -> None:
@@ -225,7 +226,7 @@ async def test_create_principal_session_adds_row_and_signs_sid() -> None:
     db = fake_session()
     exp = datetime.now(UTC) + timedelta(hours=12)
     cookie = await sessions.create_principal_session(
-        db, secret=SECRET, principal_id="pid", expires_at=exp,
+        db, secret=SECRET, principal_id=uuid4(), expires_at=exp,
         refresh_token="rt", id_token="idt",
     )
     assert len(db.added) == 1

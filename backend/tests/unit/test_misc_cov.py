@@ -171,7 +171,7 @@ def test_trigram_rank_strips_empty_query() -> None:
 
 def test_trigram_rank_none_query_postgres() -> None:
     """The Postgres branch also catches a `None`-like empty query."""
-    where, rank = search_mod.trigram_rank("", [func.coalesce(column("x"), "")])
+    _where, rank = search_mod.trigram_rank("", [func.coalesce(column("x"), "")])
     assert "word_similarity" in str(rank)
 
 

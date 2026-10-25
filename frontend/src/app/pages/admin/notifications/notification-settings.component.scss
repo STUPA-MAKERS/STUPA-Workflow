@@ -7,7 +7,6 @@
   container-type: inline-size;
 }
 
-/* The card of the task reminders: icon, title and switch, then the two fields. */
 .ns__card {
   @include sc.card($gap: var(--space-4), $direction: row);
   align-items: flex-start;

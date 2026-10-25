@@ -43,7 +43,7 @@ function emptyHook(): WebhookConfig {
 }
 
 /**
- * Webhook config UI at `/admin/webhooks` (board Admin-Webhooks). One card per webhook:
+ * Webhook config UI at `/admin/webhooks`. One card per webhook:
  * the name with the state of its newest delivery as status text (Zugestellt,
  * Fehlgeschlagen, Läuft, Noch nie), the whole target URL, the real event keys as tags,
  * the "Aktiv" switch (it saves at once), "Zustellstatus" (the diagnosis below the card:

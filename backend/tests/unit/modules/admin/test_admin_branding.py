@@ -8,6 +8,7 @@ scheme. The server enforces these rules. The frontend gate is only UX.
 from __future__ import annotations
 
 import base64
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -20,7 +21,7 @@ from app.modules.admin.branding import (
 )
 
 
-def _png(url: str = "data:image/png;base64,iVBORw0KGgo=") -> dict:
+def _png(url: str = "data:image/png;base64,iVBORw0KGgo=") -> dict[str, Any]:
     """Return a PNG data URL.
 
     `iVBORw0KGgo=` is exactly the 8-byte PNG signature, so the magic-byte check passes.

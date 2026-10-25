@@ -60,9 +60,11 @@ export type ShellFrame = 'rail' | 'public' | 'bare' | 'pending';
   styleUrl: './shell.component.scss',
 })
 export class ShellComponent {
-  // Injected for its side effect: it warms the reference-data cache after sign-in.
-  // Nothing reads it, and that is the point — the pages that need the data find it
-  // in the cache rather than being coupled to a prefetch they did not ask for.
+  /**
+   * Injected for its side effect: it warms the reference-data cache after sign-in. Nothing
+   * reads it, because the pages that need the data find it in the cache and must not
+   * depend on a prefetch they did not ask for.
+   */
   private readonly prefetch = inject(PrefetchService);
 
   readonly auth = inject(AuthService);

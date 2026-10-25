@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Protocol, cast
+from typing import Protocol
 
-from app.modules.avatars.gravatar import AvatarImage, AvatarMime, sniff_avatar
+from app.modules.avatars.gravatar import AvatarImage, sniff_avatar
 
 logger = logging.getLogger("app.avatars")
 
@@ -71,7 +71,7 @@ def decode_entry(raw: bytes) -> CachedAvatar | None:
     sniffed = sniff_avatar(data)
     if sniffed is None or sniffed.encode("ascii") != mime:
         return None
-    return CachedAvatar(AvatarImage(mime=cast(AvatarMime, sniffed), data=data))
+    return CachedAvatar(AvatarImage(mime=sniffed, data=data))
 
 
 class RedisAvatarCache:

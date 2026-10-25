@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from typing import Any
 
 import pytest
 from fastapi import FastAPI
@@ -83,7 +84,7 @@ async def _principal_id(maker: async_sessionmaker[AsyncSession], sub: str) -> uu
     return pid
 
 
-def _body(s: _Setup, *, voting: bool = True, delegate: uuid.UUID | None = None) -> dict:
+def _body(s: _Setup, *, voting: bool = True, delegate: uuid.UUID | None = None) -> dict[str, Any]:
     return {
         "meetingId": str(s.meeting_id),
         "delegatorId": str(s.a),

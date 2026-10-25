@@ -60,7 +60,7 @@ export interface AgendaTodoOption {
 }
 
 /**
- * "TOP hinzufügen" (frame 6): put an application or a to-do on the agenda, or add a
+ * "TOP hinzufügen": put an application or a to-do on the agenda, or add a
  * free-text item.
  *
  * The application list is `GET …/agenda/assignable`: the applications of the meeting

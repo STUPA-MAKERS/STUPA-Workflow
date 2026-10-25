@@ -241,7 +241,7 @@ def test_ws_connection_cap(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_ws_pending_guest_is_admitted_live(monkeypatch: pytest.MonkeyPatch) -> None:
     g = _guest()
-    app, broker = _ws_app(monkeypatch, g)
+    app, _broker = _ws_app(monkeypatch, g)
     with (
         TestClient(app) as client,
         client.websocket_connect("/api/public/meetings/7KQ4MP/ws") as ws,
@@ -387,7 +387,7 @@ def test_ws_admitted_guest_closes_with_the_meeting(monkeypatch: pytest.MonkeyPat
 
     The first frame after the connect is `guest_counts`.
     """
-    app, broker = _ws_app(
+    app, _broker = _ws_app(
         monkeypatch,
         _guest("admitted"),
         meeting=SimpleNamespace(status="closed", current_agenda_item_id=None),

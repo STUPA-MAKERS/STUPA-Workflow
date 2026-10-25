@@ -92,7 +92,7 @@ interface DayCard {
 }
 
 /**
- * The calendar view of the meeting overview (board Sitzungen, variant C): a month grid,
+ * The calendar view of the meeting overview: a month grid,
  * Monday to Sunday, and a side panel.
  *
  * The grid marks today, shows the meetings of each day (time and a two-line title; a

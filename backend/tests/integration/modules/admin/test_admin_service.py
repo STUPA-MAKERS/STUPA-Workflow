@@ -13,6 +13,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from sqlalchemy import Engine, create_engine, func, select, text
@@ -93,7 +94,7 @@ async def _make_type(session: AsyncSession) -> ApplicationType:
     return app_type
 
 
-def _graph(*, with_action: bool = True) -> dict:
+def _graph(*, with_action: bool = True) -> dict[str, Any]:
     return {
         "states": [
             {"key": "draft", "label": {"de": "Entwurf"}, "isInitial": True, "color": "#4a90d9"},
@@ -111,7 +112,7 @@ def _graph(*, with_action: bool = True) -> dict:
     }
 
 
-def _global_graph(*, with_accepted: bool = True) -> dict:
+def _global_graph(*, with_accepted: bool = True) -> dict[str, Any]:
     states = [{"key": "created", "label": {"de": "Erstellt"}, "isInitial": True}]
     if with_accepted:
         states.append({"key": "accepted", "label": {"de": "Angenommen"}})

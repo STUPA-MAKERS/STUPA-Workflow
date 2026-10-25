@@ -18,9 +18,10 @@ user with the permission and a time-validated role assignment.
 from __future__ import annotations
 
 import types
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -143,7 +144,7 @@ class _BusyLocker:
     """Return `False` always to model a taken lock during a concurrent cast."""
 
     @asynccontextmanager
-    async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncIterator[bool]:
+    async def acquire(self, key: str, *, ttl_ms: int = 5000) -> AsyncGenerator[bool]:
         yield False
 
 
@@ -176,7 +177,7 @@ def _voter(groups: set[str] | None = None) -> Principal:
     return Principal(sub="p", permissions={"vote.cast"}, groups=members)
 
 
-def _recv(ws) -> dict:
+def _recv(ws) -> dict[str, Any]:
     """Return the next event and skip the presence frames.
 
     The `viewers` broadcast fires asynchronously on a connect or a disconnect. It can

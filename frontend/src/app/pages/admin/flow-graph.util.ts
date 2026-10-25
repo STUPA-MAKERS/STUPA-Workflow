@@ -248,8 +248,6 @@ export function serializeFlowGraph(graph: FlowGraph): string {
   return JSON.stringify(normalizeFlowGraph(graph), null, 2);
 }
 
-// Auto-layout: Sugiyama-light with layers, barycenter, and centering.
-
 const COL_GAP = 240;
 const ROW_GAP = 130;
 /** Left and top padding that keeps nodes off the canvas edge. */

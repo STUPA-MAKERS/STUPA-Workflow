@@ -457,9 +457,9 @@ def test_ops_for_type() -> None:
 
 
 def test_apply_ordered_unknown_op_is_false() -> None:
-    assert _apply_ordered("==", 1, 1) is True
-    assert _apply_ordered("<", 1, 2) is True
-    assert _apply_ordered("~~", 1, 2) is False
+    assert _apply_ordered("==", Decimal(1), Decimal(1)) is True
+    assert _apply_ordered("<", Decimal(1), Decimal(2)) is True
+    assert _apply_ordered("~~", Decimal(1), Decimal(2)) is False
 
 
 def test_compare_requires_object() -> None:

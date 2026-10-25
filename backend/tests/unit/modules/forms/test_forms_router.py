@@ -6,6 +6,7 @@ through `get_current_principal`. The integration suite covers the real DB paths.
 
 from __future__ import annotations
 
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -111,7 +112,7 @@ def test_get_effective_form_bad_uuid_422(app_client: TestClient) -> None:
     assert r.status_code == 422
 
 
-def _payload() -> dict:
+def _payload() -> dict[str, Any]:
     return {
         "fields": [
             {"key": "title", "type": "text", "label": {"de": "Titel"}, "required": True}

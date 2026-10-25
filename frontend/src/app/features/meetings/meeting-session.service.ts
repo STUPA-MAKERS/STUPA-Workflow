@@ -115,7 +115,6 @@ export class MeetingSessionService implements OnDestroy {
   /** The highest draft sequence number seen per agenda item (viewer side). */
   private readonly draftSeen = new Map<Uuid, number>();
 
-  // Permission flags, per meeting where loaded. The backend checks them per Gremium.
   /** The admin manages the meetings of every Gremium. Everybody else manages per
    *  Gremium through `session.manage`, which the server reports as `canManage`. */
   readonly canManageAny = computed(() => this.auth.isAdmin());
@@ -235,12 +234,12 @@ export class MeetingSessionService implements OnDestroy {
    * the start. Only a planned meeting starts, and it needs a minute-taker: the page
    * says so at once instead of showing the server 409 after the click.
    *
-   * The open window: before `opensAt` the page refuses at once (the button is off
-   * anyway) and reads the meeting again, because the window may have moved. The
-   * server 409 `meeting_too_early` (the clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens "Sitzung
-   * schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with
-   * `confirmEarly`. When the server still finds the open early (the clocks differ),
-   * its 409 `early_open_unconfirmed` opens the dialog too.
+   * The open window: before `opensAt` the page refuses at once (the button is off anyway) and reads
+   * the meeting again, because the window may have moved. The server 409 `meeting_too_early` (the
+   * clocks differ) does the same. Before `confirmUntil` the open is early: the first call opens
+   * "Sitzung schon eröffnen?" (`earlyOpenAsk`), and the dialog calls again with `confirmEarly`.
+   * When the server still finds the open early (the clocks differ), its 409
+   * `early_open_unconfirmed` opens the dialog too.
    *
    * The close is a dialog of its own (`CloseMeetingDialogComponent`), and a planned
    * meeting that does not take place is deleted, not closed.

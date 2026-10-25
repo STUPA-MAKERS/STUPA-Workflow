@@ -34,7 +34,6 @@
   border: 0;
 }
 
-/* One right per line: the box and its name at the start, the key at the end. */
 .rd__perm {
   display: flex;
   align-items: center;
@@ -67,7 +66,6 @@
   gap: var(--space-1) var(--space-2);
   min-width: 0;
 }
-/* A group keeps its exact spelling from the IdP; a long one wraps. */
 .rd__groupNames {
   overflow-wrap: anywhere;
 }
@@ -83,8 +81,8 @@
 }
 
 
-/* The kit lays out the footer wrapper (flex, wrap, end, 12px); the spacer pushes the
-   delete to the start. */
+// The kit lays out the footer wrapper (flex, wrap, end, 12px); the spacer pushes the delete
+// to the start.
 .rd__foot {
   width: 100%;
 }
@@ -101,7 +99,6 @@
   }
 }
 
-/* A phone: cancel and save on one line, the delete below them at the start. */
 @include bp.phone {
   .rd__spacer {
     display: none;

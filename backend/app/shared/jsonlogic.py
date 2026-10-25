@@ -17,30 +17,31 @@ The whitelist `JSONLOGIC_OPERATORS` derives from the `_EVALUATORS` dispatch tabl
 from __future__ import annotations
 
 import operator
-from collections.abc import Callable
-from typing import Any
+from collections.abc import Callable, Container, Mapping
 
 #: Maximum nesting depth of an expression. It protects the evaluator and the validator
 #: against a RecursionError on deeply nested input, far above any real expression.
 _MAX_DEPTH = 64
+
+type _Evaluator = Callable[[list[object]], object]
 
 
 class JsonLogicError(Exception):
     """Invalid JsonLogic expression (unknown operator, wrong arity, ...)."""
 
 
-def _as_args(value: Any) -> list[Any]:
+def _as_args(value: object) -> list[object]:
     """Normalize operator arguments to a list (JsonLogic allows a scalar shorthand)."""
     return value if isinstance(value, list) else [value]
 
 
-def _resolve_var(path: Any, ctx: dict[str, Any]) -> Any:
+def _resolve_var(path: object, ctx: Mapping[str, object]) -> object:
     """Resolve the `var` operator: a dotted path in `ctx`.
 
     The form `[path, default]` sets the fallback. A path that does not resolve returns
     that fallback, which is `None` when the caller gives none.
     """
-    default: Any = None
+    default: object = None
     if isinstance(path, list):
         default = path[1] if len(path) > 1 else None
         path = path[0] if path else ""
@@ -48,7 +49,7 @@ def _resolve_var(path: Any, ctx: dict[str, Any]) -> Any:
         return ctx
     if not isinstance(path, str):
         raise JsonLogicError(f"var path must be a string, got {type(path).__name__}")
-    current: Any = ctx
+    current: object = ctx
     for part in path.split("."):
         if isinstance(current, dict) and part in current:
             current = current[part]
@@ -59,20 +60,20 @@ def _resolve_var(path: Any, ctx: dict[str, Any]) -> Any:
     return current
 
 
-def _num(value: Any) -> float:
+def _num(value: object) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise JsonLogicError(f"expected a number, got {value!r}")
     return float(value)
 
 
-def _arity(op: str, n: int) -> Callable[[Callable[[list[Any]], Any]], Callable[[list[Any]], Any]]:
+def _arity(op: str, n: int) -> Callable[[_Evaluator], _Evaluator]:
     """Build a decorator that requires exactly `n` operands.
 
     The wrapped function raises `JsonLogicError` for any other operand count.
     """
 
-    def wrap(fn: Callable[[list[Any]], Any]) -> Callable[[list[Any]], Any]:
-        def run(args: list[Any]) -> Any:
+    def wrap(fn: _Evaluator) -> _Evaluator:
+        def run(args: list[object]) -> object:
             if len(args) != n:
                 raise JsonLogicError(f"'{op}' requires exactly {n} operands")
             return fn(args)
@@ -82,10 +83,10 @@ def _arity(op: str, n: int) -> Callable[[Callable[[list[Any]], Any]], Callable[[
     return wrap
 
 
-def _compare(op: Callable[[float, float], bool]) -> Callable[[list[Any]], bool]:
+def _compare(op: Callable[[float, float], bool]) -> Callable[[list[object]], bool]:
     """Build a binary comparison over two operands that `_num` coerces to numbers."""
 
-    def run(args: list[Any]) -> bool:
+    def run(args: list[object]) -> bool:
         if len(args) != 2:
             raise JsonLogicError("comparison requires exactly 2 operands")
         return op(_num(args[0]), _num(args[1]))
@@ -93,7 +94,7 @@ def _compare(op: Callable[[float, float], bool]) -> Callable[[list[Any]], bool]:
     return run
 
 
-def _eval_subtract(args: list[Any]) -> float:
+def _eval_subtract(args: list[object]) -> float:
     if len(args) == 1:
         return -_num(args[0])
     if len(args) == 2:
@@ -101,7 +102,7 @@ def _eval_subtract(args: list[Any]) -> float:
     raise JsonLogicError("'-' requires 1 (negate) or 2 operands")
 
 
-def _eval_divide(args: list[Any]) -> float:
+def _eval_divide(args: list[object]) -> float:
     if len(args) != 2:
         raise JsonLogicError("'/' requires exactly 2 operands")
     divisor = _num(args[1])
@@ -110,22 +111,26 @@ def _eval_divide(args: list[Any]) -> float:
     return _num(args[0]) / divisor
 
 
-def _eval_in(args: list[Any]) -> bool:
+def _contains(container: Container[object], needle: object) -> bool:
+    return needle in container
+
+
+def _eval_in(args: list[object]) -> bool:
     if len(args) != 2:
         raise JsonLogicError("'in' requires exactly 2 operands")
     needle, haystack = args[0], args[1]
     if isinstance(haystack, (list, str)):
-        return needle in haystack
+        return _contains(haystack, needle)
     raise JsonLogicError("'in' second operand must be a list or string")
 
 
-def _eval_add(args: list[Any]) -> float:
+def _eval_add(args: list[object]) -> float:
     if not args:
         raise JsonLogicError("'+' requires at least 1 operand")
     return sum(_num(a) for a in args)
 
 
-def _eval_multiply(args: list[Any]) -> float:
+def _eval_multiply(args: list[object]) -> float:
     if not args:
         raise JsonLogicError("'*' requires at least 1 operand")
     product = 1.0
@@ -137,7 +142,7 @@ def _eval_multiply(args: list[Any]) -> float:
 #: Operator to a pure function over the evaluated arguments. ``var`` is not here, because
 #: it resolves a path. ``and`` and ``or`` do not short-circuit: every operand is
 #: evaluated first.
-_EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
+_EVALUATORS: dict[str, _Evaluator] = {
     "==": _arity("==", 2)(lambda a: a[0] == a[1]),
     "!=": _arity("!=", 2)(lambda a: a[0] != a[1]),
     ">": _compare(operator.gt),
@@ -158,7 +163,9 @@ _EVALUATORS: dict[str, Callable[[list[Any]], Any]] = {
 JSONLOGIC_OPERATORS: frozenset[str] = frozenset(_EVALUATORS) | {"var"}
 
 
-def eval_jsonlogic(expr: Any, ctx: dict[str, Any] | None = None, *, _depth: int = 0) -> Any:
+def eval_jsonlogic(
+    expr: object, ctx: Mapping[str, object] | None = None, *, _depth: int = 0
+) -> object:
     """Evaluate `expr` against `ctx`.
 
     The function is pure. It has no side effect and never calls `eval`.
@@ -184,7 +191,7 @@ def eval_jsonlogic(expr: Any, ctx: dict[str, Any] | None = None, *, _depth: int 
     return evaluator(args)
 
 
-def validate_jsonlogic(expr: Any, *, _depth: int = 0) -> None:
+def validate_jsonlogic(expr: object, *, _depth: int = 0) -> None:
     """Check that the expression uses only whitelisted operators.
 
     This is the save-time gate. It stops at the first error.

@@ -4,7 +4,6 @@
 
 @include df.host;
 
-/* Every block of the body shares the same left and right edges: no block pads itself. */
 .aid {
   @include df.form;
 }
@@ -12,17 +11,12 @@
   @include df.switch-label;
 }
 
-/* The kind: the full width of the body, the segments share it in equal parts. */
 .aid__kind {
   width: 100%;
 }
 
-/* The area between the kind and the switch row: the search and the list
-   (or the empty state, the loading rows or the title field). On a desktop it has one
-   height for every kind and every state, so the dialog keeps its height from the opening
-   to the close: the list scrolls inside it. The height follows the viewport, so the
-   dialog is about three quarters of a 900px screen and still fits a 720px one. On a phone
-   the area takes the height of its content. */
+// One height for every kind and state, so the dialog keeps its height while it is open.
+// ~3/4 of a 900px screen, and it still fits a 720px one.
 .aid__area {
   display: flex;
   flex-direction: column;
@@ -41,7 +35,6 @@
 }
 
 
-/* The rest of the area below the search: the list, the loading rows or the empty state. */
 .aid__slot {
   display: flex;
   flex: 1 1 auto;
@@ -50,7 +43,6 @@
   min-height: 0;
 }
 
-/* The list scrolls inside the area, with the shared fade at an end with more content. */
 .aid__list {
   display: flex;
   flex: 0 1 auto;
@@ -61,9 +53,6 @@
   @include fade.fade-y(var(--space-5));
 }
 
-/* A row: a ring that fills with a check when picked, the title over a muted line (the
-   state of an application, the column and due date of a to-do). The radio stays for the
-   keyboard and the screen reader; the ring shows the pick. */
 .aid__row {
   position: relative;
   display: flex;
@@ -128,8 +117,6 @@
   color: inherit;
 }
 
-/* "Nicht öffentlich": one settings row on surface 3, label left, switch right. The whole
-   row toggles the switch (`toggleFromRow`). */
 .aid__np {
   justify-content: center;
   min-height: 52px;

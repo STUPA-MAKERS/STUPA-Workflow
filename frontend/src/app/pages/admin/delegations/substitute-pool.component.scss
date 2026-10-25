@@ -21,7 +21,6 @@
   list-style: none;
 }
 
-/* "Mitglied → Stellvertretung" on one line; a narrow pane wraps it before the arrow. */
 .sp__row {
   display: flex;
   align-items: center;
@@ -65,7 +64,6 @@
   margin-inline-start: auto;
 }
 
-/* The add dialog. */
 .sp__form {
   display: flex;
   flex-direction: column;
@@ -96,7 +94,6 @@
   color: var(--color-text-muted);
 }
 
-/* The shared top and bottom fade: an end fades only while more content lies past it. */
 .sp__hits {
   @include fade.fade-y(var(--space-5));
 }

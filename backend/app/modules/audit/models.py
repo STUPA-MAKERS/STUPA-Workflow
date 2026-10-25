@@ -14,7 +14,7 @@ newest 100 rows and deletes the older rows.
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Literal
+from typing import Any, Literal
 
 from sqlalchemy import (
     BigInteger,
@@ -64,7 +64,7 @@ class AuditEntry(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     #: Holds id references and metadata ONLY. Never put a raw PII value here.
-    data: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    data: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
     prev_hash: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     hash: Mapped[bytes] = mapped_column(LargeBinary)
 

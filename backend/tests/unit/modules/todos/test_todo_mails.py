@@ -77,7 +77,7 @@ def test_the_kinds_are_registered() -> None:
 
 async def test_the_assigned_mail(sent: list[dict[str, Any]]) -> None:
     actor = PrincipalRow(id=ME, sub="me", display_name="Ada", email="ada@x.org")
-    session, b, c = _session(actor=actor)
+    session, _b, c = _session(actor=actor)
     mail = TodoMail("assigned", c.id, (OTHER,), ME)
     assert await mails.send_todo_mail(session, queue=None, settings=SETTINGS, mail=mail)  # type: ignore[arg-type]
     (out,) = sent

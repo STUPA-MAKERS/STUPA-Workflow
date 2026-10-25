@@ -101,7 +101,7 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
 };
 
 /**
- * Invoices (boards Fin-Rechnungen and the other Fin-Rechnung* boards): a list of invoices
+ * Invoices: a list of invoices
  * beside a detail sheet, like the applications page. An invoice is a document of its own;
  * a booking can reference one invoice, so one invoice can serve many bookings.
  *
@@ -113,11 +113,12 @@ const SEGMENT_QUERY: Record<InvoiceSegment, Pick<InvoiceQuery, 'status' | 'booke
  * Import: a ZUGFeRD or Factur-X PDF dropped on the page or picked with the file dialog.
  * The parsed fields fill the review form. A PDF without ZUGFeRD data (422
  * `invoice_not_zugferd`) opens the empty form for manual entry, with the PDF as receipt.
+ *
+ * Side by side it is a pane page (`styles.scss`): the panes fill the free height and scroll
+ * by themselves.
  */
 @Component({
   selector: 'app-invoices',
-  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
-  // themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -262,7 +263,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     }));
   });
 
-  // --- the open row ------------------------------------------------------------------
   /** The invoice open in the detail (`?id=`). */
   readonly selectedId = signal('');
   private readonly fetchedInvoice = signal<Invoice | null>(null);
@@ -364,7 +364,7 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
   readonly importFileSize = signal(0);
   private importFileMime = '';
 
-  /** Number, supplier and a positive gross are required (board Fin-Rechnung-Import). */
+  /** Number, supplier and a positive gross are required. */
   readonly canSubmitCreate = computed(() =>
     invoiceFieldsValid(this.newNumber(), this.newSupplier(), this.newGross()),
   );
@@ -604,7 +604,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     });
   }
 
-  // --- the open row ------------------------------------------------------------------
   /** Open an invoice in the detail. The URL keeps it, so the back button closes it. */
   openInvoice(id: string): void {
     this.closeForms();
@@ -633,7 +632,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.editing.set(null);
   }
 
-  // --- import ----------------------------------------------------------------------
   /** Files dropped on the page (outside the drop zone). One import at a time. */
   onFilesDropped(files: File[]): void {
     if (this.canManage() && files[0]) this.importFile(files[0]);
@@ -750,7 +748,6 @@ export class InvoicesComponent implements OnDestroy, InvoiceFormHost {
     this.reload();
   }
 
-  // --- forms -----------------------------------------------------------------------
   openCreate(): void {
     this.closeForms();
     this.newNumber.set('');

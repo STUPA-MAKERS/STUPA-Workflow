@@ -194,7 +194,7 @@ class GuardContext:
     budget_has_decision_gremium: bool = False
 
 
-def _to_decimal(value: Any) -> Decimal | None:
+def _to_decimal(value: object) -> Decimal | None:
     if value is None or isinstance(value, bool):
         return None
     try:
@@ -203,7 +203,7 @@ def _to_decimal(value: Any) -> Decimal | None:
         return None
 
 
-def _to_date(value: Any) -> date | None:
+def _to_date(value: object) -> date | None:
     if isinstance(value, datetime):
         return value.date()
     if isinstance(value, date):
@@ -216,7 +216,7 @@ def _to_date(value: Any) -> date | None:
     return None
 
 
-def _to_bool(value: Any) -> bool:
+def _to_bool(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -238,7 +238,7 @@ def ops_for_type(value_type: str) -> frozenset[str]:
     return _TEXT_OPS
 
 
-def _eval_compare(spec: Any, ctx: GuardContext) -> bool:
+def _eval_compare(spec: object, ctx: GuardContext) -> bool:
     """Evaluate the `compare` guard over `{field, op, value}` per type.
 
     The value type comes from `ctx.field_types[field]` and defaults to `text`. A field
@@ -301,13 +301,13 @@ _ORDERED_OPS: dict[str, Callable[[Any, Any], bool]] = {
 }
 
 
-def _apply_ordered(op: str, left: Any, right: Any) -> bool:
+def _apply_ordered(op: str, left: Decimal | date, right: Decimal | date) -> bool:
     """Apply an ordered operator; an unknown operator gives False."""
     fn = _ORDERED_OPS.get(op)
     return fn(left, right) if fn is not None else False
 
 
-def _has_field(value: Any, ctx: GuardContext) -> bool:
+def _has_field(value: object, ctx: GuardContext) -> bool:
     """Evaluate `hasField`: the field is present and not empty.
 
     A value of `None`, an empty string or an empty list counts as missing.
@@ -318,7 +318,7 @@ def _has_field(value: Any, ctx: GuardContext) -> bool:
 
 #: Leaf operator to a pure predicate ``(value, ctx) -> bool``. An automatic transition
 #: has empty ``roles`` and ``actor_committees``, so the actor gates fail there.
-_LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
+_LEAF_EVALUATORS: dict[str, Callable[[object, GuardContext], bool]] = {
     "roleIs": lambda value, ctx: value in ctx.roles,
     "isInCommittee": lambda value, ctx: str(value) in ctx.actor_committees,
     "actorIsApplicant": lambda value, ctx: ctx.actor_is_applicant == bool(value),
@@ -340,7 +340,7 @@ _LEAF_EVALUATORS: dict[str, Callable[[Any, GuardContext], bool]] = {
 }
 
 
-def _eval_leaf(op: str, value: Any, ctx: GuardContext) -> bool:
+def _eval_leaf(op: str, value: object, ctx: GuardContext) -> bool:
     evaluator = _LEAF_EVALUATORS.get(op)
     if evaluator is None:
         raise GuardError(f"unknown guard operator: {op!r}")  # pragma: no cover
@@ -375,11 +375,13 @@ def eval_guard(guard: dict[str, Any] | None, ctx: GuardContext) -> bool:
     raise GuardError(f"unknown guard operator: {op!r}")
 
 
-def _children(op: str, value: Any) -> list[dict[str, Any]]:
-    children = value if isinstance(value, list) else [value]
-    for c in children:
+def _children(op: str, value: object) -> list[dict[str, Any]]:
+    raw = value if isinstance(value, list) else [value]
+    children: list[dict[str, Any]] = []
+    for c in raw:
         if not isinstance(c, dict):
             raise GuardError(f"'{op}' children must be guard objects, got {c!r}")
+        children.append(c)
     return children
 
 
@@ -438,7 +440,7 @@ def validate_guard(guard: dict[str, Any] | None, *, allow_actor_ops: bool = True
         _validate_compare(value)
 
 
-def _validate_compare(spec: Any) -> None:
+def _validate_compare(spec: object) -> None:
     """Check the shape of a `compare` guard.
 
     This function checks the structure and that `op` is a known comparison operator.
@@ -524,7 +526,7 @@ def budget_ids_of_action(action: dict[str, Any]) -> list[str]:
     return []
 
 
-def _validate_notify_recipients(recipients: Any) -> None:
+def _validate_notify_recipients(recipients: object) -> None:
     if not isinstance(recipients, list) or not recipients:
         raise GuardError("notify action requires a non-empty 'recipients' list")
     for r in recipients:

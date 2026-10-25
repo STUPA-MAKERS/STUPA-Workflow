@@ -401,8 +401,6 @@ export class TodoBoardRowsComponent implements OnInit {
     this.load(held?.etag ?? null);
   }
 
-  // ------------------------------------------------------------------ data
-
   private load(etag: string | null): void {
     const seq = ++this.seq;
     const muts = this.mutations;
@@ -516,8 +514,6 @@ export class TodoBoardRowsComponent implements OnInit {
     return null;
   }
 
-  // ------------------------------------------------------------------ live
-
   /** A card is held or a write is in flight: a live change waits. */
   private busy(): boolean {
     return this.dragging() || this.hold() || this.pending > 0;
@@ -599,8 +595,6 @@ export class TodoBoardRowsComponent implements OnInit {
     this.boards.set(list.map((b) => (b.id === boardId ? fn(b) : b)));
     return true;
   }
-
-  // ------------------------------------------------------------------ rows
 
   isOpen(row: BoardRow): boolean {
     return !this.collapsed().has(row.board.id);
@@ -693,8 +687,6 @@ export class TodoBoardRowsComponent implements OnInit {
     return out;
   }
 
-  // ------------------------------------------------------------------ moves
-
   /** The rollback applies only when nothing else changed the row meanwhile. */
   private move(boardId: Uuid, cardId: Uuid, move: TodoCardMove): void {
     const before = this.boards().find((b) => b.id === boardId);
@@ -768,8 +760,6 @@ export class TodoBoardRowsComponent implements OnInit {
     target.splice(event.currentIndex, 0, held);
     this.move(row.board.id, cardId, moveRequest(target, event.currentIndex, toCol));
   }
-
-  // ------------------------------------------------------------------ keyboard drag
 
   onTileKeyUp(event: KeyboardEvent): void {
     this.keyDrag.keyUp(event);

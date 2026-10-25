@@ -23,6 +23,7 @@ from app.modules.notifications.privacy import (
     notify_erasure_rejected,
 )
 from app.modules.notifications.provider import mail_queue_from_pool
+from app.modules.privacy.models import ErasureRequest
 from app.modules.privacy.schemas import (
     EmailErasureBody,
     EmailErasureOut,
@@ -96,7 +97,7 @@ ErasureServiceDep = Annotated[ErasureRequestService, Depends(get_erasure_service
 SettingsServiceDep = Annotated[PrivacySettingsService, Depends(get_settings_service)]
 
 
-def _out(request_row: Any) -> ErasureRequestOut:
+def _out(request_row: ErasureRequest) -> ErasureRequestOut:
     return ErasureRequestOut.model_validate(request_row, from_attributes=True)
 
 

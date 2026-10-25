@@ -579,8 +579,10 @@ export interface SignedUrlOutWire {
 export interface ApplicationCreateBody {
   typeId: Uuid;
   data: Record<string, unknown>;
-  // Optional. For a logged-in user the backend takes the identity from the account.
-  // For an anonymous submission the server requires these fields.
+  /**
+   * Optional. For a logged-in user the backend takes the identity from the account. For an
+   * anonymous submission the server requires this field and `applicantName`.
+   */
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
@@ -629,8 +631,6 @@ export interface TransitionResult {
   statusEventId: Uuid;
   dispatchedActions: string[];
 }
-
-// View models. Frontend friendly, i18n already resolved. Built by `mappers.ts`.
 
 /** Application status with the label resolved for the current `lang`. */
 export interface ApplicationState {
@@ -895,7 +895,10 @@ export interface SignedUrl {
 export interface NewApplication {
   typeId: Uuid;
   data: Record<string, unknown>;
-  // Null for a logged-in user. The backend takes the identity and the altcha itself.
+  /**
+   * Null for a logged-in user, like `applicantName`. The backend takes the identity and the
+   * altcha itself.
+   */
   applicantEmail?: string | null;
   applicantName?: string | null;
   lang: Lang;
@@ -921,8 +924,15 @@ export interface DraftUpload {
   draftExpiresAt: IsoDateTime;
 }
 
-// Form definition. A mirror of the backend `FormFieldDef`.
-
+/**
+ * The type of a form field, a mirror of the backend `FormFieldDef`.
+ *
+ * - `gremium_select` and `budget_select` are dynamic pickers. The server injects the
+ *   options: Gremien or the budget tree.
+ * - `email` and `iban` are typed inputs with built-in validation.
+ * - `daterange` is a date range `{from, to}`.
+ * - `funding` is the requested funding, separate from the cost total of the positions.
+ */
 export type FieldType =
   | 'text'
   | 'textarea'
@@ -931,13 +941,10 @@ export type FieldType =
   | 'date'
   | 'select'
   | 'multiselect'
-  // Dynamic pickers. The server injects the options: Gremien or the budget tree.
   | 'gremium_select'
   | 'budget_select'
-  // Typed inputs with built-in validation.
   | 'email'
   | 'iban'
-  // Date range {from, to}.
   | 'daterange'
   | 'checkbox'
   | 'file'
@@ -945,7 +952,6 @@ export type FieldType =
   | 'markdown'
   | 'computed'
   | 'positions'
-  // Requested funding, separate from the cost total of the positions.
   | 'funding'
   | 'section';
 
@@ -1351,8 +1357,6 @@ export interface VoteClosed {
   branchFired: boolean;
 }
 
-// Meetings and protocol. The wire form is camelCase (`_CamelModel`).
-
 /** Meeting status. The backend enum is `planned|live|closed`. */
 export type MeetingStatus = 'planned' | 'live' | 'closed';
 /** `draft`: planned, not open yet. `cancelled`: the application left the vote state by hand, so the vote stopped. */
@@ -1559,8 +1563,6 @@ export interface CalendarFeed {
   url: string | null;
 }
 
-// View models for meetings and protocol.
-
 /** Vote summary, frontend view. It normalizes the `null` defaults. */
 export interface MeetingVote extends ElectionFields {
   id: Uuid;
@@ -1712,17 +1714,19 @@ export interface Protocol {
   gremiumProtocolsPublic?: boolean;
 }
 
-// Notification preferences. The account popout offers them as self service.
-
-/** Toggle for a notification kind (`GET/PUT /notifications/preferences`). */
+/**
+ * Toggle for a notification kind (`GET/PUT /notifications/preferences`). The account popout
+ * offers it as self service.
+ */
 export interface NotificationPreference {
   kind: string;
   enabled: boolean;
 }
 
-// OAuth grants and MCP setup. The account popout offers them as self service.
-
-/** An active OAuth grant of the logged-in user. It is an agent or MCP token. */
+/**
+ * An active OAuth grant of the logged-in user. It is an agent or MCP token. The account popout
+ * offers the grants as self service.
+ */
 export interface OAuthGrant {
   id: string;
   clientId: string;
@@ -1798,8 +1802,6 @@ export interface SearchResults {
   /** Sources that errored. The search degrades rather than returning nothing. */
   failed: string[];
 }
-
-// Public meeting with QR code.
 
 /** Admitted guests vote (`vote`) or only follow the meeting (`watch`). */
 export type GuestsMode = 'vote' | 'watch';

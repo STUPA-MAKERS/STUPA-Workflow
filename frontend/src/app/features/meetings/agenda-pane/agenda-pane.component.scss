@@ -1,7 +1,5 @@
 @use '../../../shared/ui/drag-preview' as dp;
 
-/* The agenda pane: a heading line and the rows. The page decides the width and the
-   scrolling; the pane only fills its box. */
 :host {
   display: flex;
   flex-direction: column;
@@ -17,7 +15,6 @@
   min-height: 2.5rem;
   padding: 0 var(--space-1) var(--space-2) var(--space-4);
 }
-/* Only the heading for screen readers is left: the line takes no room. */
 .ap__head--sheet {
   min-height: 0;
   padding: 0;
@@ -75,7 +72,6 @@
 .ap__row app-list-item {
   --li-hover: var(--color-surface-2);
 }
-/* Rows are denser than a plain list: the boards use 54px rows. */
 .ap__row ::ng-deep .li {
   min-height: 3.375rem;
   padding: 7px var(--space-3);
@@ -91,13 +87,8 @@
 .ap__lead {
   position: relative;
 }
-/* The number: grey, filled with the accent for the item that runs now, a check in an
-   accent ring for a handled one. */
 
-/* The grip shows on hover and while a control of the row has the focus. It sits in the
-   gutter before the number, so the row does not move when it appears. Its box ends at the
-   number, because the dots fill only the middle of the box and the scrolling list clips
-   anything left of the row's own padding. */
+// The box ends at the number, because the scrolling list clips anything left of the row padding.
 .ap__grip {
   position: absolute;
   inset-inline-end: 100%;
@@ -124,9 +115,7 @@
   align-items: center;
   gap: var(--space-2);
 }
-/* The menu button shows on hover and focus on a pointer device, and only then takes its
-   room from the title. It keeps no width while hidden, but it stays in the tab order, and
-   the focus opens it. A touch screen has no hover, so the button stays there. */
+// A touch screen has no hover, so there the button always shows.
 @media (hover: hover) {
   .ap__menu {
     width: 0;
@@ -167,8 +156,6 @@
   outline-offset: 1px;
 }
 
-/* Drag and drop: the lift and the drop box of the to-do board. The row in the hand is
-   lifted onto an opaque surface with a shadow and tilted a little; the grip shows on it. */
 .ap__preview {
   box-sizing: border-box;
   border-radius: var(--radius-lg);
@@ -179,13 +166,10 @@
 .ap__preview .ap__grip {
   opacity: 1;
 }
-/* The row in the hand keeps its menu button, as the row at rest under the pointer. */
 .ap__preview .ap__menu {
   width: auto;
   margin-inline-start: 0;
 }
-/* Where it lands: a dashed box of the height of a row, strong enough to read beside the
-   row in the hand. */
 .ap__placeholder {
   min-height: 3.375rem;
   border: 2px dashed var(--color-accent);

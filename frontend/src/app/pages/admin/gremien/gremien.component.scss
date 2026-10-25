@@ -29,7 +29,6 @@
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-2);
 }
 
-/* The heading of a row only holds the toggle; it takes the free width. */
 .grem__h {
   display: flex;
   flex: 1 1 auto;
@@ -38,7 +37,6 @@
   font: inherit;
 }
 
-/* The toggle takes the free width, so a click anywhere on the name opens the row. */
 .grem__toggle {
   display: flex;
   flex: 1 1 auto;

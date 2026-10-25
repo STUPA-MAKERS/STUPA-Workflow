@@ -1,8 +1,3 @@
-// The form sheet of the finance pages (booking, transfer, invoice): it replaces the
-// detail sheet. A fixed head (title, subtitle, close), a body that scrolls in two
-// columns of sections, and a fixed foot (delete on the left; cancel and save on the
-// right). In the bottom sheet of a phone the sheet brings the head, so the form leaves
-// out its own. The form components `@use` this file.
 @use 'field' as f;
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
@@ -50,8 +45,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* In the bottom sheet, the sheet body gives the side gutter. The form adds no second
-   gutter, so the fields go from 16px to 16px of a phone screen. */
 .ff--sheet .ff__body {
   padding: var(--space-2) 0 var(--space-5);
 }
@@ -99,8 +92,6 @@
   }
 }
 
-/* Fields this form builds itself (a picker, the note, the application
-   search) take the look of the kit fields: a filled box with the label inside. */
 .ff__box {
   @include f.box;
   @include f.box-labelled;
@@ -117,7 +108,6 @@
   font-family: var(--font-mono);
   font-size: 0.8125rem;
 }
-/* A value without a lock, in the box of a field. A locked value is `app-locked-field`. */
 .ff__box--static {
   flex-direction: column;
   align-items: stretch;
@@ -131,8 +121,7 @@
   color: var(--color-text-muted);
 }
 
-/* The note: a textarea in the look of the kit fields. */
-/* 16px on a phone, so iOS does not zoom into the note. */
+// 16px on a phone, so iOS does not zoom into the note.
 @include bp.phone {
   .ff {
     --textarea-font-size: 1rem;
@@ -146,7 +135,6 @@
   font-size: var(--fs-small);
 }
 
-/* A small icon button in a form row (the × that removes the receipt). */
 .ff__iconBtn {
   display: inline-grid;
   flex: none;
@@ -171,7 +159,6 @@
 }
 
 
-/* The foot: delete on the left, cancel and save on the right. Balanced on one axis. */
 .ff__foot {
   display: flex;
   flex: none;
@@ -194,7 +181,6 @@
   white-space: nowrap;
 }
 
-/* One pane at a time the page scrolls: the foot sticks to the end of the viewport. */
 .ff--page .ff__body {
   overflow: visible;
 }

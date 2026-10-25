@@ -31,7 +31,7 @@ export interface OwnAttendanceChange {
 }
 
 /**
- * "Deine Anwesenheit" of a member (board Teilnahme-Vorher): "Anwesend" or "Abwesend"
+ * "Deine Anwesenheit" of a member: "Anwesend" or "Abwesend"
  * ("Abwesend" sends an excuse, `excused`) and an optional reason, which only the
  * member and the meeting lead read.
  *

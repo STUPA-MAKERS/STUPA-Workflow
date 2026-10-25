@@ -7,7 +7,6 @@
   gap: var(--space-3);
   padding-bottom: var(--space-3);
 }
-/* The rows run to the edges of the sheet; the chosen one is a full-width band. */
 .ms__list {
   display: flex;
   flex-direction: column;
@@ -32,7 +31,6 @@
   background: var(--color-selected);
   color: var(--color-on-selected);
 }
-/* The other board: below a line, as wide as the rows. */
 .ms__row--transfer {
   margin-inline: calc(-1 * var(--space-4));
   border-top: var(--border-width) solid var(--color-border);

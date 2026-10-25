@@ -1,6 +1,3 @@
-// The closed field: the filled field of the ui-kit (`_field.scss`), the whole box is the
-// button. The open list: the option menu of the app (the kit `_option-menu.scss`) with a search
-// on top and the cost centres grouped by their top-level budget.
 @use 'field' as f;
 @use 'option-menu' as om;
 @use 'scroll-fade' as fade;
@@ -13,7 +10,6 @@
   display: inline-flex;
   max-width: 100%;
 }
-// The chip: the global `.chip` of the filter bars; the name is cut at the end.
 .ccs__chip {
   max-width: 100%;
   min-width: 0;
@@ -87,8 +83,6 @@
   transform: rotate(180deg);
 }
 
-// The card (a leg of a transfer): the label on top, the name on its own line, the path
-// key below it, then the projected lines. The whole card is the button.
 :host(.ccs--card) .ccs__box {
   min-height: 0;
   border-radius: var(--radius-xl);
@@ -121,7 +115,7 @@
   font-weight: var(--fw-regular);
 }
 
-// The popover. It stays invisible until it has its place, so it never shows at 0/0.
+// Invisible until it has its place, so it never shows at 0/0.
 .ccs__menu {
   @include om.menu;
   @include om.motion;
@@ -192,13 +186,10 @@
   padding: 0 var(--space-2) var(--space-2);
   @include fade.fade-y(var(--space-5));
 }
-// The popover gives the list its own limit: the room of the popover less the search. The
-// list then scrolls even where a flex item in a box with only a `max-height` does not
-// shrink.
+// A limit of its own, because a flex item in a box with only a `max-height` does not shrink.
 .ccs__menu .ccs__list {
   max-height: calc(var(--ccs-max, 30rem) - 2.75rem - 2 * var(--space-3));
 }
-// The sheet: the search stays in place, the list scrolls below it.
 .ccs__list--sheet {
   padding: 0;
 }

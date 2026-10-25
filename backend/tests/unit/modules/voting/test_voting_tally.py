@@ -6,6 +6,8 @@ tie. The tests use no database and no clock, so they stay deterministic.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.modules.voting.tally import (
@@ -26,7 +28,7 @@ OPTIONS = [YES, NO, ABSTAIN]
 def _config(
     *,
     majority_rule: str = "simple",
-    quorum: dict | None = None,
+    quorum: dict[str, Any] | None = None,
     abstain_counts_quorum: bool = True,
     tie_break: str = "rejected",
     options: list[str] | None = None,

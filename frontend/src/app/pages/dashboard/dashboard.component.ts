@@ -51,8 +51,6 @@ import {
   TabPagerComponent,
   TabsComponent,
 } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { flowColorKind } from '@shared/status-kind.util';
@@ -131,6 +129,9 @@ type Loaded<T> = T | null | undefined;
  *
  * No request shows the global loading overlay: each block shows its own skeleton, empty
  * or error state.
+ *
+ * It imports the shared blocks by path, not through the `@shared/ui` barrel, so this lazy
+ * chunk takes only the blocks it uses.
  */
 @Component({
   selector: 'app-dashboard',
@@ -189,8 +190,6 @@ export class DashboardComponent {
   /** The account sheet of the compact phone head. */
   readonly accountOpen = signal(false);
 
-  // ---------------------------------------------------------------- data
-
   /** The "load again" trigger of each request that `load` made, by its signal. */
   private readonly reloads = new Map<() => unknown, () => void>();
   private readonly tasks = this.load(this.api.listTasks());
@@ -221,12 +220,8 @@ export class DashboardComponent {
   /** The active application types, for the card "Antrag stellen" of a new user. */
   readonly applyTypes = computed(() => this.types().filter((t) => t.active));
 
-  // ---------------------------------------------------------------- head
-
   /** The first word of the display name: "Willkommen, Mara". */
   readonly firstName = computed(() => this.auth.displayName().trim().split(/\s+/)[0]);
-
-  // ---------------------------------------------------------------- tabs
 
   /** The open tab, from `?tab=`. An unknown value opens the first tab. */
   readonly tab = toSignal(
@@ -369,8 +364,6 @@ export class DashboardComponent {
     return canCast ? 'pending' : null;
   }
 
-  // ---------------------------------------------------------------- today
-
   /** "Di, 29.09.2026". */
 
   readonly meetingsLoading = computed(() => this.timeline() === undefined);
@@ -451,8 +444,6 @@ export class DashboardComponent {
     return [day, shortTime(m.startTime)].filter((s) => !!s).join(', ');
   }
 
-  // ---------------------------------------------------------------- format
-
   /** How long a task waits, in calendar days: "heute", "1 Tag", "5 Tage". */
   private waited(at: IsoDateTime): string {
     const days = calendarDaysSince(at, new Date(Date.now()));
@@ -500,8 +491,6 @@ export class DashboardComponent {
     this.reloads.set(value, () => again.next());
     return value;
   }
-
-  // ---------------------------------------------------------------- phone
 
   openAccount(): void {
     this.accountOpen.set(true);

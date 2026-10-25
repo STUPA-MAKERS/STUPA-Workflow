@@ -50,7 +50,9 @@ def test_resolve_survives_a_cycle() -> None:
     assert tree_rules.resolve_decision_gremium("a", parent_of, {}) == (None, None)
 
 
-def _node(nid: str, parent: str | None, path: str, decision_gremium: object = None) -> tuple:
+def _node(
+    nid: str, parent: str | None, path: str, decision_gremium: object = None
+) -> tuple[Any, ...]:
     return (nid, parent, None, path.split("-")[-1], path, "N", "EUR", True, None, [], [],
             1, 1, False, None, decision_gremium)
 

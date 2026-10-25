@@ -92,8 +92,7 @@ export interface InvoiceFormHost {
 }
 
 /**
- * The invoice form (boards Fin-Rechnung-Import, Fin-Rechnung-Bearbeiten,
- * Fin-Tel-Rechnung-Import): a new invoice, the review of an imported one, or the edit of
+ * The invoice form: a new invoice, the review of an imported one, or the edit of
  * one. It replaces the detail sheet.
  *
  * Beside the fields sits the receipt: the imported or attached PDF (with the button that

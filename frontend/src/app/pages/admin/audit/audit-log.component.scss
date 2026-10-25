@@ -6,7 +6,6 @@
   container-type: inline-size;
 }
 
-/* The chain check. */
 .al__verify {
   display: flex;
   align-items: center;
@@ -73,7 +72,6 @@
   list-style: none;
 }
 
-/* The whole row opens the details. */
 .al__row {
   display: grid;
   grid-template-columns: 10.5rem minmax(10rem, 1.3fr) minmax(6rem, 0.8fr) minmax(8rem, 1fr) 1rem;
@@ -137,7 +135,6 @@
 .al__meta dd {
   margin: 0;
 }
-/* Ids and data values wrap; they are never cut. */
 .al__wrap {
   overflow-wrap: anywhere;
 }
@@ -164,7 +161,6 @@
   justify-content: center;
 }
 
-/* Narrower: time and action on the first line, actor and target below. */
 @container (max-width: 44rem) {
   .al__row {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 1rem;

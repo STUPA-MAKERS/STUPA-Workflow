@@ -90,7 +90,7 @@ function altOf(file: File): string {
  * access reads the same sheet, and its foot says who keeps the minutes and the state of
  * the protocol.
  *
- * A closed meeting (boards Sitzung-Protokoll-Entwurf, Sitzung-Geschlossen): the protocol
+ * A closed meeting: the protocol
  * bar on top (draft and "Finalisieren & versenden", or final and the PDF links) and the
  * keeper line below the title, "Protokoll: Lara Leitung (TOP 1–3), Uli Übernahme (ab TOP 3,
  * 18:55)". The text stays editable for every writer while the protocol is a draft.
@@ -159,7 +159,7 @@ export class TopSheetComponent {
   /** The finalize runs. */
   readonly finalizing = input(false);
   /**
-   * The participant view (boards Teilnahme-Live, Schmal-Teilnahme): read only, "Jetzt"
+   * The participant view: read only, "Jetzt"
    * before the item that the room handles, the line "Mara Keller führt das Protokoll"
    * below the title, and the text without a protocol of the viewer.
    */

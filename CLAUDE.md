@@ -17,7 +17,7 @@ worker. Frontend = Angular 20 (strict TS, standalone, separate `.html`/`.scss`, 
 ngx-formly). Postgres 16 (versioned JSONB), Redis, MinIO (S3), ClamAV, typst (internal
 Markdown→PDF), ALTCHA.
 
-Full prose: `README.md`. Workflow & Definition of Done: `CONTRIBUTING.md`.
+Full prose: `README.md`. Workflow & Definition of Done: the `conventions` skill.
 
 ## How to navigate (read in this order)
 
@@ -103,4 +103,4 @@ So a wrapper that looks for `AGENTS.md` or `.agents/skills` resolves to the same
   `alembic upgrade head`
 - Stack (`deploy/`): `docker compose config -q` · `docker compose up -d --build`
 
-See `conventions` skill + `CONTRIBUTING.md` for the full gates.
+See the `conventions` skill for the full gates.

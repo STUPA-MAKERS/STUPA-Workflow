@@ -7,7 +7,6 @@
   min-width: 0;
 }
 
-/* "Von → nach": the two legs side by side with the arrow between them. */
 .tf__legs {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 44px minmax(0, 1fr);
@@ -38,7 +37,6 @@
 .tf__swapInline {
   display: none;
 }
-/* Narrow: the legs stack, the arrow points down, "Tauschen" sits beside it. */
 @container (max-width: 40rem) {
   .tf__legs {
     grid-template-columns: minmax(0, 1fr);
@@ -57,7 +55,6 @@
   }
 }
 
-/* "Frei danach" in a leg card: the free amount now struck through, then after. */
 .tf__free {
   display: flex;
   flex-wrap: wrap;
@@ -74,7 +71,6 @@
   color: var(--color-text-subtle);
 }
 
-/* A leg of a transfer under correction: fixed, on the selection surface. */
 .tf__fixedName {
   display: flex;
   align-items: center;
@@ -96,8 +92,6 @@
   font-size: var(--fs-small);
 }
 
-/* A new transfer: the amount beside the fiscal year, the description over the full
-   width. One column in a narrow pane: amount, description, year. */
 .tf__fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

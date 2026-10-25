@@ -38,7 +38,7 @@ interface PickerSection {
 }
 
 /**
- * The board chip of the to-dos page ("Board: Studierendenparlament", frame 34) and its
+ * The board chip of the to-dos page ("Board: Studierendenparlament") and its
  * list: Persönlich (with the meta-board "Alle" under "Meine To-Dos" when `allId` is set),
  * Gremien and Team, each board with its open count. Desktop: a list
  * under the chip; Escape and a click outside close it. Phone: the bottom sheet.

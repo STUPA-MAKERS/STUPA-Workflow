@@ -2,13 +2,11 @@
 @use 'scroll-fade' as fade;
 @use '../../../shared/ui/list-pane' as lp;
 
-/* The same two panes as the votes (voting.component.scss). */
+// The same two panes as voting.component.scss.
 
 :host {
   @include lp.stack;
 }
-/* One pane at a time the host takes at least the free height of the shell main. Side by
-   side it is a pane page (`.pane-page`), which sets its own flex. */
 :host(:not(.pane-page)) {
   flex: 1 0 auto;
 }
@@ -26,7 +24,6 @@
   @include lp.split-column;
 }
 
-/* ------------------------------------------------------------------ list pane */
 .grl:not(.grl--split) .grl__pane {
   flex: 1 0 auto;
 }
@@ -43,7 +40,6 @@
 .grl:not(.grl--split) .grl__scroll {
   flex: 1 0 auto;
 }
-/* Side by side only the rows scroll, down to the bottom edge of the pane. */
 .grl--split .grl__scroll {
   @include lp.split-scroll(--grl-fade);
 }
@@ -64,7 +60,7 @@
 .grl__skel .grl__head {
   padding-top: var(--space-1);
 }
-/* The loading shape: a bar about as wide as "Meine Gremien 3". */
+// About as wide as "Meine Gremien 3".
 .grl__skelHead {
   width: 7.5rem;
 }
@@ -76,7 +72,6 @@
 .grl__rows {
   @include lp.stack;
 }
-/* Side by side a row is a selectable item of its own: round on every corner. */
 .grl--split .grl__row {
   border-radius: var(--radius-lg);
 }
@@ -108,16 +103,13 @@
   font-weight: var(--fw-semibold);
   white-space: nowrap;
 }
-/* The note starts at the edge of the filters and the rows. */
 .grl__loadError {
   margin: var(--space-4) 0;
 }
 
-/* ------------------------------------------------------------------ detail pane */
 .grl__detail {
   @include lp.detail;
 }
-/* Side by side the detail is as high as the pane: the gremium scrolls inside its sheet. */
 .grl--split .grl__detail {
   min-height: 0;
 }

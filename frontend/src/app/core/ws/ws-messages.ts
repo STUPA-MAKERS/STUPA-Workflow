@@ -163,8 +163,6 @@ export type ClientMessage =
   | { type: 'subscribe' }
   | BodyDraftMsg;
 
-// ------------------------------------------------------------------ to-do boards (`/api/ws/todos`)
-
 /**
  * A change ping of a board. It names what changed, never the content: the page reads the
  * card (`GET /todos/cards/{id}/tile`) or the board through REST, which keeps every rule.

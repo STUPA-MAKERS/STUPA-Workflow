@@ -80,7 +80,7 @@ export function parseRecipients(raw: string): string[] {
 }
 
 /**
- * The dialog that creates or edits a gremium (board Verwaltung-Gremium-Dialog).
+ * The dialog that creates or edits a gremium.
  *
  * It holds every setting of a gremium (gaps N38): name (the slug comes from the name of
  * a new gremium and never changes after), CD variant, default language, quorum, vote

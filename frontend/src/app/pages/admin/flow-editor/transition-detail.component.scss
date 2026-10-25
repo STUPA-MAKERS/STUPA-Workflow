@@ -1,6 +1,5 @@
 @use './inspector';
 
-/* Transparent wrapper. The blocks join the flex column of the panel directly. */
 :host {
   display: contents;
 }
@@ -38,7 +37,6 @@
   color: var(--color-text-muted);
 }
 
-/* A recipient: the kind, the value it needs (a gremium, a role, an address), remove. */
 .td__recipient {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -48,14 +46,11 @@
 .td__recipient + .td__recipient {
   margin-top: var(--space-1);
 }
-/* With a value: the kind and remove on the first line, the value under the kind. */
 .td__recipient--ref > :nth-child(2) {
   grid-column: 1;
   grid-row: 2;
 }
 
-/* A value → cost center row: the value and remove on the first line, the cost center
-   under the value. Both fields get the full width of the narrow panel. */
 .td__mapRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -78,7 +73,6 @@
   margin-left: calc(-1 * var(--space-2));
 }
 
-/* "Aktion hinzufügen": the type, then the button. */
 .td__add {
   display: flex;
   align-items: center;

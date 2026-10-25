@@ -1,7 +1,5 @@
-// The six label colours of the server palette. The app has no token for blue and
-// violet, so those two carry their own light value and a dark one under the dark
-// theme; every colour follows the theme. A component includes `colors` and sets `data-color` on the element that
-// paints `--lbl`.
+// The six label colours of the server palette. The app has no token for blue and violet, so
+// those two carry their own light and dark value.
 @mixin colors {
   [data-color='green'] {
     --lbl: var(--color-success);
@@ -29,7 +27,6 @@
   }
 }
 
-// A label as a small dot before its name.
 @mixin dot {
   display: inline-block;
   flex: none;

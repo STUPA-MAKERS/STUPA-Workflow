@@ -1,5 +1,3 @@
-// Flow editor (board Admin-Flow-Editor): the canvas sheet with its toolbar and legend,
-// and the inspector beside it.
 @use 'breakpoints' as bp;
 @use 'scroll-fade' as fade;
 @use 'press';
@@ -9,7 +7,6 @@
   flex-direction: column;
   min-width: 0;
 }
-/* Wide: the admin frame passes the free height down (route data `adminPane`). */
 :host(.fe-pane) {
   flex: 1 1 0;
   min-height: 0;
@@ -34,9 +31,6 @@
   font-size: var(--fs-sm);
 }
 
-/* ---- Work area ------------------------------------------------------------------- */
-
-/* Below wide: the canvas, then the inspector. */
 .fe__work {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -53,7 +47,6 @@
   }
 }
 
-/* The canvas sheet: a toolbar over the dotted canvas. */
 .fe__sheet {
   display: flex;
   flex-direction: column;
@@ -139,7 +132,6 @@
   padding-left: var(--space-4);
 }
 
-/* The canvas box: a dotted grid; the SVG fills it. Below wide it has a fixed height. */
 .fe__canvas-wrap {
   position: relative;
   flex: 1 1 auto;
@@ -155,8 +147,7 @@
   }
 }
 
-/* While the flow loads, the empty graph stays hidden under the placeholder. The SVG keeps
-   its box, so the canvas measures its real size. */
+// The SVG keeps its box while the flow loads, so the canvas measures its real size.
 .fe__canvas--loading {
   visibility: hidden;
 }
@@ -164,7 +155,7 @@
   position: absolute;
   inset: var(--space-4);
 }
-/* touch-action: none stops pen and touch panning from fighting the pan and connect logic. */
+// touch-action: none stops pen and touch panning from fighting the pan and connect logic.
 .fe__canvas {
   display: block;
   width: 100%;
@@ -177,8 +168,7 @@
   cursor: grabbing;
 }
 
-/* The scroll tongues, as on the wide tables (ui-kit data table): flush with the middle
-   of each side, rounded on the inner side only. */
+// The scroll tongues of the ui-kit data table.
 .fe__tongue {
   position: absolute;
   z-index: 2;
@@ -204,8 +194,8 @@
   opacity: 1;
   pointer-events: auto;
 }
-/* The size stays the same on hover: a repeat-click target that grows moves its own edge
-   away mid-click. The colour carries the hover. */
+// The size stays on hover, because a repeat-click target that grows moves its own edge away
+// mid-click.
 .fe__tongue--held {
   background: var(--color-accent);
   color: var(--color-on-accent);
@@ -276,7 +266,6 @@
   }
 }
 
-/* The legend at the bottom left of the canvas. */
 .fe__legend {
   position: absolute;
   left: var(--space-5);
@@ -308,14 +297,10 @@
   border-top: 2px dashed var(--color-text-subtle);
 }
 
-/* ---- Canvas: nodes and edges ----------------------------------------------------- */
-
 .fe__node-g {
   cursor: pointer;
 }
 
-/* The focus (a hovered or selected state, a selected transition) draws everything
-   that is not related to it faint. */
 .fe__node-g,
 .fe__edge-g {
   transition: opacity var(--motion-fast, 120ms) var(--ease-standard, ease);
@@ -333,7 +318,6 @@
   }
 }
 
-/* A state: surface 2, an edge in the state colour (or the outline colour). */
 .fe__node {
   fill: var(--color-surface-2);
   stroke: var(--color-text-subtle);
@@ -347,7 +331,6 @@
   stroke: var(--color-accent);
   stroke-dasharray: 5 3;
 }
-/* The ring around the selected state. */
 .fe__node-halo {
   fill: none;
   stroke: var(--color-accent);
@@ -369,7 +352,6 @@
   user-select: none;
 }
 
-/* "Endzustand" under the label of a terminal state. */
 .fe__node-tag {
   fill: var(--color-text-muted);
   font-size: 11px;
@@ -377,7 +359,6 @@
   user-select: none;
 }
 
-/* The kind above a state ("Abstimmung (Gremium)"), in the accent colour. */
 .fe__node-kind {
   fill: var(--color-accent-text);
   font-size: 11.5px;
@@ -386,7 +367,6 @@
   user-select: none;
 }
 
-/* A connector: a hollow port on the right edge of the state. */
 .fe__connector {
   fill: var(--color-surface-3);
   stroke: var(--color-text-subtle);
@@ -404,8 +384,6 @@
 .fe__connector--guard {
   stroke: var(--color-info, var(--color-accent));
 }
-/* The text beside a dot. A halo in the canvas colour keeps it legible where a line
-   passes under it. */
 .fe__dot-label {
   fill: var(--color-text-muted);
   font-size: 10.5px;
@@ -449,8 +427,6 @@
   fill: context-stroke;
 }
 
-/* An edge label: muted; the selected edge in the accent colour. A halo in the colour
-   of the sheet keeps it readable where it crosses a line. */
 .fe__edge-label {
   fill: var(--color-text-muted);
   font-size: 11.5px;
@@ -468,8 +444,6 @@
 .fe__bolt {
   fill: var(--color-warning);
 }
-
-/* ---- Canvas: groups and proxies -------------------------------------------------- */
 
 .fe__groupbox {
   fill: var(--color-surface-2);
@@ -522,8 +496,6 @@
   pointer-events: none;
 }
 
-/* ---- Inspector ------------------------------------------------------------------- */
-
 .fe__panel {
   display: flex;
   flex-direction: column;
@@ -575,8 +547,6 @@
   color: var(--color-text);
   font-size: var(--fs-xs);
 }
-
-/* ---- Phone ----------------------------------------------------------------------- */
 
 @include bp.phone {
   .fe__canvas-wrap {

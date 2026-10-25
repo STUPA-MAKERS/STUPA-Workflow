@@ -52,7 +52,7 @@ const ERROR_TEXT: Record<string, TranslationKey> = {
 };
 
 /**
- * "Board-Einstellungen" (frame 9, `todo.configure`): the name, the columns (rename,
+ * "Board-Einstellungen" (`todo.configure`): the name, the columns (rename,
  * order by drag or by the menu, the done column, add, delete), the labels (name and
  * colour from the fixed palette) and the archive of done cards. Every change saves at
  * once; `changed` gives the board to the page.
@@ -175,8 +175,6 @@ export class TodoBoardSettingsComponent {
     this.run(this.api.patchBoard(this.board().id, { archiveAfterDays: n }));
   }
 
-  // ------------------------------------------------------------------ columns
-
   columnMenu(col: TodoColumn, index: number): RowMenuSection[] {
     const t = (key: TranslationKey) => this.i18n.translate(key);
     const items: RowMenuItem[] = [{ id: 'rename', label: t('todos.settings.renameColumn'), icon: 'edit' }];
@@ -286,8 +284,6 @@ export class TodoBoardSettingsComponent {
     if (!col || !this.moveTo()) return;
     this.run(this.api.deleteColumn(this.board().id, col.id, this.moveTo()), () => this.deleting.set(null));
   }
-
-  // ------------------------------------------------------------------ labels
 
   editLabel(label: TodoLabel | null): void {
     this.labelEdit.set(label?.id ?? '');

@@ -307,7 +307,7 @@ def validate_answers(
     return result
 
 
-def _is_present(value: Any) -> bool:
+def _is_present(value: object) -> bool:
     """Report a value as present when it is not ``None`` and not empty.
 
     An empty string, list or dict counts as absent.
@@ -334,7 +334,7 @@ def _is_visible(field: FormFieldDef, ctx: Mapping[str, Any]) -> bool:
         return True
 
 
-def _validate_value(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_value(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate a present value against its field type and append the errors."""
     t = field.type
     if t in _TEXT_TYPES:
@@ -375,7 +375,7 @@ def _err(errors: list[FieldError], key: str, msg: str) -> None:
     errors.append(FieldError(field=key, msg=msg))
 
 
-def _validate_text(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_text(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate a text value against its length bounds and its pattern.
 
     A broken stored pattern or a ReDoS timeout gives a field error, not a hang or a 500.
@@ -401,7 +401,7 @@ def _validate_text(field: FormFieldDef, value: Any, errors: list[FieldError]) ->
             _err(errors, field.key, "does not match required pattern")
 
 
-def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_number(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate a finite number against its bounds.
 
     A comparison of NaN or Infinity with min or max raises ``decimal.InvalidOperation``, so
@@ -427,7 +427,7 @@ def _validate_number(field: FormFieldDef, value: Any, errors: list[FieldError]) 
         _err(errors, field.key, f"greater than maximum {v.max}")
 
 
-def _validate_funding(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_funding(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate the requested funding: a finite number above 0.
 
     The check against the cost total runs after all fields (`_check_funding_total`),
@@ -440,7 +440,7 @@ def _validate_funding(field: FormFieldDef, value: Any, errors: list[FieldError])
 
 
 def _check_funding_total(
-    field: FormFieldDef, value: Any, cost_total: Decimal, errors: list[FieldError]
+    field: FormFieldDef, value: object, cost_total: Decimal, errors: list[FieldError]
 ) -> None:
     """Report a requested funding above the cost total.
 
@@ -453,7 +453,7 @@ def _check_funding_total(
         _err(errors, field.key, f"greater than the cost total {cost_total}")
 
 
-def _validate_date(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_date(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     if not isinstance(value, str):
         _err(errors, field.key, "must be an ISO date string")
         return
@@ -467,7 +467,7 @@ def _option_values(field: FormFieldDef) -> set[str]:
     return {o.value for o in field.options or []}
 
 
-def _validate_select(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_select(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate a single option value.
 
     ``FieldOption.value`` is a str, so only a string can be a valid option. The isinstance
@@ -478,7 +478,7 @@ def _validate_select(field: FormFieldDef, value: Any, errors: list[FieldError]) 
 
 
 def _validate_multiselect(
-    field: FormFieldDef, value: Any, errors: list[FieldError]
+    field: FormFieldDef, value: object, errors: list[FieldError]
 ) -> None:
     """Validate a list of option values.
 
@@ -495,7 +495,7 @@ def _validate_multiselect(
 
 
 def _validate_uuid_ref(
-    field: FormFieldDef, value: Any, errors: list[FieldError], label: str
+    field: FormFieldDef, value: object, errors: list[FieldError], label: str
 ) -> None:
     """Check the value of a dynamic picker field as a well-formed UUID.
 
@@ -520,7 +520,7 @@ def _validate_uuid_ref(
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
-def _validate_email(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_email(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     if not isinstance(value, str) or not _EMAIL_RE.match(value):
         _err(errors, field.key, "is not a valid e-mail address")
 
@@ -542,13 +542,13 @@ def _iban_mod97_ok(iban: str) -> bool:
     return int("".join(str(int(ch, 36)) for ch in rearranged)) % 97 == 1
 
 
-def _validate_iban(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_iban(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Check the IBAN form and the ISO-7064 mod-97 checksum, not only a regex."""
     if not isinstance(value, str) or not _iban_mod97_ok(value):
         _err(errors, field.key, "is not a valid IBAN")
 
 
-def _validate_daterange(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_daterange(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Check a `daterange` value ``{"from": ISO, "to": ISO}`` with ``from <= to``."""
     if not isinstance(value, dict):
         _err(errors, field.key, "must be an object with 'from' and 'to'")
@@ -567,12 +567,12 @@ def _validate_daterange(field: FormFieldDef, value: Any, errors: list[FieldError
         _err(errors, field.key, "'from' must not be after 'to'")
 
 
-def _validate_checkbox(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_checkbox(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     if not isinstance(value, bool):
         _err(errors, field.key, "must be a boolean")
 
 
-def _validate_file(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_file(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate the attachment references of a file field.
 
     The upload checks content, size and MIME type, so this function checks only the shape.
@@ -584,7 +584,7 @@ def _validate_file(field: FormFieldDef, value: Any, errors: list[FieldError]) ->
     _err(errors, field.key, "must be an attachment reference (string or list of strings)")
 
 
-def _validate_table(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_table(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate the rows of a table field.
 
     The row cap does not use a falsy ``or``, because a configured ``maxRows=0`` is valid
@@ -630,7 +630,7 @@ def _offer_value(offer: Mapping[str, Any]) -> Decimal | None:
     return num if num.is_finite() else None
 
 
-def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError]) -> None:
+def _validate_positions(field: FormFieldDef, value: object, errors: list[FieldError]) -> None:
     """Validate the cost positions of a field.
 
     The list needs at least ``minPositions`` positions. Each position needs at least
@@ -715,7 +715,7 @@ def _validate_positions(field: FormFieldDef, value: Any, errors: list[FieldError
             _err(errors, where, "exactly one offer must be marked preferred")
 
 
-def positions_total(value: Any) -> Decimal | None:
+def positions_total(value: object) -> Decimal | None:
     """Sum the preferred offer values of all positions.
 
     The result is the position total. It is ``None`` when no position has a valid
@@ -782,7 +782,7 @@ def extract_promoted(
     return out
 
 
-def _finite_decimal(value: Any) -> Decimal | None:
+def _finite_decimal(value: object) -> Decimal | None:
     """Return ``value`` as a finite ``Decimal``, or ``None`` for an absent or bad value."""
     if value is None or value == "" or isinstance(value, bool):
         return None

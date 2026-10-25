@@ -4,7 +4,6 @@
   display: block;
 }
 
-/* The budget chip and the fiscal years on one line; the years wrap below on a narrow sheet. */
 .bt__pickers {
   display: flex;
   flex-wrap: wrap;
@@ -12,7 +11,6 @@
   gap: var(--space-3);
   min-width: 0;
 }
-/* Many years scroll sideways inside their own box instead of cutting the labels. */
 .bt__years {
   max-width: 100%;
   overflow-x: auto;
@@ -27,9 +25,8 @@
   color: var(--color-text-muted);
 }
 
-/* Eight columns share the sheet beside the admin navigation: the cells keep a narrower
-   inline padding than the kit default, so the amounts fit without a sideways scroll.
-   The first and the last cell keep the kit padding at the row edge. */
+// Eight columns share the sheet beside the admin navigation, so the cells keep a narrower
+// inline padding than the kit default; the edge cells keep the kit padding.
 :host .bt__table ::ng-deep .dt__table th,
 :host .bt__table ::ng-deep .dt__table td {
   padding-inline: var(--space-2);
@@ -41,7 +38,6 @@
   padding-inline-end: var(--space-3);
 }
 
-/* The tree cell: the fold button or its gap, then name over key path. */
 .bt__node {
   display: flex;
   align-items: center;
@@ -77,9 +73,8 @@
   flex: none;
   width: 1.75rem;
 }
-/* The name column takes only the width the fixed columns leave: the text box asks for no
-   width of its own (`width: 0`) and grows into the free room. So a long name or a deep
-   node never pushes the amounts out of the sheet. */
+// `width: 0` asks for no width, so a long name or a deep node never pushes the amounts out of the
+// sheet.
 .bt__nodeText {
   display: flex;
   flex: 1 1 0;
@@ -87,8 +82,6 @@
   width: 0;
   min-width: 0;
 }
-/* The name and its status ("Inaktiv") share a line. A long name wraps at a word and is
-   never cut. */
 .bt__nameLine {
   display: flex;
   flex-wrap: wrap;
@@ -104,7 +97,6 @@
   font-weight: var(--fw-semibold);
   overflow-wrap: break-word;
 }
-/* A path keeps every key; it wraps at a dash instead of being cut. */
 .bt__path {
   font-size: var(--fs-xs);
   color: var(--color-text-muted);
@@ -118,7 +110,6 @@
 .bt__avail {
   color: var(--color-accent-text);
 }
-/* The amounts a narrow table leaves out, one small line each under "Verfügbar". */
 .bt__more {
   display: block;
   font-size: var(--fs-xs);
@@ -130,8 +121,6 @@
   color: var(--color-danger);
 }
 
-/* The colour of a node: filled for its own colour, muted for the colour of a parent,
-   an empty box without a colour. */
 .bt__swatch {
   display: inline-block;
   width: 1.375rem;
@@ -153,11 +142,8 @@
   gap: 2px;
 }
 
-/* The inline row "Unter VS-200": key, name, create, cancel. It is one row of the row
-   group: the selection colour fills the whole cell edge to edge, so the last row follows
-   the round corner of the table, and the form keeps the inline padding of the cells.
-   The fields have no label inside, so they are as high as the buttons (40px). The
-   selector beats the hover rule of the row group, because the row is not clickable. */
+// The fields have no label inside, so they are as high as the 40px buttons. The selector beats
+// the hover rule of the row group, because the row is not clickable.
 :host .bt__table ::ng-deep .dt__detail-row > td {
   padding: 0;
   background: var(--color-selected);
@@ -209,7 +195,6 @@
   }
 }
 
-/* Dialogs. */
 .bt__form {
   display: flex;
   flex-direction: column;
@@ -264,7 +249,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 3px;
 }
-/* The browser's own colour picker, as a box with a rainbow edge. */
 .bt__colorNative {
   background: conic-gradient(#e5484d, #f5a524, #f5d90a, #46a758, #0091ff, #8e4ec6, #e5484d);
 }
@@ -301,7 +285,6 @@
   font-weight: var(--fw-semibold);
 }
 
-/* A plain number field for the cutoff: it saves on change, like the board. */
 .bt__numField {
   display: flex;
   flex-direction: column;

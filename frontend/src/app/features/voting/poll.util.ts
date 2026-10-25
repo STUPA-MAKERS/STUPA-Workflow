@@ -200,8 +200,6 @@ function topOf(order: readonly string[], counts: Readonly<Record<string, number>
   return most > 0 ? order.filter((id) => (counts[id] ?? 0) === most) : [];
 }
 
-// ------------------------------------------------------------------ the editor
-
 /** One option in the editor: a text, or a date with a start and an optional end. */
 export interface PollOptionDraft {
   /** A local key for the list; the server gives the ids. */

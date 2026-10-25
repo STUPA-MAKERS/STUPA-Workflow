@@ -33,7 +33,7 @@ import hashlib
 import io
 import json
 import tarfile
-from collections.abc import Iterable, Iterator
+from collections.abc import Generator, Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import IO
@@ -257,7 +257,7 @@ def decrypt_stream(source: IO[bytes], target: IO[bytes], identity: x25519.Identi
 
 
 @contextmanager
-def open_tar(handle: IO[bytes]) -> Iterator[tarfile.TarFile]:
+def open_tar(handle: IO[bytes]) -> Generator[tarfile.TarFile]:
     """Open a decrypted tar for reading.
 
     The ``finally`` of this context manager closes the tar, so the SIM115 advice does

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
     Boolean,
@@ -41,10 +42,10 @@ class MailTemplate(UUIDPkMixin, CreatedAtMixin, Base):
     __tablename__ = "mail_template"
 
     key: Mapped[str] = mapped_column(Text, unique=True)
-    subject_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    body_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    body_html_i18n: Mapped[dict] = mapped_column(JSONB, server_default="{}")
-    placeholders: Mapped[dict] = mapped_column(JSONB, server_default="{}")
+    subject_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    body_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    body_html_i18n: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
+    placeholders: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default="{}")
 
 
 class NotificationPreference(Base):
