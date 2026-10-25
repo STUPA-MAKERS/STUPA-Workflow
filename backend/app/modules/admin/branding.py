@@ -9,7 +9,9 @@ data URL. The server validates it authoritatively. The server decodes the data
 URL and checks the real byte size against the 2 MB cap. It does not trust the
 client ``size`` field. It sniffs the image type from the decoded magic bytes and
 accepts the PNG, JPEG, WebP and ICO whitelist only. The sniffed type must match
-the declared ``mime``. Inline SVG is an XSS vector, so the server refuses it. An
+the declared ``mime``. Inline SVG is an XSS vector, so the server refuses it.
+The validator here runs synchronously, so the ClamAV scan of the inline bytes
+(``BrandingAsset.inline_bytes``) runs in ``SiteConfigService`` before the store. An
 http(s) URL or an absolute asset URL is allowed, but the server never fetches
 it. For such a URL the server checks the declared values only. Footer and legal
 URLs refuse the ``javascript:`` and ``data:`` schemes. Freetexts and labels have
@@ -131,6 +133,17 @@ class BrandingAsset(_CamelModel):
         if self.size > MAX_LOGO_BYTES:
             raise ValueError(f"logo exceeds {MAX_LOGO_BYTES} bytes")
         return self
+
+    def inline_bytes(self) -> bytes | None:
+        """Return the decoded bytes of an inline data-URL logo, else ``None``.
+
+        The model validator already checked the data URL, so the decode cannot fail
+        here. A logo behind an http(s) or absolute URL has no bytes on the server.
+        """
+        raw = self.url.strip()
+        if not raw.lower().startswith("data:"):
+            return None
+        return base64.b64decode(raw.split(",", 1)[1], validate=True)
 
     def _validate_data_url(self, raw: str) -> None:
         """Decode the data URL and validate the real bytes against the magic type and size."""

@@ -64,6 +64,7 @@ import {
   chatPeople,
   highlightMentions,
   mentionIds,
+  mentionQuery,
 } from './chat-mentions';
 import type {
   ChatAttachment,
@@ -798,8 +799,21 @@ export class ChatComponent {
   /** Read the "@" search of a text box after an input, a click or a caret move. */
   protected readMention(picker: MentionPicker, event: Event): void {
     const box = event.target as HTMLTextAreaElement;
+    if (picker === this.composerMentions && event.type === 'input') this.internalForMention(box);
     picker.setPeople(picker === this.composerMentions ? this.composerPeople() : this.editPeople());
     picker.update(box.value, box.selectionStart ?? box.value.length);
+  }
+
+  /**
+   * A typed "@" in a message that may not mention (a public one, where the other side
+   * reads the names) makes the message internal, so the list opens. Only the "@" itself
+   * switches: a person who sets it back to public keeps typing without a second switch.
+   */
+  private internalForMention(box: HTMLTextAreaElement): void {
+    if (this.mayMention(this.visibility()) || !this.mentionables().length) return;
+    if (!this.visibilityOptions().includes('internal')) return;
+    if (mentionQuery(box.value, box.selectionStart ?? box.value.length)?.query !== '') return;
+    this.visibility.set('internal');
   }
 
   /** A key for the open "@" list. True: the list took it. */

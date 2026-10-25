@@ -1,7 +1,9 @@
 """Virus scanning with ClamAV/clamd: the ``VirusScanner`` protocol and ``ScanVerdict``.
 
-The worker scans the uploaded object with the ``clamd`` INSTREAM command. The module
-imports ``clamd`` lazily, because only the worker path needs it.
+The worker scans an uploaded attachment with the ``clamd`` INSTREAM command, after the
+upload (quarantine). ``scan_or_raise`` scans in the request, before the upload is
+stored: invoice PDFs, Markdown images, CD logos and inline branding logos use it. The module imports
+``clamd`` lazily, because only a configured scanner needs it.
 """
 
 from __future__ import annotations
@@ -11,6 +13,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from app.settings import Settings
+from app.shared.errors import ServiceUnavailableError, UnsupportedMediaTypeError
 
 # The official EICAR test signature. It is not a real virus. Quarantine tests and fakes
 # use it.
@@ -89,3 +92,33 @@ def build_scanner(settings: Settings) -> VirusScanner | None:
         port=settings.clamav_port,
         timeout_seconds=settings.clamav_timeout_seconds,
     )
+
+
+async def scan_or_raise(data: bytes, settings: Settings) -> None:
+    """Scan the bytes of an upload in the request and raise on a bad verdict.
+
+    The caller calls this before it stores the bytes, so an infected file never
+    reaches the bucket. Without ClamAV the scan is skipped outside ``production``,
+    which covers development and contract CI. In ``production`` a missing or failed
+    scanner fails closed, so the server never stores an unscanned upload. This
+    matches the quarantine of the attachments.
+
+    Raises:
+        ServiceUnavailableError: The scanner is missing in production or the scan
+            failed (503).
+        UnsupportedMediaTypeError: The scanner found a signature (415). The detail
+            names the signature.
+    """
+    scanner = build_scanner(settings)
+    if scanner is None:
+        if settings.is_production:
+            raise ServiceUnavailableError("Virus scan unavailable.")
+        return
+    try:
+        verdict = await scanner.scan(data)
+    except ScannerError as exc:
+        raise ServiceUnavailableError("Virus scan unavailable.") from exc
+    if not verdict.clean:
+        raise UnsupportedMediaTypeError(
+            f"File rejected by virus scan: {verdict.signature or 'unknown'}"
+        )

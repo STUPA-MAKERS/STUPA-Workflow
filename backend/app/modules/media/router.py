@@ -75,7 +75,12 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 def get_media_service(session: DbSession, request: Request, settings: SettingsDep) -> MediaService:
     """Wire the service with the optional object storage from the app state."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
-    return MediaService(session, storage=storage, max_bytes=settings.markdown_image_max_bytes)
+    return MediaService(
+        session,
+        storage=storage,
+        max_bytes=settings.markdown_image_max_bytes,
+        settings=settings,
+    )
 
 
 def get_public_protocols(session: DbSession) -> PublicProtocolService:

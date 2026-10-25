@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.modules.webhooks.ssrf import SsrfError, assert_allowed_url, pin_url
+from app.shared.ssrf import SsrfError, assert_allowed_url, pin_url
 
 
 def _resolver(*addrs: str):

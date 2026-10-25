@@ -72,7 +72,7 @@ from app.modules.applications.router import (
     get_magic_link_sender,
 )
 from app.modules.applications.schemas import ApplicationListItem, StateOut
-from app.settings import Settings, load_settings
+from app.settings import Settings, get_settings, load_settings
 from app.shared.errors import ForbiddenError, UnauthorizedError
 from app.shared.ratelimit import RateLimitResult
 
@@ -452,7 +452,7 @@ def test_admin_service_factories_construct() -> None:
     sess = SimpleNamespace()
     req = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
     assert isinstance(get_config_service(sess, req), ConfigService)  # type: ignore[arg-type]
-    assert isinstance(get_site_config_service(sess), SiteConfigService)  # type: ignore[arg-type]
+    assert isinstance(get_site_config_service(sess, get_settings()), SiteConfigService)  # type: ignore[arg-type]
     assert isinstance(get_gremium_role_service(sess), GremiumRoleService)  # type: ignore[arg-type]
 
 

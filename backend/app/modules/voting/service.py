@@ -114,6 +114,44 @@ def open_tally_revealed(present: int, voted: int, expected: int) -> bool:
 
 
 
+async def holds_gremium_vote_role(
+    session: AsyncSession, gremium_id: UUID, principal: Principal
+) -> bool:
+    """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
+
+    Both go through ``gremium_ids_for``, so the OAuth scope cap applies (F16). The
+    read rule of a vote without a meeting (``VotingService.assert_can_read``) uses
+    this part alone, because that rule checks the admin role before, with a read
+    right instead of ``vote.manage``.
+    """
+    from app.modules.admin.gremium_roles import gremium_ids_for
+
+    for perm in ("vote.manage", "session.manage"):
+        if gremium_id in await gremium_ids_for(session, principal, perm):
+            return True
+    return False
+
+
+async def manages_votes_in_gremium(
+    session: AsyncSession, gremium_id: UUID, principal: Principal
+) -> bool:
+    """Tell whether the principal manages the votes of this gremium.
+
+    This is the single source of the gremium rule of vote management: the admin role
+    (``admin_bypass`` with ``vote.manage``) or a gremium role with ``vote.manage`` or
+    ``session.manage`` (``holds_gremium_vote_role``). The OAuth scope cap applies to
+    every path, so an admin token with only the ``read`` scope cannot manage.
+    ``VotingService.can_manage_group`` applies it to a vote without a meeting, and
+    ``PermissionOps.can_manage_votes`` adds the session lead and the protokollant of
+    a meeting to it. No global permission grants the right.
+    """
+    from app.modules.admin.gremium_roles import admin_bypass
+
+    if admin_bypass(principal, "vote.manage"):
+        return True
+    return await holds_gremium_vote_role(session, gremium_id, principal)
+
+
 def _refuse_open(rows: Sequence[Vote], *, owner: str) -> None:
     """Refuse a delete while one of the votes is open.
 
@@ -1344,7 +1382,9 @@ class VotingService:
         gremium_id = await self._vote_gremium_id(
             meeting_id=None, eligible_group=vote.eligible_group
         )
-        if gremium_id is not None and await self._manages_in_gremium(gremium_id, principal):
+        if gremium_id is not None and await holds_gremium_vote_role(
+            self.session, gremium_id, principal
+        ):
             return
         raise ForbiddenError("not allowed to view this vote")
 
@@ -1407,18 +1447,6 @@ class VotingService:
             return False
         return (await self.my_ballot(vote, delegator_sub, secret=secret)).cast
 
-    async def _manages_in_gremium(self, gremium_id: UUID, principal: Principal) -> bool:
-        """Tell whether a gremium role gives ``vote.manage`` or ``session.manage`` here.
-
-        Both go through ``gremium_ids_for``, so the OAuth scope cap applies (F16).
-        """
-        from app.modules.admin.gremium_roles import gremium_ids_for
-
-        for perm in ("vote.manage", "session.manage"):
-            if gremium_id in await gremium_ids_for(self.session, principal, perm):
-                return True
-        return False
-
     async def _vote_gremium_id(
         self, *, meeting_id: UUID | None, eligible_group: str
     ) -> UUID | None:
@@ -1452,7 +1480,8 @@ class VotingService:
         open, close and delete buttons from it. This gate must therefore admit exactly
         the people that flag names, or the UI offers an action that the API refuses.
         ``MeetingService.can_manage_votes`` is the single source of that rule: the
-        session manager, the protokollant, or a gremium role with ``vote.manage``.
+        session manager, the protokollant, or the gremium rule
+        (``manages_votes_in_gremium``).
 
         The protokollant is an active member of the gremium of the meeting, which
         ``_resolve_protokollant`` enforces, so this reaches no other gremium. The same
@@ -1478,20 +1507,17 @@ class VotingService:
         It covers create, open, close, cancel and delete. The checks run in this
         order:
 
-        1. The admin role (``admin_bypass`` with ``vote.manage``). The OAuth scope cap
-           applies, so an admin token with only the ``read`` scope cannot manage.
-        2. For a meeting-bound vote, the meeting rule. It keeps the enforced right
-           equal to the advertised ``canManageVotes`` flag.
-        3. The gremium permission ``vote.manage`` OR ``session.manage`` in the gremium
-           of the vote. This covers the application vote that no meeting holds.
+        1. For a meeting-bound vote, the meeting rule
+           (``PermissionOps.can_manage_votes``). It keeps the enforced right equal to
+           the advertised ``canManageVotes`` flag, and it holds the gremium rule.
+        2. The gremium rule (``manages_votes_in_gremium``) in the gremium of the vote:
+           the admin role or a gremium role with ``vote.manage`` or
+           ``session.manage``. This covers the application vote that no meeting holds,
+           and a vote whose meeting is gone.
 
-        No global permission grants the right. A vote with a free group key resolves
-        no gremium, so only the admin role passes.
+        A vote with a free group key resolves no gremium, so only the admin role
+        passes.
         """
-        from app.modules.admin.gremium_roles import admin_bypass
-
-        if admin_bypass(principal, "vote.manage"):
-            return True
         if meeting_id is not None and await self._meeting_grants_vote_management(
             meeting_id, principal
         ):
@@ -1500,8 +1526,10 @@ class VotingService:
             meeting_id=meeting_id, eligible_group=eligible_group
         )
         if gremium_id is None:
-            return False
-        return await self._manages_in_gremium(gremium_id, principal)
+            from app.modules.admin.gremium_roles import admin_bypass
+
+            return admin_bypass(principal, "vote.manage")
+        return await manages_votes_in_gremium(self.session, gremium_id, principal)
 
     async def assert_can_manage_group(
         self, eligible_group: str, meeting_id: UUID | None, principal: Principal

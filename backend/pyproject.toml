@@ -84,8 +84,8 @@ dev = [
     # on every run. Without a fixed version and a fixed seed (see `--seed` in the CI),
     # `be-contract` turns non-deterministic and passes or fails on the same commit. Exact
     # pins keep a red run reproducible and stop tool updates from moving it.
-    "schemathesis==4.30.1",
-    "hypothesis==6.168.5",
+    "schemathesis==4.31.1",
+    "hypothesis==6.170.0",
     "ruff>=0.9",
     "basedpyright>=1.28",
     "testcontainers[postgres]>=4.8",
@@ -160,6 +160,8 @@ modules = [
     "modules/webhooks",
     "modules/audit",
     "modules/backup",
+    # The SSRF guard of the webhooks lives in app/shared, and the gate follows it.
+    "shared/ssrf.py",
     # worker/backup.py: `worker` is its own coverage source, so coverage.xml lists the
     # file as plain `backup.py`.
     "backup.py",

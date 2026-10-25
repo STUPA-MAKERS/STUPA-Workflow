@@ -85,7 +85,7 @@ The non-negotiables. Source of truth: `CONTRIBUTING.md`, `.github/pull_request_t
 `errors.py` problem+json · `guards.py` guard evaluator (no eval) · `jsonlogic.py` JsonLogic for
 form visibleIf/compute · `config_schemas.py` camelCase base · `permissions.py` permission catalog ·
 `paging.py` pagination · `ratelimit.py` rate limiting · `altcha.py`/`antiabuse.py` captcha ·
-`i18n.py` locale · `xlsx.py` spreadsheet export · `filenames.py` upload display/storage names and
+`i18n.py` locale · `xlsx.py` spreadsheet export · `ssrf.py` SSRF guard of the outgoing requests (webhooks, Gravatar; 100 % branch gate) · `filenames.py` upload display/storage names and
 `Content-Disposition` (see `be-files`).
 
 **Related:** every `be-*` skill, `frontend`, `deploy`.
