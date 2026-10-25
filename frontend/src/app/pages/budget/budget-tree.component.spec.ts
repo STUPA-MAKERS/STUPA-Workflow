@@ -1370,6 +1370,88 @@ describe('BudgetTreeComponent', () => {
     expect(c.fyEdit()).toBe(FY);
   });
 
+  // --- close and reopen a fiscal year -----------------------------------------
+
+  const CLOSED: FiscalYear = { ...FY, closedAt: '2026-03-01T00:00:00Z' };
+
+  it('offers the close for an open year and the reopen for a closed one', async () => {
+    const { c, fixture } = await setup();
+    expect(c.fyMenu(FY)[0].items.map((i: { id: string }) => i.id)).toEqual(['close']);
+    expect(c.fyMenu(FY)[1].items[0].disabledReason).toBeUndefined();
+    expect(c.fyMenu(CLOSED)[0].items.map((i: { id: string }) => i.id)).toEqual(['reopen']);
+    expect(c.fyMenu(CLOSED)[1].items[0].disabledReason).toBe('Das Haushaltsjahr ist abgeschlossen.');
+    c.fiscalYears.set([CLOSED]);
+    c.openFy();
+    fixture.detectChanges();
+    expect(screen.getByText('abgeschlossen')).toBeInTheDocument();
+    expect(c.fyOptions()).toEqual([{ value: 'fy-1', label: 'HHJ 2026 · abgeschlossen' }]);
+  });
+
+  it.each([
+    [FY, 'close', 'Haushaltsjahr 2026 abgeschlossen.'],
+    [CLOSED, 'reopen', 'Haushaltsjahr 2026 wieder geöffnet.'],
+  ])('closes or reopens a year after the confirmation', async (fy, action, msg) => {
+    const { c, http, toast, fixture } = await setup();
+    c.openFy();
+    c.onFyMenu(fy, { id: action, label: '' });
+    expect(c.fyOpen()).toBe(false);
+    expect(c.fyCloseTarget()).toBe(fy);
+    fixture.detectChanges();
+    expect(screen.getByRole('dialog')).toHaveTextContent('Haushaltsjahr 2026');
+    c.doFyClose();
+    const req = http.expectOne((r) => r.url.endsWith(`/budgets/b-vs/fiscal-years/fy-1/${action}`));
+    expect(req.request.method).toBe('POST');
+    req.flush(fy);
+    expect(toast.success).toHaveBeenCalledWith(msg);
+    expect(c.fyCloseTarget()).toBeNull();
+    expect(c.fyOpen()).toBe(true);
+    http.expectOne((r) => r.url.endsWith('/budgets/b-vs/fiscal-years')).flush([]);
+  });
+
+  it('toasts a failed close and keeps the confirmation open', async () => {
+    const { c, http, toast } = await setup();
+    c.askFyClose(FY);
+    c.doFyClose();
+    http.expectOne((r) => r.url.endsWith('/close')).flush(null, { status: 500, statusText: 'err' });
+    expect(toast.error).toHaveBeenCalledWith('Aktion fehlgeschlagen.');
+    expect(c.fyCloseTarget()).toBe(FY);
+    c.closeFyClose();
+    expect(c.fyCloseTarget()).toBeNull();
+  });
+
+  it('doFyClose is a no-op without a target or without a top', async () => {
+    const { c, http } = await setup();
+    c.doFyClose();
+    c.askFyClose(FY);
+    c.selectedTopId.set('');
+    c.doFyClose();
+    http.verify();
+  });
+
+  it('freezes the limit of a closed year', async () => {
+    const { c, http, toast } = await setup();
+    c.fiscalYears.set([CLOSED]);
+    expect(c.selectedFyClosed()).toBe(true);
+    expect(c.rowMenu()[0].items[0].disabledReason).toBe('Das Haushaltsjahr ist abgeschlossen.');
+    // A year closed by someone else in the meantime: the server answers 409.
+    c.openLimit(TREE[0].children[0]);
+    c.limitValue.set('500');
+    c.saveLimit();
+    http
+      .expectOne((r) => r.url.endsWith('/allocations/fy-1'))
+      .flush({ code: 'fiscal_year_closed' }, { status: 409, statusText: 'conflict' });
+    expect(toast.error).toHaveBeenCalledWith('Das Haushaltsjahr ist abgeschlossen.');
+  });
+
+  it('locks the year field in the edit of a closed year', async () => {
+    const { c, fixture } = await setup();
+    c.openFyEdit(CLOSED);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(screen.getByRole('spinbutton', { name: 'Jahr' })).toBeDisabled();
+  });
+
   it('nests no second main landmark inside the shell main', async () => {
     // `<main>` in a routed page template lands inside the `<main id="main">` of the
     // shell. HTML forbids that, and it gives a screen reader two "main" landmarks.

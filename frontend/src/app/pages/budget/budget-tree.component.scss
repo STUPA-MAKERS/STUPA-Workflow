@@ -153,15 +153,21 @@
   gap: 2px;
 }
 
-/* The inline row "Unter VS-200": key, name, create, cancel. */
+/* The inline row "Unter VS-200": key, name, create, cancel. It is one row of the row
+   group: the selection colour fills the whole cell edge to edge, so the last row follows
+   the round corner of the table, and the form keeps the inline padding of the cells.
+   The fields have no label inside, so they are as high as the buttons (40px). The
+   selector beats the hover rule of the row group, because the row is not clickable. */
+:host .bt__table ::ng-deep .dt__detail-row > td {
+  padding: 0;
+  background: var(--color-selected);
+}
 .bt__child {
   display: grid;
   grid-template-columns: auto minmax(6rem, 9rem) minmax(0, 1fr) auto;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--color-selected);
+  padding: var(--space-3);
   color: var(--color-on-selected);
 }
 .bt__childUnder {
@@ -171,13 +177,27 @@
 .bt__childKey ::ng-deep input {
   font-family: var(--font-mono);
 }
+.bt__childKey ::ng-deep input::placeholder {
+  font-family: var(--font-sans);
+}
 .bt__childActions {
   display: inline-flex;
   gap: var(--space-2);
 }
 @include bp.phone {
+  /* On a phone the row is a card, and the card paints the colour: the cells of a card
+     are transparent. The form takes the padding of a card. */
+  :host .bt__table ::ng-deep .dt__table tbody tr.dt__detail-row {
+    display: block;
+    padding: 0;
+    background: var(--color-selected);
+  }
   .bt__child {
     grid-template-columns: minmax(0, 1fr);
+    padding: var(--space-3) var(--space-4);
+  }
+  .bt__childActions {
+    justify-content: flex-end;
   }
   /* A card names its depth with a small step only, and its title wraps. */
   .bt__node {

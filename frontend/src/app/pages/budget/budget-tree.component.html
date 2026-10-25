@@ -129,23 +129,25 @@
               <span class="bt__childUnder">{{ 'budget.tree.addChildUnder' | t: { path: parent.pathKey } }}</span>
               <app-input
                 class="bt__childKey"
-                [label]="'budget.tree.key' | t"
+                [placeholder]="'budget.tree.key' | t"
+                [ariaLabel]="'budget.tree.key' | t"
                 [ngModel]="childDraft().key"
                 (ngModelChange)="patchChild('key', $event)"
                 name="childKey"
               />
               <app-input
                 class="bt__childName"
-                [label]="'budget.tree.name' | t"
+                [placeholder]="'budget.tree.name' | t"
+                [ariaLabel]="'budget.tree.name' | t"
                 [ngModel]="childDraft().name"
                 (ngModelChange)="patchChild('name', $event)"
                 name="childName"
               />
               <span class="bt__childActions">
-                <app-button type="submit" variant="fill" size="sm" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()">
+                <app-button type="submit" variant="fill" [disabled]="!childDraft().key.trim() || !childDraft().name.trim()">
                   {{ 'budget.tree.create' | t }}
                 </app-button>
-                <app-button variant="text" size="sm" (click)="cancelAddChild()">{{ 'action.cancel' | t }}</app-button>
+                <app-button variant="text" (click)="cancelAddChild()">{{ 'action.cancel' | t }}</app-button>
               </span>
             </form>
           }
@@ -368,13 +370,17 @@
       >
         <ng-template appCell="display" let-fy><span class="bt__fyName">{{ $any(fy).display }}</span></ng-template>
         <ng-template appCell="active" let-fy>
-          <app-status-text [kind]="$any(fy).active ? 'accent' : 'muted'">{{ ($any(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t }}</app-status-text>
+          @if ($any(fy).closedAt) {
+            <app-status-text kind="neutral">{{ 'budget.tree.fyClosed' | t }}</app-status-text>
+          } @else {
+            <app-status-text [kind]="$any(fy).active ? 'accent' : 'muted'">{{ ($any(fy).active ? 'budget.tree.fyActive' : 'budget.tree.fyInactive') | t }}</app-status-text>
+          }
         </ng-template>
         <ng-template appCell="actions" let-fy>
           <span class="bt__actions" (click)="$event.stopPropagation()" (keydown.enter)="$event.stopPropagation()">
             <app-row-menu
               [label]="('budget.tree.rowActions' | t) + ': ' + $any(fy).display"
-              [sections]="fyMenu()"
+              [sections]="fyMenu($any(fy))"
               (selected)="onFyMenu($any(fy), $event)"
             />
           </span>
@@ -396,7 +402,7 @@
 <app-dialog [open]="!!fyEdit()" [title]="'budget.tree.fyEdit' | t" [subtitle]="selectedTopLabel()" [closeLabel]="'action.close' | t" (closed)="closeFyEdit()">
   @if (fyEdit()) {
     <form id="bt-fy-edit-form" class="bt__form" (submit)="$event.preventDefault(); saveFyEdit()">
-      <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" name="fyEditYear" />
+      <app-input type="number" [label]="'budget.tree.fyYear' | t" [ngModel]="fyEditYear()" (ngModelChange)="patchFyEditYear($event)" [disabled]="!!fyEdit()!.closedAt" name="fyEditYear" />
       <app-switch [checked]="fyEditActive()" (checkedChange)="fyEditActive.set($event)">
         {{ 'budget.tree.fyActive' | t }}
       </app-switch>
@@ -407,6 +413,18 @@
     <app-button variant="fill" [disabled]="!fyEditYear()" (click)="saveFyEdit()">{{ 'budget.tree.save' | t }}</app-button>
   </div>
 </app-dialog>
+
+<!-- Close a fiscal year, or reopen a closed one. A closed year takes no booking,
+     transfer, limit or application assignment. -->
+<app-confirm-dialog
+  [open]="!!fyCloseTarget()"
+  [title]="fyCloseTarget() ? ((fyCloseTarget()!.closedAt ? 'budget.tree.fyReopenTitle' : 'budget.tree.fyCloseTitle') | t: { year: fyCloseTarget()!.display }) : ''"
+  [body]="fyCloseTarget() ? ((fyCloseTarget()!.closedAt ? 'budget.tree.fyReopenConfirm' : 'budget.tree.fyCloseConfirm') | t) : ''"
+  [confirmLabel]="fyCloseTarget() ? ((fyCloseTarget()!.closedAt ? 'budget.tree.fyReopen' : 'budget.tree.fyClose') | t) : ''"
+  [danger]="false"
+  (confirm)="doFyClose()"
+  (cancel)="closeFyClose()"
+/>
 
 <!-- Delete a fiscal year. The server refuses with 409 while bookings, allocations or
      applications still hang on the year. That reason stays visible in the dialog. -->

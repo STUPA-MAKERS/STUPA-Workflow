@@ -319,7 +319,7 @@ class FlowExtrasActionDispatcher:
     async def _assign_node(
         self, session: AsyncSession, app: Application, budget_id: UUID, *, source: str
     ) -> bool:
-        """Assign the cost center and its single active fiscal year, then write the audit.
+        """Assign the cost center and its single active open fiscal year, then write the audit.
 
         The call is idempotent. A retry of the same action (same idempotency key)
         finds the cost center already set and changes nothing, so it writes no second
@@ -327,8 +327,8 @@ class FlowExtrasActionDispatcher:
 
         Returns:
             `True` after the assignment. The caller commits. `False` when the node is
-            missing or the application already has this cost center. Nothing changed in
-            that case.
+            missing, the application sits in a closed fiscal year, or the application
+            already has this cost center. Nothing changed in that case.
         """
         node = await session.get(Budget, budget_id)
         if node is None:
@@ -348,6 +348,15 @@ class FlowExtrasActionDispatcher:
                 app.id,
             )
             return False
+        if app.fiscal_year_id is not None:
+            current_fy = await session.get(FiscalYear, app.fiscal_year_id)
+            if current_fy is not None and current_fy.closed_at is not None:
+                # A closed fiscal year is frozen. The manual route gives 409 here.
+                logger.warning(
+                    "assignBudget: application %s sits in a closed fiscal year — no change",
+                    app.id,
+                )
+                return False
         if app.budget_id == node.id:
             logger.info(
                 "assignBudget: application %s already has budget %s — no change",
@@ -362,10 +371,11 @@ class FlowExtrasActionDispatcher:
                 select(FiscalYear.id).where(
                     FiscalYear.budget_id == top.id,
                     FiscalYear.active.is_(True),
+                    FiscalYear.closed_at.is_(None),
                 )
             )
         ).all()
-        # Set the active fiscal year only when it is unambiguous. Otherwise leave it open.
+        # Set the active open fiscal year only when it is unambiguous. Otherwise leave it open.
         if len(active_ids) == 1:
             app.fiscal_year_id = active_ids[0]
         # A money mutation needs an audit trail. House rule, mirrors BudgetTreeService.

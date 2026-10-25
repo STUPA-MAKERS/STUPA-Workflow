@@ -191,6 +191,8 @@ const BACKEND_AUDIT_ACTIONS = [
   'budget_node_update',
   'budget_node_delete',
   'budget_fiscal_year_delete',
+  'budget_fiscal_year_close',
+  'budget_fiscal_year_reopen',
   'budget_allocation_set',
   'budget_expense_create',
   'budget_expense_update',

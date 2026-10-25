@@ -183,12 +183,14 @@
                               <app-icon name="right" [size]="17" />
                             </span>
                           }
-                          <app-row-menu
-                            class="exp__menu"
-                            [label]="'expenses.rowMenu' | t: { description: t.description }"
-                            [sections]="transferMenu()"
-                            (selected)="onTransferMenu($event, t)"
-                          />
+                          @if (canChange(t.fiscalYearId)) {
+                            <app-row-menu
+                              class="exp__menu"
+                              [label]="'expenses.rowMenu' | t: { description: t.description }"
+                              [sections]="transferMenu()"
+                              (selected)="onTransferMenu($event, t)"
+                            />
+                          }
                         </span>
                       </span>
                     </app-list-item>
@@ -356,7 +358,7 @@
             [transfer]="t"
             [costCentres]="costCentres()"
             [fyLabel]="fyLabel(t.fiscalYearId)"
-            [canManage]="canManage()"
+            [canManage]="canChange(t.fiscalYearId)"
             [split]="split()"
             [phone]="phone()"
             (edit)="openTransferEdit(t)"
@@ -374,7 +376,7 @@
             [application]="linkedApplication()"
             [subRows]="sub.subOf(e.id)"
             [subLoading]="sub.isLoadingSub(e.id)"
-            [canManage]="canManage()"
+            [canManage]="canChange(e.fiscalYearId)"
             [split]="split()"
             [phone]="phone()"
             (edit)="openEdit($event)"

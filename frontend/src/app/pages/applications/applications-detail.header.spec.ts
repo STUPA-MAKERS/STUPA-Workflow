@@ -525,6 +525,23 @@ describe('ApplicationsDetailComponent — header', () => {
       http.verify();
     });
 
+    it('offers a closed year only while it is the year of the application', async () => {
+      const closed = { ...YEARS[1], id: 'fyc', year: 2024, display: '2024', closedAt: '2026-03-01T00:00:00Z' };
+      const c = (await setup({ app: { budgetId: 'b2', fiscalYearId: 'fy1' }, tree: TREE })).cmp as unknown as {
+        fiscalOptions: () => { value: string; label: string }[];
+        fiscalYears: { set: (v: unknown[]) => void };
+        app: { update: (f: (a: Record<string, unknown>) => Record<string, unknown>) => void };
+      };
+      c.fiscalYears.set([YEARS[0], closed]);
+      expect(c.fiscalOptions().map((o) => o.label)).toEqual(['Automatisch (aktives HHJ)', '2026']);
+      c.app.update((a) => ({ ...a, fiscalYearId: 'fyc' }));
+      expect(c.fiscalOptions().map((o) => o.label)).toEqual([
+        'Automatisch (aktives HHJ)',
+        '2026',
+        '2024 · abgeschlossen',
+      ]);
+    });
+
     it('names a cost centre without a year and offers "Zuordnen" without one', async () => {
       const { http } = await setup({ app: { budgetId: null, fiscalYearId: null }, tree: TREE });
       expect(screen.getByRole('button', { name: 'Kostenstelle' })).toHaveTextContent('Zuordnen');

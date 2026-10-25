@@ -118,6 +118,7 @@ class ExpenseOps(BudgetTreeServiceBase):
                 )
             node = await self._get_node(app.budget_id)
             fy_id = app.fiscal_year_id
+            await self._require_open_fiscal_year(fy_id)
             app_title = _title_of(app.data)
         else:
             if payload.budget_id is None:
@@ -199,6 +200,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         expense = await self.session.get(BudgetExpense, expense_id)
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
+        await self._require_open_fiscal_year(expense.fiscal_year_id)
         fields = payload.model_fields_set
         # Sub-booking invariant: never set the parent amount directly while
         # children exist. It equals the sum of the children. Count the children
@@ -455,6 +457,7 @@ class ExpenseOps(BudgetTreeServiceBase):
         ).scalar_one_or_none()
         if expense is None:
             raise NotFoundError(f"budget expense {expense_id} not found")
+        await self._require_open_fiscal_year(expense.fiscal_year_id)
         await self._audit(
             AuditAction.BUDGET_EXPENSE_DELETE,
             target_type="budget_expense",

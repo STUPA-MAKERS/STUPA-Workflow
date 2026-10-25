@@ -71,6 +71,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             raise ConflictError(
                 "Booking already removed; nothing to revert.", code="already_reverted"
             )
+        await self._require_open_fiscal_year(expense.fiscal_year_id)
         await self._audit(
             AuditAction.BUDGET_EXPENSE_DELETE,
             target_type="budget_expense",
@@ -105,6 +106,7 @@ class RevertOps(NodeOps, AllocationOps, ExpenseOps):
             raise ConflictError(
                 "Transfer already removed; nothing to revert.", code="already_reverted"
             )
+        await self._require_open_fiscal_year(rows[0].fiscal_year_id)
         await self._audit(
             AuditAction.BUDGET_EXPENSE_DELETE,
             target_type="budget_transfer",
