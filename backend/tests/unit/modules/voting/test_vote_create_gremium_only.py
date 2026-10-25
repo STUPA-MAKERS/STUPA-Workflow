@@ -34,7 +34,7 @@ from tests._support.flow_fakes import fake_session, result
 
 GID = UUID("00000000-0000-0000-0000-0000000c0de1")
 OTHER = UUID("00000000-0000-0000-0000-0000000c0de2")
-# `create` takes the caller. The router checks the manage right before the call.
+#: `create` takes the caller. The router checks the manage right before the call.
 MANAGER = Principal(sub="m")
 ADMIN = Principal(sub="a", roles=["admin"])
 
@@ -96,9 +96,6 @@ def _patch_gremium_perms(
     monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _fake)
 
 
-# The request body.
-
-
 def test_body_refuses_a_free_group_key() -> None:
     with pytest.raises(ValidationError):
         _body(eligibleGroup="stupa")
@@ -108,9 +105,6 @@ def test_body_refuses_a_client_eligible_count() -> None:
     """The client cannot send the quorum denominator."""
     with pytest.raises(ValidationError):
         _body(eligibleCount=3)
-
-
-# create(): gremium check and the server-side roster count.
 
 
 async def test_create_stores_the_roster_count() -> None:
@@ -137,8 +131,9 @@ async def test_create_percent_quorum_needs_no_client_count() -> None:
 
 
 async def test_create_unknown_gremium_422() -> None:
+    """An unknown gremium id gives 422."""
     db = fake_session()
-    db.scalar_results = [None]  # no gremium with this id
+    db.scalar_results = [None]
     with pytest.raises(ValidationProblem) as err:
         await VotingService(db).create(uuid4(), _body(), MANAGER)
     assert err.value.code == "eligible_group_invalid"
@@ -222,9 +217,6 @@ async def test_create_application_without_gremium_scoped_admin_token_403() -> No
         await VotingService(db).create(app.id, _body(), token)
 
 
-# Manage right of a standalone vote.
-
-
 async def test_session_manage_manages_a_standalone_vote(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -253,9 +245,6 @@ async def test_free_key_vote_only_the_admin_manages(
     with pytest.raises(ForbiddenError):
         await svc.assert_can_manage_group("stupa", None, Principal(sub="m"))
     await svc.assert_can_manage_group("stupa", None, Principal(sub="a", roles=["admin"]))
-
-
-# Read access to a standalone vote.
 
 
 async def test_eligible_voter_reads_without_application_read(
@@ -287,9 +276,6 @@ async def test_free_key_vote_needs_application_read(
     with pytest.raises(ForbiddenError):
         await svc.assert_can_read(vote, Principal(sub="m", groups={"stupa"}))  # pyright: ignore[reportArgumentType]
     await svc.assert_can_read(vote, Principal(sub="r", permissions={"application.read_all"}))  # pyright: ignore[reportArgumentType]
-
-
-# The capability flags of GET /votes/{id}.
 
 
 async def test_get_scoped_flags_for_a_voter(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -328,10 +314,13 @@ async def test_get_scoped_token_never_casts(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def test_create_follows_the_vote_gremium_snapshot() -> None:
-    """Flow variant B: in a vote state only the snapshot decides."""
+    """Flow variant B: in a vote state only the snapshot decides.
+
+    The scalar is the id of the existing gremium.
+    """
     app = _application(vote_gremium_id=OTHER, current_state_id=uuid4())
     db = fake_session(result(app), result(("vote", {})))
-    db.scalar_results = [GID]  # the gremium exists
+    db.scalar_results = [GID]
     with pytest.raises(ValidationProblem) as err:
         await VotingService(db).create(app.id, _body(), MANAGER)
     assert err.value.code == "eligible_group_mismatch"

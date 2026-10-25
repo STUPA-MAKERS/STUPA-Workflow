@@ -81,7 +81,6 @@ _ALL_PERMS = (
 )
 
 
-# DTO factories
 def _expense_out() -> ExpenseOut:
     return ExpenseOut(
         id=_EID,
@@ -337,9 +336,12 @@ class _FakeService:
         )
 
     async def invoice_file_bytes(self, invoice_id: uuid.UUID) -> tuple[bytes, str, str]:
+        """Return an HTML polyglot with an HTML MIME type and a name with CR and LF.
+
+        A client could inject such a MIME type. The router must not trust it and always
+        sends application/pdf as an attachment.
+        """
         self.calls["invoice_file_bytes"] = invoice_id
-        # This returns an HTML MIME type that a client could inject. The router must not
-        # trust it. The router always sends application/pdf as an attachment.
         return (b"<html>polyglot</html>", "text/html", 'we"ird\r\nname.pdf')
 
 
@@ -358,7 +360,6 @@ def _client(fake: _FakeService, perms: tuple[str, ...] = _ALL_PERMS) -> TestClie
     return TestClient(app)
 
 
-# Router: service factory and full tree view
 def test_get_budget_tree_service_factory_with_storage() -> None:
     """The factory reads `object_storage` from the app state and passes `sub` as the actor."""
     sentinel = object()
@@ -401,7 +402,6 @@ def test_list_tree_gremium_scoped(
     assert fake.calls["scope"] == {_GID}
 
 
-# Router: node, fiscal year, allocation and assign CRUD
 def test_create_node(fake: _FakeService) -> None:
     resp = _client(fake).post(
         "/api/budgets", json={"key": "VS", "name": "VS-Mittel", "gremiumId": str(_GID)}
@@ -504,16 +504,17 @@ def test_create_invoice(fake: _FakeService) -> None:
     assert fake.calls["create_invoice"][1] == "admin"
 
 
-# Router: node-scoped read through `_require_node_view`, full view and scope branches
 def test_list_applications_full_view(fake: _FakeService) -> None:
-    """A full view (budget.view) makes `_require_node_view` return at once."""
+    """A full view (budget.view) makes `_require_node_view` return at once.
+
+    The full view skips the Gremium scope check.
+    """
     resp = _client(fake, ("budget.view",)).get(
         f"/api/budgets/{_BID}/applications", params={"fiscalYear": str(_FYID)}
     )
     assert resp.status_code == 200
     assert resp.json()[0]["applicationId"] == str(_AID)
     assert fake.calls["list_applications"] == (_BID, _FYID)
-    # The full view skips the Gremium scope check.
     assert "can_view" not in fake.calls
 
 
@@ -579,8 +580,8 @@ def test_list_fiscal_years_scoped_allowed(
     assert fake.calls["list_fy"] == _BID
 
 
-# Router: `_find_subtree` recursion through the export with a `node` filter
 def test_find_subtree_direct() -> None:
+    """A hit in a child exercises the recursion."""
     leaf = _tree_node()
     other = BudgetTreeNodeOut(
         id=uuid.uuid4(),
@@ -594,7 +595,6 @@ def test_find_subtree_direct() -> None:
         children=[leaf],
     )
     assert _find_subtree([other], other.id) is other
-    # a hit in a child exercises the recursion
     assert _find_subtree([other], leaf.id) is leaf
     assert _find_subtree([other], uuid.uuid4()) is None
 
@@ -633,7 +633,6 @@ def test_export_with_node_filter_missing(fake: _FakeService) -> None:
     assert resp.content[:2] == b"PK"
 
 
-# Router: expenses (flat book and update) plus transfers
 def test_book_expense_flat(fake: _FakeService) -> None:
     resp = _client(fake).post(
         "/api/expenses",
@@ -669,6 +668,7 @@ def test_create_transfer(fake: _FakeService) -> None:
 
 
 def test_export_expenses_xlsx(fake: _FakeService) -> None:
+    """The router calls list_expenses_paged with limit 10_000."""
     resp = _client(fake, ("budget.export",)).get(
         "/api/expenses/export.xlsx",
         params={
@@ -689,18 +689,19 @@ def test_export_expenses_xlsx(fake: _FakeService) -> None:
     assert entry.target_id == "buchungen.xlsx"
     assert entry.data["rows"] == 1
     assert fake.session.committed is True
-    # The router calls list_expenses_paged with limit 10_000.
     assert fake.calls["list_expenses_paged"]["limit"] == 10_000
 
 
 def test_export_expenses_ids_filter(fake: _FakeService) -> None:
-    """`ids` limits the export to the selected bookings."""
+    """`ids` limits the export to the selected bookings.
+
+    A matching id keeps the booking, so the export has one row. A foreign id leaves no
+    row.
+    """
     client = _client(fake, ("budget.export",))
-    # a matching id keeps the booking, so the export has one row
     resp = client.get("/api/expenses/export.xlsx", params={"ids": str(_EID)})
     assert resp.status_code == 200
     assert fake.session.entries[-1].data["rows"] == 1
-    # a foreign id leaves no row in the export
     resp = client.get("/api/expenses/export.xlsx", params={"ids": str(uuid.uuid4())})
     assert resp.status_code == 200
     assert fake.session.entries[-1].data["rows"] == 0
@@ -714,8 +715,8 @@ def test_export_expenses_requires_permission(fake: _FakeService) -> None:
 def test_list_expenses_paged_sort_passthrough(fake: _FakeService) -> None:
     """The router passes `sort` to the service unchanged, including the date columns.
 
-    An earlier version wrongly collapsed invoiceDate and paymentDate onto createdAt. The
-    date sort in the bookings tab then had no effect. This is the regression test.
+    A collapse of invoiceDate and paymentDate onto createdAt would make the date sort in
+    the bookings tab ineffective.
     """
     _client(fake).get("/api/expenses?sort=amount&order=desc")
     assert fake.calls["list_expenses_paged"]["sort"] == "amount"
@@ -725,14 +726,13 @@ def test_list_expenses_paged_sort_passthrough(fake: _FakeService) -> None:
     assert fake.calls["list_expenses_paged"]["sort"] == "paymentDate"
 
 
-# Router: invoice CRUD and file endpoints
 def test_get_invoice(fake: _FakeService) -> None:
+    """budget.view is the full view: the linked bookings carry no gremium filter."""
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}")
     assert resp.status_code == 200
     assert resp.json()["number"] == "R-2026-1"
     assert resp.json()["linkedBookings"] == []
     assert fake.calls["get_invoice"] == _IID
-    # budget.view is the full view: the linked bookings carry no gremium filter.
     assert fake.calls["get_invoice_scope"] is None
 
 
@@ -826,16 +826,17 @@ def test_parse_invoice_not_zugferd(fake: _FakeService) -> None:
 
 
 def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
+    """The file route always sends application/pdf as an attachment with a safe file name.
+
+    The router ignores the client MIME type, so the HTML polyglot never renders inline.
+    The header helper drops CR and LF and keeps quotes and backslashes out of the quoted
+    fallback. The exact name goes percent-encoded into ``filename*``.
+    """
     resp = _client(fake, ("budget.view",)).get(f"/api/invoices/{_IID}/file")
     assert resp.status_code == 200
     cd = resp.headers["content-disposition"]
-    # Security hardening: the router ignores the client MIME type and always
-    # sends application/pdf with Content-Disposition attachment. The HTML polyglot must
-    # never render inline.
     assert resp.headers["content-type"] == "application/pdf"
     assert cd.startswith("attachment;")
-    # The header helper drops CR and LF and keeps quotes and backslashes out of the
-    # quoted fallback; the exact name goes percent-encoded into filename*.
     plain, ext = cd.removeprefix("attachment; ").split("; ")
     assert plain.startswith('filename="') and plain.endswith('"')
     assert '"' not in plain[len('filename="') : -1]
@@ -846,15 +847,15 @@ def test_get_invoice_file_sanitises_filename(fake: _FakeService) -> None:
     assert fake.calls["invoice_file_bytes"] == _IID
 
 
-# Schemas: model validators, both sides of every branch
 def test_expense_create_income_not_linkable() -> None:
-    # income plus application_id raises ValueError
+    """An income with an application_id raises ValueError.
+
+    An income without application_id passes, and so does an expense with application_id.
+    """
     with pytest.raises(ValueError, match="income cannot be linked"):
         ExpenseCreate(amount=Decimal("1"), description="x", kind="income", applicationId=_AID)
-    # income without application_id passes and the validator returns self
     ok = ExpenseCreate(amount=Decimal("1"), description="x", kind="income")
     assert ok.kind == "income"
-    # expense plus application_id passes because the first condition is false
     ok2 = ExpenseCreate(amount=Decimal("1"), description="x", applicationId=_AID)
     assert ok2.application_id == _AID
 
@@ -893,17 +894,17 @@ def test_transfer_create_distinct() -> None:
     assert ok.from_budget_id != ok.to_budget_id
 
 
-# invoice_import: pure helpers, all branches
 def test_amount_helper() -> None:
     assert _amount(None) is None
     assert _amount(SimpleNamespace(amount=Decimal("5"))) == Decimal("5")
 
 
 def test_sane_amount_helper() -> None:
+    """A non-finite, negative or too large amount gives None."""
     assert _sane_amount(None) is None
-    assert _sane_amount(Decimal("NaN")) is None  # not finite
-    assert _sane_amount(Decimal("-1")) is None  # negative
-    assert _sane_amount(Decimal("99999999999.99")) is None  # too large
+    assert _sane_amount(Decimal("NaN")) is None
+    assert _sane_amount(Decimal("-1")) is None
+    assert _sane_amount(Decimal("99999999999.99")) is None
     assert _sane_amount(Decimal("10.00")) == Decimal("10.00")
 
 
@@ -918,11 +919,12 @@ def test_require_sane_gross() -> None:
 
 
 def test_cii_date_helper() -> None:
+    """A too short value, a non-digit prefix and an invalid month give None."""
     assert _cii_date(None) is None
     assert _cii_date("") is None
-    assert _cii_date("2026") is None  # too short
-    assert _cii_date("abcdefgh") is None  # non-digit prefix
-    assert _cii_date("20261301") is None  # invalid month → ValueError branch
+    assert _cii_date("2026") is None
+    assert _cii_date("abcdefgh") is None
+    assert _cii_date("20261301") is None
     assert _cii_date("20260613") == date(2026, 6, 13)
 
 
@@ -933,19 +935,16 @@ def test_cii_decimal_helper() -> None:
 
 
 def test_find_text_helper() -> None:
+    """A missing element, a whitespace-only text and an empty element give None."""
     assert _find_text(None, "x") is None
     root = ET.fromstring("<r><a>  </a><b>hi</b></r>")
-    # no matching element, so found is None
     assert _find_text(root, "missing") is None
-    # found.text holds only whitespace, which covers the "text or None" branch
     assert _find_text(root, "a") is None
     assert _find_text(root, "b") == "hi"
-    # a self-closing element has no text, so found.text is None
     root2 = ET.fromstring("<r><c/></r>")
     assert _find_text(root2, "c") is None
 
 
-# _map branches through SimpleNamespace stubs
 def test_map_non_eur_currency() -> None:
     inv = SimpleNamespace(currency_code="USD")
     with pytest.raises(UnsupportedInvoiceCurrencyError) as ei:
@@ -960,14 +959,16 @@ def test_map_missing_gross_is_not_zugferd() -> None:
 
 
 def test_map_minimal_no_tax_no_terms_no_seller() -> None:
-    """A None currency defaults to EUR. Empty taxes give tax None. Terms and seller stay None."""
+    """A None currency defaults to EUR. Empty taxes give tax None. Terms and seller stay None.
+
+    A currency_code of None becomes "EUR". The tax totals, the payment terms, the seller
+    and the tax basis are absent, so getattr returns None.
+    """
     inv = SimpleNamespace(
-        currency_code=None,  # becomes "EUR"
+        currency_code=None,
         grand_total_amount=SimpleNamespace(amount=Decimal("50.00")),
         invoice_number="R-9",
         invoice_date=date(2026, 1, 1),
-        # tax_total_amounts, payment_terms, seller and tax_basis_total_amount are absent,
-        # so getattr returns None
     )
     parsed = _map(inv)  # type: ignore[arg-type]
     assert parsed.gross_amount == Decimal("50.00")
@@ -996,7 +997,6 @@ def test_map_with_tax_terms_seller() -> None:
     assert parsed.net_amount == Decimal("100.00")
 
 
-# parse_zugferd_pdf: a FacturXError falls back to the tolerant CII parser
 _VALID_CII = """<?xml version="1.0" encoding="UTF-8"?>
 <rsm:CrossIndustryInvoice
     xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
@@ -1069,7 +1069,6 @@ def test_parse_zugferd_pdf_success_path(monkeypatch: pytest.MonkeyPatch) -> None
     assert parsed.number == "MAPPED"
 
 
-# _extract_cii_xml: size, decode and content-error branches
 def test_extract_unreadable_pdf() -> None:
     with pytest.raises(NotZugferdError, match="unreadable PDF"):
         _extract_cii_xml(b"not a pdf at all")
@@ -1091,10 +1090,13 @@ def test_extract_no_xml_attachment() -> None:
 
 
 def test_extract_declared_size_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A declared `/Size` above the limit gives NotZugferdError (line 118)."""
+    """A declared `/Size` above the limit gives NotZugferdError.
+
+    The module imports PdfReader lazily, so the real reader stays untouched.
+    """
     pdf = _pdf_with_xml("factur-x.xml", _VALID_CII)
     real_reader = getattr(imp, "PdfReader", None)
-    assert real_reader is None  # the module imports PdfReader lazily
+    assert real_reader is None
 
     from pypdf import PdfReader as _RealReader
 
@@ -1114,7 +1116,6 @@ def test_extract_declared_size_too_large(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr("pypdf.PdfReader", _FakeReader)
     with pytest.raises(NotZugferdError, match="too large"):
         _extract_cii_xml(pdf)
-    # The real reader stays untouched.
     assert _RealReader is not _FakeReader
 
 
@@ -1143,7 +1144,7 @@ def test_extract_content_decompress_error(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_extract_payload_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A payload above the limit gives NotZugferdError (line 124)."""
+    """A payload above the limit gives NotZugferdError."""
     big = b"<x>" + b"a" * (imp._MAX_EMBEDDED_XML_BYTES + 1) + b"</x>"
 
     class _Emb:
@@ -1165,7 +1166,10 @@ def test_extract_payload_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_extract_invalid_utf8_uses_replace(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Invalid UTF-8 makes the code decode with the replace handler (lines 128-129)."""
+    """Invalid UTF-8 makes the code decode with the replace handler.
+
+    The output holds the replacement character.
+    """
     bad = b"\xff\xfe<x/>"
 
     class _Emb:
@@ -1184,10 +1188,9 @@ def test_extract_invalid_utf8_uses_replace(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr("pypdf.PdfReader", _FakeReader)
     out = _extract_cii_xml(b"whatever")
     assert isinstance(out, str)
-    assert "�" in out  # replacement char
+    assert "�" in out
 
 
-# _parse_cii_header: tx, settlement and summation None branches
 def test_parse_cii_header_minimal_gross_only() -> None:
     """Only the gross amount exists. The tx, agreement and settlement subpaths give defaults."""
     xml = (
@@ -1240,13 +1243,13 @@ def test_parse_cii_header_no_tx_no_gross_is_not_zugferd() -> None:
 
 
 def test_parse_cii_header_unparseable_xml() -> None:
-    """Broken XML raises ET.ParseError and gives NotZugferdError (lines 267-268)."""
+    """Broken XML raises ET.ParseError and gives NotZugferdError."""
     with pytest.raises(NotZugferdError, match="unparseable CII XML"):
         _parse_cii_header(b"<rsm:CrossIndustryInvoice>not closed")
 
 
 def test_parse_cii_header_non_eur_currency() -> None:
-    """A currency other than EUR gives UnsupportedInvoiceCurrencyError (line 285)."""
+    """A currency other than EUR gives UnsupportedInvoiceCurrencyError."""
     xml = _VALID_CII.replace(
         "<ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>",
         "<ram:InvoiceCurrencyCode>USD</ram:InvoiceCurrencyCode>",

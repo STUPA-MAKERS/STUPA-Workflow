@@ -15,13 +15,13 @@ from collections.abc import Iterable, Mapping, Sequence
 from datetime import date, timedelta
 from decimal import Decimal
 
-# Path segment: alphanumeric, for example `VS`, `800` or `04`. Path composition
-# reserves the separator `-`, so a segment must not contain it.
+#: Path segment: alphanumeric, for example `VS`, `800` or `04`. Path composition
+#: reserves the separator `-`, so a segment must not contain it.
 _KEY_RE = re.compile(r"^[A-Za-z0-9]+$")
 _SEP = "-"
 _ZERO = Decimal("0")
-# Length cap per path segment. It matches `max_length` in the schemas and bounds
-# the free text in the `path_key` prefix comparisons.
+#: Length cap per path segment. It matches `max_length` in the schemas and bounds
+#: the free text in the `path_key` prefix comparisons.
 _KEY_MAX = 64
 
 
@@ -259,10 +259,10 @@ def resolve_decision_gremium[K, G](
     return None, None
 
 
-# Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
-# currency, active, color, accepted_state_keys, denied_state_keys,
-# fiscal_start_month, fiscal_start_day, hidden_in_budget, view_gremium_id,
-# decision_gremium_id.
+#: Field order of a node tuple: id, parent_id, gremium_id, key, path_key, name,
+#: currency, active, color, accepted_state_keys, denied_state_keys,
+#: fiscal_start_month, fiscal_start_day, hidden_in_budget, view_gremium_id,
+#: decision_gremium_id.
 NodeTuple = tuple[
     object, object | None, object | None, str, str, str, str, bool,
     str | None, list, list, int, int, bool, object | None, object | None,

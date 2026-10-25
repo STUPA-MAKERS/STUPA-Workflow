@@ -64,8 +64,11 @@ async def _member(session: AsyncSession, gremium_id: uuid.UUID, perms: list[str]
 
 
 async def _other_gremium(session: AsyncSession, flow: VoteFlow) -> VoteFlow:
-    """A second gremium. The test database holds one active flow, so the second
-    "flow" reuses the application of the first and only changes the gremium."""
+    """Return a second gremium as a flow.
+
+    The test database holds one active flow, so the second "flow" reuses the application of
+    the first and only changes the gremium.
+    """
     gremium = Gremium(name="H", slug=f"h-{uuid.uuid4().hex[:8]}")
     session.add(gremium)
     await session.commit()
@@ -94,6 +97,12 @@ async def _readable(svc: VotingService, vote_id: uuid.UUID, principal: Principal
 
 
 async def test_list_matches_the_single_read(session: AsyncSession) -> None:
+    """The list shows what the single read shows.
+
+    The voter belongs to the first gremium through the vote key and is a member of it
+    through the meeting. Open votes come first (newest opened first), then the ended
+    votes, and no draft by default. A `%` in the search is a literal, not a wildcard.
+    """
     mine = await seed_vote_flow(session)
     other = await _other_gremium(session, mine)
     meeting_id = await add_meeting(session, mine.gremium_id)
@@ -113,14 +122,12 @@ async def test_list_matches_the_single_read(session: AsyncSession) -> None:
     foreign = await add_vote(session, other, status="open", opens_at=T0)
 
     svc = VotingService(session)
-    # A voter of the first gremium (the vote key) who is also a member of it (the meeting).
     member = await _member(session, mine.gremium_id, ["vote.cast"])
     principal = Principal(sub=member.sub, groups=voter(member.sub, mine).groups)
     await svc.cast(standalone, principal, "yes", now=T0)
 
     page = await svc.list_visible(principal, limit=50, offset=0)
     ids = [item.id for item in page.items]
-    # Open first (newest opened first), then the ended votes. No draft by default.
     assert ids == [meeting_vote, standalone, closed]
     assert page.total == 3
     for vote_id in (*ids, foreign):
@@ -141,7 +148,6 @@ async def test_list_matches_the_single_read(session: AsyncSession) -> None:
 
     found = await svc.list_visible(principal, q="sitzung", limit=50, offset=0)
     assert [item.id for item in found.items] == [meeting_vote]
-    # A `%` is a literal, not a wildcard.
     assert (await svc.list_visible(principal, q="%", limit=50, offset=0)).total == 0
 
     paged = await svc.list_visible(principal, limit=1, offset=1)
@@ -150,6 +156,7 @@ async def test_list_matches_the_single_read(session: AsyncSession) -> None:
 
 
 async def test_gremium_filter_and_reader_scope(session: AsyncSession) -> None:
+    """A manager of the other gremium reads its standalone vote, not the first one."""
     mine = await seed_vote_flow(session)
     other = await _other_gremium(session, mine)
     a = await add_vote(session, mine, status="open", opens_at=T0)
@@ -163,7 +170,6 @@ async def test_gremium_filter_and_reader_scope(session: AsyncSession) -> None:
     only_b = await svc.list_visible(reader, gremium_id=other.gremium_id, limit=50, offset=0)
     assert [item.id for item in only_b.items] == [b]
 
-    # A manager of the other gremium reads its standalone vote, not the first one.
     manager = await _member(session, other.gremium_id, ["vote.manage"])
     managed = await svc.list_visible(manager, limit=50, offset=0)
     assert [item.id for item in managed.items] == [b]

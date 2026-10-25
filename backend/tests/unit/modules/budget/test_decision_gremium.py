@@ -39,9 +39,9 @@ def test_resolve_inherits_the_nearest_ancestor() -> None:
 
 
 def test_resolve_none() -> None:
+    """An unknown node ends the walk at once."""
     parent_of = {"top": None, "leaf": "top"}
     assert tree_rules.resolve_decision_gremium("leaf", parent_of, {}) == (None, None)
-    # An unknown node ends the walk at once.
     assert tree_rules.resolve_decision_gremium("x", parent_of, {}) == (None, None)
 
 
@@ -93,8 +93,11 @@ async def test_decision_gremium_of_unknown_node() -> None:
 
 
 async def test_create_node_with_a_decision_gremium() -> None:
+    """A node gets its decision Gremium.
+
+    The fake session serves the sibling check (none) and the Gremium lookup.
+    """
     g = uuid.uuid4()
-    # Queue: the sibling check (none), the Gremium lookup.
     sess = fake_session(result(), result(g))
     out = await BudgetTreeService(sess).create_node(
         BudgetNodeCreate(key="VS", name="VS", decisionGremiumId=g)
@@ -113,9 +116,13 @@ async def test_create_node_refuses_an_unknown_gremium() -> None:
 
 
 async def test_create_child_inherits_in_the_response() -> None:
+    """A child shows the inherited decision Gremium in the response.
+
+    The fake session serves the parent, the sibling check, then the ancestors of the
+    parent.
+    """
     g = uuid.uuid4()
     parent = _budget(path_key="VS", key="VS")
-    # Queue: the parent, the sibling check, then the ancestors of the parent.
     sess = fake_session(
         result(parent), result(), result("VS"), result((parent.id, None, g))
     )
@@ -129,16 +136,19 @@ async def test_create_child_inherits_in_the_response() -> None:
 
 
 async def test_update_node_sets_and_clears_the_gremium() -> None:
+    """An update sets the decision Gremium, and null clears it.
+
+    A cleared top-level node has no effective value. The fake session serves the node
+    and the Gremium lookup.
+    """
     g = uuid.uuid4()
     node = _budget(path_key="VS", key="VS")
-    # Queue: the node, the Gremium lookup.
     sess = fake_session(result(node), result(g))
     out = await BudgetTreeService(sess).update_node(
         node.id, BudgetNodeUpdate(decisionGremiumId=g)
     )
     assert node.decision_gremium_id == g
     assert out.effective_decision_gremium_id == g
-    # null clears it; a top-level node then has no effective value.
     sess = fake_session(result(node))
     out = await BudgetTreeService(sess).update_node(
         node.id, BudgetNodeUpdate(decisionGremiumId=None)
@@ -155,10 +165,14 @@ def _app_in(state_id: uuid.UUID | None) -> Any:
 
 
 async def test_assign_budget_refused_in_a_budget_vote_state() -> None:
+    """The assignment is refused while the vote Gremium comes from the cost center.
+
+    The State lookup goes through ``get``.
+    """
     state = State(kind="vote", config={"gremiumSource": "budget"})
     app = _app_in(uuid.uuid4())
     sess = fake_session(result(app))
-    sess._gets = [state]  # the State lookup goes through `get`
+    sess._gets = [state]
     with pytest.raises(ConflictError) as err:
         await BudgetTreeService(sess).assign_budget(
             app.id, AssignBudgetRequest(budgetId=None)

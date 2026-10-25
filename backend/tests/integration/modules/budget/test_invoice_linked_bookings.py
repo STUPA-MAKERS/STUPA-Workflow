@@ -46,6 +46,10 @@ async def _gremium(session: AsyncSession, name: str) -> Gremium:
 
 
 async def test_linked_bookings_follow_the_budget_visibility(session: AsyncSession) -> None:
+    """The linked bookings follow the budget visibility of the reader.
+
+    A booking without the invoice never shows up.
+    """
     svc = BudgetTreeService(session)
     culture = await _gremium(session, "Kulturreferat")
     sport = await _gremium(session, "Sportreferat")
@@ -80,7 +84,6 @@ async def test_linked_bookings_follow_the_budget_visibility(session: AsyncSessio
         ),
         actor="t",
     )
-    # A booking without the invoice never shows up.
     await svc.book_expense(
         ExpenseCreate(
             amount=Decimal("5.00"), description="Porto", budgetId=top_b.id,
@@ -112,4 +115,3 @@ async def test_linked_bookings_follow_the_budget_visibility(session: AsyncSessio
 
     updated = await svc.update_invoice(invoice.id, InvoiceUpdate(note="geprüft"))
     assert {b.id for b in updated.linked_bookings} == {on_a.id, on_b.id}
-

@@ -197,6 +197,10 @@ def _assert_no_names(payload: Any) -> None:
 async def test_public_list_and_detail_hide_names_and_non_public_tops(
     api: FastAPI, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """The public list and detail hide the names and the non-public TOPs.
+
+    The public PDF is served, never the internal one with the names.
+    """
     storage = _Storage()
     gremium_id, _, protocol_id = await _seed(maker)
     await _finalize(maker, protocol_id, storage)
@@ -246,7 +250,6 @@ async def test_public_list_and_detail_hide_names_and_non_public_tops(
         assert pdf.headers["X-Robots-Tag"] == "noindex"
         assert "attachment" in pdf.headers["content-disposition"]
         assert "_2026-09-29_oeffentlich.pdf" in pdf.headers["content-disposition"]
-        # The public PDF, never the internal one with the names.
         text = pdf.content.decode()
         for name in NAMES:
             assert name not in text
@@ -261,6 +264,10 @@ async def test_public_list_and_detail_hide_names_and_non_public_tops(
 async def test_application_items_carry_the_application_title(
     api: FastAPI, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """An application item shows the application title, as on the meeting page.
+
+    Without a title it shows the neutral heading.
+    """
     storage = _Storage()
     gremium_id, meeting_id, protocol_id = await _seed(maker, non_public_item=False)
     tag = uuid.uuid4().hex[:8]
@@ -294,7 +301,6 @@ async def test_application_items_carry_the_application_title(
     with TestClient(api) as client:
         _enter(client, api, storage)
         data = client.get(f"/api/public/protocols/{protocol_id}").json()
-        # The application title, as on the meeting page; without one the neutral heading.
         assert [top["title"] for top in data["tops"]] == [
             "Sommerfest",
             "Lastenrad",
@@ -307,13 +313,15 @@ async def test_application_items_carry_the_application_title(
 async def test_hidden_protocols_answer_404_with_noindex(
     api: FastAPI, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """A hidden protocol answers 404 with noindex.
+
+    Hidden are the protocols of a gremium that does not publish, a draft of a public
+    gremium, and a held-back protocol of a public gremium.
+    """
     storage = _Storage()
-    # A gremium that does not publish its protocols.
     private_gid, _, private_pid = await _seed(maker, public=False)
     await _finalize(maker, private_pid, storage)
-    # A draft of a public gremium.
     _, _, draft_pid = await _seed(maker)
-    # A held-back protocol of a public gremium.
     withheld_gid, _, withheld_pid = await _seed(maker)
     await _finalize(maker, withheld_pid, storage, withheld=True)
 
@@ -338,6 +346,11 @@ async def test_hidden_protocols_answer_404_with_noindex(
 async def test_search_semester_and_paging(
     api: FastAPI, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """The search covers the meeting title and the public TOP text, also with LIKE wildcards.
+
+    A non-public TOP is never searched. The list is newest first, with paging, and the
+    semester and year filters apply.
+    """
     storage = _Storage()
     gid_a, _, pid_a = await _seed(maker, title="Sitzung Herbst", day=_date(2026, 10, 5))
     gid_b, _, pid_b = await _seed(maker, title="Sitzung Frühjahr", day=_date(2026, 2, 3))
@@ -347,21 +360,17 @@ async def test_search_semester_and_paging(
 
     with TestClient(api) as client:
         _enter(client, api, storage)
-        # Search over the meeting title.
         hits = client.get("/api/public/protocols", params={**scope, "q": "herbst"}).json()
         assert [i["id"] for i in hits["items"]] == [str(pid_a)]
-        # Search over the public TOP text, also with LIKE wildcards in the text.
         hits = client.get("/api/public/protocols", params={**scope, "q": "Sommerfest"}).json()
         assert hits["total"] == 2
         assert client.get("/api/public/protocols", params={**scope, "q": "%"}).json()["total"] == 0
-        # A non-public TOP is never searched.
         assert (
             client.get("/api/public/protocols", params={**scope, "q": "Vertrauliche"}).json()[
                 "total"
             ]
             == 0
         )
-        # Newest first, and paging.
         page = client.get("/api/public/protocols", params={**scope, "limit": 1}).json()
         assert page["total"] == 2
         assert [i["id"] for i in page["items"]] == [str(pid_a)]
@@ -369,7 +378,6 @@ async def test_search_semester_and_paging(
             "/api/public/protocols", params={**scope, "limit": 1, "offset": 1}
         ).json()
         assert [i["id"] for i in page["items"]] == [str(pid_b)]
-        # Semester and year filters.
         ws = client.get("/api/public/protocols", params={**scope, "semester": "ws-2026"}).json()
         assert [i["id"] for i in ws["items"]] == [str(pid_a)]
         ws25 = client.get("/api/public/protocols", params={**scope, "semester": "ws-2025"})
@@ -400,9 +408,13 @@ async def _audit(maker: async_sessionmaker[AsyncSession], target: uuid.UUID) -> 
 async def test_switch_on_backfills_and_audits(
     api: FastAPI, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """The switch to public builds the missing public versions and audits the change.
+
+    The protocol was finalized while the gremium was private and has no non-public TOP,
+    so no public version exists yet. Without Redis the backfill runs inline, and the
+    protocol is public at once. The switch off hides it at once.
+    """
     storage = _Storage()
-    # Finalized while the gremium was private and without a non-public TOP: no
-    # public version exists yet.
     gremium_id, _, protocol_id = await _seed(maker, public=False, non_public_item=False)
     await _finalize(maker, protocol_id, storage)
     async with maker() as session:
@@ -420,7 +432,6 @@ async def test_switch_on_backfills_and_audits(
         res = client.patch(f"/api/admin/gremien/{gremium_id}", json={"protocolsPublic": True})
         assert res.status_code == 200
         assert res.json()["protocolsPublic"] is True
-        # Without Redis the backfill runs inline: the protocol is public now.
         detail = client.get(f"/api/public/protocols/{protocol_id}")
         assert detail.status_code == 200
         assert detail.json()["tops"][0]["markdown"] == PUBLIC_BODY
@@ -428,7 +439,6 @@ async def test_switch_on_backfills_and_audits(
         preview = client.get(f"/api/admin/gremien/{gremium_id}/public-preview").json()
         assert preview == {"finalCount": 1, "missingCount": 0}
 
-        # Switching off hides it at once.
         client.patch(f"/api/admin/gremien/{gremium_id}", json={"protocolsPublic": False})
         assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 404
 
@@ -443,6 +453,11 @@ async def test_switch_on_backfills_and_audits(
 async def test_withhold_toggle_and_finalize_option(
     api: FastAPI, maker: async_sessionmaker[AsyncSession]
 ) -> None:
+    """The withhold toggle and the finalize option each write one publication entry.
+
+    The same value again writes no second entry. A Markdown change on a final protocol
+    stays refused.
+    """
     storage = _Storage()
     _, meeting_id, protocol_id = await _seed(maker)
 
@@ -463,9 +478,7 @@ async def test_withhold_toggle_and_finalize_option(
         assert res.json()["publicWithheld"] is False
         assert res.json()["status"] == "final"
         assert client.get(f"/api/public/protocols/{protocol_id}").status_code == 200
-        # The same value again writes no second entry.
         client.patch(f"/api/protocols/{protocol_id}", json={"publicWithheld": False})
-        # A Markdown change on a final protocol stays refused.
         assert (
             client.patch(f"/api/protocols/{protocol_id}", json={"markdown": "x"}).status_code
             == 409
@@ -476,7 +489,6 @@ async def test_withhold_toggle_and_finalize_option(
     finalize = [e for e in entries if e.action == "protocol_finalize"]
     assert finalize[0].data["publicWithheld"] is True
     publication = [e for e in entries if e.action == "protocol_publication"]
-    # The finalize option and the later release each write one entry.
     assert [(e.data["old"], e.data["new"]) for e in publication] == [(False, True), (True, False)]
 
 

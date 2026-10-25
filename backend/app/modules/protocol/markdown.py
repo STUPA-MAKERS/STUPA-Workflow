@@ -37,30 +37,12 @@ from datetime import time as _time
 
 from app.modules.media.refs import is_image_path
 
-try:  # marko is optional here. The primary regex protection works without it.
+try:
     import marko as _marko  # pyright: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - primary regex protection works without marko
     _marko = None
 
 
-# RCE defense in depth.
-# The former pytex renderer had a Markdown `eval` escape in its `trusted` mode. A
-# link reference definition of the form `[//]: # "EXPR"` stayed invisible in the
-# PDF and ran `eval(EXPR)` inside the render container. It fired ONLY when
-# CommonMark parsed the definition with `label == "//"` AND `dest == "#"`. The
-# typst renderer has no such escape. The strip stays, so no stored body carries
-# the trigger.
-#
-# A line-oriented regex such as `^[ \t]*[...]: #` is NOT reliable. A link
-# reference definition is a CommonMark block. It may span several lines
-# (`[//]:\n#\n"EXPR"`), nest inside a container (`> [//]: # "EXPR"` or
-# `- [//]: # "EXPR"`) and carry whitespace or newlines inside the label
-# (`[ // ]`). Every one of those forms escapes a simple per-line regex. The
-# pattern below therefore removes the ENTIRE eval-capable definition: the head
-# `[label] : #` with a bare `#` target, never a `#fragment`, plus the
-# optional title (`"…"`, `'…'` or `(…)`). It tolerates whitespace and newlines
-# wherever CommonMark allows them. A real reference link (`[foo]: #section`), an
-# inline link, an image and the vote callout (`> [!abstimmung]`) stay untouched.
 _EVAL_REFDEF_RE = re.compile(
     # The label excludes BOTH brackets (`[^\][]`, not `[^\]]`). A CommonMark
     # reference definition never carries an unescaped `[` in its label, and without
@@ -81,6 +63,21 @@ def _strip_eval_refdefs(markdown: str) -> str:
     The function strips the head and the expression of every bare-`#` link
     reference definition, in any CommonMark form. The eval trigger of pytex
     therefore never reaches the Markdown tree. Normal Markdown stays untouched.
+
+    The pytex renderer ran `eval(EXPR)` for a definition that CommonMark parsed with
+    `label == "//"` AND `dest == "#"`, and the definition stayed invisible in the PDF.
+    The typst renderer has no such escape. The strip stays as RCE defense in depth, so
+    no stored body carries the trigger.
+
+    A line-oriented regex such as `^[ \t]*[...]: #` is NOT reliable, because a link
+    reference definition is a CommonMark block. It can span several lines
+    (`[//]:\n#\n"EXPR"`), nest in a container (`> [//]: # "EXPR"` or `- [//]: # "EXPR"`)
+    and carry whitespace or newlines in the label (`[ // ]`). The pattern therefore
+    removes the ENTIRE definition: the head `[label] : #` with a bare `#` target, never
+    a `#fragment`, plus the optional title (`"…"`, `'…'` or `(…)`). It accepts
+    whitespace and newlines wherever CommonMark allows them. A real reference link
+    (`[foo]: #section`), an inline link, an image and the vote callout (`>
+    [!abstimmung]`) stay untouched.
     """
     return _EVAL_REFDEF_RE.sub("", markdown)
 
@@ -115,40 +112,41 @@ def _has_eval_refdef(markdown: str) -> bool:
     return _walk(document)
 
 
-# Internal pytex marker for the evaluated expression: `\iffalse{pytex(...)}\fi`.
-# An editor body never needs it. The pattern also matches a multi-line marker.
 _PYTEX_IFFALSE_RE = re.compile(
     r"\\iffalse\s*\{?\s*pytex\s*\(.*?\)\s*\}?\s*\\fi",
     re.DOTALL | re.IGNORECASE,
 )
-# Image path traversal: a Markdown image `![alt](PATH)` with an absolute path
-# (`/...`) or a `../` path could reach a container file through
-# `\includegraphics` and leak a readable image from outside the render
-# directory. The code replaces such a path with a plain-text placeholder. A
-# relative in-repo path and the canonical path of an uploaded image
-# (`/api/media/images/<id>`) stay untouched.
 _UNSAFE_IMAGE_RE = re.compile(
     r"!\[(?P<alt>[^\]]*)\]\(\s*(?P<path>[^)\s]+)[^)]*\)",
 )
 
 
 def _is_unsafe_image_path(path: str) -> bool:
-    """Return True for an absolute-root or `..` traversal image path."""
+    """Return True for an absolute-root or `..` traversal image path.
+
+    An absolute path is a POSIX, UNC or Windows drive path. A `../` anywhere, also
+    URL-encoded as `%2e%2e`, is traversal.
+    """
     if path.startswith(("/", "\\")) or re.match(r"^[a-zA-Z]:[\\/]", path):
-        return True  # absolute: POSIX, UNC or a Windows drive
-    # A `../` anywhere, also URL-encoded as `%2e%2e`, is traversal.
+        return True
     normalized = path.replace("\\", "/").lower()
     return "../" in normalized or "%2e%2e" in normalized
 
 
 def _neutralize_unsafe_image(match: re.Match[str]) -> str:
+    r"""Replace an unsafe image path with a plain-text placeholder.
+
+    An absolute path or a `../` path could reach a container file through
+    `\includegraphics` and leak a readable image from outside the render directory, so
+    the path is never passed through. A harmless relative path stays unchanged. The
+    canonical path of an uploaded image (`/api/media/images/<id>`) stays too: it is
+    absolute but no file path, because the render service maps it to an uploaded asset
+    and never reads a file for it.
+    """
     path = match.group("path")
     if is_image_path(path) or not _is_unsafe_image_path(path):
-        # The canonical path of an uploaded image is absolute but no file path: the
-        # render service maps it to an uploaded asset and never reads a file for it.
-        return match.group(0)  # a harmless relative path stays unchanged
+        return match.group(0)
     alt = match.group("alt").strip() or "Bild"
-    # Do NOT pass the path through. Replace it with a plain-text placeholder.
     return f"*[{_md_escape(alt)} (Bild entfernt)]*"
 
 
@@ -162,11 +160,16 @@ def sanitize_user_markdown(markdown: str) -> str:
     the canonical path of an uploaded image, and vote callouts. The marko parse
     verifies the eval trigger structurally. While an eval-capable `LinkRefDef` survives, the strip
     repeats. The body therefore leaves without an eval vector.
+
+    The strip runs again at most three times, as a structural backstop, because an
+    eval-capable `LinkRefDef` can survive the regex, for example with a future marko
+    version.
+
+    The pytex marker `\iffalse{pytex(...)}\fi` holds the evaluated expression. An editor
+    body never needs it, and the pattern also matches a multi-line marker.
     """
     cleaned = _PYTEX_IFFALSE_RE.sub("", markdown)
     cleaned = _strip_eval_refdefs(cleaned)
-    # Structural backstop: an eval-capable LinkRefDef may survive, for example
-    # with a future marko version. The loop strips again until none remains.
     for _ in range(3):
         if not _has_eval_refdef(cleaned):
             break
@@ -174,7 +177,7 @@ def sanitize_user_markdown(markdown: str) -> str:
     cleaned = _UNSAFE_IMAGE_RE.sub(_neutralize_unsafe_image, cleaned)
     return cleaned
 
-# Gremium `cd_variant` values that select a protocol render variant.
+#: Gremium `cd_variant` values that select a protocol render variant.
 _PROTOCOL_VARIANTS = {"stupa", "asta"}
 
 
@@ -203,7 +206,23 @@ class KeeperLine:
 
 @dataclass(slots=True)
 class ProtocolDoc:
-    """All header data of a protocol, filled from the database by the service."""
+    """All header data of a protocol, filled from the database by the service.
+
+    Attributes:
+        end_time: The meeting end in local time, from `meeting.closed_at`. With the start it
+            forms the "Zeit: Start – Ende" title-page line, which the renderer builds from
+            `beginn` and `ende`.
+        protokollant: The single keeper name. It is the fallback for a render service that
+            does not know `keepers`, and for a meeting without keeper periods.
+        keepers: Every period of a protocol keeper, in time order. The renderer lists them in
+            the header and adds a handover line at the agenda item where a later period
+            starts. Only the internal variant carries them.
+        excused: The excused members, a group of their own.
+        started_at: The real start in local time (`YYYY-MM-DD HH:MM`), or the planned start
+            when the meeting has no recorded start.
+        quorate: The quorum from the present members against the active members. `None`
+            means no statement.
+    """
 
     title: str
     gremium_name: str | None
@@ -211,33 +230,20 @@ class ProtocolDoc:
     date: _date | None
     markdown: str
     start_time: _time | None = None
-    # Meeting end in local time, from `meeting.closed_at`. Together with the
-    # start it forms the "Zeit: Start – Ende" title-page line, which the
-    # renderer builds from `beginn` and `ende`.
     end_time: _time | None = None
-    # The legacy single name. It stays as the fallback of a render service that does
-    # not know `keepers` yet, and for a meeting without keeper periods.
     protokollant: str | None = None
-    # Every period of a protocol keeper, in time order. The renderer lists them
-    # in the header and adds a handover line at the agenda item where a later
-    # period starts. Only the internal variant carries them.
     keepers: list[KeeperLine] = field(default_factory=list)
     present: list[str] = field(default_factory=list)
-    # The excused members are their own group.
     excused: list[str] = field(default_factory=list)
     absent: list[str] = field(default_factory=list)
-    # The real start in local time (`YYYY-MM-DD HH:MM`), or the planned start when
-    # the meeting has no recorded start.
     started_at: str | None = None
     datalines: list[str] = field(default_factory=list)
-    # Quorum from the present members against the active members. `None` means
-    # no statement.
     quorate: bool | None = None
 
 
-# Signature block of the renderer (`unterschriften`). The frontmatter
-# supplies the name of the secretary. The board line stays a blank
-# line for a hand signature.
+#: Signature block of the renderer (`unterschriften`). The frontmatter
+#: supplies the name of the secretary. The board line stays a blank
+#: line for a hand signature.
 _SIGNATURES = ["Schriftführung", "Vorstand"]
 
 
@@ -269,20 +275,24 @@ def _yaml_keepers(keepers: list[KeeperLine]) -> list[str]:
 
 
 def _frontmatter(doc: ProtocolDoc) -> list[str]:
+    """Build the YAML frontmatter lines of the protocol document.
+
+    `datum` fills the protocol header with date and time, and `date` fills the report
+    title page. The renderer sets `beginn` and `ende` into the "Zeit: Start – Ende" data
+    line. The quorum is a title-page data line. The renderer sets one signature line per
+    entry of `unterschriften`.
+    """
     lines = ["---", f"title: {_yaml_scalar(doc.title)}", "typ: protokoll"]
     if doc.gremium_name:
         lines.append(f"gremium: {_yaml_scalar(doc.gremium_name)}")
     if doc.cd_variant:
         lines.append(f"cd: {_yaml_scalar(doc.cd_variant)}")
     if doc.date is not None:
-        # `datum` fills the protocol header with date and time. `date` fills
-        # the report title page.
         datum = doc.date.isoformat()
         if doc.start_time is not None:
             datum = f"{datum} {doc.start_time.strftime('%H:%M')}"
         lines.append(f"datum: {_yaml_scalar(datum)}")
         lines.append(f"date: {_yaml_scalar(doc.date.isoformat())}")
-    # The renderer sets start and end into the "Zeit: Start – Ende" data line.
     if doc.start_time is not None:
         lines.append(f"beginn: {_yaml_scalar(doc.start_time.strftime('%H:%M'))}")
     if doc.end_time is not None:
@@ -296,11 +306,9 @@ def _frontmatter(doc: ProtocolDoc) -> list[str]:
     lines += _yaml_list("entschuldigt", doc.excused)
     lines += _yaml_list("abwesend", doc.absent)
     if doc.quorate is not None:
-        # Quorum as a title-page data line.
         quorate = "Gegeben" if doc.quorate else "Nicht gegeben"
         lines.append(f"beschlussfaehigkeit: {_yaml_scalar(quorate)}")
     lines += _yaml_list("datalines", doc.datalines)
-    # Signature page: the renderer sets one signature line per entry.
     lines += _yaml_list("unterschriften", _SIGNATURES)
     lines.append("---")
     return lines
@@ -352,19 +360,20 @@ def build_vote_snippet(
     because the result reads from the tally box. The snippet stays part of the
     editable Markdown as a blockquote callout. `conditions` are the conditions of
     the decision: one plain body line `Auflage n: text` each.
+
+    The renderer detects the tally line by two or more of ja/nein/enthaltung, and the
+    ballot options carry exactly these keys. A condition or the note is a plain body
+    line, because the callout body of the renderer has no list. The renderer keeps the
+    note below the tally box.
     """
     head = question.strip() if question and question.strip() else title
     lines = [f"> [!abstimmung] **{_md_escape(head)}**"]
     if counts:
-        # The renderer detects the tally line by two or more of ja/nein/enthaltung
-        # (yes/no/abstain). The ballot options carry exactly these keys.
         tally = ", ".join(f"{_md_escape(opt)}: {n}" for opt, n in counts.items())
         lines.append(f"> {tally}")
     for index, condition in enumerate(conditions or [], start=1):
-        # A plain body line: the callout body of the renderer has no list.
         lines.append(f"> Auflage {index}: {_md_escape(condition)}")
     if note:
-        # A plain body line of the callout: the renderer keeps it below the tally box.
         lines.append(f"> {_md_escape(note)}")
     return "\n".join(lines)
 
@@ -387,7 +396,7 @@ class ElectionSnippet:
     round: int = 1
     candidates: list[ElectionLine] = field(default_factory=list)
     abstentions: int = 0
-    # The single-candidate ballot (Ja/Nein/Enthaltung).
+    #: The single-candidate ballot (Ja/Nein/Enthaltung).
     yes: int | None = None
     no: int | None = None
     by_lot: bool = False
@@ -467,10 +476,10 @@ class PollSnippet:
     """The protocol view of one poll, built from its config and its stored result."""
 
     question: str
-    # "Umfrage · Einzelwahl", "Umfrage · Mehrfachwahl, höchstens 2", "Terminumfrage".
+    #: "Umfrage · Einzelwahl", "Umfrage · Mehrfachwahl, höchstens 2", "Terminumfrage".
     meta: str
     lines: list[PollLine] = field(default_factory=list)
-    # None for a date poll: it has no abstention.
+    #: None for a date poll: it has no abstention.
     abstentions: int | None = 0
     ballots: int = 0
     date: bool = False

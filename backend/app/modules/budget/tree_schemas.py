@@ -17,9 +17,9 @@ from pydantic import Field, model_validator
 from app.modules.budget.schemas import _CamelModel
 from app.shared.paging import Page
 
-# Money cap that matches the DB column `numeric(12, 2)`. An input field applies
-# it as `le`, so an oversized amount gives a clean 422 instead of a
-# numeric-overflow 500.
+#: Money cap that matches the DB column `numeric(12, 2)`. An input field applies
+#: it as `le`, so an oversized amount gives a clean 422 instead of a
+#: numeric-overflow 500.
 _MAX_AMOUNT = Decimal("9999999999.99")
 
 
@@ -35,14 +35,14 @@ class BudgetNodeCreate(_CamelModel):
     name: str = Field(min_length=1, max_length=200)
     parent_id: UUID | None = Field(default=None, alias="parentId")
     gremium_id: UUID | None = Field(default=None, alias="gremiumId")
-    # Deciding Gremium of the node and its subtree (flow variant B). Optional.
+    #: Deciding Gremium of the node and its subtree (flow variant B). Optional.
     decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
     currency: str = Field(default="EUR", min_length=3, max_length=3)
     active: bool = True
     color: str | None = None
     fiscal_start_month: int = Field(default=1, ge=1, le=12, alias="fiscalStartMonth")
-    # 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
-    # `date(...)` ValueError. The 500 that follows leaves the budget unusable.
+    #: 1..28: the cutoff must exist in EVERY month. Days 29 to 31 would raise a
+    #: `date(...)` ValueError. The 500 that follows leaves the budget unusable.
     fiscal_start_day: int = Field(default=1, ge=1, le=28, alias="fiscalStartDay")
 
 
@@ -61,13 +61,13 @@ class BudgetNodeUpdate(_CamelModel):
     accepted_state_keys: list[str] | None = Field(default=None, alias="acceptedStateKeys")
     denied_state_keys: list[str] | None = Field(default=None, alias="deniedStateKeys")
     hidden_in_budget: bool | None = Field(default=None, alias="hiddenInBudget")
-    # Visibility Gremium. `None` in the payload clears the assignment.
+    #: Visibility Gremium. `None` in the payload clears the assignment.
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
-    # Deciding Gremium. `None` in the payload clears it; the node then inherits the
-    # value of the nearest ancestor.
+    #: Deciding Gremium. `None` in the payload clears it; the node then inherits the
+    #: value of the nearest ancestor.
     decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
     fiscal_start_month: int | None = Field(default=None, ge=1, le=12, alias="fiscalStartMonth")
-    # 1..28: see `BudgetNodeCreate`. The cutoff must exist in every month.
+    #: 1..28: see `BudgetNodeCreate`. The cutoff must exist in every month.
     fiscal_start_day: int | None = Field(default=None, ge=1, le=28, alias="fiscalStartDay")
 
 
@@ -87,9 +87,9 @@ class BudgetNodeOut(_CamelModel):
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
-    # The own deciding Gremium, the effective one (own or nearest ancestor) and the
-    # node that holds the effective value. The UI shows "inherited from ..." when the
-    # source is an ancestor.
+    #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
+    #: node that holds the effective value. The UI shows "inherited from ..." when the
+    #: source is an ancestor.
     decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
     effective_decision_gremium_id: UUID | None = Field(
         default=None, alias="effectiveDecisionGremiumId"
@@ -110,11 +110,11 @@ class AllocationView(_CamelModel):
 
     fiscal_year_id: UUID = Field(alias="fiscalYearId")
     allocated: Decimal
-    # Bound: accepted applications, reduced pro rata by the expenses bound to them.
+    #: Bound: accepted applications, reduced pro rata by the expenses bound to them.
     bound: Decimal = Decimal("0")
-    # Expended: actual expenses, kind='expense'.
+    #: Expended: actual expenses, kind='expense'.
     expended: Decimal = Decimal("0")
-    # Income, kind='income'. It raises the available budget.
+    #: Income, kind='income'. It raises the available budget.
     income: Decimal = Decimal("0")
     committed: Decimal
     requested: Decimal = Decimal("0")
@@ -137,9 +137,9 @@ class BudgetTreeNodeOut(_CamelModel):
     denied_state_keys: list[str] = Field(default_factory=list, alias="deniedStateKeys")
     hidden_in_budget: bool = Field(default=False, alias="hiddenInBudget")
     view_gremium_id: UUID | None = Field(default=None, alias="viewGremiumId")
-    # The own deciding Gremium, the effective one (own or nearest ancestor) and the
-    # node that holds the effective value. The UI shows "inherited from ..." when the
-    # source is an ancestor.
+    #: The own deciding Gremium, the effective one (own or nearest ancestor) and the
+    #: node that holds the effective value. The UI shows "inherited from ..." when the
+    #: source is an ancestor.
     decision_gremium_id: UUID | None = Field(default=None, alias="decisionGremiumId")
     effective_decision_gremium_id: UUID | None = Field(
         default=None, alias="effectiveDecisionGremiumId"
@@ -244,18 +244,18 @@ class BudgetApplicationOut(_CamelModel):
     path_key: str | None = Field(default=None, alias="pathKey")
     fiscal_year_id: UUID | None = Field(default=None, alias="fiscalYearId")
     amount: Decimal | None = None
-    # The approved amount of the valid decision, None = as requested.
+    #: The approved amount of the valid decision, None = as requested.
     approved_amount: Decimal | None = Field(default=None, alias="approvedAmount")
     currency: str | None = None
     state_id: UUID | None = Field(default=None, alias="stateId")
-    # Current flow state (i18n label + color) for the status column.
+    #: Current flow state (i18n label + color) for the status column.
     state_label: dict[str, str] | None = Field(default=None, alias="stateLabel")
     state_color: str | None = Field(default=None, alias="stateColor")
     created_at: datetime = Field(alias="createdAt")
 
 
 ExpenseKind = Literal["expense", "income"]
-# Payment method: bank transfer, cash, direct debit, card, PayPal.
+#: Payment method: bank transfer, cash, direct debit, card, PayPal.
 PaymentMethod = Literal["ueberweisung", "bar", "lastschrift", "karte", "paypal"]
 
 
@@ -355,9 +355,9 @@ class ExpenseOut(_CamelModel):
     application_id: UUID | None = Field(default=None, alias="applicationId")
     application_title: str | None = Field(default=None, alias="applicationTitle")
     transfer_id: UUID | None = Field(default=None, alias="transferId")
-    # `actor` is the principal `sub`, the raw identity for the audit log.
-    # `actorName` is the display name the server resolves. Never show the raw
-    # id in the UI.
+    #: `actor` is the principal `sub`, the raw identity for the audit log.
+    #: `actorName` is the display name the server resolves. Never show the raw
+    #: id in the UI.
     actor: str | None = None
     actor_name: str | None = Field(default=None, alias="actorName")
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
@@ -369,9 +369,9 @@ class ExpenseOut(_CamelModel):
     category: str | None = None
     invoice_id: UUID | None = Field(default=None, alias="invoiceId")
     invoice_number: str | None = Field(default=None, alias="invoiceNumber")
-    # A set `parentExpenseId` means this booking IS a sub-booking. A
-    # `childCount` above 0 means the booking HAS sub-bookings. The UI can
-    # expand them. The `amount` is then the sum of the children and read-only.
+    #: A set `parentExpenseId` means this booking IS a sub-booking. A
+    #: `childCount` above 0 means the booking HAS sub-bookings. The UI can
+    #: expand them. The `amount` is then the sum of the children and read-only.
     parent_expense_id: UUID | None = Field(default=None, alias="parentExpenseId")
     child_count: int = Field(default=0, alias="childCount")
     created_at: datetime = Field(alias="createdAt")
@@ -395,8 +395,8 @@ class InvoiceCreate(_CamelModel):
     gross_amount: Decimal = Field(alias="grossAmount", ge=0, le=_MAX_AMOUNT)
     note: str | None = None
     status: InvoiceStatus = "open"
-    # Optional receipt from the ZUGFeRD import. The token is a handle to the
-    # original PDF already stored in MinIO. `/invoices/parse` returns it.
+    #: Optional receipt from the ZUGFeRD import. The token is a handle to the
+    #: original PDF already stored in MinIO. `/invoices/parse` returns it.
     file_token: str | None = Field(default=None, alias="fileToken")
     file_name: str | None = Field(default=None, alias="fileName")
     file_mime: str | None = Field(default=None, alias="fileMime")
@@ -421,8 +421,8 @@ class InvoiceParseResult(_CamelModel):
     file_token: str = Field(alias="fileToken")
     file_name: str = Field(alias="fileName")
     file_mime: str = Field(alias="fileMime")
-    # Possible duplicate: an invoice with the same number already exists. The
-    # UI warns before the confirm but does not block the import.
+    #: Possible duplicate: an invoice with the same number already exists. The
+    #: UI warns before the confirm but does not block the import.
     duplicate: bool = False
 
 
@@ -474,7 +474,7 @@ class InvoiceBookingOut(_CamelModel):
     amount: Decimal
     description: str
     payment_date: date | None = Field(default=None, alias="paymentDate")
-    # Set when the booking is a sub-booking of another booking.
+    #: Set when the booking is a sub-booking of another booking.
     parent_expense_id: UUID | None = Field(default=None, alias="parentExpenseId")
     created_at: datetime = Field(alias="createdAt")
 
@@ -599,8 +599,8 @@ class TransferRowOut(_CamelModel):
     note: str | None = None
     invoice_date: date | None = Field(default=None, alias="invoiceDate")
     payment_date: date | None = Field(default=None, alias="paymentDate")
-    # `actor` is the principal `sub`. `actorName` is the resolved display name.
-    # Never show the raw id in the UI.
+    #: `actor` is the principal `sub`. `actorName` is the resolved display name.
+    #: Never show the raw id in the UI.
     actor: str | None = None
     actor_name: str | None = Field(default=None, alias="actorName")
     created_at: datetime = Field(alias="createdAt")

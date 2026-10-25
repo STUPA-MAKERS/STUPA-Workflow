@@ -43,6 +43,10 @@ async def session(
 
 
 async def test_close_sets_closed_at_and_audits(session: AsyncSession) -> None:
+    """The close sets closed_at, keeps the window end, and audits aggregates only.
+
+    The window end is a different column. No voter sub appears anywhere in the entry.
+    """
     flow = await seed_vote_flow(session)
     vote_id = await add_vote(session, flow, status="draft")
     row = await session.get(Vote, vote_id)
@@ -64,7 +68,7 @@ async def test_close_sets_closed_at_and_audits(session: AsyncSession) -> None:
 
     await session.refresh(row)
     assert row.closed_at == closed_at
-    assert row.closes_at == WINDOW_END  # the window end is a different column
+    assert row.closes_at == WINDOW_END
 
     entries = await audit_actions(session, vote_id)
     assert [e.action for e in entries] == ["vote_open", "vote_close"]
@@ -72,7 +76,6 @@ async def test_close_sets_closed_at_and_audits(session: AsyncSession) -> None:
     assert close["result"] == "passed"
     assert close["counts"] == {"yes": 2, "no": 1, "abstain": 0}
     assert close["applicationId"] == str(flow.app_id)
-    # Aggregates only: no voter sub anywhere in the entry.
     assert "v1" not in str(close) and "v2" not in str(close)
 
 

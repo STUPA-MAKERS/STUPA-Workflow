@@ -35,17 +35,17 @@ NOW = datetime(2026, 6, 6, 12, 0, tzinfo=UTC)
 GID = uuid.UUID("00000000-0000-0000-0000-0000000060e1")
 OPTIONS = ["yes", "no"]
 
-# The roster of the measured gremium: the sub, the permissions of the gremium role, and
-# the permissions of the global role. The global `vote.cast` is gone from the catalog.
-# A stale role row that still holds it must grant nothing, so some entries keep it.
-# `manager` and `protokoll` are ordinary roles of people who also sit in the committee.
+#: The roster of the measured gremium: the sub, the permissions of the gremium role, and
+#: the permissions of the global role. The global `vote.cast` is gone from the catalog.
+#: A stale role row that still holds it must grant nothing, so some entries keep it.
+#: `manager` and `protokoll` are ordinary roles of people who also sit in the committee.
+#: `guest` is a member without the voting role, `outsider` a non-member with the global right.
 _ALL_GREMIUM_PERMS = ["session.manage", "vote.manage", "vote.cast", "protocol.write"]
 _ROSTER: tuple[tuple[str, list[str] | None, set[str]], ...] = (
     ("admin", _ALL_GREMIUM_PERMS, {"vote.cast"}),
     ("member", ["vote.cast"], {"vote.cast"}),
     ("manager", _ALL_GREMIUM_PERMS, set()),
     ("protokoll", ["vote.cast"], set()),
-    # A member without the voting role, plus a non-member who holds the global right.
     ("guest", ["protocol.write"], set()),
     ("outsider", None, {"vote.cast"}),
 )
@@ -150,8 +150,10 @@ async def test_quorum_roster_equals_cast_gate() -> None:
 async def test_forged_oidc_group_claim_never_reaches_the_roster() -> None:
     """A raw IdP group named `vote:<gremium_id>` must not grant the cast right.
 
-    The gate now trusts the namespaced key on its own, so the resolver must keep the
+    The gate trusts the namespaced key on its own, so the resolver must keep the
     reserved namespace for real memberships.
+
+    The principal has no assignments, no mapping hit and no membership.
     """
     row = PrincipalRow(
         sub="forger",
@@ -160,7 +162,6 @@ async def test_forged_oidc_group_claim_never_reaches_the_roster() -> None:
         oidc_groups=[rbac.vote_group_key(GID)],
     )
     row.id = "forger"  # type: ignore[assignment]
-    # No assignments, no mapping hit, no membership.
     db = auth_fakes.fake_session(
         auth_fakes.result(), auth_fakes.result(), auth_fakes.result()
     )
@@ -170,7 +171,7 @@ async def test_forged_oidc_group_claim_never_reaches_the_roster() -> None:
 
 
 async def test_free_group_key_admits_nobody() -> None:
-    """A non-UUID group key proves no membership. No global right casts in it any more."""
+    """A non-UUID group key proves no membership, and no global right casts in it."""
     vote = _vote(eligible_group="stupa")
     holder = Principal(sub="a", roles=["admin"], permissions={"vote.cast"}, groups={"stupa"})
     db = fake_session(result(vote))

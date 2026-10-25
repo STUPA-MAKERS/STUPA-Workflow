@@ -34,10 +34,10 @@ from app.modules.voting.models import Vote
 from app.modules.voting.schemas import ElectionResultOut
 from app.shared.config_schemas import ElectionConfig
 
-# The lines of the old callout and of the new callout of one election (same length).
+#: The lines of the old callout and of the new callout of one election (same length).
 _Change = tuple[Sequence[str], Sequence[str]]
 
-# The marker that opens a callout (``> [!abstimmung]``, ``> [!note]``, ...).
+#: The marker that opens a callout (``> [!abstimmung]``, ``> [!note]``, ...).
 _OPENER = re.compile(r"^>\s*\[!")
 
 

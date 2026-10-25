@@ -51,11 +51,6 @@ def _is_closed_error(exc: pytest.ExceptionInfo[ConflictError]) -> bool:
     return exc.value.code == "fiscal_year_closed"
 
 
-# --------------------------------------------------------------------------
-# Close and reopen.
-# --------------------------------------------------------------------------
-
-
 async def test_close_sets_timestamp_actor_and_audit() -> None:
     top = _budget(id=uuid.uuid4())
     fy = _fy(budget_id=top.id)
@@ -117,11 +112,6 @@ async def test_list_reports_closed_at() -> None:
     assert out[0].closed_at == _CLOSED_AT
 
 
-# --------------------------------------------------------------------------
-# The fiscal year itself: the year is fixed, the active flag is free, no delete.
-# --------------------------------------------------------------------------
-
-
 async def test_year_change_on_closed_year_409() -> None:
     top = _budget(id=uuid.uuid4())
     fy = _closed_fy(budget_id=top.id, year=2025)
@@ -152,16 +142,12 @@ async def test_delete_closed_year_409() -> None:
     assert sess.deleted == []
 
 
-# --------------------------------------------------------------------------
-# Guard helpers.
-# --------------------------------------------------------------------------
-
-
 async def test_require_open_passes_none_missing_and_open() -> None:
+    """No year (no lookup at all), a missing row and an open year pass."""
     svc = BudgetTreeService(fake_session(gets=[None, _fy()]))
-    await svc._require_open_fiscal_year(None)  # no lookup at all
-    await svc._require_open_fiscal_year(uuid.uuid4())  # missing row
-    await svc._require_open_fiscal_year(uuid.uuid4())  # open year
+    await svc._require_open_fiscal_year(None)
+    await svc._require_open_fiscal_year(uuid.uuid4())
+    await svc._require_open_fiscal_year(uuid.uuid4())
 
 
 async def test_require_open_refuses_closed() -> None:
@@ -181,17 +167,12 @@ async def test_resolve_explicit_closed_year_409() -> None:
 
 
 async def test_resolve_default_skips_closed_year() -> None:
-    # Two active years, one of them closed: the open one is the single default.
+    """Two active years, one of them closed: the open one is the single default."""
     top = _budget(id=uuid.uuid4())
     closed = _closed_fy(budget_id=top.id, year=2025)
     open_ = _fy(budget_id=top.id, year=2026)
     svc = BudgetTreeService(fake_session(result(top), result(closed, open_)))
     assert await svc._resolve_fiscal_year(top, None) == open_.id
-
-
-# --------------------------------------------------------------------------
-# Every money mutation on a closed year answers 409.
-# --------------------------------------------------------------------------
 
 
 async def test_book_expense_for_application_in_closed_year_409() -> None:

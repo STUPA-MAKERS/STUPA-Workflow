@@ -414,7 +414,10 @@ def test_account_and_statement_routes_are_gone(fake: _FakeService, path: str) ->
 
 
 def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
-    """#invoices: every budget role can read the paged invoice list."""
+    """#invoices: every budget role can read the paged invoice list.
+
+    The query parameters reach the service call with the aliases resolved.
+    """
     r = _app_as(fake, {"budget.view"}).get(
         "/api/invoices?q=Acme&status=open&grossMin=10&issueFrom=2026-01-01&limit=20"
     )
@@ -422,7 +425,6 @@ def test_invoices_list_readable_by_view(fake: _FakeService) -> None:
     body = r.json()
     assert body["total"] == 1
     assert body["items"][0]["number"] == "R-2026-1"
-    # The query parameters reach the service call with the aliases resolved.
     kwargs = fake.calls["list_invoices_paged"]
     assert kwargs["q"] == "Acme"
     assert kwargs["status"] == "open"
@@ -458,7 +460,7 @@ def test_invoice_create_requires_book(fake: _FakeService) -> None:
 def test_tree_without_permission_is_gremium_scoped(
     fake: _FakeService, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """#budget-scope: without a budget.* permission the tree returns the Gremium scope.
+    """Without a budget.* permission the tree returns the Gremium scope.
 
     The router passes the member Gremien as visible_gremium_ids. Without a membership the
     tree stays empty.
@@ -505,6 +507,11 @@ def test_budget_export_requires_permission(fake: _FakeService) -> None:
 
 
 def test_budget_export_xlsx(fake: _FakeService) -> None:
+    """The export answers with an xlsx file, a zip container that starts with "PK".
+
+    The router audits the export: it writes an export entry and commits in the same
+    transaction.
+    """
     app = create_app()
     app.dependency_overrides[get_budget_tree_service] = lambda: fake
     app.dependency_overrides[get_current_principal] = lambda: Principal(
@@ -515,11 +522,9 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
     assert resp.status_code == 200
     assert resp.headers["content-type"].startswith(_XLSX)
     assert "budget.xlsx" in resp.headers["content-disposition"]
-    assert resp.content[:2] == b"PK"  # xlsx = zip container
+    assert resp.content[:2] == b"PK"
     assert fake.calls["tree"] == _GID
     assert fake.calls["fy_labels"] is True
-    # The router audits the export. It writes an export entry and commits in the same
-    # transaction.
     (entry,) = fake.session.entries
     assert entry.action == "export"
     assert entry.actor == "fin"
@@ -528,7 +533,7 @@ def test_budget_export_xlsx(fake: _FakeService) -> None:
 
 
 def test_get_budget_tree_service_factory() -> None:
-    # request.app.state.object_storage supplies the optional storage.
+    """``request.app.state.object_storage`` supplies the optional storage."""
     request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(object_storage=None)))
     svc = get_budget_tree_service(
         session=object(),  # type: ignore[arg-type]
@@ -540,9 +545,6 @@ def test_get_budget_tree_service_factory() -> None:
     assert svc.storage is None
     assert svc.actor == "tester"
     assert ServiceDep is not None
-
-
-# Fiscal-year delete (budget.structure) and the transfer entity routes (budget.book).
 
 
 def test_delete_fiscal_year(client: TestClient, fake: _FakeService) -> None:

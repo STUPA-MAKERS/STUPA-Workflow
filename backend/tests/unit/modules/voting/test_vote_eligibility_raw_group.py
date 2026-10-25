@@ -2,9 +2,9 @@
 
 A hostile or misconfigured IdP can emit a group name that equals a gremium UUID string.
 `resolve_principal` puts both raw OIDC group claims and gremium membership keys into
-`Principal.groups`. The cast gate of a gremium-scoped vote now needs the namespaced
+`Principal.groups`. The cast gate of a gremium-scoped vote needs the namespaced
 `vote:<gremium_id>` key from `rbac.vote_group_key`. Only a real `vote.cast` Gremium
-membership sets that key, so such a claim can no longer reach the cast roster.
+membership sets that key, so such a claim cannot reach the cast roster.
 """
 
 from __future__ import annotations
@@ -17,9 +17,9 @@ from app.modules.voting.service import VotingService
 
 
 def test_vote_group_key_is_namespaced() -> None:
+    """The namespaced key never equals the bare UUID text that an OIDC claim could carry."""
     gid = uuid.uuid4()
     assert vote_group_key(gid) == f"vote:{gid}"
-    # The namespaced key can never equal the bare UUID-as-text an OIDC claim could carry.
     assert vote_group_key(gid) != str(gid)
 
 

@@ -70,13 +70,13 @@ class PublicDecision(_CamelModel):
     result: VoteResult | None = None
     majority_rule: MajorityRule = Field(default="simple", alias="majorityRule")
     secret: bool = False
-    # The vote is already in the TOP text as a callout: the detail page shows the
-    # text only, the list keeps the result.
+    #: The vote is already in the TOP text as a callout: the detail page shows the
+    #: text only, the list keeps the result.
     in_text: bool = Field(default=False, alias="inText")
-    # The conditions of the decision, when the vote passed with a proposal.
+    #: The conditions of the decision, when the vote passed with a proposal.
     conditions: list[str] = Field(default_factory=list)
-    # Personnel elections. The public version names the elected candidates
-    # only; the other candidates appear as a count, and no vote count travels.
+    #: Personnel elections. The public version names the elected candidates
+    #: only; the other candidates appear as a count, and no vote count travels.
     kind: Literal["motion", "election"] = "motion"
     seats: int | None = None
     round: int = 1
@@ -132,6 +132,7 @@ class PublicTop(_CamelModel):
 
     @property
     def results(self) -> list[VoteResult]:
+        """Return the results of the decisions that have one."""
         return [d.result for d in self.decisions if d.result is not None]
 
 
@@ -149,7 +150,7 @@ class PublicSnapshot(_CamelModel):
 
     version: int = SNAPSHOT_VERSION
     tops: list[PublicTop] = Field(default_factory=list)
-    # The free text of a meeting without agenda items. None when TOPs exist.
+    #: The free text of a meeting without agenda items. None when TOPs exist.
     markdown: str | None = None
     attendance: PublicAttendance = Field(default_factory=PublicAttendance)
 
@@ -178,9 +179,6 @@ def apply_public_snapshot(protocol: Protocol, snapshot: PublicSnapshot, pdf: byt
         protocol.public_pdf_size = len(pdf)
 
 
-# ---------------------------------------------------------------- semesters
-
-
 def semester_of(day: _date) -> str:
     """Return the semester key of a date.
 
@@ -206,20 +204,23 @@ def semester_range(key: str) -> tuple[_date, _date]:
 SEMESTER_PATTERN = r"^(ws|ss)-(19|20)\d{2}$"
 
 
-# ---------------------------------------------------------------- wire models
-
-
 class PublicGremiumRef(_CamelModel):
+    """A gremium as the public page names it."""
+
     id: UUID
     name: str
     slug: str
 
 
 class PublicGremiumOut(PublicGremiumRef):
+    """A gremium with the number of its public protocols."""
+
     protocol_count: int = Field(alias="protocolCount")
 
 
 class PublicTopSummary(_CamelModel):
+    """One TOP in the public list: number, title and results."""
+
     number: int
     title: str | None = None
     non_public: bool = Field(alias="nonPublic")
@@ -227,11 +228,15 @@ class PublicTopSummary(_CamelModel):
 
 
 class PublicTopOut(PublicTopSummary):
+    """One TOP on the public detail page, with its text and its decisions."""
+
     markdown: str | None = None
     decisions: list[PublicDecision] = Field(default_factory=list)
 
 
 class PublicProtocolSummary(_CamelModel):
+    """One protocol in the public list."""
+
     id: UUID
     title: str
     date: _date
@@ -244,6 +249,8 @@ class PublicProtocolSummary(_CamelModel):
 
 
 class PublicProtocolDetail(_CamelModel):
+    """One protocol on the public detail page."""
+
     id: UUID
     title: str
     date: _date
@@ -258,6 +265,8 @@ class PublicProtocolDetail(_CamelModel):
 
 
 class PublicProtocolPage(_CamelModel):
+    """One page of the public protocol list."""
+
     items: list[PublicProtocolSummary]
     total: int
     limit: int
@@ -265,11 +274,10 @@ class PublicProtocolPage(_CamelModel):
 
 
 class PublicSemesterOut(_CamelModel):
+    """A semester key with the number of its public protocols."""
+
     key: str
     count: int
-
-
-# ---------------------------------------------------------------- reads
 
 
 def visible_clause() -> ColumnElement[bool]:
@@ -313,6 +321,7 @@ class PublicProtocolService:
     """The reads of the public protocols page. No write and no auth here."""
 
     def __init__(self, session: AsyncSession, *, storage: ObjectStorage | None = None) -> None:
+        """Bind the service to a session and the optional object storage."""
         self.session = session
         self.storage = storage
 
@@ -447,10 +456,13 @@ class PublicProtocolService:
         return [PublicSemesterOut(key=k, count=counts[k]) for k in ordered]
 
     async def _visible(self, protocol_id: UUID) -> tuple[Protocol, Meeting, Gremium]:
+        """Load a publicly visible protocol with its meeting and gremium.
+
+        A missing, draft, held-back protocol and one of a non-public gremium all give
+        the same 404, so the page reveals nothing about a hidden protocol.
+        """
         row = (await self.session.execute(self._base().where(Protocol.id == protocol_id))).first()
         if row is None:
-            # One answer for "missing", "draft", "held back" and "gremium not
-            # public": the page reveals nothing about a hidden protocol.
             raise NotFoundError("protocol not found")
         protocol, meeting, gremium = row
         return protocol, meeting, gremium
@@ -501,6 +513,9 @@ class PublicProtocolService:
     async def get_pdf(self, protocol_id: UUID) -> tuple[bytes, str]:
         """Return the public PDF bytes and the download file name, else 404.
 
+        The file name keeps only safe characters of the slug, because the slug is admin
+        text and goes into a header value.
+
         Raises:
             NotFoundError: The protocol is not visible or has no public PDF.
             ServiceUnavailableError: The storage failed for a short time (503).
@@ -512,7 +527,6 @@ class PublicProtocolService:
             data = await self.storage.get(protocol.public_pdf_storage_key)
         except StorageError as exc:
             raise ServiceUnavailableError("Protocol PDF temporarily unavailable.") from exc
-        # The slug is admin text: keep only safe characters for the header value.
         slug = re.sub(r"[^A-Za-z0-9_-]", "", gremium.slug) or "gremium"
         name = f"Protokoll_{slug}_{meeting_day(meeting).isoformat()}_oeffentlich.pdf"
         return data, name

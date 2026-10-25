@@ -1,7 +1,7 @@
 """Shared schema base of the budget module.
 
-The cost-center tree API in `app.modules.budget.tree_schemas` replaced the legacy
-flat-pot API. Only the shared camelCase base class remains here.
+The cost-center tree API lives in `app.modules.budget.tree_schemas`. This module holds
+only the shared camelCase base class.
 """
 
 from __future__ import annotations

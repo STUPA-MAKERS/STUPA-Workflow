@@ -61,7 +61,10 @@ async def test_manage_admin_read_token_denied() -> None:
 
 
 async def test_manage_gremium_session_manage_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The gremium permission `session.manage` alone manages a standalone vote."""
+    """The gremium permission `session.manage` alone manages a standalone vote.
+
+    The lead of another gremium gets 403.
+    """
     gid = uuid4()
 
     async def _fake(
@@ -73,7 +76,6 @@ async def test_manage_gremium_session_manage_ok(monkeypatch: pytest.MonkeyPatch)
     principal = Principal(sub="lead")
     service = VotingService(fake_session())
     await service.assert_can_manage_group(str(gid), None, principal)
-    # The lead of another gremium gets 403.
     with pytest.raises(ForbiddenError):
         await service.assert_can_manage_group(str(uuid4()), None, principal)
 
@@ -126,11 +128,14 @@ async def test_manage_unresolvable_group_denied() -> None:
 async def test_manage_resolves_gremium_via_meeting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A meeting-bound vote inherits the Gremium of the meeting (`meeting_id` branch)."""
+    """A meeting-bound vote inherits the Gremium of the meeting (`meeting_id` branch).
+
+    The scalar is ``Meeting.gremium_id``.
+    """
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     db = fake_session()
-    db.scalar_results = [gid]  # Meeting.gremium_id
+    db.scalar_results = [gid]
     principal = Principal(sub="g")
     await VotingService(db).assert_can_manage_group("ignored", uuid4(), principal)
 
@@ -138,11 +143,14 @@ async def test_manage_resolves_gremium_via_meeting(
 async def test_manage_meeting_without_gremium_falls_back_to_group(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A `meeting_id` without a resolvable Gremium falls back to the `eligible_group`."""
+    """A `meeting_id` without a resolvable Gremium falls back to the `eligible_group`.
+
+    The meeting lookup returns nothing.
+    """
     gid = uuid4()
     _patch_permitted(monkeypatch, {gid})
     db = fake_session()
-    db.scalar_results = [None]  # the meeting lookup returns nothing
+    db.scalar_results = [None]
     principal = Principal(sub="g")
     await VotingService(db).assert_can_manage_group(str(gid), uuid4(), principal)
 

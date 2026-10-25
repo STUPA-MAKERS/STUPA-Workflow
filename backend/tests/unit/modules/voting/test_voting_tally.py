@@ -67,28 +67,30 @@ def test_leading_none_on_top_tie() -> None:
     assert leading({YES: 2, NO: 2}) is None
 
 
-# No quorum is set, so every case here meets the quorum.
 @pytest.mark.parametrize(
     ("rule", "counts", "expected"),
     [
-        # simple: yes > no / yes < no / tie
         ("simple", {YES: 3, NO: 1}, "passed"),
         ("simple", {YES: 1, NO: 3}, "rejected"),
         ("simple", {YES: 2, NO: 2}, "tie"),
-        # absolute: twice the yes count against all cast ballots. An abstention
-        # moves the threshold.
-        ("absolute", {YES: 3, NO: 1, ABSTAIN: 0}, "passed"),  # 6>4
-        ("absolute", {YES: 3, NO: 1, ABSTAIN: 2}, "tie"),     # 6==6
-        ("absolute", {YES: 3, NO: 1, ABSTAIN: 3}, "rejected"),  # 6<7
-        # Rule two_thirds (≥⅔): exactly ⅔ passes. A blocking minority gives a tie.
-        ("two_thirds", {YES: 3, NO: 1}, "passed"),   # 9≥8
-        ("two_thirds", {YES: 2, NO: 1}, "passed"),   # 6≥6 (exactly ⅔ → passed)
-        ("two_thirds", {YES: 1, NO: 2}, "rejected"),  # no reaches ⅔
-        ("two_thirds", {YES: 3, NO: 2}, "tie"),      # neither side reaches ⅔ (60%)
-        ("two_thirds", {YES: 0, NO: 0}, "tie"),      # no yes or no ballot
+        ("absolute", {YES: 3, NO: 1, ABSTAIN: 0}, "passed"),
+        ("absolute", {YES: 3, NO: 1, ABSTAIN: 2}, "tie"),
+        ("absolute", {YES: 3, NO: 1, ABSTAIN: 3}, "rejected"),
+        ("two_thirds", {YES: 3, NO: 1}, "passed"),
+        ("two_thirds", {YES: 2, NO: 1}, "passed"),
+        ("two_thirds", {YES: 1, NO: 2}, "rejected"),
+        ("two_thirds", {YES: 3, NO: 2}, "tie"),
+        ("two_thirds", {YES: 0, NO: 0}, "tie"),
     ],
 )
 def test_majority_rules(rule: str, counts: dict[str, int], expected: str) -> None:
+    """Each majority rule gives the expected result. No quorum is set, so every case meets it.
+
+    ``simple`` compares yes and no. ``absolute`` compares twice the yes count with all
+    cast ballots, so an abstention moves the threshold: 6 > 4 passes, 6 == 6 ties, 6 < 7
+    rejects. ``two_thirds`` passes at exactly ⅔ (9 ≥ 8, 6 ≥ 6) and rejects when no
+    reaches ⅔. A blocking minority (yes at 60 %) or no yes-or-no ballot gives a tie.
+    """
     out = result(_config(majority_rule=rule, tie_break="tie"), counts, eligible=0)
     assert out.result == expected
     assert out.quorum_met is True
@@ -120,7 +122,7 @@ def test_count_quorum_missed_rejects_despite_majority() -> None:
 
 
 def test_percent_quorum_met() -> None:
-    # 5 cast of 10 eligible = 50% ≥ 50%
+    """5 cast of 10 eligible = 50% ≥ 50%."""
     out = result(
         _config(quorum={"type": "percent", "value": 50}),
         {YES: 4, NO: 1},
@@ -130,7 +132,7 @@ def test_percent_quorum_met() -> None:
 
 
 def test_percent_quorum_missed() -> None:
-    # 4 cast of 10 = 40% < 50%
+    """4 cast of 10 = 40% < 50%."""
     out = result(
         _config(quorum={"type": "percent", "value": 50}),
         {YES: 3, NO: 1},
@@ -150,7 +152,7 @@ def test_percent_quorum_no_eligible_fails_closed() -> None:
 
 
 def test_abstain_counts_toward_quorum_by_default() -> None:
-    # 2 yes + 3 abstain = 5 participants ≥ 5
+    """2 yes + 3 abstain = 5 participants ≥ 5."""
     out = result(
         _config(quorum={"type": "count", "value": 5}),
         {YES: 2, NO: 0, ABSTAIN: 3},
@@ -160,7 +162,7 @@ def test_abstain_counts_toward_quorum_by_default() -> None:
 
 
 def test_abstain_excluded_from_quorum_when_disabled() -> None:
-    # the same ballots, but the abstentions do not count → 2 < 5
+    """The same ballots without the abstentions give 2 < 5."""
     out = result(
         _config(quorum={"type": "count", "value": 5}, abstain_counts_quorum=False),
         {YES: 2, NO: 0, ABSTAIN: 3},

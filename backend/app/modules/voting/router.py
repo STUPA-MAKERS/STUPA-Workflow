@@ -67,20 +67,23 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 def get_voting_service(
     session: DbSession,
-    # The flow dependency, so the override in `app.main` also reaches the close
-    # route. A close fires the pass or fail branch with all its actions.
     dispatcher: Annotated[ActionDispatcher, Depends(get_action_dispatcher)],
 ) -> VotingService:
+    """Build the voting service with the flow action dispatcher.
+
+    The dispatcher comes from the flow dependency, so the override in `app.main` also
+    reaches the close route. A close fires the pass or fail branch with all its actions.
+    """
     return VotingService(session, dispatcher)
 
 
 ServiceDep = Annotated[VotingService, Depends(get_voting_service)]
 PublisherDep = Annotated[MeetingPublisher, Depends(get_meeting_publisher)]
-# The lifecycle routes (create/open/close/cancel/delete) have no permission gate of
-# their own. The router gate requires only a session. The service then runs the
-# fail-closed gremium-scoped check (``assert_can_manage*``), which admits the admin role
-# or a gremium role with ``vote.manage`` or ``session.manage`` in the gremium of the
-# vote. This is symmetric with the scoped read (``get_scoped``).
+#: The lifecycle routes (create/open/close/cancel/delete) have no permission gate of
+#: their own. The router gate requires only a session. The service then runs the
+#: fail-closed gremium-scoped check (``assert_can_manage*``), which admits the admin role
+#: or a gremium role with ``vote.manage`` or ``session.manage`` in the gremium of the
+#: vote. This is symmetric with the scoped read (``get_scoped``).
 ReaderDep = Annotated[Principal, Depends(require_principal())]
 
 
@@ -197,12 +200,13 @@ async def open_vote(
     this route must not open it around them. The quorum denominator then comes from
     the current roster. A poll of a Gremium opens only with its end at least one hour
     ahead (422 ``closes_at_too_soon``) and sends ``poll_started``.
+
+    The livevote import is local, because the livevote modules import this module.
     """
     await service.assert_can_run_vote(vote_id, principal)
     eligible: int | None = None
     meeting_id = await service.meeting_id_of(vote_id)
     if meeting_id is not None:
-        # Local import: the livevote modules import this module.
         from app.modules.livevote.vote_open import check_draft_open
 
         eligible = await check_draft_open(service.session, meeting_id, vote_id, principal)
@@ -300,9 +304,6 @@ async def cast_ballot(
     payload: BallotIn,
     service: ServiceDep,
     publisher: PublisherDep,
-    # Auth-only gate: an external substitute is in no gremium of the vote. The service
-    # holds the authorization. It checks the roster of the vote for the own ballot, and
-    # a delegation row for the represented ballot. Both need a human session.
     principal: ReaderDep,
 ) -> BallotAccepted:
     """Cast a vote.
@@ -314,6 +315,11 @@ async def cast_ballot(
     client stays fresh. The event carries aggregates only. The reveal rule hides the
     counts and the leading option until all present members have voted
     (``VoteTallyEvent.from_vote``).
+
+    The router gate requires only a session, because an external substitute is in no
+    gremium of the vote. The service holds the authorization: it checks the roster of
+    the vote for the own ballot and a delegation row for the represented ballot. Both
+    need a human session.
     """
     accepted = await service.cast(
         vote_id,

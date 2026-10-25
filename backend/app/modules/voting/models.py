@@ -40,44 +40,49 @@ from app.db import Base, CreatedAtMixin, UUIDPkMixin
 
 
 class Vote(UUIDPkMixin, CreatedAtMixin, Base):
-    """A vote on an application (optionally bound to a meeting)."""
+    """A vote on an application (optionally bound to a meeting).
+
+    A vote ends as ``cancelled`` when the application leaves the vote state manually, so
+    it ends without a result. ``elected`` and ``runoff`` belong to an election. A motion
+    keeps ``passed``, ``rejected`` and ``tie``.
+    """
 
     __tablename__ = "vote"
 
-    # A NULL value marks a generic resolution question of a free-text agenda item with
-    # no application. Such a vote fires no flow branch and appears only in the protocol.
-    # On an application agenda item this is the application whose pass or fail branch
-    # fires on close.
+    #: A NULL value marks a generic resolution question of a free-text agenda item with
+    #: no application. Such a vote fires no flow branch and appears only in the protocol.
+    #: On an application agenda item this is the application whose pass or fail branch
+    #: fires on close.
     application_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("application.id", ondelete="CASCADE"), nullable=True
     )
-    # The meeting delete deletes every vote of the meeting itself, with its ballots and
-    # one ``vote_delete`` audit entry per vote (``VotingService.delete_for_meeting``).
-    # The Gremium delete runs the meeting delete for each meeting of the Gremium
-    # before the cascade, so no vote of it detaches. SET NULL stays as the database
-    # rule for a delete outside the services: such a vote detaches and does not
-    # cascade.
+    #: The meeting delete deletes every vote of the meeting itself, with its ballots and
+    #: one ``vote_delete`` audit entry per vote (``VotingService.delete_for_meeting``).
+    #: The Gremium delete runs the meeting delete for each meeting of the Gremium
+    #: before the cascade, so no vote of it detaches. SET NULL stays as the database
+    #: rule for a delete outside the services: such a vote detaches and does not
+    #: cascade.
     meeting_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting.id", ondelete="SET NULL"), nullable=True
     )
-    # The agenda item that the vote belongs to (live vote). SET NULL, as for
-    # ``meeting_id``: the meeting delete deletes the votes before the agenda cascade.
-    # An agenda item with an open or closed vote cannot be removed, and its
-    # remove deletes the draft and cancelled votes explicitly with a ``vote_delete``
-    # audit entry.
+    #: The agenda item that the vote belongs to (live vote). SET NULL, as for
+    #: ``meeting_id``: the meeting delete deletes the votes before the agenda cascade.
+    #: An agenda item with an open or closed vote cannot be removed, and its
+    #: remove deletes the draft and cancelled votes explicitly with a ``vote_delete``
+    #: audit entry.
     agenda_item_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("meeting_agenda_item.id", ondelete="SET NULL"), nullable=True
     )
     eligible_group: Mapped[str] = mapped_column(Text)
-    # The vote question that the protocol snippet shows. NULL means no explicit question.
+    #: The vote question that the protocol snippet shows. NULL means no explicit question.
     question: Mapped[str | None] = mapped_column(Text, nullable=True)
     config: Mapped[dict] = mapped_column(JSONB)
-    # The decision proposal of an application vote: `{approvedAmount, conditions}`.
-    # A passed vote writes it as the decision of the application. NULL = no deviation.
+    #: The decision proposal of an application vote: `{approvedAmount, conditions}`.
+    #: A passed vote writes it as the decision of the application. NULL = no deviation.
     proposal: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    # Authoritative eligible-voter count (roster). It is the denominator of the percent
-    # quorum. A NULL value means unknown, so the percent quorum stays fail-closed and
-    # never counts as met.
+    #: Authoritative eligible-voter count (roster). It is the denominator of the percent
+    #: quorum. A NULL value means unknown, so the percent quorum stays fail-closed and
+    #: never counts as met.
     eligible_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     opens_state_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("state.id", ondelete="SET NULL"), nullable=True
@@ -88,8 +93,8 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     closes_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
-    # The real end of the vote. ``close`` and ``cancel`` set it. NULL while the vote
-    # runs, and for old rows that migration ``vote_closed_at`` could not backfill.
+    #: The real end of the vote. ``close`` and ``cancel`` set it. NULL while the vote
+    #: runs, and for old rows that migration ``vote_closed_at`` could not backfill.
     closed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
@@ -98,39 +103,35 @@ class Vote(UUIDPkMixin, CreatedAtMixin, Base):
     result_branch_transition_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("transition.id", ondelete="SET NULL"), nullable=True
     )
-    # The attendance when a meeting vote closed: the present members and the
-    # admitted guests. The close of a meeting vote sets both. NULL for an open vote, a
-    # vote without a meeting, and a vote that closed before the columns existed. The
-    # protocol and the result cards show them as counts, never as names.
+    #: The attendance when a meeting vote closed: the present members and the
+    #: admitted guests. The close of a meeting vote sets both. NULL for an open vote, a
+    #: vote without a meeting, and a vote that closed before the columns existed. The
+    #: protocol and the result cards show them as counts, never as names.
     present_members: Mapped[int | None] = mapped_column(Integer, nullable=True)
     present_guests: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
-    # an election (``config`` = ElectionConfig). An election never has an application
-    # and never fires a flow branch. A runoff points to its parent election
-    # (``parent_vote_id``) and counts the rounds (``round``, 1 for the first round).
-    # ``election_result`` holds the result of a closed election: the votes per
-    # candidate, the abstentions, the elected candidates, a pending runoff and the lot.
+    #: Personnel elections. ``kind`` tells a motion (``config`` = VoteConfig) from
+    #: an election (``config`` = ElectionConfig). An election never has an application
+    #: and never fires a flow branch. A runoff points to its parent election
+    #: (``parent_vote_id``) and counts the rounds (``round``, 1 for the first round).
+    #: ``election_result`` holds the result of a closed election: the votes per
+    #: candidate, the abstentions, the elected candidates, a pending runoff and the lot.
     kind: Mapped[str] = mapped_column(Text, server_default="motion", default="motion")
     parent_vote_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("vote.id", ondelete="SET NULL"), nullable=True
     )
     round: Mapped[int] = mapped_column(Integer, server_default="1", default=1)
     election_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    # Polls ("Umfrage", ``kind = 'poll'``, ``config`` = PollConfig). A poll only counts:
-    # ``result`` stays NULL, and ``poll_result`` holds the counts of a closed poll. A
-    # poll without a meeting ends at ``closes_at``; ``reminded_at`` records the one
-    # reminder mail 24 h before that end.
+    #: Polls ("Umfrage", ``kind = 'poll'``, ``config`` = PollConfig). A poll only counts:
+    #: ``result`` stays NULL, and ``poll_result`` holds the counts of a closed poll. A
+    #: poll without a meeting ends at ``closes_at``; ``reminded_at`` records the one
+    #: reminder mail 24 h before that end.
     poll_result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (
-        # ``cancelled``: the application left the vote state manually, so the vote ends
-        # without a result.
         CheckConstraint(
             "status IN ('draft','open','closed','cancelled')", name="vote_status"
         ),
-        # ``elected`` and ``runoff`` belong to an election. A motion keeps
-        # ``passed``, ``rejected`` and ``tie``.
         CheckConstraint(
             "result IS NULL OR result IN ('passed','rejected','tie','elected','runoff')",
             name="vote_result",

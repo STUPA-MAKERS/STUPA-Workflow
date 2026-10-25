@@ -16,6 +16,7 @@ class BudgetStatsService:
     """Materialized-view refresh bound to an ``AsyncSession``."""
 
     def __init__(self, session: AsyncSession) -> None:
+        """Bind the service to a session."""
         self.session = session
 
     async def refresh(self, *, concurrently: bool = False) -> None:

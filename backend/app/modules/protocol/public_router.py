@@ -46,13 +46,14 @@ def _errors(*codes: int) -> dict[int | str, dict[str, Any]]:
 
 
 def get_public_protocol_service(session: DbSession, request: Request) -> PublicProtocolService:
+    """Build the public protocol service with the optional object storage."""
     storage: ObjectStorage | None = getattr(request.app.state, "object_storage", None)
     return PublicProtocolService(session, storage=storage)
 
 
 ServiceDep = Annotated[PublicProtocolService, Depends(get_public_protocol_service)]
 GremiumQuery = Annotated[list[UUID] | None, Query(alias="gremium", max_length=50)]
-# No control characters: a NUL byte would make Postgres fail on the LIKE pattern.
+#: No control characters: a NUL byte would make Postgres fail on the LIKE pattern.
 SearchQuery = Annotated[
     str | None, Query(min_length=1, max_length=100, pattern=r"^[^\x00-\x1f\x7f]*$")
 ]

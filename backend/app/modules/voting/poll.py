@@ -50,12 +50,12 @@ if TYPE_CHECKING:
 
 POLL = "poll"
 
-# 409 codes of the edit.
+#: 409 codes of the edit.
 NOT_A_POLL = "not_a_poll"
 POLL_HAS_ANSWERS = "poll_has_answers"
 POLL_NOT_EDITABLE = "poll_not_editable"
 
-# The end of a poll of a Gremium lies at least this far ahead (create, edit and open).
+#: The end of a poll of a Gremium lies at least this far ahead (create, edit and open).
 MIN_RUNTIME = timedelta(hours=1)
 
 _DATE_ANSWERS = frozenset({"yes", "maybe", "no"})
@@ -191,6 +191,7 @@ class PollService:
     """The poll of a Gremium and the edit of a poll, on a ``VotingService`` session."""
 
     def __init__(self, voting: VotingService) -> None:
+        """Bind the service to a voting service and its session."""
         self.voting = voting
         self.session = voting.session
 

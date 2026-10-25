@@ -41,8 +41,8 @@ if TYPE_CHECKING:
 
     from app.modules.auth.principal import Principal
 
-# Without a status filter the list leaves out the drafts: a draft has no ballot yet,
-# and only the managers of the vote act on it.
+#: Without a status filter the list leaves out the drafts: a draft has no ballot yet,
+#: and only the managers of the vote act on it.
 DEFAULT_STATUSES: tuple[VoteStatus, ...] = ("open", "closed", "cancelled")
 
 
@@ -56,8 +56,14 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
 
     The clause mirrors ``VotingService.assert_can_read``. The query must join
     ``Meeting`` on ``Vote.meeting_id`` (outer join).
+
+    The livevote import is local, because ``app.modules.livevote.service`` imports the
+    voting service. A poll of a Gremium is no application vote, so the global
+    application rights do not reach it, only the Gremium clause. The eligible voter
+    holds ``vote:<gremium>``, which ``resolve_principal`` writes for a gremium role with
+    ``vote.cast``. The manager holds ``vote.manage`` or ``session.manage``,
+    scope-capped.
     """
-    # Local import: `app.modules.livevote.service` imports the voting service.
     from app.modules.livevote.service import MeetingService
 
     visible, delegated = await MeetingService(session).meeting_read_scope(principal)
@@ -70,13 +76,9 @@ async def read_scope(session: AsyncSession, principal: Principal) -> ColumnEleme
         )
     if admin_bypass(principal, "application.read"):
         return or_(meeting_ok, Vote.meeting_id.is_(None))
-    # A poll of a Gremium is no application vote: the global application rights do
-    # not reach it, only the Gremium clause below.
     global_ok: ColumnElement[bool] = false()
     if principal.has("application.read") or principal.has("application.read_all"):
         global_ok = and_(Vote.meeting_id.is_(None), Vote.kind != "poll")
-    # The eligible voter: `resolve_principal` writes `vote:<gremium>` for a gremium role
-    # with `vote.cast`. The manager: `vote.manage` or `session.manage`, scope-capped.
     keys = {
         g.removeprefix(VOTE_GROUP_PREFIX)
         for g in principal.groups

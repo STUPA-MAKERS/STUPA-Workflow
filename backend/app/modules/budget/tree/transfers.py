@@ -30,7 +30,7 @@ from app.search import dialect_of, trigram_rank
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
 
-# The fields a transfer patch may write. Both legs get the same value.
+#: The fields a transfer patch may write. Both legs get the same value.
 _PATCHABLE: tuple[str, ...] = (
     "amount",
     "description",
@@ -48,10 +48,11 @@ class TransferOps(ExpenseOps):
 
         The service books an expense on the source and an income on the target.
         Both bookings use the same fiscal year.
+
+        The fiscal year must belong to the top level of both cost centers.
         """
         src = await self._get_node(payload.from_budget_id)
         dst = await self._get_node(payload.to_budget_id)
-        # The fiscal year must belong to the top level of both cost centers.
         fy_src = await self._resolve_fiscal_year(src, payload.fiscal_year_id)
         fy_dst = await self._resolve_fiscal_year(dst, payload.fiscal_year_id)
         if fy_src != fy_dst:
@@ -180,6 +181,9 @@ class TransferOps(ExpenseOps):
         once. `budget_id` matches EITHER cost centre and includes the subtree,
         because a transfer is interesting from both ends. `q` searches the
         description and the note.
+
+        The subtree filter matches through the transfer id, because either leg may sit
+        in the subtree.
         """
         filters: list[ColumnElement[bool]] = [
             BudgetExpense.transfer_id.is_not(None),
@@ -195,7 +199,6 @@ class TransferOps(ExpenseOps):
                     Budget.path_key.like(node.path_key + _SEP + "%"),
                 )
             )
-            # Either leg may sit in the subtree, so match through the transfer id.
             leg = aliased(BudgetExpense)
             filters.append(
                 BudgetExpense.transfer_id.in_(

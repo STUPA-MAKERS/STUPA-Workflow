@@ -2,7 +2,7 @@
 
 A second cast of the same voter gives 409 with the code ``already_voted``. This holds
 for an open vote, for a secret vote and for the live-vote WebSocket, which sends the
-same code as an error frame. ``VoteConfig`` has no ``allowChange`` any more.
+same code as an error frame. ``VoteConfig`` has no ``allowChange``.
 """
 
 from __future__ import annotations
@@ -83,8 +83,12 @@ def test_ballot_accepted_has_only_the_cast_status() -> None:
 
 @pytest.mark.parametrize("secret", [False, True])
 async def test_second_cast_gives_409_already_voted(secret: bool) -> None:
+    """The first cast inserts, and the second cast gives 409 ``already_voted``.
+
+    The second cast finds the unique row and inserts nothing. The open path never
+    updates a ballot.
+    """
     vote = _vote(secret=secret)
-    # The first cast inserts. The second cast finds the unique row and inserts nothing.
     db = fake_session(result(vote), result(SimpleNamespace(id=uuid4())))
     first = await VotingService(db).cast(vote.id, _voter(), "yes", now=NOW)
     assert first.status == "cast"
@@ -94,7 +98,6 @@ async def test_second_cast_gives_409_already_voted(secret: bool) -> None:
     assert ei.value.status == 409
     assert ei.value.code == ALREADY_VOTED == "already_voted"
     assert db.committed == 0
-    # The open path never updates a ballot.
     assert all("DO UPDATE" not in str(stmt) for stmt in db.statements)
 
 
@@ -116,7 +119,7 @@ class _AlreadyVoted:
         self.rolled_back += 1
 
     async def scalar(self, _stmt: object) -> int:
-        # The account check of the WebSocket cast: the account is active.
+        """Report an active account for the account check of the WebSocket cast."""
         return 1
 
 

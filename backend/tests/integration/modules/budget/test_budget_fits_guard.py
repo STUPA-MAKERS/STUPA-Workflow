@@ -1,4 +1,4 @@
-"""Integration: `flow.context._budget_fits` gives income the correct sign (regression).
+"""Integration: `flow.context._budget_fits` gives income the correct sign.
 
 Income rows (`kind='income'`) raise the available amount. They do not lower it. This is
 the same direction as `tree_rules.node_available`.
@@ -69,15 +69,15 @@ async def _seed(session: AsyncSession) -> tuple[uuid.UUID, uuid.UUID]:
 
 
 def _app(budget_id: uuid.UUID, fy_id: uuid.UUID, amount: str) -> SimpleNamespace:
-    # `_budget_fits` reads only these three attributes of the application.
+    """Return the three attributes of an application that ``_budget_fits`` reads."""
     return SimpleNamespace(
         budget_id=budget_id, fiscal_year_id=fy_id, amount=Decimal(amount)
     )
 
 
 async def test_income_raises_availability(session: AsyncSession) -> None:
+    """Allocation 1000 plus income 500 leaves 1500, so an application of 1200 fits."""
     budget_id, fy_id = await _seed(session)
-    # Allocation 1000 plus income 500 leaves 1500 available. An application of 1200 fits.
     session.add(
         BudgetExpense(
             budget_id=budget_id, fiscal_year_id=fy_id, kind="income",
@@ -89,8 +89,8 @@ async def test_income_raises_availability(session: AsyncSession) -> None:
 
 
 async def test_expense_lowers_availability(session: AsyncSession) -> None:
+    """Allocation 1000 minus expense 400 leaves 600, so an application of 800 does not fit."""
     budget_id, fy_id = await _seed(session)
-    # Allocation 1000 minus expense 400 leaves 600 available. An application of 800 does not fit.
     session.add(
         BudgetExpense(
             budget_id=budget_id, fiscal_year_id=fy_id, kind="expense",
@@ -102,8 +102,8 @@ async def test_expense_lowers_availability(session: AsyncSession) -> None:
 
 
 async def test_mixed_income_and_expense_net(session: AsyncSession) -> None:
+    """1000 minus 700 (expense) plus 300 (income) leaves 600 available."""
     budget_id, fy_id = await _seed(session)
-    # 1000 minus 700 (expense) plus 300 (income) leaves 600 available.
     session.add_all(
         [
             BudgetExpense(

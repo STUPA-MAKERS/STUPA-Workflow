@@ -30,9 +30,9 @@ class ProtocolPatch(_CamelModel):
     least one of the two fields.
     """
 
-    # Deployment-independent cap. It returns a clean 422 instead of an
-    # nginx 413 or the render cap. 512 kB stays under the nginx limit of 1 MiB
-    # and the typst limit of 32 MiB.
+    #: Deployment-independent cap. It returns a clean 422 instead of an
+    #: nginx 413 or the render cap. 512 kB stays under the nginx limit of 1 MiB
+    #: and the typst limit of 32 MiB.
     markdown: str | None = Field(default=None, max_length=512_000)
     public_withheld: bool | None = Field(default=None, alias="publicWithheld")
 
@@ -46,9 +46,9 @@ class ProtocolPatch(_CamelModel):
 class ProtocolFinalizeBody(_CamelModel):
     """`POST /protocols/{id}/finalize`: the optional finalize options."""
 
-    # Hold back this protocol from the public protocols page (True) or release it
-    # (False). Absent or null keeps the stored value, so a draft held back earlier
-    # stays held back.
+    #: Hold back this protocol from the public protocols page (True) or release it
+    #: (False). Absent or null keeps the stored value, so a draft held back earlier
+    #: stays held back.
     public_withheld: bool | None = Field(default=None, alias="publicWithheld")
 
 
@@ -65,14 +65,14 @@ class ProtocolOut(_CamelModel):
     meeting_id: UUID = Field(alias="meetingId")
     markdown: str
     status: Literal["draft", "rendering", "final"]
-    # Result link after `finalize`: a short-lived signed MinIO URL, never a
-    # direct bucket link. It stays NULL for a draft and without storage.
+    #: Result link after `finalize`: a short-lived signed MinIO URL, never a
+    #: direct bucket link. It stays NULL for a draft and without storage.
     pdf_url: str | None = Field(default=None, alias="pdfUrl")
-    # Redacted public variant, set only when an agenda item is non-public.
+    #: Redacted public variant, set only when an agenda item is non-public.
     public_pdf_url: str | None = Field(default=None, alias="publicPdfUrl")
     sent_at: datetime | None = Field(default=None, alias="sentAt")
-    # The protocol is held back from the public protocols page.
+    #: The protocol is held back from the public protocols page.
     public_withheld: bool = Field(default=False, alias="publicWithheld")
-    # The gremium publishes its final protocols. The editor then shows the notice
-    # that the public TOPs become public.
+    #: The gremium publishes its final protocols. The editor then shows the notice
+    #: that the public TOPs become public.
     gremium_protocols_public: bool = Field(default=False, alias="gremiumProtocolsPublic")
