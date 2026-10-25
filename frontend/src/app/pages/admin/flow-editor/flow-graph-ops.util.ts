@@ -18,7 +18,7 @@ import type {
   TransitionBranch,
   TransitionDef,
 } from '../admin.models';
-import { autoLayout, blankState, layoutEntities } from '../flow-graph.util';
+import { autoLayout, blankState } from '../flow-graph.util';
 import {
   compareSpecOf,
   defaultGuard,
@@ -27,14 +27,6 @@ import {
   recipientNeedsRef,
   recipientsOf,
 } from './flow-guard.util';
-import {
-  buildGroupById,
-  buildParentGroupId,
-  buildStateOwnerId,
-  computeEdgeEnds,
-  deepStateKeys,
-} from './flow-level.util';
-import type { EndRef, Point } from './flow-editor.models';
 
 
 /** Unique state key (`state`, `state2`, …). */
@@ -438,85 +430,6 @@ export function setRecipientRef(
     list.map((r, i) => (i === ri ? { ...r, ref } : r)),
   );
 }
-
-
-export function setStatePosition(g: FlowGraph, key: string, x: number, y: number): FlowGraph {
-  return {
-    ...g,
-    layout: {
-      ...(g.layout ?? {}),
-      positions: { ...(g.layout?.positions ?? {}), [key]: { x, y } },
-    },
-  };
-}
-
-/** Shift several states at once for a group drag. Clamps to non-negative coordinates. */
-export function moveStatesBy(g: FlowGraph, keys: string[], dx: number, dy: number): FlowGraph {
-  const positions = { ...(g.layout?.positions ?? {}) };
-  for (const k of keys) {
-    const cur = positions[k];
-    if (cur) {
-      positions[k] = {
-        x: Math.max(0, Math.round(cur.x + dx)),
-        y: Math.max(0, Math.round(cur.y + dy)),
-      };
-    }
-  }
-  return { ...g, layout: { ...(g.layout ?? {}), positions } };
-}
-
-/**
- * Auto-arrange the given drill-down level. Each sub-group acts as one node. The
- * function shifts the members of a sub-group as a block.
- */
-export function relayoutLevel(g: FlowGraph, ctx: string | null): FlowGraph {
-  const allGroups = g.layout?.groups ?? [];
-  const byId = buildGroupById(allGroups);
-  const parents = buildParentGroupId(allGroups);
-  const owner = buildStateOwnerId(allGroups);
-  const visible = g.states.filter((s) => (owner.get(s.key) ?? null) === ctx);
-  const childGroups = allGroups.filter((gr) => (parents.get(gr.id) ?? null) === ctx);
-  const ends = computeEdgeEnds(g, ctx, owner, parents);
-  const entId = (r: EndRef): string | null =>
-    r.type === 'state' ? `s:${r.key}` : r.type === 'group' ? `g:${r.id}` : null;
-  const initialKey = g.states.find((s) => s.isInitial)?.key;
-  const entities = [
-    ...visible.map((s) => ({ id: `s:${s.key}`, isInitial: !!s.isInitial })),
-    ...childGroups.map((gr) => ({
-      id: `g:${gr.id}`,
-      isInitial: initialKey ? deepStateKeys(byId, gr.id).includes(initialKey) : false,
-    })),
-  ];
-  const edges: Array<readonly [string, string]> = [];
-  for (const e of ends) {
-    if (!e) continue;
-    const a = entId(e.src);
-    const b = entId(e.dst);
-    if (a && b && a !== b) edges.push([a, b] as const);
-  }
-  const target = layoutEntities(entities, edges);
-  const positions: Record<string, Point> = { ...(g.layout?.positions ?? {}) };
-  for (const s of visible) {
-    const p = target[`s:${s.key}`];
-    if (p) positions[s.key] = p;
-  }
-  // Group as a block: shift the member bbox top-left onto the target position.
-  for (const grp of childGroups) {
-    const p = target[`g:${grp.id}`];
-    if (!p) continue;
-    const deep = deepStateKeys(byId, grp.id);
-    const pts = deep.map((k) => positions[k]).filter((q): q is Point => !!q);
-    if (!pts.length) continue;
-    const dx = p.x - Math.min(...pts.map((q) => q.x));
-    const dy = p.y - Math.min(...pts.map((q) => q.y));
-    for (const k of deep) {
-      const cur = positions[k];
-      if (cur) positions[k] = { x: cur.x + dx, y: cur.y + dy };
-    }
-  }
-  return { ...g, layout: { ...(g.layout ?? {}), positions } };
-}
-
 
 /** First free `grpN` id. */
 export function freshGroupId(groups: readonly FlowGroup[]): { id: string; n: number } {

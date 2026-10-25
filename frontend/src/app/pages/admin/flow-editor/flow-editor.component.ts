@@ -7,6 +7,7 @@ import {
   effect,
   inject,
   signal,
+  untracked,
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -51,9 +52,9 @@ import { FabComponent } from '@shared/ui/fab/fab.component';
 import { VersionHistoryComponent } from '../version-history/version-history.component';
 import { FlowCanvasInteraction, type TempEdge } from './flow-canvas-interaction';
 import { createFlowCanvasView } from './flow-canvas-view';
+import { FLOW_LAYOUTER, type LevelLayout } from './flow-elk';
 import { FlowEditorOptionsService } from './flow-editor-options.service';
 import {
-  NODE_W,
   type GuardGroup,
   type Selection,
   type TransitionLists,
@@ -84,11 +85,17 @@ import { TransitionDetailComponent } from './transition-detail.component';
 import { TransitionInspectorComponent } from './transition-inspector.component';
 import { TransitionListsComponent } from './transition-lists.component';
 
+/** The smallest scale of the start view: below it the labels are too small to read. */
+const MIN_FIT_SCALE = 0.75;
+
 /**
  * Flow editor as a visual drag-and-drop canvas (board Admin-Flow-Editor).
  *
- * The user moves the states freely as nodes. Node positions persist in `layout`.
- * To draw a transition, the user drags from a connector dot onto a target node.
+ * The editor places the states itself: ELK lays out each level from its structure
+ * (`flow-elk.ts`) whenever it changes, and the lines run in right angles between the
+ * layers. The positions stored in `layout` are only the places until the first layout
+ * answers. Hovering or selecting a state, or selecting a transition, draws everything
+ * else faint. To draw a transition, the user drags from a connector dot onto a target node.
  * A click on a node or an edge opens it in the inspector beside the canvas: a state
  * with its settings and its incoming and outgoing transitions, a transition with its
  * settings, its guard and its actions. "Versionen" in the header shows the version
@@ -190,7 +197,14 @@ export class FlowEditorComponent {
   /** Viewport (zoom and pan) in world coordinates. A null value fits the whole content. */
   protected readonly view = signal<ViewRect | null>(null);
 
-  protected readonly NODE_W = NODE_W;
+  /** The state under the pointer (focus). */
+  protected readonly hoverKey = signal<string | null>(null);
+
+  private readonly layouter = inject(FLOW_LAYOUTER);
+  /** The last layout that answered, with the input it answers. */
+  private readonly levelLayout = signal<{ key: string; layout: LevelLayout } | null>(null);
+  /** The layouter failed: the canvas shows the stored places. */
+  private readonly layoutFailed = signal(false);
 
   private readonly vm = createFlowCanvasView({
     graph: this.graph,
@@ -198,6 +212,12 @@ export class FlowEditorComponent {
     selection: this.selection,
     multiSel: this.multiSel,
     multiSelGroups: this.multiSelGroups,
+    hover: this.hoverKey,
+    layout: computed(() => {
+      const r = this.levelLayout();
+      if (!r) return null;
+      return r.key === this.layoutKey() ? r.layout : { pos: r.layout.pos, routes: new Map() };
+    }),
     stateLabel: (s) => this.label(s),
     guardDotLabel: (g) => this.guardGroupLabel(g),
   });
@@ -210,15 +230,21 @@ export class FlowEditorComponent {
   protected readonly nodes = this.vm.nodes;
   protected readonly edges = this.vm.edges;
   protected readonly contentBounds = this.vm.contentBounds;
+  private readonly layoutKey = computed(() => JSON.stringify(this.vm.layoutInput()));
+  /**
+   * The canvas waits for its first layout, so the boxes do not jump from the stored
+   * places to the laid-out ones. Without a layouter or after a failure it shows at once.
+   */
+  protected readonly layoutPending = computed(
+    () => !!this.layouter && !this.layoutFailed() && this.levelLayout() === null,
+  );
 
   private readonly pointer = new FlowCanvasInteraction({
     svg: () => this.canvas()?.nativeElement,
     graph: () => this.graph(),
     updateGraph: (fn) => this.graph.update(fn),
-    positions: () => this.vm.positions(),
     nodes: () => this.vm.nodes(),
     contentBounds: () => this.fitBounds(),
-    deepKeys: (id) => this.vm.deepKeys(id),
     openGroup: (id) => this.openGroup(id),
     selection: this.selection,
     multiSel: this.multiSel,
@@ -257,6 +283,22 @@ export class FlowEditorComponent {
       () => this.canvasWrap()?.nativeElement,
       ({ width, height }) => this.canvasSize.set({ w: Math.round(width), h: Math.round(height) }),
     );
+
+    // Lay the level out again whenever its structure changes. Only the answer to the
+    // newest input counts; an older one that answers late is dropped.
+    effect(() => {
+      const input = this.vm.layoutInput();
+      const key = this.layoutKey();
+      const layouter = this.layouter;
+      if (!layouter || untracked(this.levelLayout)?.key === key) return;
+      const many = (n: number): string => this.i18n.translate('admin.flow.bundle', { n });
+      layouter(input, many).then(
+        (layout) => {
+          if (key === this.layoutKey()) this.levelLayout.set({ key, layout });
+        },
+        () => this.layoutFailed.set(true),
+      );
+    });
 
     // The drill-down context must never point at a deleted group. Undo, redo or a
     // dissolve from another path can delete it. Fall back to the top level.
@@ -298,17 +340,22 @@ export class FlowEditorComponent {
   });
 
   /**
-   * The view that fits the whole content. A flow smaller than the canvas box keeps its
-   * real size (scale 1) and sits in the middle of the box; a larger flow scales down to
-   * fit. Before the box is measured (and in tests) it is the content bounds.
+   * The start view. A flow smaller than the canvas box keeps its real size (scale 1)
+   * and sits in the middle of the box; a larger flow scales down to fit, but not below
+   * `MIN_FIT_SCALE`, where the labels would be too small to read. A flow that does not
+   * fit then starts at its left end (the initial state), centred in height, and the
+   * reader pans to the rest. Before the box is measured (and in tests) it is the content
+   * bounds.
    */
   protected readonly fitBounds = computed(() => {
     const b = this.contentBounds();
     const { w, h } = this.canvasSize();
     if (!w || !h) return b;
-    const fw = Math.max(b.w, w);
-    const fh = Math.max(b.h, h);
-    return { x: b.x - (fw - b.w) / 2, y: b.y - (fh - b.h) / 2, w: fw, h: fh };
+    const scale = Math.min(1, Math.max(MIN_FIT_SCALE, Math.min(w / b.w, h / b.h)));
+    const vw = w / scale;
+    const vh = h / scale;
+    const x = vw >= b.w ? b.x - (vw - b.w) / 2 : b.x;
+    return { x, y: b.y - (vh - b.h) / 2, w: vw, h: vh };
   });
 
   protected readonly viewBox = computed(() => {
@@ -649,12 +696,6 @@ export class FlowEditorComponent {
 
   protected recipientNeedsRef(kind: string): boolean {
     return recipientNeedsRef(kind);
-  }
-
-  protected relayout(): void {
-    const ctx = this.currentGroupId();
-    this.graph.update((g) => ops.relayoutLevel(g, ctx));
-    this.resetView();
   }
 
   protected createGroupFromSelection(): void {

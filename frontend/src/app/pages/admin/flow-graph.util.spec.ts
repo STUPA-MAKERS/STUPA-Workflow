@@ -5,7 +5,6 @@ import {
   blankState,
   blankTransition,
   emptyFlowGraph,
-  layoutEntities,
   normalizeFlowGraph,
   validateFlowGraph,
 } from './flow-graph.util';
@@ -412,25 +411,6 @@ describe('autoLayout edge cases', () => {
     const laid = autoLayout(noTransitions);
     expect(laid.layout!.positions!['a']).toBeDefined();
     expect(laid.layout!.positions!['b']).toBeDefined();
-  });
-});
-
-describe('layoutEntities', () => {
-  it('arranges virtual entities/edges and honours isInitial', () => {
-    const pos = layoutEntities(
-      [{ id: 'x', isInitial: true }, { id: 'y' }, { id: 'z' }],
-      [
-        ['x', 'y'],
-        ['y', 'z'],
-      ],
-    );
-    expect(pos['x'].x).toBeLessThan(pos['y'].x);
-    expect(pos['y'].x).toBeLessThan(pos['z'].x);
-  });
-
-  it('returns positions for entities without edges', () => {
-    const pos = layoutEntities([{ id: 'solo' }], []);
-    expect(pos['solo']).toBeDefined();
   });
 });
 

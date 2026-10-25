@@ -373,24 +373,6 @@ export function autoLayout(graph: FlowGraph): FlowGraph {
   };
 }
 
-/**
- * Condensed auto-layout for one drill-down level. It treats arbitrary entities, that is
- * the visible states and the group boxes, as nodes of a virtual graph. A group behaves
- * like ONE node during auto-arrange. The function returns fresh positions per entity id
- * and ignores existing positions.
- */
-export function layoutEntities(
-  entities: ReadonlyArray<{ id: string; isInitial?: boolean }>,
-  edges: ReadonlyArray<readonly [string, string]>,
-): Record<string, { x: number; y: number }> {
-  const fake: FlowGraph = {
-    states: entities.map((e) => ({ key: e.id, label: {}, isInitial: !!e.isInitial })),
-    transitions: edges.map(([from, to]) => ({ from, to })),
-    layout: null,
-  };
-  return autoLayout(fake).layout?.positions ?? {};
-}
-
 export function emptyFlowGraph(): FlowGraph {
   return { states: [], transitions: [] };
 }

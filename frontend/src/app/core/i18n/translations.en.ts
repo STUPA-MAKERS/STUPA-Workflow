@@ -2033,7 +2033,7 @@ export const en: Partial<Record<TranslationKey, string>> = {
   'admin.flow.guardValue': 'Value',
   'admin.flow.addAction': 'Add action',
   'admin.flow.diagram': 'Diagram',
-  'admin.flow.relayout': 'Re-layout',
+  'admin.flow.bundle': '{n} transitions',
   'admin.flow.undo': 'Undo',
   'admin.flow.redo': 'Redo',
   'admin.flow.zoom': 'Zoom',

@@ -2078,7 +2078,7 @@ export const de = {
   'admin.flow.guardValue': 'Wert',
   'admin.flow.addAction': 'Aktion hinzufügen',
   'admin.flow.diagram': 'Diagramm',
-  'admin.flow.relayout': 'Neu anordnen',
+  'admin.flow.bundle': '{n} Übergänge',
   'admin.flow.undo': 'Rückgängig',
   'admin.flow.redo': 'Wiederholen',
   'admin.flow.zoom': 'Zoom',
