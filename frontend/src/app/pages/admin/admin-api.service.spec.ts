@@ -271,7 +271,7 @@ describe('AdminApiService — real mode (contract)', () => {
     http.expectOne('/api/cd-variants').flush([]);
   });
 
-  it('wires OIDC group-mapping CRUD endpoints (#5-4)', () => {
+  it('wires OIDC group-mapping CRUD endpoints', () => {
     s.listGroupMappings().subscribe();
     http.expectOne('/api/admin/group-mappings').flush([]);
 
@@ -285,7 +285,7 @@ describe('AdminApiService — real mode (contract)', () => {
     expect(http.expectOne('/api/admin/group-mappings/gm-9').request.method).toBe('DELETE');
   });
 
-  it('wires mail-template endpoints (list/upsert/reset/preview) (#5-4/#12)', () => {
+  it('wires mail-template endpoints (list/upsert/reset/preview)', () => {
     s.listMailTemplates().subscribe();
     http.expectOne('/api/admin/mail-templates').flush([]);
 
@@ -952,7 +952,7 @@ describe('AdminApiService — mock mode, exhaustive store branches', () => {
     expect(empty).toEqual({ applicationTypeId: 'unknown-type', fields: [] });
   });
 
-  it('creates a form version, bumps the version, and toggles active (#13/#forms)', async () => {
+  it('creates a form version, bumps the version, and toggles active (#forms)', async () => {
     const s = svc();
     const fields: FormFieldDef[] = [{ key: 'a', type: 'text', label: { de: 'A' } }];
     const v1 = await firstValueFrom(s.createFormVersion('f-foerderung', fields, { de: 'D' }));

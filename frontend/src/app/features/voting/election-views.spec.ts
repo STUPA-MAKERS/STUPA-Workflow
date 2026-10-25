@@ -39,7 +39,7 @@ function card(over: Partial<MeetingVote> = {}): MeetingVote {
   });
 }
 
-describe('election views (F2)', () => {
+describe('election views', () => {
   it('the meeting card: the election ballot for a voter', async () => {
     await render(VoteCardComponent, {
       inputs: { vote: card({ status: 'open' }), meetingStatus: 'live', canVote: true, canManage: false },

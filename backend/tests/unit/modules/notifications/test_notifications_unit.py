@@ -169,7 +169,7 @@ async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
     calls: list[tuple[str, dict, str | None]] = []
 
     class FakePool:
-        async def enqueue_job(self, name, payload, *, _job_id=None):  # noqa: ANN001
+        async def enqueue_job(self, name, payload, *, _job_id=None):
             calls.append((name, payload, _job_id))
             return object()
 
@@ -181,7 +181,7 @@ async def test_arq_queue_enqueues_with_idempotent_job_id() -> None:
 
 async def test_arq_queue_dedup_logs_when_none(caplog: pytest.LogCaptureFixture) -> None:
     class FakePool:
-        async def enqueue_job(self, *a, **k):  # noqa: ANN002, ANN003
+        async def enqueue_job(self, *a, **k):
             return None  # arq: the job id already exists
 
     q = ArqMailQueue(FakePool())
@@ -227,7 +227,7 @@ def test_template_out_serializes_camel() -> None:
 async def test_create_mail_pool_failure_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
     import arq
 
-    async def boom(*a, **k):  # noqa: ANN002, ANN003
+    async def boom(*a, **k):
         raise OSError("no redis")
 
     monkeypatch.setattr(arq, "create_pool", boom)
@@ -241,7 +241,7 @@ async def test_create_mail_pool_success(monkeypatch: pytest.MonkeyPatch) -> None
 
     sentinel = object()
 
-    async def ok(*a, **k):  # noqa: ANN002, ANN003
+    async def ok(*a, **k):
         return sentinel
 
     monkeypatch.setattr(arq, "create_pool", ok)

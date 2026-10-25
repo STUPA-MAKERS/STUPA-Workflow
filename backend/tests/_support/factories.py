@@ -34,7 +34,7 @@ class PageParamsFactory(BaseFactory[PageParams]):
     __model__ = PageParams
 
 
-def seed_core(**overrides: Any) -> dict[str, Any]:  # noqa: ANN401 — Platzhalter-Signatur
+def seed_core(**overrides: Any) -> dict[str, Any]:  # Platzhalter-Signatur
     """Seed helper stub for the core fixtures (Gremium, type, form, flow, roles).
 
     The real database seed logic comes with the data model. The stub exists so

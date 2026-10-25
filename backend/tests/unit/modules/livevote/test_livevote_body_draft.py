@@ -265,7 +265,7 @@ async def test_receive_routes_drafts_past_the_general_throttle() -> None:
         handled.append(raw)
 
     conn.ws.receive_json = _receive_json  # type: ignore[attr-defined]
-    conn._handle_body_draft = _draft  # type: ignore[method-assign]
+    conn._handle_body_draft = _draft
     with pytest.raises(_Stop):
         await conn._receive()
     assert [h["type"] for h in handled] == ["body_draft"]

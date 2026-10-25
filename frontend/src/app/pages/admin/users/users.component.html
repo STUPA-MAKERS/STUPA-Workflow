@@ -12,8 +12,6 @@
     </app-note>
   }
 
-  <!-- The search never scrolls away: it sticks to the top while the list scrolls. It
-       searches while the user types; there is no "Suchen" button. -->
   <app-sticky-bar>
     <div class="au__search" role="search">
       <app-search-pill
@@ -103,7 +101,6 @@
             }
           </div>
           <div class="au__act">
-            <!-- A merged account is a locked reference: no action. -->
             @if (!p.mergedIntoId) {
               <app-row-menu
                 [sections]="menuFor(p)"

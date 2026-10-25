@@ -88,7 +88,7 @@ export function parseRecipients(raw: string): string[] {
  * protocol recipients (`PUT /admin/gremien/{id}/mail-recipients`, after the base data).
  * If the dialog cannot read the recipients, the field stays locked and a save sends only
  * the base data: the PUT replaces the list, so an empty field would delete it.
- * There is no switch for changing a ballot after casting: a ballot never changes (O11).
+ * There is no switch for changing a ballot after casting: a ballot never changes.
  *
  * The switch "Öffentlich" puts the final protocols on the public protocol page. Turning
  * it on for a gremium that has it off asks first ("Protokolle veröffentlichen?", in the
@@ -182,7 +182,6 @@ export class GremiumDialogComponent {
   protected readonly canSave = computed(() => !!this.form().name.trim() && !this.saving());
 
   constructor() {
-    // Each opening starts from the gremium (or an empty form), never from the last edit.
     effect(() => {
       if (!this.open()) return;
       const g = this.gremium();
@@ -276,7 +275,6 @@ export class GremiumDialogComponent {
           this.previewLoading.set(false);
           this.preview.set(p);
         },
-        // Without the counts the question still asks, in general words.
         error: () => this.previewLoading.set(false),
       });
       return;
@@ -290,6 +288,10 @@ export class GremiumDialogComponent {
     this.save();
   }
 
+  /**
+   * The recipients are not saved when their stored list failed to load, because the PUT would
+   * replace it with the empty field.
+   */
   private save(): void {
     const f = this.form();
     this.saving.set(true);
@@ -314,7 +316,6 @@ export class GremiumDialogComponent {
     req.subscribe({
       next: (saved) => {
         if (isNew) this.created = saved;
-        // Without the stored list, the PUT would replace it with the empty field.
         if (this.recipientsLoadFailed()) {
           this.saving.set(false);
           this.saved.emit({ gremium: saved, created: isNew, recipients: null });
@@ -335,7 +336,6 @@ export class GremiumDialogComponent {
         this.saving.set(false);
         this.saved.emit({ gremium: saved, created, recipients: r.recipients });
       },
-      // The base data is saved. Only the recipients failed, mostly an invalid address.
       error: (err: { status?: number }) => {
         this.fail(
           err.status === 422 ? 'admin.gremien.recipientsInvalid' : 'admin.gremien.recipientsFailed',

@@ -557,7 +557,7 @@ describe('AuditLogComponent', () => {
     expect(cmp.targetLink(entry(1, { targetType: 'invoice', targetId: 'i-9' }))).toEqual([
       '/invoices',
     ]);
-    // The guest settings live on the deadlines admin page (Z1).
+    // The guest settings live on the deadlines admin page.
     expect(
       cmp.targetLink(entry(1, { targetType: 'guest_application_settings', targetId: '1' })),
     ).toEqual(['/admin/deadlines']);

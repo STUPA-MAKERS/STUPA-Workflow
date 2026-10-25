@@ -2611,7 +2611,7 @@ describe('ExpensesComponent (filters, generically)', () => {
   });
 });
 
-// --- list/detail (FE10c) ---------------------------------------------------
+// --- list/detail ---------------------------------------------------
 
 /** A tree with figures for the fiscal year `fy-1`, so the detail shows its numbers. */
 const FIG_TREE: BudgetTreeNode[] = [

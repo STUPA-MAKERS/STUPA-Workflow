@@ -73,7 +73,7 @@ class RedisAvatarCache:
     async def get(self, digest: str, size: int) -> CachedAvatar | None:
         try:
             raw = await self._client.get(cache_key(digest, size))  # type: ignore[attr-defined]
-        except Exception as exc:  # noqa: BLE001 - fail open: Redis is only a cache
+        except Exception as exc:  # fail open: Redis is only a cache
             logger.warning("avatar cache read failed: %s", type(exc).__name__)
             return None
         if raw is None:
@@ -87,5 +87,5 @@ class RedisAvatarCache:
             await self._client.set(  # type: ignore[attr-defined]
                 cache_key(digest, size), encode_entry(image), ex=ttl_seconds
             )
-        except Exception as exc:  # noqa: BLE001 - fail open: Redis is only a cache
+        except Exception as exc:  # fail open: Redis is only a cache
             logger.warning("avatar cache write failed: %s", type(exc).__name__)

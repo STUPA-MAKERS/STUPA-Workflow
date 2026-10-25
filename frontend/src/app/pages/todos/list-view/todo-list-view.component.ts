@@ -84,7 +84,6 @@ export class TodoListViewComponent {
   private sorted(rows: ListRow[]): ListRow[] {
     const dir = this.sort();
     if (dir === 'none') return rows;
-    // Cards without a date go last in both directions.
     return [...rows].sort((a, b) => {
       const x = a.card.dueDate;
       const y = b.card.dueDate;

@@ -7,7 +7,7 @@ export const MAX_CONDITIONS = 20;
 export const MAX_CONDITION_LENGTH = 1000;
 
 /**
- * The editor state of a decision proposal (F1, approval with deviations).
+ * The editor state of a decision proposal (approval with deviations).
  *
  * `amount` is the canonical decimal string of the currency input (`"900.00"`, `''` for
  * empty). `conditions` keeps empty rows while the user types; `toProposal` drops them.
@@ -105,7 +105,7 @@ export function conditionCount(n: number, t: Translate): string {
 }
 
 /**
- * The prefill of the decision question of an application vote (F1).
+ * The prefill of the decision question of an application vote.
  *
  * Without a deviation it is the plain question. With one it names the approved amount
  * (with the requested one) and/or the number of conditions.

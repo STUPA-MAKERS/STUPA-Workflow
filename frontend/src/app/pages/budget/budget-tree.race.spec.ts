@@ -102,7 +102,7 @@ async function setup<A extends FakeApi = FakeApi>(api: A = new FakeApi() as A) {
   return { c, api };
 }
 
-describe('BudgetTreeComponent reload race guard (AUD-039)', () => {
+describe('BudgetTreeComponent reload race guard', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   it('drops a stale reload fan-out response that resolves after a newer reload', async () => {

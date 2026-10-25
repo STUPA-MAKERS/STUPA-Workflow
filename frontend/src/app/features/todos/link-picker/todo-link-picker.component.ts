@@ -75,6 +75,9 @@ export function linkKey(kind: TodoLinkKind, id: Uuid): string {
  * where it was. The panel is rendered at the end of `<body>`, because a dialog or a
  * drawer around the picker clips and transforms its content. Phone: the shared bottom
  * sheet.
+ *
+ * On desktop the panel renders at the end of <body>, because a dialog or a drawer around the picker
+ * clips and transforms its content.
  */
 @Component({
   selector: 'app-todo-link-picker',
@@ -143,8 +146,11 @@ export class TodoLinkPickerComponent {
     return all.filter((g) => g.hits.length);
   });
 
+  /**
+   * An `open` that is true before the first render waits for the template, because the query runs
+   * the effect again.
+   */
   constructor() {
-    // Each opening starts empty, with the focus in the field.
     effect(() => {
       if (!this.open()) return;
       untracked(() => {
@@ -155,8 +161,6 @@ export class TodoLinkPickerComponent {
         queueMicrotask(() => this.panelRoot().querySelector<HTMLInputElement>('.lp__field')?.focus());
       });
     });
-    // Desktop: the panel lives at the end of <body> while it is open. An `open` that is true
-    // before the first render waits for the template: the query runs the effect again.
     effect(() => {
       const pop = this.pop();
       const floating = this.open() && !this.phone();

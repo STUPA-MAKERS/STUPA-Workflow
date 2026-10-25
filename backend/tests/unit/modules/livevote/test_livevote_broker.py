@@ -65,7 +65,7 @@ class _FakePubSub:
     async def subscribe(self, channel: str) -> None:
         self.subscribed.append(channel)
 
-    async def listen(self):  # noqa: ANN201
+    async def listen(self):
         # A realistic stream: first a subscribe ack that the broker drops, then messages.
         yield {"type": "subscribe", "data": 1}
         for raw in self._messages:
@@ -130,7 +130,7 @@ class _FakePatternPubSub(_FakePubSub):
     async def punsubscribe(self, pattern: str) -> None:
         self.unsubscribed.append(pattern)
 
-    async def listen(self):  # noqa: ANN201
+    async def listen(self):
         yield {"type": "psubscribe", "data": 1}
         yield {"type": "message", "data": b"{}"}
         for raw in self._messages:

@@ -340,7 +340,7 @@ class BackupService:
             value = await self.session.scalar(
                 text("SELECT version_num FROM alembic_version LIMIT 1")
             )
-        except Exception:  # noqa: BLE001 — a fresh database may not have the table
+        except Exception:  # a fresh database may not have the table
             return None
         return str(value) if value is not None else None
 

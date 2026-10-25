@@ -517,7 +517,7 @@ async def principals_with_access(session: AsyncSession, ids: list[UUID]) -> set[
 # -- Service ------------------------------------------------------------------------
 
 
-def _role(row: Any) -> RoleInfo:  # noqa: ANN401 - a Role or a GremiumRole row
+def _role(row: Any) -> RoleInfo:  # a Role or a GremiumRole row
     return RoleInfo(id=row.id, key=row.key, label=dict(row.name_i18n or {}))
 
 

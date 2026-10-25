@@ -78,7 +78,7 @@ describe('VoteOpenDialogComponent', () => {
     expect(screen.getByRole('switch', { name: 'Geheime Abstimmung' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('builds no tie break, no ballot change and no eligible count (O11, O18)', async () => {
+  it('builds no tie break, no ballot change and no eligible count', async () => {
     const { http, opened, toasts } = await setup();
     expect(screen.queryByText(/Stimmengleichheit/)).toBeNull();
     expect(screen.queryByText(/änderbar/)).toBeNull();
@@ -167,7 +167,7 @@ describe('VoteOpenDialogComponent', () => {
     expect(empty.closed).toHaveBeenCalled();
   });
 
-  describe('guests vote too (#17)', () => {
+  describe('guests vote too', () => {
     const PUBLIC = { ...MEETING, publicJoin: true, guestsMode: 'vote', admittedGuests: 7 } as unknown as Meeting;
 
     async function open(meeting: Meeting, item: AgendaItem = APP_TOP) {
@@ -216,7 +216,7 @@ describe('VoteOpenDialogComponent', () => {
     });
   });
 
-  describe('decision proposal (F1)', () => {
+  describe('decision proposal', () => {
     const PRICED: AgendaItem = { ...APP_TOP, amount: '1250.00' };
     const norm = (s: string) => s.replace(/\u00a0/g, ' ');
 

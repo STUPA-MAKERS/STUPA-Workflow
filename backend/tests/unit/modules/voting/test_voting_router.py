@@ -51,7 +51,7 @@ class _FakeService:
     def __init__(self) -> None:
         self.cast_args: dict[str, object] | None = None
 
-    async def assert_can_manage_group(self, eligible_group, meeting_id, principal):  # noqa: ANN001
+    async def assert_can_manage_group(self, eligible_group, meeting_id, principal):
         # Stands in for the real service gate on the router path. The admin role or
         # the manager marker passes. The service tests cover the per-Gremium
         # resolution. Everything else fails closed with a 403.
@@ -59,30 +59,30 @@ class _FakeService:
             return
         raise ForbiddenError("not allowed to manage this vote")
 
-    async def assert_can_manage_vote(self, vote_id, principal):  # noqa: ANN001
+    async def assert_can_manage_vote(self, vote_id, principal):
         await self.assert_can_manage_group(str(GID), None, principal)
 
-    async def assert_can_run_vote(self, vote_id, principal):  # noqa: ANN001
+    async def assert_can_run_vote(self, vote_id, principal):
         # The protokollant gate of a meeting vote; the service tests cover it.
         await self.assert_can_manage_vote(vote_id, principal)
         if getattr(self, "meeting_id", None) is not None and getattr(self, "not_keeper", False):
             raise ForbiddenError("only the protokollant may open or close a vote")
 
-    async def create(self, application_id, payload, principal):  # noqa: ANN001
+    async def create(self, application_id, payload, principal):
         return _vote_out("draft")
 
-    async def meeting_id_of(self, vote_id):  # noqa: ANN001
+    async def meeting_id_of(self, vote_id):
         return getattr(self, "meeting_id", None)
 
-    async def open(self, vote_id, *, now, actor=None, eligible_count=None):  # noqa: ANN001
+    async def open(self, vote_id, *, now, actor=None, eligible_count=None):
         self.open_actor = actor
         self.open_eligible = eligible_count
         return _vote_out("open")
 
-    async def get(self, vote_id):  # noqa: ANN001
+    async def get(self, vote_id):
         return _vote_out("open")
 
-    async def get_scoped(self, vote_id, principal):  # noqa: ANN001
+    async def get_scoped(self, vote_id, principal):
         # The real service holds the scope gate and sets the flags of the caller.
         out = await self.get(vote_id)
         return out.model_copy(
@@ -91,7 +91,7 @@ class _FakeService:
 
     async def cast(
         self, vote_id, principal, choice, *, now, as_delegation=False
-    ):  # noqa: ANN001
+    ):
         self.cast_args = {
             "vote_id": vote_id,
             "choice": choice,
@@ -100,14 +100,14 @@ class _FakeService:
         }
         return BallotAccepted(status="cast")
 
-    async def close(self, vote_id, principal):  # noqa: ANN001
+    async def close(self, vote_id, principal):
         return VoteClosed(id=vote_id, result="passed", tally=_TALLY)
 
-    async def cancel(self, vote_id, *, now=None, actor=None):  # noqa: ANN001
+    async def cancel(self, vote_id, *, now=None, actor=None):
         self.cancel_actor = actor
         return _vote_out("cancelled")
 
-    async def delete_standalone(self, vote_id, *, actor):  # noqa: ANN001
+    async def delete_standalone(self, vote_id, *, actor):
         from app.shared.errors import ConflictError
 
         if str(vote_id).startswith("00000000"):
@@ -401,13 +401,13 @@ def test_ballot_broadcasts_vote_tally(
         def __init__(self) -> None:
             self.tallies: list[object] = []
 
-        async def vote_opened(self, vote) -> None:  # noqa: ANN001
+        async def vote_opened(self, vote) -> None:
             return None
 
-        async def vote_tally(self, vote) -> None:  # noqa: ANN001
+        async def vote_tally(self, vote) -> None:
             self.tallies.append(vote)
 
-        async def vote_closed(self, vote) -> None:  # noqa: ANN001
+        async def vote_closed(self, vote) -> None:
             return None
 
     pub = _RecordingPublisher()

@@ -190,7 +190,6 @@ export class MeetingsListComponent {
   ]);
 
   constructor() {
-    // The shown meetings read their sheet ahead, so a click shows it at once.
     prefetchDetails({
       items: computed(() => {
         const found = this.timeline.searchItems();
@@ -200,7 +199,6 @@ export class MeetingsListComponent {
       reads: (m) =>
         Object.values(meetingSheetReads(this.api, inject(DelegationsApiService), m)).filter((r) => r !== null),
     });
-    // A deep link to a meeting that is not in the first pages: read it once.
     effect(() => {
       const id = this.selParam();
       const loading = this.timeline.loadingList();
@@ -211,8 +209,6 @@ export class MeetingsListComponent {
       });
     });
 
-    // A dialog changed or deleted a meeting: keep the deep-linked one current, and drop
-    // the selection of a deleted one.
     effect(() => {
       const change = this.timeline.lastChange();
       if (!change) return;
@@ -232,6 +228,8 @@ export class MeetingsListComponent {
    * A 403, a server error or a network error keeps it and shows the reason, so a reload
    * or "Erneut laden" can still reach the meeting. The read runs once per id: after a
    * failure only the button reads again, not the next change of the list state.
+   *
+   * `requested` stays set, so a later change of the list state does not read again.
    */
   private readSelected(id: Uuid): void {
     this.requested = id;
@@ -245,8 +243,6 @@ export class MeetingsListComponent {
           this.clearSelection();
           return;
         }
-        // `requested` stays: a later change of the list state must not read again. Only
-        // "Erneut laden" (`retrySelected`) does.
         this.selError.set({ id, kind: status === 403 ? 'forbidden' : 'failed' });
       },
     });

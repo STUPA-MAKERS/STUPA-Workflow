@@ -243,7 +243,7 @@ describe('AgendaPaneComponent', () => {
       expect(screen.getByRole('dialog', { name: 'TOP entfernen?' })).toHaveTextContent('„Unbenannter TOP“');
     });
 
-    it('disables the remove of an item with an open or closed vote and says why (O25)', async () => {
+    it('disables the remove of an item with an open or closed vote and says why', async () => {
       const votes = [
         vote({ agendaItemId: 't-1', status: 'closed', result: 'passed' }),
         vote({ id: 'v-2', agendaItemId: 't-2', status: 'cancelled' }),
@@ -283,7 +283,7 @@ describe('AgendaPaneComponent', () => {
       expect(on.remove).not.toHaveBeenCalled();
     });
 
-    it('keeps only the NÖ switch once the meeting is closed (O22)', async () => {
+    it('keeps only the NÖ switch once the meeting is closed', async () => {
       const { container, fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'TOP hinzufügen' })).toBeNull();
       expect(container.querySelector('.ap__grip')).toBeNull();

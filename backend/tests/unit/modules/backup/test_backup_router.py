@@ -62,9 +62,9 @@ def _row(**kw: object) -> Backup:
     for real, so the helper fills all of them in.
     """
     defaults: dict[str, object] = {"kind": "manual", "status": "pending", "pinned": False}
-    row = Backup(**{**defaults, **kw})  # type: ignore[arg-type]
+    row = Backup(**{**defaults, **kw})
     row.id = BACKUP_ID
-    if row.created_at is None:  # type: ignore[comparison-overlap]
+    if row.created_at is None:
         row.created_at = CREATED_AT
     return row
 
@@ -90,12 +90,12 @@ class _FakeService:
         self.created.append((kind, actor, note))
         return _row(status="pending", kind=kind, created_by=actor, note=note)
 
-    async def export_stream(self, row: Backup):  # noqa: ANN202 — AsyncIterator[bytes]
+    async def export_stream(self, row: Backup):  # AsyncIterator[bytes]
         self.export_calls += 1
         if not row.storage_key:
             raise BackupError("this backup has no stored archive")
 
-        async def _chunks():  # noqa: ANN202
+        async def _chunks():
             yield b"cipher"
 
         return _chunks()

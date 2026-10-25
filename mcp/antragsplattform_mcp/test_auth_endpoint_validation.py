@@ -12,7 +12,6 @@ import pytest
 
 from antragsplattform_mcp.auth import AuthError, _require_secure_endpoint
 
-
 BASE = "https://antrag.uni.de"
 
 

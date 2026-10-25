@@ -161,7 +161,7 @@ class GuestConnection:
             if not isinstance(guest, dict) or guest.get("id") != str(self.guest_id):
                 return
             self.status = str(guest.get("status"))
-            self.display_name = guest.get("displayName")  # type: ignore[assignment]
+            self.display_name = guest.get("displayName")
             number = guest.get("number")
             if isinstance(number, int):
                 self.number = number
@@ -241,7 +241,7 @@ class GuestConnection:
                         await self.ws.close(code=1000)
                     except WebSocketDisconnect:
                         pass
-                    except Exception:  # noqa: BLE001 - a failed task ends the connection
+                    except Exception:  # a failed task ends the connection
                         logger.warning("guest pump/receive task failed", exc_info=True)
             finally:
                 pump.cancel()

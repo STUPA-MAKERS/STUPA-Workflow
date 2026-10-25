@@ -25,7 +25,7 @@ describe('voteResultInfo', () => {
     expect(info.labels).toEqual({ yes: 'Ja', no: 'Nein', abstain: 'Enthaltung', result: 'Ergebnis' });
   });
 
-  it('calls a tie and every other result a rejection (O18)', () => {
+  it('calls a tie and every other result a rejection', () => {
     for (const result of ['tie', 'rejected', null]) {
       expect(voteResultInfo({ ...closed, result }, t, 'de').result).toEqual({ label: 'Abgelehnt', tone: 'rejected' });
     }
@@ -58,7 +58,7 @@ describe('voteResultResolver', () => {
     expect(voteResultResolver([{ ...closed, question: null, title: null }], t, 'de')('Beschlussfrage')).toBeNull();
   });
 
-  it('keeps the two rounds of an election apart (F2)', () => {
+  it('keeps the two rounds of an election apart', () => {
     const election = {
       ...closed,
       kind: 'election' as const,

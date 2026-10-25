@@ -74,7 +74,7 @@ class ClamdScanner:
     async def scan(self, data: bytes) -> ScanVerdict:
         try:
             return await asyncio.to_thread(self._scan_sync, data)
-        except Exception as exc:  # noqa: BLE001 - transient -> ScannerError (retry)
+        except Exception as exc:  # transient -> ScannerError (retry)
             raise ScannerError(f"scan failed: {type(exc).__name__}") from exc
 
 

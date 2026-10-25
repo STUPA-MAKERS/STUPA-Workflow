@@ -384,7 +384,7 @@ async def test_broker_publisher_roundtrip_over_redis(redis_url: str) -> None:
         meetingId=mid,
         eligibleGroup="stupa",
         config=_CONFIG,
-        status="open",  # type: ignore[arg-type]
+        status="open",
         secret=False,
         tally=TallyOut(counts={"yes": 2, "no": 0}, eligible=5, quorumMet=False),
     )

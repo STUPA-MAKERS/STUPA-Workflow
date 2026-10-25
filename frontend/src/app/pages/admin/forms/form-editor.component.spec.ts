@@ -177,7 +177,7 @@ describe('FormEditorComponent', () => {
     expect(c.errorsFor(0, 0)).not.toContain('label (de) is required');
   });
 
-  it('toggles "Mit Budget" and persists it on the type (#24/budget)', async () => {
+  it('toggles "Mit Budget" and persists it on the type (budget)', async () => {
     const { fixture, updateApplicationType } = await setup(
       draft([{ key: 'title', type: 'text', label: { de: 'Titel', en: '' } }]),
     );
@@ -813,7 +813,7 @@ describe('FormEditorComponent — nullish/branch edges', () => {
   });
 });
 
-describe('FormEditorComponent — layout of the redesign (FE12b)', () => {
+describe('FormEditorComponent — layout of the redesign', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
   // jsdom in jest has no structuredClone. The duplicate action relies on the browser global.

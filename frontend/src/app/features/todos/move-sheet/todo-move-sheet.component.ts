@@ -73,7 +73,6 @@ export class TodoMoveSheetComponent {
   ]);
 
   constructor() {
-    // Each opening starts on the column of the card.
     effect(() => {
       if (!this.open()) return;
       untracked(() => {

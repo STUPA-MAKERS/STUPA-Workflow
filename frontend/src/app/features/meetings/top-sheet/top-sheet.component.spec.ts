@@ -312,7 +312,7 @@ describe('TopSheetComponent', () => {
     const card = view.container.querySelector('.mde__vote') as HTMLElement;
     expect(card.dataset['result']).toBe('rejected');
     expect(card.querySelector('.mde__voteKind')?.textContent).toMatch(/^Beschluss · \d\d:52 · Einfache Mehrheit$/);
-    // O18: a tie is a rejection.
+    // A tie is a rejection.
     expect(card.querySelector('.mde__voteResult')?.textContent).toBe('Abgelehnt');
   });
 

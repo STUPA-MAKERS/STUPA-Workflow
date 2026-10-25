@@ -264,7 +264,6 @@
   flex-direction: column;
   gap: var(--space-5);
   min-height: 0;
-  /* 10px below the bar, as between the bar and the title of the other sheets. */
   padding: 10px var(--space-6) var(--space-6);
   overflow-y: auto;
   overscroll-behavior: contain;

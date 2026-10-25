@@ -18,7 +18,7 @@ async function setup(m: Meeting, p: Protocol, finalizing = false) {
 const closed = (over: Partial<Meeting> = {}) => meeting({ status: 'closed', ...over });
 
 describe('ProtocolBarComponent', () => {
-  it('offers the finalize of a draft to a holder of the right (O2, O13)', async () => {
+  it('offers the finalize of a draft to a holder of the right', async () => {
     const { finalize } = await setup(closed(), protocol());
     expect(screen.getByRole('status')).toHaveTextContent('Entwurf · Das Protokoll ist noch nicht versandt.');
     await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));

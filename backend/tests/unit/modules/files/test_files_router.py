@@ -129,7 +129,7 @@ def fake_service() -> _FakeService:
 class _EmptyResult:
     """Stub a SQLAlchemy result: `all` returns an empty list, so no Gremium memberships."""
 
-    def all(self) -> list[object]:  # noqa: A003
+    def all(self) -> list[object]:
         return []
 
 
@@ -147,7 +147,7 @@ class _NoCreatorDb:
         return _EmptyResult()
 
 
-async def _fake_session():  # noqa: ANN202
+async def _fake_session():
     yield _NoCreatorDb()
 
 

@@ -52,7 +52,6 @@
 /* ------------------------------------------------------------------ rows */
 .inv__scroll {
   @include lp.scroll(--inv-fade);
-  /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
 }
 .inv--split .inv__scroll {
@@ -153,21 +152,16 @@
 }
 
 @include bp.phone {
-  /* A phone row gives the sub line more width, so the number and the due date fit: less
-     padding, a smaller gap to the amount and narrower dots. */
   .inv__row {
     --li-pad-x: var(--space-3);
     --li-gap: var(--space-2);
   }
-  /* Four segments with counts in a phone column: less padding, and a segment never gets
-     narrower than its label and count, so no label gets an ellipsis. */
   .inv__seg ::ng-deep .seg {
     grid-auto-columns: minmax(max-content, 1fr);
   }
   .inv__seg ::ng-deep .seg__opt {
     padding-inline: var(--space-2);
   }
-  /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .inv__chips {
     @include lp.phone-chips;
   }

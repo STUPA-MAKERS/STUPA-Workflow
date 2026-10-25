@@ -71,7 +71,7 @@ def parse_frontmatter(text: str) -> tuple[Meta, Records, str]:
     if end is None:
         return {}, {}, text
     try:
-        raw: object = yaml.load("\n".join(lines[1:end]), Loader=yaml.BaseLoader)  # noqa: S506
+        raw: object = yaml.load("\n".join(lines[1:end]), Loader=yaml.BaseLoader)
     except yaml.YAMLError as exc:
         raise FrontmatterError(f"the frontmatter is not valid YAML: {exc}") from None
     meta, records = _coerce(raw)

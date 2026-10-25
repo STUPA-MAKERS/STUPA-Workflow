@@ -160,7 +160,7 @@ async def voting_delegation_check(
     sub: str,
     meeting_id: UUID | None,
     eligible_group: str,
-    now: datetime,  # noqa: ARG001 - signature consistency; delegations are session-bound
+    now: datetime,  # signature consistency; delegations are session-bound
 ) -> tuple[bool, str | None]:
     """Give the two-sided vote verdict for `sub`.
 
@@ -400,7 +400,7 @@ class DelegationService:
             for d, meeting, gremium in rows
         ]
 
-    async def _joined(self, *where) -> list[tuple[MeetingDelegation, Meeting, Gremium]]:  # noqa: ANN002
+    async def _joined(self, *where) -> list[tuple[MeetingDelegation, Meeting, Gremium]]:
         rows = (
             await self.session.execute(
                 select(MeetingDelegation, Meeting, Gremium)

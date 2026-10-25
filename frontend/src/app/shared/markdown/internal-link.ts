@@ -21,6 +21,5 @@ export function routeInternalLink(event: MouseEvent, router: Router | null): voi
   if (!link || link.hasAttribute('target') || !/^(\/(?!\/)|#)/.test(href)) return;
   if (SERVER_PATH_RE.test(href)) return;
   event.preventDefault();
-  // An anchor stays on the current page: the path of the router URL plus the fragment.
   void router.navigateByUrl(href.startsWith('#') ? router.url.split('#')[0] + href : href);
 }

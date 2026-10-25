@@ -383,8 +383,8 @@ def test_the_default_wiring() -> None:
     storage = object()
 
     class _Request:
-        class app:  # noqa: N801
-            class state:  # noqa: N801
+        class app:
+            class state:
                 object_storage = storage
 
     service = get_ticket_service(object(), _Request())  # type: ignore[arg-type]

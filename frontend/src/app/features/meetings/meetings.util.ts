@@ -67,7 +67,7 @@ function countOf(text: string, part: string): number {
 }
 
 /**
- * The question in the head line of the callout. A runoff (F2) copies the question of its
+ * The question in the head line of the callout. A runoff copies the question of its
  * election, so its head names the round: "Frage (2. Wahlgang)". Each round then has its
  * own head line, as in the backend `build_election_snippet`.
  */
@@ -99,7 +99,7 @@ export function voteSnippet(vote: MeetingVote): string {
 }
 
 /**
- * The protocol callout of a personnel election (F2), the same text as the backend
+ * The protocol callout of a personnel election, the same text as the backend
  * `build_election_snippet` writes: "Wahl · 2 Posten", the votes per candidate (best
  * first) and the abstentions, "Gewählt: …" and the notes of the lot and the runoff. A
  * single candidate writes its Ja/Nein/Enthaltung line.
@@ -112,7 +112,6 @@ export function electionSnippet(vote: MeetingVote): string {
   if (!election || !result) return lines.join('\n');
   const names = new Map(election.candidates.map((c) => [c.id, c.name]));
   const yesNo = typeof result.yes === 'number' && typeof result.no === 'number';
-  // Best first, as the backend writes them; the single candidate keeps its place.
   const rows = election.candidates.map((c) => ({
     name: c.name,
     votes: result.counts[c.id] ?? 0,

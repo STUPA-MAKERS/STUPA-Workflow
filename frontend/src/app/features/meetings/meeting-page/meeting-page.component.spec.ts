@@ -184,7 +184,7 @@ describe('MeetingPageComponent', () => {
       expect(on.closeSession).toHaveBeenCalledTimes(1);
     });
 
-    it('finalizes the draft of a closed meeting as a step of its own (O13)', async () => {
+    it('finalizes the draft of a closed meeting as a step of its own', async () => {
       const { on, fixture } = await setup({ meeting: meeting({ status: 'closed' }) });
       expect(screen.queryByRole('button', { name: 'Sitzung schließen' })).toBeNull();
       await userEvent.click(screen.getByRole('button', { name: 'Finalisieren & versenden' }));
@@ -533,7 +533,7 @@ describe('MeetingPageComponent', () => {
       flushDelegations();
     });
 
-    it('passes the end of an attendance conflict on (O23)', async () => {
+    it('passes the end of an attendance conflict on', async () => {
       const { on, http, fixture } = await setup({ attendanceConflict: 'pr-2' });
       await userEvent.click(screen.getByTitle('Anwesenheit'));
       http.match((r) => r.url.includes('/delegations/')).forEach((req) => req.flush(DELEGATION_CONTEXT));
@@ -733,7 +733,7 @@ describe('MeetingPageComponent', () => {
     }
   });
 
-  describe('public meeting (#17)', () => {
+  describe('public meeting', () => {
     it('offers the QR code in the phone menu and shows it from the attendance sheet', async () => {
       const { fixture } = await setup({ meeting: meeting({ publicJoin: true }) }, [MEDIA.phone]);
       const menu = await openMenu();

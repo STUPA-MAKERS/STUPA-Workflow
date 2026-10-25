@@ -58,6 +58,8 @@ export function findFieldByKey(
  * its value. A `positions` field gets the message on the position the path names (props
  * `serverErrors`, index → text); the positions editor opens that position. The function
  * returns the number of errors it could place; the caller shows a toast for the rest.
+ *
+ * The first error of a position wins, because it is the one the editor shows.
  */
 export function applyServerErrors(
   fields: readonly FormlyFieldConfig[],
@@ -75,7 +77,6 @@ export function applyServerErrors(
       const index = errorPositionIndex(error.field);
       const map = byPosition.get(field) ?? {};
       const at = index ?? -1;
-      // The first error of a position wins: it is the one the editor shows.
       map[at] ??= translate(index === null ? 'forms.errors.server' : positionErrorKey(error));
       byPosition.set(field, map);
       continue;
@@ -84,7 +85,6 @@ export function applyServerErrors(
     field.props['errorText'] = translate('forms.errors.server');
     control.setErrors({ ...(control.errors ?? {}), server: true });
     control.markAsTouched();
-    // The server text holds until the next change of the value.
     const sub = control.valueChanges.subscribe(() => {
       sub.unsubscribe();
       if (field.props) delete field.props['errorText'];

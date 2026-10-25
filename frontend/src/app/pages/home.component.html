@@ -6,9 +6,6 @@
     }
   </div>
 
-  <!-- The ways in, side by side and weighted the same. The page has no way to tell
-       which kind of visitor it has, so it must not guess by making one of them the
-       primary action. The protocol card shows only when a public protocol exists. -->
   @if (loginError(); as reason) {
     <app-note class="home__loginError" kind="error" icon="lock" role="alert">
       <span>{{ reason | t }}</span>

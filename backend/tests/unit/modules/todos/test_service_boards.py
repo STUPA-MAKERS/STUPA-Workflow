@@ -34,7 +34,7 @@ OUT = object()
 def _svc(session: ScriptedSession, **kw: Any) -> TodoService:
     return TodoService(
         session,  # type: ignore[arg-type]
-        access=kw.pop("access", FakeAccess(**kw)),  # type: ignore[arg-type]
+        access=kw.pop("access", FakeAccess(**kw)),
         links=FakeLinks(),  # type: ignore[arg-type]
         files=FakeFiles(),  # type: ignore[arg-type]
     )

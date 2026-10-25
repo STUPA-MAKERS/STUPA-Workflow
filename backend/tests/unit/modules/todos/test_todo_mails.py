@@ -135,7 +135,7 @@ async def test_notify_counts_and_survives_a_failure(sent: list[dict[str, Any]]) 
     async def _boom(*_a: Any, **_k: Any) -> Any:
         raise RuntimeError("db")
 
-    broken.get = _boom  # type: ignore[method-assign]
+    broken.get = _boom
     empty, _b2, _c2 = _session(emails=[])
     count = await mails.notify_todo_mails(
         queue=None,

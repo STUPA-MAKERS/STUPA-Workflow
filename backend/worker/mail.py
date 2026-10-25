@@ -57,7 +57,7 @@ async def send_mail(ctx: dict[str, Any], payload: dict[str, object]) -> str:
     msg = MailMessage.from_payload(payload)
     try:
         await sender.send(msg)
-    except Exception as exc:  # noqa: BLE001 - transient SMTP error -> retry
+    except Exception as exc:  # transient SMTP error -> retry
         job_try = int(ctx.get("job_try", 1))
         if job_try >= settings.mail_max_tries:
             logger.error(

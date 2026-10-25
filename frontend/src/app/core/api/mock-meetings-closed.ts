@@ -5,7 +5,7 @@ import type { MeetingOutWire, ProtocolOutWire } from './models';
  *
  * `…0101` has a draft protocol: the protocol bar offers "Finalisieren & versenden", the
  * text of TOP 3 holds the result of its vote, and two people kept the minutes; the demo
- * user kept them last, so the text stays editable while the protocol is a draft (O22).
+ * user kept them last, so the text stays editable while the protocol is a draft.
  * `…0102` has a final protocol with an internal and a public PDF. The ids are the ids of
  * the first two past rows of the mock timeline, so a click in the list opens them. The
  * interceptor routes the paths of these ids here (`closedMockId`).
@@ -168,7 +168,7 @@ export function closedMeetingGet(id: string, path: string): unknown {
 }
 
 /**
- * A write to a closed demo meeting: the text of an item (O22, while the protocol is a
+ * A write to a closed demo meeting: the text of an item (while the protocol is a
  * draft), the protocol PATCH and the finalize. Anything else gives `undefined`.
  */
 export function closedMeetingWrite(id: string, method: string, path: string, body: unknown): unknown {

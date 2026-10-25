@@ -45,14 +45,14 @@ NOW = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
 
 
 class _Result:
-    def __init__(self, row: Any = None, rows: list[Any] | None = None) -> None:  # noqa: ANN401
+    def __init__(self, row: Any = None, rows: list[Any] | None = None) -> None:
         self._row = row
         self._rows = rows or []
 
-    def one(self) -> Any:  # noqa: ANN401
+    def one(self) -> Any:
         return self._row
 
-    def first(self) -> Any:  # noqa: ANN401
+    def first(self) -> Any:
         return self._row
 
     def all(self) -> list[Any]:
@@ -79,7 +79,7 @@ class _Session:
         self.deleted: list[Any] = []
         self.committed = 0
 
-    async def execute(self, stmt: Any, params: Any = None) -> _Result:  # noqa: ANN401
+    async def execute(self, stmt: Any, params: Any = None) -> _Result:
         sql = str(stmt)
         self.statements.append(sql)
         if "count(" in sql:
@@ -88,21 +88,21 @@ class _Session:
             return _Result(row=self._removed.pop(0) if self._removed else None)
         return _Result()
 
-    async def scalar(self, stmt: Any) -> Any:  # noqa: ANN401
+    async def scalar(self, stmt: Any) -> Any:
         self.statements.append(str(stmt))
         return self._scalar.pop(0) if self._scalar else None
 
-    async def scalars(self, stmt: Any) -> _Result:  # noqa: ANN401
+    async def scalars(self, stmt: Any) -> _Result:
         self.statements.append(str(stmt))
         return _Result(rows=self._scalars.pop(0) if self._scalars else [])
 
-    def add(self, obj: Any) -> None:  # noqa: ANN401
+    def add(self, obj: Any) -> None:
         self.added.append(obj)
 
     async def flush(self) -> None:
         return None
 
-    async def delete(self, obj: Any) -> None:  # noqa: ANN401
+    async def delete(self, obj: Any) -> None:
         self.deleted.append(obj)
 
     async def commit(self) -> None:
@@ -116,7 +116,7 @@ AUDITS: list[dict[str, Any]] = []
 def _patches(monkeypatch: pytest.MonkeyPatch) -> None:
     AUDITS.clear()
 
-    async def _record(session: object, **kw: Any) -> None:  # noqa: ANN401
+    async def _record(session: object, **kw: Any) -> None:
         AUDITS.append(kw)
 
     monkeypatch.setattr(drafts_mod, "audit_record", _record)
@@ -204,7 +204,7 @@ async def test_token_is_valid_reads_the_token_table() -> None:
     assert await _drafts(_Session(scalar=[None])).token_is_valid("t", now=NOW) is False
 
 
-def _draft_row(**over: Any) -> Attachment:  # noqa: ANN401
+def _draft_row(**over: Any) -> Attachment:
     base: dict[str, Any] = {
         "id": uuid.uuid4(),
         "application_id": None,

@@ -145,7 +145,6 @@ export class AdminOAuthGrantsComponent {
       })
       .subscribe({
         next: (page) => {
-          // The last row of the last page went away (a revoke): step back one page.
           if (!page.items.length && this.offset() > 0) {
             this.offset.update((o) => Math.max(0, o - PAGE_SIZE));
             this.load();
@@ -221,6 +220,10 @@ export class AdminOAuthGrantsComponent {
     this.confirmRevoke.set(grant);
   }
 
+  /**
+   * A 404 means the grant died between the list and the click. That is the wanted end state, so the
+   * page reports it and refreshes instead of failing.
+   */
   doRevoke(): void {
     const grant = this.confirmRevoke();
     if (!grant || this.revoking()) return;
@@ -228,8 +231,6 @@ export class AdminOAuthGrantsComponent {
     this.api.revokeOAuthGrant(grant.id).subscribe({
       next: () => this.afterRevoke('admin.oauthGrants.revoked'),
       error: (err: unknown) => {
-        // 404 = the grant died between the list and the click. That is the wanted
-        // end state, so the page reports it and refreshes instead of failing.
         if (errorStatus(err) === 404) {
           this.afterRevoke('admin.oauthGrants.alreadyGone');
           return;

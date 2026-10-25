@@ -355,7 +355,7 @@ async def delete_my_ticket_note(
 
 def _assignee_filter(raw: str | None) -> AssigneeFilter | None:
     if raw is None or raw in ("me", "none"):
-        return raw  # pyright: ignore[reportReturnType]
+        return raw
     try:
         return UUID(raw)
     except ValueError as exc:

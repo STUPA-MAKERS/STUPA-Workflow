@@ -223,7 +223,7 @@ class _Session:
 class _Recorder(ApplicationsService):
     """The service with a recording `create`, so the test sees the hand-off."""
 
-    async def create(self, payload: Any, **kwargs: Any) -> tuple[Any, str]:  # type: ignore[override]
+    async def create(self, payload: Any, **kwargs: Any) -> tuple[Any, str]:
         self.created = (payload, kwargs)
         return _FakeApp(), str(payload.applicant_email)
 
@@ -393,9 +393,9 @@ def test_mail_template_is_in_the_catalogue() -> None:
 
 
 def test_format_date() -> None:
-    assert captured_mod._format_date(None, "de") == ""  # noqa: SLF001
-    assert captured_mod._format_date(date(2026, 10, 1), "de") == "01.10.2026"  # noqa: SLF001
-    assert captured_mod._format_date(date(2026, 10, 1), "en") == "2026-10-01"  # noqa: SLF001
+    assert captured_mod._format_date(None, "de") == ""
+    assert captured_mod._format_date(date(2026, 10, 1), "de") == "01.10.2026"
+    assert captured_mod._format_date(date(2026, 10, 1), "en") == "2026-10-01"
 
 
 class _Queue:
@@ -516,7 +516,7 @@ async def test_deliver_capture_mail_wraps_the_notifier(monkeypatch: pytest.Monke
 
     monkeypatch.setattr(router_mod, "notify_application_captured", _notify)
     app_id = uuid4()
-    await router_mod._deliver_capture_mail(  # noqa: SLF001
+    await router_mod._deliver_capture_mail(
         object(), "a@example.org", app_id, True, None  # type: ignore[arg-type]
     )
     assert calls[0]["application_id"] == app_id

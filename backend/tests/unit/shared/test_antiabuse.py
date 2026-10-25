@@ -385,9 +385,9 @@ async def test_rate_limit_ticket_messages_keys_on_the_account() -> None:
 
     settings = _settings(rl_ticket_messages_per_hour=1)
     limiter = InMemoryRateLimiter(now=lambda: 0.0)
-    await rate_limit_ticket_messages(settings, limiter, None)  # type: ignore[arg-type]
-    await rate_limit_ticket_messages(settings, limiter, Principal(sub="a"))  # type: ignore[arg-type]
-    await rate_limit_ticket_messages(settings, limiter, Principal(sub="b"))  # type: ignore[arg-type]
+    await rate_limit_ticket_messages(settings, limiter, None)
+    await rate_limit_ticket_messages(settings, limiter, Principal(sub="a"))
+    await rate_limit_ticket_messages(settings, limiter, Principal(sub="b"))
     with pytest.raises(RateLimitedError):
-        await rate_limit_ticket_messages(settings, limiter, Principal(sub="a"))  # type: ignore[arg-type]
+        await rate_limit_ticket_messages(settings, limiter, Principal(sub="a"))
     assert _settings().rl_ticket_messages_per_hour == 60

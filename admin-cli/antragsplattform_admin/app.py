@@ -346,7 +346,7 @@ class AdminCLI:
             _ = action()
         except DbError as error:
             self.error(str(error))
-        except Exception as error:  # noqa: BLE001 — a handler must never kill the UI
+        except Exception as error:  # a handler must never kill the UI
             self.error(f"{type(error).__name__}: {error}")
 
     def _accept(self, buffer: Buffer) -> bool:
@@ -365,7 +365,7 @@ class AdminCLI:
                 get_app().exit()
         except DbError as error:
             self.error(str(error))
-        except Exception as error:  # noqa: BLE001 — never let a command crash the UI
+        except Exception as error:  # never let a command crash the UI
             self.error(f"{type(error).__name__}: {error}")
 
     def _dispatch(self, line: str) -> bool:
@@ -684,8 +684,11 @@ class AdminCLI:
         self.choose(
             "Role",
             [
-                (views.fmt(r["id"]),
-                 f"{views.fmt(r['key'])}  ({views.fmt(r['perms'])}p · {views.fmt(r['assignments'])}a)")
+                (
+                    views.fmt(r["id"]),
+                    f"{views.fmt(r['key'])}  "
+                    f"({views.fmt(r['perms'])}p · {views.fmt(r['assignments'])}a)",
+                )
                 for r in rows
             ],
             lambda key: then(by_id[key]) if key else None,
@@ -1064,7 +1067,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if "-h" in args or "--help" in args:
         print(
-            "antragsplattform admin-cli — manage users/roles/OIDC mappings + view the audit log.\n\n"
+            "antragsplattform admin-cli — manage users/roles/OIDC mappings"
+            " + view the audit log.\n\n"
             "Usage: antragsplattform-admin [--read-only] [--check] [--version]\n\n"
             "DB access is resolved automatically: $DATABASE_URL if set, otherwise the\n"
             "DSN from deploy/.env rewritten to localhost:<port published in the compose\n"

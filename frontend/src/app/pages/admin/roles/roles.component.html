@@ -39,7 +39,6 @@
 
             @if (isOpen(r)) {
               <div class="ar__body" [id]="'ar-body-' + r.id">
-                <!-- The display name. The key never changes. -->
                 <div class="ar__names">
                   <app-input
                     class="ar__keyField"
@@ -71,7 +70,7 @@
                           (ngModelChange)="togglePerm(r, perm, $event)"
                           [name]="r.id + '-' + perm"
                           ><span class="ar__perm mono" [title]="perm"
-                            ><!-- The parts carry a <wbr> each; the whole key is the name. -->
+                            >
                             <span aria-hidden="true">@for (part of permParts(perm); track $index) {{{ part }}<wbr />}</span
                             ><span class="sr-only">{{ perm }}</span></span
                           ></app-checkbox

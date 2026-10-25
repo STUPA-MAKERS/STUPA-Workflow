@@ -93,6 +93,10 @@ type QPos = QuestionPos;
  *
  * Wide (`MEDIA.wide`): a pane page. The page does not scroll; each column scrolls inside
  * itself and fades at an end only where more content is. Narrower, the columns stack.
+ *
+ * The actions of a card head stop their click, because a click that reaches the card would select
+ * the old place again after a move. The menu of the question types sits outside the scrolling
+ * columns, so their edges and fades do not cut it.
  */
 @Component({
   selector: 'app-form-editor',
@@ -430,7 +434,6 @@ export class FormEditorComponent {
         return next;
       }),
     );
-    // The shown group and the selection follow the groups to their new places.
     const place = (i: number): number => {
       if (i === from) return to;
       if (from < to && i > from && i <= to) return i - 1;
@@ -461,6 +464,9 @@ export class FormEditorComponent {
   /**
    * Open or close the type menu of a group at its button. The menu opens below the
    * button, or above it when the space below is too small for it.
+   *
+   * On a phone the menu is a bottom sheet, so a scroll inside the sheet must not close it.
+   * Elsewhere a scroll closes the menu before it can drift away from its button.
    */
   protected toggleTypeMenu(gi: number, event: Event): void {
     if (this.typeMenuGroup() === gi) {
@@ -479,13 +485,9 @@ export class FormEditorComponent {
       );
     }
     this.typeMenuGroup.set(gi);
-    // On a phone the menu is a bottom sheet. A scroll inside the sheet must not close it.
     if (this.phone()) return;
-    // The menu stays at its place on the screen, so a scroll of the page or of a column
-    // closes it before it can drift away from its button.
     window.removeEventListener('scroll', this.closeOnScroll, { capture: true });
     window.addEventListener('scroll', this.closeOnScroll, { capture: true, once: true });
-    // The keyboard continues in the menu: the focus goes to its first type.
     setTimeout(() => this.menuItems()[0]?.focus({ preventScroll: true }));
   }
 
@@ -669,7 +671,6 @@ export class FormEditorComponent {
       this.follow(pos, { gi: pos.gi, qi: target });
       return;
     }
-    // At the edge, hand the question to the neighboring group when one exists.
     const ngi = pos.gi + dir;
     if (ngi < 0 || ngi >= groups.length) return;
     this.restructure(() =>
@@ -725,7 +726,6 @@ export class FormEditorComponent {
       next.options = [blankOption()];
     }
     if (type === 'computed' && !next.compute) next.compute = { var: '' };
-    // Non-numeric types cannot be promoted into a metric.
     if (type !== 'number' && type !== 'currency') {
       delete next.isPromoted;
       delete next.promoteTarget;
@@ -814,9 +814,12 @@ export class FormEditorComponent {
     this.dragQuestion = null;
   }
 
-  /** Start the drag of a question in the outline. */
+  /**
+   * Start the drag of a question in the outline.
+   *
+   * The group around the row must not start a group drag.
+   */
   protected onQuestionDragStart(event: DragEvent, pos: QPos): void {
-    // The group around the row must not start a group drag.
     event.stopPropagation();
     event.dataTransfer?.setData('text/plain', `${pos.gi}:${pos.qi}`);
     this.dragQuestion = pos;
@@ -840,7 +843,6 @@ export class FormEditorComponent {
     const moved = moveQuestionTo(this.groups(), from, to);
     if (!moved) return;
     this.restructure(() => this.groups.set(moved.groups));
-    // The selected question keeps its selection at its new place.
     if (!selField) return;
     moved.groups.forEach((g, gi) => {
       const qi = g.fields.indexOf(selField);
@@ -943,7 +945,6 @@ export class FormEditorComponent {
         this.saving.set(false);
         this.keepTypeAsSaved();
         this.savedForm.set(snapshot);
-        // A save creates a new version, and that version is active.
         this.active.set(true);
         this.hasVersion.set(true);
         this.toast.success(this.i18n.translate('admin.common.saved'));

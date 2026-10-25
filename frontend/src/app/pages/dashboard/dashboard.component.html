@@ -1,5 +1,3 @@
-<!-- One DOM order for every width: the head, the greeting, "Heute", the work list. Wide,
-     the grid of the host puts "Heute" into a sheet at the end edge (variant B). -->
 <div class="dash__top">
   @if (phone()) {
     <app-search-pill
@@ -40,7 +38,6 @@
   [title]="'dashboard.greeting' | t: { name: firstName() }"
 />
 
-<!-- "Heute": the live meeting and the next meetings. -->
 <aside
   class="dash__today"
   [attr.aria-labelledby]="hasToday() ? 'dash-today-h' : null"
@@ -146,11 +143,8 @@
   </div>
 </aside>
 
-<!-- The work list: one table, two tabs. -->
 <section class="dash__work" [attr.aria-label]="'dashboard.work.label' | t">
   @if (phone()) {
-    <!-- Phone: the tabs and their pages; a swipe moves to the next tab, and the link goes
-         under the rows, so the tabs keep the width. -->
     <app-tab-pager
       class="dash__tabs dash__pager"
       idPrefix="dash"
@@ -194,13 +188,10 @@
     </div>
   }
   @if (wide()) {
-    <!-- Wide: the button stands at the end of the work list, beside the sheet "Heute". -->
     <app-fab [label]="'fab.application' | t" link="/apply" [contained]="true" />
   }
 </section>
 
-<!-- The rows of one tab. While the tab loads, the table draws its own skeleton rows (a
-     phone: the skeleton). -->
 <ng-template #workTpl let-t>
   @if (errorOf(t)) {
     <app-note class="dash__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retryTab(t)">{{ 'dashboard.error' | t }}</app-note>

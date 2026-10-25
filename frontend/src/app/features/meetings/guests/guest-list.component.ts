@@ -29,7 +29,7 @@ interface GuestRow {
 }
 
 /**
- * The tab "Gäste" of the attendance sheet (#17): the admitted guests with the tag "Gast",
+ * The tab "Gäste" of the attendance sheet: the admitted guests with the tag "Gast",
  * "zugelassen 18:16 · Lea Hoffmann" and the status ("Anwesend", or "Schaut zu" when the
  * guests only follow), then the guests who left or were removed. The row menu renames a
  * guest or removes one; the remove explains the consequences first. Guests are no rows of

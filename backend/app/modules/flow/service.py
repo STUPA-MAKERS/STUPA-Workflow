@@ -499,7 +499,7 @@ class FlowService:
                 "auto-transition on confirmation skipped (app=%s): %s", application_id, exc
             )
             return None
-        except Exception:  # noqa: BLE001 - a failed start must not fail the committed confirmation
+        except Exception:  # a failed start must not fail the committed confirmation
             # Roll back the failed step, so the caller can still use the session (the
             # verify commits, the create refreshes the application).
             await self.session.rollback()
@@ -653,7 +653,7 @@ class FlowService:
         for vote_id in vote_ids:
             try:
                 await self.publisher.vote_cancelled(await voting.get(vote_id))
-            except Exception:  # noqa: BLE001 - the broadcast is best effort
+            except Exception:  # the broadcast is best effort
                 logger.warning("vote_cancelled broadcast failed (vote=%s)", vote_id)
 
     async def fire(

@@ -196,8 +196,6 @@ export class AdminCdVariantsComponent {
   constructor() {
     inject(DestroyRef).onDestroy(() => this.revokePreview());
     this.reload();
-    // The master data names the variant of each gremium. A failed read leaves the
-    // "genutzt von" part out.
     this.api.listGremienOptions().subscribe({
       next: (gremien) => {
         const map = new Map<string, string[]>();
@@ -220,7 +218,6 @@ export class AdminCdVariantsComponent {
       next: (list) => {
         this.variants.set(list);
         this.loading.set(false);
-        // The first variant starts open, so its logos show at once.
         if (this.expandedId() === null && list.length) this.expandedId.set(list[0].id);
       },
       error: () => {
@@ -437,6 +434,7 @@ export class AdminCdVariantsComponent {
     this.confirmDelete.set(variant);
   }
 
+  /** A 409 means a Gremium still points at this variant, so the message names that reason. */
   doDelete(): void {
     const variant = this.confirmDelete();
     if (!variant || this.deleting()) return;
@@ -451,8 +449,6 @@ export class AdminCdVariantsComponent {
       },
       error: (err: unknown) => {
         this.deleting.set(false);
-        // 409 = a Gremium still points at this variant. Name that reason, so the
-        // admin knows the delete needs a change on the Gremium first.
         const key: TranslationKey =
           errorStatus(err) === 409 ? 'admin.cdVariants.inUse' : 'admin.common.saveFailed';
         this.deleteError.set(key);
@@ -560,7 +556,6 @@ export class AdminCdVariantsComponent {
       next: (logo) => {
         this.logoSaving.set(false);
         this.closeLogoDialog();
-        // A square logo replaces the one that the variant held.
         const keep = (l: CdVariantLogo) => logo.slot !== 'square' || l.slot !== 'square';
         this.variants.update((list) =>
           list.map((v) =>

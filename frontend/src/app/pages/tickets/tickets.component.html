@@ -60,8 +60,6 @@
         @if (error()) {
           <app-note class="tk__loadError" kind="error" icon="alert" role="alert" retryable (retry)="retry()">{{ 'tickets.list.error' | t }}</app-note>
         } @else if (loading()) {
-          <!-- The shape of the loaded list: group headings and rows in the geometry of
-               `app-list-item` with the kind tile and the person, after 300ms (`skel-in`). -->
           <div class="tk__skel skel-in">
             @for (n of [2, 4]; track $index) {
               <section class="tk__group" aria-hidden="true">
@@ -107,7 +105,6 @@
                       </span>
                       <span trail class="tk__trail">
                         @if (!manager) {
-                          <!-- The reporter sees no assignee. -->
                         } @else if (row.assignee; as a) {
                           <app-avatar
                             size="sm"

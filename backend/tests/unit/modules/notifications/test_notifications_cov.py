@@ -1144,7 +1144,7 @@ async def test_notify_erasure_executed_no_email_skips(
 ) -> None:
     called: list[bool] = []
     monkeypatch.setattr(
-        privacy, "get_sessionmaker", lambda: called.append(True)  # type: ignore[func-returns-value]
+        privacy, "get_sessionmaker", lambda: called.append(True)
     )
     await privacy.notify_erasure_executed(
         queue=None,
@@ -1213,7 +1213,7 @@ async def test_notify_erasure_rejected_no_email_skips(
 ) -> None:
     called: list[bool] = []
     monkeypatch.setattr(
-        privacy, "get_sessionmaker", lambda: called.append(True)  # type: ignore[func-returns-value]
+        privacy, "get_sessionmaker", lambda: called.append(True)
     )
     await privacy.notify_erasure_rejected(
         queue=None,

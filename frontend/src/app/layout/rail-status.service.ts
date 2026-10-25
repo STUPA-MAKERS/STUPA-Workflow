@@ -110,7 +110,6 @@ export class RailStatusService {
         this._live.set(live);
       });
 
-    // Load at sign-in; forget everything at sign-out.
     effect(() => {
       const signedIn = this.auth.isAuthenticated();
       untracked(() => {

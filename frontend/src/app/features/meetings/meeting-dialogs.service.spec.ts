@@ -120,7 +120,7 @@ describe('MeetingDialogsService', () => {
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
   });
 
-  it('hands the minutes over now or with the next item, and discards a planned handover (Z3)', () => {
+  it('hands the minutes over now or with the next item, and discards a planned handover', () => {
     const { svc, http, toasts } = setup();
     const member = { principalId: 'p-2', displayName: 'Mika', email: null, status: null, source: null, note: null, isSelf: false };
     svc.askHandover(member);
@@ -147,7 +147,7 @@ describe('MeetingDialogsService', () => {
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
   });
 
-  it('keeps a refusal the dialog can explain in the dialog (O20, last TOP)', () => {
+  it('keeps a refusal the dialog can explain in the dialog (last TOP)', () => {
     const { svc, http, toasts } = setup();
     const member = { principalId: 'p-2', displayName: 'Mika', email: null, status: null, source: null, note: null, isSelf: false };
     for (const [status, code] of [[422, 'protokollant_needs_protocol_write'], [409, 'no_next_item'], [409, 'already_protokollant']] as const) {
@@ -168,7 +168,7 @@ describe('MeetingDialogsService', () => {
     expect(svc.handoverTarget()).toBeNull();
   });
 
-  it('names the minute-taker of a planned meeting and explains the O20 refusal as a toast', () => {
+  it('names the minute-taker of a planned meeting and explains the protocol.write refusal as a toast', () => {
     const { svc, http, toasts } = setup();
     svc.setProtokollant(M({ status: 'planned' }), 'p-2');
     http.expectOne('/api/meetings/m-1').flush({ code: 'protokollant_needs_protocol_write' }, { status: 422, statusText: 'x' });

@@ -70,7 +70,6 @@
         </div>
       }
 
-      <!-- The SVG renders 1:1 inside the box, so a drag never rescales it. -->
       <div #canvasWrap class="fe__canvas-wrap">
         <svg
           #canvas
@@ -93,7 +92,6 @@
             </marker>
           </defs>
 
-          <!-- The lines of the focus come last, so they lie on top of the faint ones. -->
           @for (e of edges(); track e.index) {
             <g class="fe__edge-g" [class.fe__edge-g--sel]="e.selected" [class.fe__dim]="e.dim" [style.--edge-color]="e.color || null" (pointerdown)="$event.stopPropagation(); selectEdge(e.index)">
               <path [attr.d]="e.d" class="fe__edge-hit" />
@@ -153,9 +151,6 @@
               } @else if (n.gremiumFromBudget) {
                 <text [attr.x]="n.w / 2" [attr.y]="n.h / 2 + 15" text-anchor="middle" class="fe__node-tag">{{ 'admin.flow.nodeGremiumFromBudget' | t }}</text>
               }
-              <!-- Connector dots: a drag creates a transition. A vote node shows
-                   one labeled dot per branch. The label sits above the line that
-                   leaves the dot, so the line never runs through it. -->
               @for (d of n.dots; track d.id) {
                 <g>
                   <circle
@@ -176,8 +171,6 @@
             </g>
           }
 
-          <!-- Group boxes: ONE box per (sub-)group. A click opens it (drill-down).
-               Shift-click selects the box for nesting. -->
           @for (gb of groupBoxes(); track gb.id) {
             <g class="fe__groupbox-g" [class.fe__groupbox-g--multi]="gb.multi">
               <rect
@@ -198,8 +191,6 @@
             </g>
           }
 
-          <!-- Proxy nodes while drilled in: external sources left, targets right.
-               A click jumps to the original node. -->
           @for (p of proxies().left; track p.pid) {
             <g class="fe__proxy-g" (pointerdown)="$event.stopPropagation()" (click)="onProxyClick(p.pid)">
               <rect [attr.x]="p.x" [attr.y]="p.y" [attr.width]="150" height="44" rx="10" class="fe__proxy" [class.fe__proxy--group]="p.isGroup" />
@@ -217,9 +208,6 @@
           <app-skeleton class="fe__canvasSkel" variant="panel" [label]="'common.loading' | t" />
         }
 
-        <!-- The scroll tongues in the middle of each side, as on the wide tables: a press
-             pans one step towards the hidden content, a hold keeps going. Each one is
-             disabled and invisible while its side hides nothing. -->
         @for (side of panSides; track side) {
           <button
             type="button"
@@ -250,8 +238,6 @@
     </section>
 
     <aside #panel class="fe__panel" appScrollFade="y" [attr.aria-label]="'admin.flow.inspector' | t">
-      <!-- The version history stays loaded (it names the active version in the lead
-           line) and shows only on "Versionen". -->
       <div class="fe__versions" [class.fe__hidden]="!showVersions()">
         <app-button class="fe__back" variant="text" size="sm" (click)="showVersions.set(false)">
           <app-icon name="back" /> {{ 'admin.flow.versionsClose' | t }}

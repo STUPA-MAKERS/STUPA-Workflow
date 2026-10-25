@@ -216,14 +216,12 @@ export class MeetingsCalendarComponent {
       if (this.midnightTimer !== null) clearTimeout(this.midnightTimer);
     });
 
-    // Read the days of the grid again when the month or the Gremium filter changes.
     effect(() => {
       const range = this.range();
       const gremium = this.timeline.gremiumFilter();
       untracked(() => this.load(range, gremium));
     });
 
-    // A dialog changed or deleted a meeting: put it into the month.
     effect(() => {
       const change = this.timeline.lastChange();
       if (!change) return;
@@ -387,7 +385,6 @@ export class MeetingsCalendarComponent {
   private moveMonth(delta: number): void {
     const next = shiftMonth(this.month(), delta);
     this.month.set(next);
-    // Keep the day of the month where it exists, else the last day of the new month.
     const cur = parseDay(this.selectedDay())?.getDate() ?? 1;
     const last = new Date(next.year, next.month + 1, 0).getDate();
     this.selectedDay.set(isoDay(new Date(next.year, next.month, Math.min(cur, last))));

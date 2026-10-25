@@ -62,10 +62,10 @@ def data_uuid_strings(data: object) -> set[str]:
                 return
             found.add(v)
         elif isinstance(v, dict):
-            for x in v.values():  # pyright: ignore[reportUnknownVariableType]
+            for x in v.values():
                 walk(x)
         elif isinstance(v, (list, tuple)):
-            for x in v:  # pyright: ignore[reportUnknownVariableType]
+            for x in v:
                 walk(x)
 
     walk(data)
@@ -690,7 +690,7 @@ class AuditService:
         def i18n_label(m: object) -> str | None:
             if not isinstance(m, dict) or not m:
                 return None
-            return m.get("de") or next(iter(m.values()), None)  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+            return m.get("de") or next(iter(m.values()), None)
 
         async def fill(stmt: Select[uuid.UUID, Any]) -> None:
             for row_id, label in (await self.session.execute(stmt)).all():

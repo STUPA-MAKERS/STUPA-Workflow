@@ -437,7 +437,6 @@ export class GroupMappingsComponent {
         this.dialog.set(null);
         this.refresh(kind);
       },
-      // The dialog stays open, so the admin can correct the input.
       error: (err: { status?: number }) => {
         this.saving.set(false);
         this.toast.error(this.i18n.translate(this.errorKey(err?.status)));

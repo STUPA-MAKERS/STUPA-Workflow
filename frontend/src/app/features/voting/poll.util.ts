@@ -38,7 +38,7 @@ export function pollChoiceLimit(poll: PollConfig): number {
 
 /**
  * A single or multi poll as an election ballot: the options are the candidates and the
- * choice limit is the seats. The ballot reuses the candidate rows of an election (F2).
+ * choice limit is the seats. The ballot reuses the candidate rows of an election.
  */
 export function pollAsElection(poll: PollConfig): ElectionConfig {
   return {

@@ -76,13 +76,13 @@ def test_form_field_dynamic_selects_need_no_options() -> None:
     # The server injects the options of gremium_select and budget_select. Unlike select
     # and multiselect, these types need NO options in the form.
     for t in ("gremium_select", "budget_select"):
-        f = FormFieldDef(key="ziel", type=t, label={"de": "Ziel"})  # type: ignore[arg-type]
+        f = FormFieldDef(key="ziel", type=t, label={"de": "Ziel"})
         assert f.options is None
 
 
 def test_form_field_typed_inputs_valid() -> None:
     for t in ("email", "iban", "daterange"):
-        f = FormFieldDef(key="f", type=t, label={"de": "x"})  # type: ignore[arg-type]
+        f = FormFieldDef(key="f", type=t, label={"de": "x"})
         assert f.type == t
 
 

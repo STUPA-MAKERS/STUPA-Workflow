@@ -68,13 +68,17 @@ type SessionAction = 'settings' | 'attendance' | 'beamer' | 'qr' | 'close' | 'de
  * text and the votes can be prepared before the start. The dock at the foot steps
  * through the agenda and holds the attendance and the minute-taker.
  *
- * A closed meeting finalizes its protocol from the protocol bar of the sheet (O13). The
+ * A closed meeting finalizes its protocol from the protocol bar of the sheet. The
  * attendance opens as a side sheet. A minute-taker picked in the dock of a live meeting
- * goes to the handover dialog of `MeetingsComponent` (Z3).
+ * goes to the handover dialog of `MeetingsComponent`.
  *
  * Wide (>= 1200px): three columns. Below that the agenda moves into a sheet from the
  * start edge, and the vote cards go above the item. On a phone the agenda sheet, the
  * attendance and the minute-taker open as bottom sheets.
+ *
+ * The reason for a disabled action is visible text, not only a tooltip, because a disabled button
+ * takes no focus and no touch. The agenda sheet stays outside the body, because the scroll fade of
+ * the body is a mask, and a mask clips the fixed sheet and its scrim to the box of the body.
  */
 @Component({
   selector: 'app-meeting-page',
@@ -140,7 +144,7 @@ export class MeetingPageComponent {
   readonly savingAgenda = input.required<boolean>();
   readonly renamingTopId = input.required<Uuid | null>();
   readonly renameDraft = model<string>('');
-  /** O23: the member whose "present" the server refused (409 `delegation_active`). */
+  /** The member whose "present" the server refused (409 `delegation_active`). */
   readonly attendanceConflict = input<Uuid | null>(null);
 
   /** Leave the session page for the meeting list. */
@@ -152,7 +156,7 @@ export class MeetingPageComponent {
   readonly castVote = output<{ voteId: Uuid; choice: string }>();
   readonly voteOpen = output<Uuid>();
   readonly voteClose = output<Uuid>();
-  /** The lot of an election was drawn, or its runoff opened (F2). */
+  /** The lot of an election was drawn, or its runoff opened. */
   readonly electionChanged = output<void>();
   readonly voteCancel = output<Uuid>();
   readonly voteDelete = output<Uuid>();
@@ -165,7 +169,7 @@ export class MeetingPageComponent {
   readonly toggleBeamer = output<void>();
   readonly attendanceChange = output<AttendanceChange>();
   readonly attendanceReset = output<Attendance>();
-  /** O23: the delegation of the refused member was revoked in the attendance sheet. */
+  /** The delegation of the refused member was revoked in the attendance sheet. */
   readonly attendanceConflictResolved = output<Uuid>();
   /** Open "TOP hinzufügen". */
   readonly addTop = output<void>();
@@ -179,14 +183,14 @@ export class MeetingPageComponent {
   readonly moveTop = output<AgendaMove>();
   /** Name the minute-taker of a planned meeting. */
   readonly setProtokollant = output<Uuid>();
-  /** A member was picked in the dock to take the minutes of a live meeting over (Z3). */
+  /** A member was picked in the dock to take the minutes of a live meeting over. */
   readonly pickHandover = output<Uuid>();
   /** Discard the planned handover. */
   readonly cancelHandover = output<void>();
 
   /** The dock panel that is open: a popover above the dock, a bottom sheet on a phone. */
   readonly panel = signal<DockPanel>('none');
-  /** The large QR code of a public meeting (#17): the header popover or the phone sheet. */
+  /** The large QR code of a public meeting: the header popover or the phone sheet. */
   readonly qrOpen = signal(false);
   /** The agenda sheet below the wide layout. */
   readonly agendaOpen = signal(false);
@@ -199,7 +203,6 @@ export class MeetingPageComponent {
   protected readonly revision = signal(0);
 
   constructor() {
-    // The page keeps room below its content for the dock.
     observeElementSize(
       () => this.dock().nativeElement,
       (size) => this.dockHeight.set(size.height),
@@ -269,7 +272,7 @@ export class MeetingPageComponent {
 
   /**
    * The main action of the header: open a planned meeting or close a live one. A closed
-   * meeting finalizes its protocol in the protocol bar of the sheet (O13). `null` when the
+   * meeting finalizes its protocol in the protocol bar of the sheet. `null` when the
    * viewer has none.
    */
   private readonly now = openWindowClock();
@@ -294,6 +297,8 @@ export class MeetingPageComponent {
    * The session menu: settings, attendance and delete. Below the wide layout the beamer
    * of a planned or live meeting goes in here too; on a phone the header keeps only the title, so the close moves in
    * as well (the opening is on the preparation page, the finalize in the protocol bar).
+   *
+   * The beamer route and its stream need session.manage in the gremium.
    */
   protected readonly menu = computed<RowMenuSection[]>(() => {
     const m = this.meeting();
@@ -301,12 +306,9 @@ export class MeetingPageComponent {
     const main: RowMenuItem[] = [];
     if (m.canManage) main.push({ id: 'settings', label: t('meetings.settings.title'), icon: 'edit' });
     main.push({ id: 'attendance', label: t('meetings.page.recordAttendance'), icon: 'users' });
-    // The beamer follows a running meeting; a closed meeting has nothing to show there.
-    // The beamer route and its stream need session.manage in the gremium (`canManage`).
     if (!this.wide() && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'beamer', label: t('meetings.beamer.enter'), icon: 'monitor' });
     }
-    // A phone has no header button for the QR code of a public meeting.
     if (this.phone() && m.publicJoin && m.status !== 'closed' && m.canManage) {
       main.push({ id: 'qr', label: t('guests.qr.title'), icon: 'grid' });
     }
@@ -440,12 +442,15 @@ export class MeetingPageComponent {
     this.agendaOpen.set(false);
   }
 
-  /** Append the result of a closed vote to the text of the open item. */
+  /**
+   * Append the result of a closed vote to the text of the open item.
+   *
+   * A phone keyboard often ends the text with a hard break, which Markdown keeps as a trailing
+   * backslash. Left in place, it becomes an empty line before the block.
+   */
   insertResult(vote: MeetingVote): void {
     const t = this.top();
     if (!t) return;
-    // A phone keyboard often ends the text with a hard break, which Markdown keeps as a
-    // trailing backslash. Left in place it becomes an empty line before the block.
     const body = (t.body ?? '').replace(/[\s\\]+$/, '');
     const snippet = voteSnippet(vote);
     this.bodyChange.emit({ itemId: t.id, body: body ? `${body}\n\n${snippet}` : snippet });

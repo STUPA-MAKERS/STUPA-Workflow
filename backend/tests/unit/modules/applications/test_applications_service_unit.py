@@ -36,7 +36,7 @@ class _GetSession:
     def __init__(self, by_type: dict[type, Any]) -> None:
         self._by_type = by_type
 
-    async def get(self, model: type, _pk: Any) -> Any:  # noqa: ANN401
+    async def get(self, model: type, _pk: Any) -> Any:
         return self._by_type.get(model)
 
 
@@ -130,7 +130,7 @@ class _ColorSession:
     def __init__(self, rows: list[tuple[str, str | None]]) -> None:
         self._rows = rows
 
-    async def execute(self, _stmt: Any) -> _Result:  # noqa: ANN401
+    async def execute(self, _stmt: Any) -> _Result:
         return _Result(list(self._rows))
 
 

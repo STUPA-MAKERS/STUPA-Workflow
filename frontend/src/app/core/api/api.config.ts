@@ -25,7 +25,7 @@ export const USE_MOCK_API = new InjectionToken<boolean>('USE_MOCK_API', {
 /** Read the mock opt-in from the global flag, the URL or localStorage (browser only).
  *  `location` comes from DI, so a test needs no jsdom `window.location`. */
 export function detectMockFlag(location: Location): boolean {
-  if (typeof window === 'undefined') return false; // SSR/prerender → real API
+  if (typeof window === 'undefined') return false;
   const w = window as Window & { __USE_MOCK_API__?: boolean };
   if (w.__USE_MOCK_API__ === true) return true;
   try {

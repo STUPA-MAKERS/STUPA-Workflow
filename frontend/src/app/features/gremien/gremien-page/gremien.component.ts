@@ -183,7 +183,6 @@ export class GremienComponent implements OnDestroy {
   ]);
 
   constructor() {
-    // The shown gremien read their first tab ahead, so a click shows it at once.
     prefetchDetails({
       items: computed(() => [...this.mine(), ...this.others()]),
       key: (r) => r.item.id,
@@ -200,7 +199,6 @@ export class GremienComponent implements OnDestroy {
 
     effect(() => this.frame.fill.set(this.split()));
 
-    // Side by side a gremium always shows: the first own one, else the first visible one.
     effect(() => {
       const split = this.split();
       const loading = this.store.loading();

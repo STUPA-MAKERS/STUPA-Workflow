@@ -79,7 +79,7 @@ describe('status kinds', () => {
       });
     });
 
-    it('shows a tie as a rejection, never as "Stimmengleichheit" (O18)', () => {
+    it('shows a tie as a rejection, never as "Stimmengleichheit"', () => {
       const view = voteResultStatus('tie');
       expect(view).toEqual({ kind: 'error', key: 'vote.result.rejected' });
       expect(de[view.key]).toBe('Abgelehnt');

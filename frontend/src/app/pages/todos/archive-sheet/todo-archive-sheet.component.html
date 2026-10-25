@@ -11,8 +11,6 @@
     @if (failed()) {
       <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'todos.archive.error' | t }}</app-note>
     } @else if (loading() && !items().length) {
-      <!-- The rows of the loaded list: a title, the day it was done, "Wiederherstellen".
-           They show after 300ms (`skel-in`). -->
       <ul class="as__list skel-in" aria-hidden="true">
         @for (w of ['72%', '58%', '66%', '50%', '62%']; track $index) {
           <li class="as__row">

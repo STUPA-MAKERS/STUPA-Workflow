@@ -184,7 +184,6 @@ export function sortRows(
   sort: AttendanceSort,
   locale: string,
 ): GremiumAttendanceRow[] {
-  // A person without a name goes after the named ones.
   const byName = (a: GremiumAttendanceRow, b: GremiumAttendanceRow) => {
     const na = a.displayName?.trim() ?? '';
     const nb = b.displayName?.trim() ?? '';

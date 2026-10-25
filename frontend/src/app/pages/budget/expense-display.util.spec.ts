@@ -47,7 +47,7 @@ describe('cost-centre labels', () => {
     const root = { ...node('r', [child]), color: '#2f7fc1' };
     const index = costCentreIndex([root]);
     expect(index.get('r')).toEqual({ name: 'r', path: 'r', color: '#2f7fc1' });
-    // The child inherits the colour of its parent (O19), in a shade of it.
+    // The child inherits the colour of its parent, in a shade of it.
     expect(index.get('c')?.name).toBe('Kultur');
     expect(index.get('c')?.path).toBe('VS-120');
     expect(index.get('c')?.color).toMatch(/^#/);
@@ -60,7 +60,7 @@ describe('cost-centre labels', () => {
   });
 });
 
-describe('finance helpers (FE10c)', () => {
+describe('finance helpers', () => {
   const tree = [
     {
       ...node('top', [

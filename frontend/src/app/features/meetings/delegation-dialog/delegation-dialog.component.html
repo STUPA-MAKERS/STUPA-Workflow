@@ -50,7 +50,6 @@
 
     @if (c.votingDelegationEnabled) {
       <div class="dd__voting">
-        <!-- The text is the label of the switch: the whole row toggles it. -->
         <label class="dd__votingText" for="dd-voting">
           <span class="dd__votingLabel">{{ 'delegation.dialog.voting' | t }}</span>
           <span class="dd__note">{{ (voting() ? 'participant.delegation.votingOn' : 'participant.delegation.votingOff') | t }}</span>

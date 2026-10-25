@@ -53,22 +53,21 @@ export class SwUpdateService {
   /** True when a new version is in the cache and a reload loads it. */
   readonly updateReady = this._updateReady.asReadonly();
 
+  /**
+   * The first update check waits 1 second, so the service worker has time to register
+   * (registerWhenStable registers after 30 seconds or once the app is stable).
+   */
   init(): void {
     if (!this.updates.isEnabled) return;
 
     this.updates.versionUpdates.subscribe((e) => this.onVersionEvent(e));
     this.updates.unrecoverable.subscribe(() => void this.reload());
 
-    // BOOTSTRAP FIX: wait 1 second, so the service worker has time to register before
-    // the first update check. The registerWhenStable strategy registers the service
-    // worker after 30 seconds or once the app is stable. This delay gives it time to
-    // register before the call to checkForUpdate().
     setTimeout(() => {
       this.safeCheck().subscribe();
       interval(5 * 60 * 1000)
         .pipe(concatMap(() => this.safeCheck()))
         .subscribe();
-      // The app has no server-side rendering, so `window` always exists here.
       fromEvent(window, 'focus')
         .pipe(concatMap(() => this.safeCheck()))
         .subscribe();
@@ -92,10 +91,11 @@ export class SwUpdateService {
     this.reloadPage();
   }
 
+  /**
+   * Other version events need no action, because after a failed installation the next check tries
+   * again.
+   */
   private onVersionEvent(e: VersionEvent): void {
-    // Every other event (VERSION_DETECTED, VERSION_INSTALLATION_FAILED,
-    // NO_NEW_VERSION_DETECTED) needs no action: after a failed installation the next
-    // check tries again.
     if (e.type === 'VERSION_READY') this._updateReady.set(true);
   }
 

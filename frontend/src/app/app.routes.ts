@@ -15,6 +15,17 @@ import {
  * shell (no rail, no bars, no footer), for the beamer. `data.footer: true` shows the
  * branded footer below a page of the signed-in frame: only the public pages have it (the
  * public frame shows it always).
+ *
+ * The beamer route comes before `voting`, because the child `:id` of `voting` would match
+ * `beamer` too. Gremium rights (`session.manage`, `vote.cast`) go through
+ * `gremiumPermission`, never through the global `permission` list. The votes guard runs per
+ * child, because `:id` admits more people than the list, and the list stays open to them,
+ * or the way back from a vote ends on /forbidden. A route without a gate (applications,
+ * tasks, the meetings of a delegation recipient) relies on the server, which filters by
+ * owner and scope. The flow
+ * editor lists both permission keys, because the save accepts either. The `frame` mode is
+ * route data, because route data wins over a `?frame=` query parameter in the input
+ * binding. The redirects keep old bookmarks and shared links working.
  */
 export const routes: Routes = [
   {
@@ -23,8 +34,6 @@ export const routes: Routes = [
     children: [
       {
         path: '',
-        // An authenticated user goes to /dashboard. Only an applicant sees the public
-        // landing page.
         canActivate: [homeRedirectGuard],
         data: { footer: true },
         loadComponent: () => import('./pages/home.component').then((m) => m.HomeComponent),
@@ -37,8 +46,6 @@ export const routes: Routes = [
       },
       {
         path: 'apply/confirmation',
-        // `contextual`: this page only means something right after a submission. Opened
-        // cold it tells the reader to check their mail for an application nobody sent.
         data: { title: 'apply.confirm.heading', contextual: true, footer: true },
         loadComponent: () =>
           import('./features/apply/apply-confirmation.component').then(
@@ -47,8 +54,6 @@ export const routes: Routes = [
       },
       {
         path: 'status',
-        // `contextual`: without an application id this renders "Antrag nicht gefunden".
-        // The id arrives from the magic link, never from navigating here.
         data: { title: 'status.heading', contextual: true, footer: true },
         loadComponent: () =>
           import('./features/apply/status-timeline.component').then(
@@ -56,9 +61,6 @@ export const routes: Routes = [
           ),
       },
       {
-        // Magic-link target: {public_base_url}/antrag/{id}#t={token}. The route is public
-        // and uses an applicant token instead of a login. The component resolves the
-        // fragment and :id.
         path: 'antrag/:id',
         data: { title: 'status.heading', footer: true },
         loadComponent: () =>
@@ -67,8 +69,6 @@ export const routes: Routes = [
           ),
       },
       {
-        // The public protocols (no login): the final protocols of the gremien that publish
-        // them, in the public version. The pages set `noindex` themselves.
         path: 'protokolle',
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
@@ -77,7 +77,6 @@ export const routes: Routes = [
           ),
       },
       {
-        // The id is a UUID and appears only in the URL, never in the page.
         path: 'protokolle/:id',
         data: { title: 'publicProtocols.title', footer: true },
         loadComponent: () =>
@@ -86,11 +85,7 @@ export const routes: Routes = [
           ),
       },
       {
-        // #17: the join page of a public meeting (the QR code of the beamer). Public: a
-        // device cookie, not a login, carries the participation.
         path: 'j/:code',
-        // The page brings its own header (wordmark, language, the own name) and footer,
-        // as on the mockup: no public bar with "Anmelden".
         data: { title: 'guests.page.routeTitle', chrome: false },
         loadComponent: () =>
           import('./features/public-meeting/public-meeting.component').then(
@@ -99,9 +94,6 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
-        // Wide: the two columns of the start page fill the width (board Main).
-        // Fab: on a phone the shell keeps the foot of the page free for the "Antrag" button.
-        // No footer: only signed-in principals see this page, so the legal links add nothing.
         data: { title: 'nav.dashboard', wide: true, fab: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -109,12 +101,6 @@ export const routes: Routes = [
       },
       {
         path: 'applications',
-        // No permission gate: without `application.read` you see only your own
-        // applications. The server filters on `created_by`.
-        //
-        // The list and the detail share one page: the list pane stays while the detail of
-        // `:id` loads in its outlet (board Anträge). A deep link to `/applications/:id`
-        // opens the page with that application, also for its owner.
         data: { title: 'nav.applications', wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -132,8 +118,6 @@ export const routes: Routes = [
           },
           {
             path: ':id',
-            // No permission gate: a creator can reach their own application. The server
-            // authorizes through `application.read`, owner, or magic-link.
             data: { title: 'applications.detail.crumb', parent: ['applications'] },
             loadComponent: () =>
               import('./pages/applications/applications-detail.component').then(
@@ -144,11 +128,6 @@ export const routes: Routes = [
       },
       {
         path: 'tasks',
-        // No permission gate: the tab shows at least your own applications in an editable
-        // state.
-        //
-        // The same two panes as `applications`: the task list stays while the detail of
-        // `:id` loads in its outlet. A deep link to `/tasks/:id` opens that task.
         data: { title: 'nav.tasks', wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tasks/tasks.component').then((m) => m.TasksComponent),
@@ -159,7 +138,6 @@ export const routes: Routes = [
               import('./pages/tasks/tasks-none.component').then((m) => m.TasksNoneComponent),
           },
           {
-            // A card of the group "To-Dos": the card detail in the right pane.
             path: 'todo/:cardId',
             data: { title: 'todos.card.kicker', parent: ['tasks'] },
             loadComponent: () =>
@@ -167,7 +145,6 @@ export const routes: Routes = [
           },
           {
             path: ':id',
-            // The detail of the applications page. The server authorizes the read.
             data: { title: 'applications.detail.crumb', parent: ['tasks'] },
             loadComponent: () =>
               import('./pages/applications/applications-detail.component').then(
@@ -177,11 +154,7 @@ export const routes: Routes = [
         ],
       },
       {
-        // Read-only beamer view for the projector. Declared before `voting`, whose child
-        // `:id` would match `beamer` too.
         path: 'voting/beamer',
-        // The beamer WebSocket needs `session.manage` in the gremium of the meeting.
-        // `chrome: false`: the projector shows the page without rail, bars or footer.
         data: { title: 'beamer.title', gremiumPermission: 'session.manage', chrome: false },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -194,19 +167,10 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/voting/beamer.component').then((m) => m.BeamerComponent),
       },
-      // The former paths of one vote and of the live page of a meeting. The list page
-      // follows the running meetings itself and opens a vote that opens.
       { path: 'voting/vote/:id', redirectTo: 'voting/:id' },
       { path: 'voting/meeting/:id', redirectTo: 'voting' },
       {
         path: 'voting',
-        // The list of the votes beside the open vote, like the applications and the
-        // tasks: the list stays while the vote of `:id` loads in its outlet.
-        //
-        // Voting rights are GREMIUM rights. No global permission grants them, so the
-        // gate goes through `gremiumPermission` (any gremium, or the admin role). The
-        // guard runs per child (`canActivateChild`), because `:id` admits more people
-        // than the list: see there.
         data: { title: 'nav.voting', gremiumPermission: VOTING_GREMIUM_PERMISSIONS, wide: true },
         canActivateChild: [authGuard],
         loadComponent: () =>
@@ -214,11 +178,6 @@ export const routes: Routes = [
         children: [
           {
             path: '',
-            // Every way back from a vote goes to this path: the phone back, "Zur Liste",
-            // "Zur Übersicht" and the redirect after a delete. A person who can open a
-            // vote (`:id`) must also come back to the list, else the guard sends them to
-            // /forbidden. The server filters `GET /votes` by the read scope, and the
-            // navigation entry stays gated.
             data: { allowAuthenticated: true },
             loadComponent: () =>
               import('./features/voting/voting-page/voting-none.component').then(
@@ -227,10 +186,6 @@ export const routes: Routes = [
           },
           {
             path: ':id',
-            // A delegation recipient can reach the ballot without vote.cast, and a reader
-            // with `application.read` can view a standalone vote. The server decides the
-            // rights and reports them as `canCast` and `canManage` on the vote; the list
-            // beside it shows what the server lets the person read.
             data: {
               title: 'voting.cast.heading',
               parent: ['voting'],
@@ -244,17 +199,11 @@ export const routes: Routes = [
       },
       {
         path: 'meetings',
-        // A Gremium member can reach their own meetings without session.manage.
-        // `session.manage` is a GREMIUM-role permission, so it goes through
-        // `gremiumPermission` and never through the global `permission` list.
-        // `meeting.view_all` is the global read right: the server shows its holder
-        // the meetings of every Gremium, also without a membership.
         data: {
           title: 'nav.meetings',
           permission: ['meeting.view_all'],
           gremiumPermission: ['session.manage'],
           allowCommitteeMember: true,
-          // The overview is a list/detail or a calendar page over the full width.
           wide: true,
         },
         canActivate: [authGuard],
@@ -263,8 +212,6 @@ export const routes: Routes = [
       },
       {
         path: 'meetings/:id',
-        // `allowAuthenticated`: a delegation recipient can be neither a member nor
-        // permitted. The server scopes the meeting view.
         data: {
           title: 'meetings.detailCrumb',
           parent: ['meetings'],
@@ -280,9 +227,6 @@ export const routes: Routes = [
       },
       {
         path: 'gremien',
-        // The gremien of a member, or every gremium with `gremium.view_all` (the admin
-        // passes `permission`). The server gates each gremium the same way and answers
-        // 404 for a gremium the principal cannot see.
         data: {
           title: 'nav.gremien',
           permission: ['gremium.view_all'],
@@ -318,7 +262,6 @@ export const routes: Routes = [
       },
       {
         path: 'budget',
-        // A Gremium with an assigned cost center sees a scoped tab.
         data: { title: 'nav.budget', permission: BUDGET_PERMISSIONS, allowScopedBudgetView: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -335,7 +278,6 @@ export const routes: Routes = [
       },
       {
         path: 'invoices',
-        // A list/detail page: the invoice list beside the detail of the open invoice.
         data: { title: 'nav.invoices', permission: BUDGET_PERMISSIONS, wide: true },
         canActivate: [authGuard],
         loadComponent: () =>
@@ -343,9 +285,6 @@ export const routes: Routes = [
       },
       {
         path: 'tickets',
-        // The tickets of the help menu: the list beside the detail of the open ticket.
-        // `ticket.manage` works every ticket; a reporter reads and answers the own ones.
-        // The server answers 403/404 to anybody else.
         data: { title: 'nav.tickets', permission: 'ticket.manage', allowReporter: true, wide: true },
         canActivate: [authGuard],
         loadComponent: () => import('./pages/tickets/tickets.component').then((m) => m.TicketsComponent),
@@ -364,10 +303,6 @@ export const routes: Routes = [
         ],
       },
       {
-        // The To-Do boards: `/todos` opens the default board, `/todos/:boardId` one board,
-        // `/todos/alle` the meta-board "Alle" (every readable board, `ALL_BOARDS`).
-        // `?card=` opens a card in the drawer, `?view=list` the table. The server
-        // authorizes every board; any signed-in person has the personal one.
         path: 'todos',
         data: { title: 'nav.todos', wide: true },
         canActivate: [authGuard],
@@ -380,11 +315,6 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/todos/todos.component').then((m) => m.TodosComponent),
       },
       {
-        // The admin frame (board Verwaltung): the admin navigation beside every admin
-        // page. The frame itself needs only a session; each page below keeps its own
-        // permission gate. `wide`: the navigation and the page fill the width. `frame`:
-        // the route data sets the mode of the frame, so a query parameter `?frame=` cannot
-        // change it (route data wins over query parameters in the input binding).
         path: 'admin',
         data: { wide: true, frame: 'admin' },
         canActivate: [authGuard],
@@ -395,8 +325,6 @@ export const routes: Routes = [
         children: [
           {
             path: 'cost-centres',
-            // D6: the admin navigation stays beside the cost centres at every width. Where
-            // the sheet is narrower than the eight columns, the table scrolls inside it.
             data: {
               title: 'budget.tree.title',
               permission: 'budget.structure',
@@ -407,15 +335,12 @@ export const routes: Routes = [
             loadComponent: () =>
               import('./pages/budget/budget-tree.component').then((m) => m.BudgetTreeComponent),
           },
-          // The page was called budget-pots while the pot feature existed. Bookmarks and
-          // shared links from that time still work.
           { path: 'budget-pots', redirectTo: 'cost-centres', pathMatch: 'full' },
           {
             path: '',
             pathMatch: 'full',
             data: {
               title: 'nav.admin',
-              // Every area-admin role can reach the admin overview.
               permission: ADMIN_AREA_PERMISSIONS,
             },
             canActivate: [authGuard],
@@ -437,7 +362,6 @@ export const routes: Routes = [
               import('./pages/admin/roles/roles.component').then((m) => m.AdminRolesComponent),
           },
           {
-            // Maps an OIDC group to a role.
             path: 'group-mappings',
             data: { title: 'admin.groupMappings.title', permission: 'admin.group_mappings', parent: ['admin'] },
             canActivate: [authGuard],
@@ -464,9 +388,6 @@ export const routes: Routes = [
           },
           {
             path: 'forms/:id',
-            // `adminNav: false`: the editor fills the width, without the admin navigation
-            // (board Admin-Formular-Editor). `adminPane`: wide, its three columns scroll
-            // on their own and the page does not.
             data: {
               title: 'admin.forms.edit',
               permission: 'form.configure',
@@ -480,12 +401,6 @@ export const routes: Routes = [
           },
           {
             path: 'flow',
-            // The save (POST /admin/flow-versions/global) accepts either key. The route
-            // gate must list both, or a holder of one of them opens an editor it cannot
-            // save, or cannot open an editor it may save.
-            // `adminNav: false`: the canvas fills the width, without the admin navigation
-            // (board Admin-Flow-Editor). `adminPane`: wide, the canvas and the inspector
-            // fill the window and the page does not scroll.
             data: {
               title: 'admin.flow.title',
               permission: ['flow.configure', 'admin.types'],
@@ -552,7 +467,6 @@ export const routes: Routes = [
               ),
           },
           {
-            // The same editor and the same site config, with the text sections.
             path: 'texts',
             data: { title: 'admin.texts.title', permission: 'admin.site', parent: ['admin'], section: 'texts' },
             canActivate: [authGuard],
@@ -579,7 +493,6 @@ export const routes: Routes = [
           },
           {
             path: 'help-tickets',
-            // `ticket.manage` alone sees the blocked senders, without the settings form.
             data: { title: 'admin.helpTickets.title', permission: ['admin.site', 'ticket.manage'], parent: ['admin'] },
             canActivate: [authGuard],
             loadComponent: () =>
@@ -597,7 +510,6 @@ export const routes: Routes = [
               ),
           },
           {
-            // Agent tokens (OAuth grants) of every principal, with a kill switch.
             path: 'oauth-grants',
             data: {
               title: 'admin.oauthGrants.title',
@@ -636,7 +548,6 @@ export const routes: Routes = [
               ),
           },
           {
-            // Platform-wide notification settings, such as the task reminders.
             path: 'notifications',
             data: {
               title: 'admin.notifications.title',
@@ -652,7 +563,6 @@ export const routes: Routes = [
         ],
       },
       {
-        // OAuth consent: after the login the user picks the scope and the token lifetime.
         path: 'oauth/consent',
         data: { title: 'account.consent.title' },
         canActivate: [authGuard],
@@ -660,9 +570,6 @@ export const routes: Routes = [
           import('./pages/account/consent.component').then((m) => m.OAuthConsentComponent),
       },
       {
-        // The account area: the same frame as the administration, in account mode (the
-        // navigation "Konto" beside the page, see `FRAME_MODES`). The frame needs only a
-        // session. `wide`: the navigation and the page fill the width.
         path: 'account',
         data: { wide: true, frame: 'account' },
         canActivate: [authGuard],
@@ -672,7 +579,6 @@ export const routes: Routes = [
           ),
         children: [
           {
-            // Wide: the empty sheet beside the navigation. Below wide: the navigation only.
             path: '',
             pathMatch: 'full',
             data: { title: 'account.frame.title' },
@@ -682,7 +588,6 @@ export const routes: Routes = [
               ),
           },
           {
-            // Your own mail switches. Each switch is an opt-out.
             path: 'notifications',
             data: { title: 'account.notifications.title' },
             loadComponent: () =>
@@ -691,15 +596,12 @@ export const routes: Routes = [
               ),
           },
           {
-            // API access: manage your own OAuth grants and download the MCP package.
             path: 'grants',
             data: { title: 'account.grants.title' },
             loadComponent: () =>
               import('./pages/account/grants.component').then((m) => m.AccountGrantsComponent),
           },
           {
-            // The calendar subscription is a popover of the meetings page now. Old links
-            // and bookmarks of the former account page land there.
             path: 'calendar',
             redirectTo: '/meetings',
             pathMatch: 'full',

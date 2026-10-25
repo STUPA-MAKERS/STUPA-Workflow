@@ -4,8 +4,8 @@ import { I18nService } from '@core/i18n/i18n.service';
 import { DraftFilesComponent } from './draft-files.component';
 
 /**
- * Formly field of a `file` field in the apply wizard: the draft uploads of that field
- * (Z4). The value is the list of the attachment ids, which the server checks against
+ * Formly field of a `file` field in the apply wizard: the draft uploads of that field.
+ * The value is the list of the attachment ids, which the server checks against
  * `attachmentIds` on the submit. The wizard sets this type on its `file` fields; every
  * other form keeps the plain reference field.
  */

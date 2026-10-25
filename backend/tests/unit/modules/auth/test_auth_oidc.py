@@ -161,7 +161,7 @@ def _id_token(**claims: object) -> str:
         "exp": now + timedelta(hours=1),
     }
     payload.update(claims)
-    return jwt.encode(payload, _KEY, algorithm="RS256", headers={"kid": _KID})  # type: ignore[arg-type]
+    return jwt.encode(payload, _KEY, algorithm="RS256", headers={"kid": _KID})
 
 
 async def test_verify_id_token_happy() -> None:

@@ -44,12 +44,13 @@ export class LiveVoteSession {
     this.connect();
   }
 
+  /**
+   * A received message proves that the server responds, so it resets the failed-attempt counter;
+   * otherwise a late drop counts wrongly toward the reconnect limit of a dead socket.
+   */
   private connect(): void {
     this.channel = this.source.connectMeeting(this.meetingId, this.beamer);
     this.channel.messages$.subscribe({
-      // A received message proves that the server responds, so reset the failed-attempt
-      // counter. If not, a late drop counts wrongly toward the reconnect limit of a
-      // dead socket.
       next: (m) => {
         this.attempts = 0;
         this.handle(m);
@@ -58,10 +59,13 @@ export class LiveVoteSession {
       error: () => this.onClosed(),
     });
     this.connection.set('open');
-    // Resync after a connect. Ask the server for the current state.
     this.channel.send({ type: 'subscribe' });
   }
 
+  /**
+   * The final result is mirrored into the tally, because the close frame carries no eligible or
+   * quorum field. The lot decides a tied election: the counts stay and the new result applies.
+   */
   private handle(m: ServerMessage): void {
     switch (m.type) {
       case 'meeting_state':
@@ -78,8 +82,6 @@ export class LiveVoteSession {
         break;
       case 'vote_closed': {
         this.result.set(m);
-        // Mirror the final result into the tally, so the bars and counts stay final.
-        // The close frame carries no eligible or quorum field.
         const prev = this.tally();
         this.tally.set({
           type: 'vote_tally',
@@ -92,8 +94,6 @@ export class LiveVoteSession {
         break;
       }
       case 'vote_lot_drawn': {
-        // The lot decides a tied election (F2): keep the counts, take the new result.
-        // A screen that joined after the close gets the result from the frame.
         const closed = this.result();
         this.result.set({
           type: 'vote_closed',
@@ -107,7 +107,6 @@ export class LiveVoteSession {
         break;
       }
       case 'vote_cancelled':
-        // A cancellation removes the running vote without a result.
         if (this.openVote()?.voteId === m.voteId) {
           this.openVote.set(null);
           this.tally.set(null);
@@ -142,14 +141,16 @@ export class LiveVoteSession {
     );
   }
 
+  /**
+   * It gives up for good instead of an endless series of "connection refused" errors when the
+   * server is unreachable; the UI then shows 'closed'.
+   */
   private onClosed(): void {
     if (this.closedByUser) {
       this.connection.set('closed');
       return;
     }
     this.attempts += 1;
-    // Give up for good instead of an endless series of "connection refused" errors when
-    // the server is unreachable (no backend or no meeting). The UI then shows 'closed'.
     if (this.attempts >= LiveVoteSession.MAX_ATTEMPTS) {
       this.errorCode.set('connection_failed');
       this.connection.set('closed');

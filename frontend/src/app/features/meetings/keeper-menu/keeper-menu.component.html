@@ -1,7 +1,6 @@
 @let m = meeting();
 
 @if (live() && m.plannedHandover; as plan) {
-  <!-- A13/Z3: the handover planned with the next TOP. -->
   <section class="km__sec" [attr.aria-label]="'meetings.keeper.planned' | t">
     <h3 class="km__cap cap">{{ 'meetings.keeper.planned' | t }}</h3>
     <div class="km__plan" role="status">

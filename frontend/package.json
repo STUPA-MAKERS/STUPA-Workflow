@@ -1,7 +1,7 @@
 {
   "name": "antragsplattform-frontend",
   "version": "0.0.0",
-  "description": "Antragsplattform SPA — Skelett + Design-System (T-03)",
+  "description": "Antragsplattform SPA — Skelett + Design-System",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",

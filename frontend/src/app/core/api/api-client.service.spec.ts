@@ -127,7 +127,7 @@ describe('ApiClient', () => {
       done();
     });
     const req = http.expectOne((r) => r.url === '/api/applications');
-    // A4: one `state` per chosen state, repeated.
+    // One `state` per chosen state, repeated.
     expect(req.request.params.getAll('state')).toEqual(['draft', 'review']);
     expect(req.request.params.get('q')).toBe('foo');
     expect(req.request.params.get('limit')).toBe('10');
@@ -171,7 +171,7 @@ describe('ApiClient', () => {
     req.flush({ applicationId: 'app-9' }, { status: 201, statusText: 'Created' });
   });
 
-  it('#11: POSTs a capture on behalf and searches the applicants', () => {
+  it('POSTs a capture on behalf and searches the applicants', () => {
     let created: unknown;
     api
       .createApplicationOnBehalf({
@@ -270,7 +270,7 @@ describe('ApiClient', () => {
     );
   });
 
-  it('uploads the first draft file with ALTCHA and no token header (Z4)', (done) => {
+  it('uploads the first draft file with ALTCHA and no token header', (done) => {
     const file = new File(['hello'], 'Angebot.pdf', { type: 'application/pdf' });
     api
       .uploadDraftAttachment(file, { altcha: 'sol', fieldKey: 'offer' })

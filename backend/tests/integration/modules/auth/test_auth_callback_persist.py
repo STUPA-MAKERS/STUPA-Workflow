@@ -58,7 +58,7 @@ def _jwk() -> dict[str, object]:
 
 def _id_token(nonce: str) -> str:
     now = datetime.now(UTC)
-    return jwt.encode(  # type: ignore[arg-type]
+    return jwt.encode(
         {
             "sub": "user-cb-1",
             "aud": CLIENT_ID,

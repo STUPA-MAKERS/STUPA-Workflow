@@ -199,6 +199,6 @@ async def notify_poll_started(
             return await send_poll_mail(
                 session, queue=queue, settings=settings, vote=vote, now=now, reminder=False
             )
-    except Exception:  # noqa: BLE001 - a mail must never break the open
+    except Exception:  # a mail must never break the open
         logger.exception("poll_started mail failed (vote=%s)", vote_id)
         return False

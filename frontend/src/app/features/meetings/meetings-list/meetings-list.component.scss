@@ -37,7 +37,6 @@
 /* ------------------------------------------------------------------ rows */
 .mtl__scroll {
   @include lp.scroll(--mtl-fade);
-  /* The FAB covers the end of the list: room to scroll the last row above it. */
   padding-bottom: calc(56px + var(--space-6));
   @include fade.fade-y(var(--mtl-fade));
 }

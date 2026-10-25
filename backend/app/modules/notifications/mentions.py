@@ -37,10 +37,10 @@ from app.modules.applications.models import Application, Comment
 from app.modules.auth.models import Principal as PrincipalRow
 from app.modules.files.service import FilesService
 from app.modules.notifications.comments import (
-    _APPLICANT_AUTHOR_FALLBACK,  # pyright: ignore[reportPrivateUsage]
-    _CHAT_BUBBLE_HTML,  # pyright: ignore[reportPrivateUsage]
-    _COMMENT_EXCERPT_LEN,  # pyright: ignore[reportPrivateUsage]
-    _initials,  # pyright: ignore[reportPrivateUsage]
+    _APPLICANT_AUTHOR_FALLBACK,
+    _CHAT_BUBBLE_HTML,
+    _COMMENT_EXCERPT_LEN,
+    _initials,
     comment_mail_text,
 )
 from app.modules.notifications.links import MailLink, application_link, ticket_link
@@ -275,7 +275,7 @@ async def notify_comment_mentions(
                 recipients=recipients,
                 actor_sub=actor_sub,
             )
-    except Exception:  # noqa: BLE001 - a mail must never break the comment
+    except Exception:  # a mail must never break the comment
         logger.exception("comment_mentioned mail failed")
         return 0
 
@@ -353,6 +353,6 @@ async def notify_ticket_mentions(
             return await send_ticket_mentions(
                 session, queue=queue, settings=settings, note_id=note_id, recipients=recipients
             )
-    except Exception:  # noqa: BLE001 - a mail must never break the note
+    except Exception:  # a mail must never break the note
         logger.exception("ticket_mentioned mail failed")
         return 0

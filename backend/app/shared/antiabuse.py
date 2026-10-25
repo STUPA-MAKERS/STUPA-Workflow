@@ -208,7 +208,7 @@ async def _json_field(request: Request, field: str) -> str | None:
     """
     try:
         body = await request.json()
-    except Exception:  # noqa: BLE001 - broken body -> endpoint validation handles it
+    except Exception:  # broken body -> endpoint validation handles it
         return None
     if isinstance(body, dict):
         value = body.get(field)

@@ -30,7 +30,6 @@
       @if (loading()) {
         <span class="pal__spinner" aria-hidden="true"></span>
       }
-      <!-- Escape on a keyboard; a close button where there is none. -->
       <button
         #closeButton
         type="button"
@@ -90,7 +89,6 @@
       @if (showEmpty()) {
         <app-empty-state class="pal__empty" shape="file" rows="3" [heading]="'search.empty' | t" />
       }
-      <!-- Say so rather than implying that this is everything. -->
       @if (showTruncated()) {
         <p class="pal__note pal__note--foot">{{ 'search.truncated' | t }}</p>
       }

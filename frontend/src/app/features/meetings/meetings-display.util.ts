@@ -40,13 +40,13 @@ export function voteResultVariant(result: string | null | undefined): BadgeVaria
   return result === 'passed' ? 'success' : result === 'rejected' ? 'danger' : 'info';
 }
 
-/** The member labels: "Anwesend / Abwesend", where "Abwesend" is `excused` (Z2). */
+/** The member labels: "Anwesend / Abwesend", where "Abwesend" is `excused`. */
 export function selfAttendanceKey(status: SelfAttendanceStatus): TranslationKey {
   return status === 'present' ? 'meetings.attendance.selfPresent' : 'meetings.attendance.selfExcused';
 }
 
 /**
- * The status label that a member sees on any row (Z2): "Anwesend" or "Abwesend".
+ * The status label that a member sees on any row: "Anwesend" or "Abwesend".
  * A member does not see the difference between `excused` and `absent`; only the
  * meeting lead sees "Entschuldigt" and "Unentschuldigt".
  */
@@ -56,7 +56,7 @@ export function memberAttendanceKey(status: AttendanceStatus): TranslationKey {
 
 /**
  * True when a member may report this status for this record: the own row, a status
- * other than `absent`, and a record that the meeting lead did not set (O15).
+ * other than `absent`, and a record that the meeting lead did not set.
  */
 export function canReportOwn(member: Attendance, status: AttendanceStatus): boolean {
   return member.isSelf && member.source !== 'lead' && status !== 'absent';
@@ -121,7 +121,6 @@ export function liveOpenedVote(
     counts: null,
     leading: null,
     closesAt: msg.closesAt,
-    // The event carries the secrecy, so the card shows the right hint before the next read.
     secret: msg.secret,
     openedAt: new Date().toISOString(),
     voted: 0,
@@ -173,7 +172,7 @@ export interface VoteRules {
   /** Unknown (a live vote before the next read) leaves the part out. */
   secret?: boolean;
   quorum?: Quorum | null;
-  /** Admitted guests vote too: no quorum, the majority of the cast votes decides (#17). */
+  /** Admitted guests vote too: no quorum, the majority of the cast votes decides. */
   guestsVote?: boolean;
 }
 
@@ -231,7 +230,6 @@ export function voteRulesParts(vote: VoteRules, t: Translate, options: VoteRules
  * shows only its secrecy and the time.
  */
 export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale: string): string {
-  // A poll has no majority and no quorum: only the secrecy applies.
   const parts =
     vote.kind === 'poll'
       ? voteRulesParts({ secret: vote.secret }, translate)
@@ -247,7 +245,7 @@ export function voteMetaLine(vote: MeetingVote, translate: Translate, i18nLocale
 }
 
 /**
- * "19 Mitglieder + 7 Gäste anwesend" for a vote with guests (#17), or `null` while the
+ * "19 Mitglieder + 7 Gäste anwesend" for a vote with guests, or `null` while the
  * counts are unknown (a vote that closed before the counts existed).
  */
 export function guestComposition(

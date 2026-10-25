@@ -89,7 +89,7 @@ class _FakeConfig:
             )
         ]
 
-    async def create_gremium(self, payload, actor):  # noqa: ANN001
+    async def create_gremium(self, payload, actor):
         return GremiumOut(
             id=uuid4(),
             name=payload.name,
@@ -102,15 +102,15 @@ class _FakeConfig:
     session = None
     was_public = False
 
-    async def gremium_protocols_public(self, gremium_id):  # noqa: ANN001
+    async def gremium_protocols_public(self, gremium_id):
         return self.was_public
 
-    async def gremium_public_preview(self, gremium_id):  # noqa: ANN001
+    async def gremium_public_preview(self, gremium_id):
         if str(gremium_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumPublicPreview(final_count=6, missing_count=5)
 
-    async def update_gremium(self, gremium_id, payload, actor):  # noqa: ANN001
+    async def update_gremium(self, gremium_id, payload, actor):
         if str(gremium_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumOut(
@@ -123,10 +123,10 @@ class _FakeConfig:
             protocols_public=bool(payload.protocols_public),
         )
 
-    async def get_gremium_mail_recipients(self, gremium_id):  # noqa: ANN001
+    async def get_gremium_mail_recipients(self, gremium_id):
         return GremiumMailRecipients(recipients=["list@x.de"])
 
-    async def set_gremium_mail_recipients(self, gremium_id, payload, actor):  # noqa: ANN001
+    async def set_gremium_mail_recipients(self, gremium_id, payload, actor):
         self.mail_recipients = list(payload.recipients)
         return payload
 
@@ -143,7 +143,7 @@ class _FakeConfig:
             )
         ]
 
-    async def create_application_type(self, payload, actor):  # noqa: ANN001
+    async def create_application_type(self, payload, actor):
         return ApplicationTypeOut(
             id=uuid4(),
             gremium_id=payload.gremium_id,
@@ -154,7 +154,7 @@ class _FakeConfig:
             active_form_version_id=None,
         )
 
-    async def update_application_type(self, type_id, payload, actor):  # noqa: ANN001
+    async def update_application_type(self, type_id, payload, actor):
         return ApplicationTypeOut(
             id=type_id,
             gremium_id=None,
@@ -165,7 +165,7 @@ class _FakeConfig:
             active_form_version_id=None,
         )
 
-    async def delete_application_type(self, type_id, actor):  # noqa: ANN001
+    async def delete_application_type(self, type_id, actor):
         return None
 
     async def list_roles(self):
@@ -181,10 +181,10 @@ class _FakeConfig:
     async def get_active_global_flow(self):
         return None  # an empty flow is enough for the gate tests
 
-    async def create_global_flow_version(self, payload, actor):  # noqa: ANN001
+    async def create_global_flow_version(self, payload, actor):
         return FlowVersionOut(id=uuid4(), version=2, active=True)
 
-    async def create_role(self, payload, actor):  # noqa: ANN001
+    async def create_role(self, payload, actor):
         return RoleOut(
             id=uuid4(),
             key=payload.key,
@@ -192,7 +192,7 @@ class _FakeConfig:
             permissions=payload.permissions,
         )
 
-    async def update_role(self, role_id, payload, actor):  # noqa: ANN001
+    async def update_role(self, role_id, payload, actor):
         return RoleOut(
             id=role_id,
             key="admin",
@@ -203,7 +203,7 @@ class _FakeConfig:
     async def list_role_assignments(self):
         return []
 
-    async def search_principals(self, query, limit=50, **_filters):  # noqa: ANN001, ANN003
+    async def search_principals(self, query, limit=50, **_filters):
         return [
             PrincipalOut(
                 id=uuid4(),
@@ -235,17 +235,17 @@ class _FakeConfig:
     async def list_group_mappings(self):
         return []
 
-    async def create_group_mapping(self, payload, actor):  # noqa: ANN001
+    async def create_group_mapping(self, payload, actor):
         return GroupMappingOut(
             id=uuid4(),
             oidc_group=payload.oidc_group,
             role_id=payload.role_id,
         )
 
-    async def update_group_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_group_mapping(self, mapping_id, payload, actor):
         return GroupMappingOut(id=mapping_id, oidc_group="g", role_id=uuid4())
 
-    async def delete_group_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_group_mapping(self, mapping_id, actor):
         self.deleted_mapping = mapping_id
 
     async def list_webhooks(self):
@@ -259,7 +259,7 @@ class _FakeConfig:
             )
         ]
 
-    async def create_webhook(self, payload, actor):  # noqa: ANN001
+    async def create_webhook(self, payload, actor):
         if payload.name == "dup":
             raise ConflictError("exists")
         return WebhookOut(
@@ -270,7 +270,7 @@ class _FakeConfig:
             active=payload.active,
         )
 
-    async def update_webhook(self, webhook_id, payload, actor):  # noqa: ANN001
+    async def update_webhook(self, webhook_id, payload, actor):
         if str(webhook_id).startswith("00000000"):
             raise NotFoundError("nope")
         return WebhookOut(
@@ -281,7 +281,7 @@ class _FakeConfig:
             active=False,
         )
 
-    async def delete_webhook(self, webhook_id, actor):  # noqa: ANN001
+    async def delete_webhook(self, webhook_id, actor):
         if str(webhook_id).startswith("00000000"):
             raise NotFoundError("nope")
         self.deleted_webhook = webhook_id
@@ -295,7 +295,7 @@ class _FakeSite:
     async def get(self):
         return SiteConfigOut(version=self._version, branding=self._branding)
 
-    async def save(self, branding, actor):  # noqa: ANN001
+    async def save(self, branding, actor):
         self._branding = branding
         self._version += 1
         return await self.get()
@@ -305,7 +305,7 @@ class _FakeSite:
 
         return getattr(self, "_help", HelpTicketsSettings())
 
-    async def put_help_tickets(self, payload, actor):  # noqa: ANN001
+    async def put_help_tickets(self, payload, actor):
         self._help = payload
         return payload
 
@@ -319,7 +319,7 @@ class _FakeSite:
 class _FakeGremiumRoles:
     """Minimal fake for the Gremium roles and memberships (gate tests)."""
 
-    async def list_roles(self, gremium_id):  # noqa: ANN001
+    async def list_roles(self, gremium_id):
         return [
             GremiumRoleOut(
                 id=uuid4(),
@@ -331,7 +331,7 @@ class _FakeGremiumRoles:
             )
         ]
 
-    async def list_memberships(self, gremium_id):  # noqa: ANN001
+    async def list_memberships(self, gremium_id):
         return [
             GremiumMembershipOut(
                 id=uuid4(),
@@ -348,12 +348,12 @@ class _FakeOidcMappings:
     async def list_membership_mappings(self):
         return []
 
-    async def create_membership_mapping(self, payload, actor):  # noqa: ANN001
+    async def create_membership_mapping(self, payload, actor):
         return GremiumMembershipMappingOut(
             id=uuid4(), gremium_id=payload.gremium_id, oidc_group=payload.oidc_group
         )
 
-    async def update_membership_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_membership_mapping(self, mapping_id, payload, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumMembershipMappingOut(
@@ -362,14 +362,14 @@ class _FakeOidcMappings:
             oidc_group=payload.oidc_group or "stupa",
         )
 
-    async def delete_membership_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_membership_mapping(self, mapping_id, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
 
     async def list_role_mappings(self):
         return []
 
-    async def create_role_mapping(self, payload, actor):  # noqa: ANN001
+    async def create_role_mapping(self, payload, actor):
         return GremiumRoleMappingOut(
             id=uuid4(),
             gremium_id=uuid4(),
@@ -377,7 +377,7 @@ class _FakeOidcMappings:
             oidc_group=payload.oidc_group,
         )
 
-    async def update_role_mapping(self, mapping_id, payload, actor):  # noqa: ANN001
+    async def update_role_mapping(self, mapping_id, payload, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
         return GremiumRoleMappingOut(
@@ -387,7 +387,7 @@ class _FakeOidcMappings:
             oidc_group=payload.oidc_group or "stupa-board",
         )
 
-    async def delete_role_mapping(self, mapping_id, actor):  # noqa: ANN001
+    async def delete_role_mapping(self, mapping_id, actor):
         if str(mapping_id).startswith("00000000"):
             raise NotFoundError("nope")
 
@@ -929,7 +929,7 @@ def test_gremium_switch_on_schedules_the_backfill(
 
     seen: list[object] = []
 
-    async def _schedule(request, session, settings, gremium_id):  # noqa: ANN001
+    async def _schedule(request, session, settings, gremium_id):
         seen.append(gremium_id)
 
     monkeypatch.setattr(protocol_router, "schedule_public_backfill", _schedule)

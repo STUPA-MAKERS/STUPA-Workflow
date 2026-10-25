@@ -129,7 +129,7 @@ async def run_retention(ctx: dict[str, Any]) -> int:
         service = _service(ctx, session)
         try:
             doomed = await service.prune()
-        except Exception:  # noqa: BLE001 — retention must never fail a backup
+        except Exception:  # retention must never fail a backup
             logger.exception("backup retention failed")
             return 0
         if doomed:

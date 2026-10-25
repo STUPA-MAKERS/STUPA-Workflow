@@ -20,3 +20,26 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["antragsplattform_admin*"]
+
+[project.optional-dependencies]
+# Lint tools. The CI job `admin-cli` installs them with `pip install -e '.[dev]'`.
+dev = [
+    "ruff>=0.9",
+    "basedpyright>=1.28",
+]
+
+# The same ruff selection as backend/. The target is 3.11, not the 3.13 of backend/,
+# because `requires-python` allows 3.11 and the CLI runs on the machine of the admin.
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF100"]
+
+[tool.basedpyright]
+pythonVersion = "3.11"
+typeCheckingMode = "standard"
+reportMissingTypeStubs = false
+reportUnnecessaryTypeIgnoreComment = "error"
+exclude = [".venv", "build"]

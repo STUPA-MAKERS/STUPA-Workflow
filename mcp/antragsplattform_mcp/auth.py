@@ -10,6 +10,7 @@ browser login.
 from __future__ import annotations
 
 import base64
+import contextlib
 import hashlib
 import json
 import os
@@ -131,7 +132,7 @@ def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
     holder: dict = {}
 
     class Handler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:  # noqa: N802
+        def do_GET(self) -> None:
             parsed = urlparse(self.path)
             if parsed.path != redirect_path:
                 self.send_response(404)
@@ -146,7 +147,8 @@ def _capture_code(redirect_path: str) -> tuple[HTTPServer, dict]:
             self.end_headers()
             self.wfile.write(_DONE_HTML)
 
-        def log_message(self, *_args) -> None:  # keep the stdlib request log quiet
+        def log_message(self, format: str, *args: object) -> None:
+            # Keep the stdlib request log quiet.
             return
 
     server = HTTPServer(("127.0.0.1", 0), Handler)
@@ -210,10 +212,8 @@ def _exchange(token_endpoint: str, data: dict) -> dict:
     resp = httpx.post(token_endpoint, data=data, timeout=15)
     if resp.status_code != 200:
         detail = resp.text
-        try:
+        with contextlib.suppress(Exception):
             detail = resp.json().get("error_description") or resp.json().get("error")
-        except Exception:  # noqa: BLE001
-            pass
         raise AuthError(f"token endpoint error ({resp.status_code}): {detail}")
     tokens = resp.json()
     expires_in = tokens.get("expires_in")
@@ -259,10 +259,8 @@ def _save(config: Config, tokens: dict) -> None:
             fh.write(payload)
         os.replace(tmp, path)
     except BaseException:
-        try:
+        with contextlib.suppress(OSError):
             os.unlink(tmp)
-        except OSError:
-            pass
         raise
 
 

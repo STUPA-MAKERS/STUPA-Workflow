@@ -135,11 +135,11 @@ export class FormlyMultiSelectType extends FieldType<FieldTypeConfig> {
     return this.current().includes(value);
   }
 
+  /** The order of the options stays, so the summary and the stored answer stay stable. */
   toggle(value: string, checked: boolean): void {
     const set = new Set(this.current());
     if (checked) set.add(value);
     else set.delete(value);
-    // Keep the order of the options, so the summary and the stored answer stay stable.
     const order = this.optionList.map((o) => o.value);
     const next = [...set].sort((a, b) => order.indexOf(a) - order.indexOf(b));
     this.formControl.setValue(next);

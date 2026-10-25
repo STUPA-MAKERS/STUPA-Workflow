@@ -61,7 +61,7 @@ function pathOf(url: string): string {
  * - `false`: the page needs the full width at every size (the flow editor, the form
  *   editor), so the frame leaves out the navigation column.
  * - anything else: the navigation column shows on a wide viewport. A wide page (the cost
- *   centres) scrolls inside its sheet instead of dropping the navigation (D6).
+ *   centres) scrolls inside its sheet instead of dropping the navigation.
  */
 type AdminNavMode = 'always' | 'never';
 
@@ -121,7 +121,7 @@ const sheetScroll = new Map<number, number>();
  *   actions of the page header. The page header then has no breadcrumbs.
  * - A route with `data: { adminNav: false }` (the flow editor, the form editor) fills
  *   the width at every size, the same as the narrow mode. Every other admin page,
- *   the cost centres too, keeps the navigation at every wide size (D6).
+ *   the cost centres too, keeps the navigation at every wide size.
  * - A full-width route with `data: { adminPane: true }` (the two editors) is a pane
  *   page from wide on: the frame fills the window and the page gets the free height,
  *   so its columns scroll inside themselves.
@@ -135,6 +135,9 @@ const sheetScroll = new Map<number, number>();
  * tiles. Wide, `/account` shows an empty sheet beside the navigation. Below wide,
  * `/account` shows the navigation alone, and on a phone an account page has the same bar
  * as an admin page.
+ *
+ * The tiles hide during a search through a class and are not destroyed, so a cleared search does
+ * not load them again.
  */
 @Component({
   selector: 'app-admin-frame',
@@ -298,8 +301,6 @@ export class AdminFrameComponent {
         this.navMode.set(navMode(this.router.routerState.snapshot.root));
         this.paneRoute.set(paneRoute(this.router.routerState.snapshot.root));
         this.parentPath.set(parentOf(this.router.routerState.snapshot.root));
-        // A swipe back that led to another page in the frame: the sheet goes back to its
-        // place with the new page.
         this.swipe()?.done();
         const top = this.restoreId === null ? 0 : (sheetScroll.get(this.restoreId) ?? 0);
         afterNextRender(
@@ -314,12 +315,9 @@ export class AdminFrameComponent {
     afterNextRender(() => this.revealActive());
     effect(() => this.nav.active.set(this.showBar()));
 
-    // Beside the navigation the frame is a pane page: it fills the window, without the
-    // bottom padding of a page that scrolls.
     effect(() => this.pageFrame.fill.set(this.split() || this.fullPane()));
     inject(DestroyRef).onDestroy(() => this.pageFrame.fill.set(false));
 
-    // The navigation shows "Verwaltung" beside the page, so the breadcrumbs leave it out.
     effect(() =>
       this.pageFrame.crumbRoot.set(this.split() ? this.mode().home.replace(/^\//, '') : null),
     );

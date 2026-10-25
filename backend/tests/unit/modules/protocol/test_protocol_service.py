@@ -306,7 +306,7 @@ async def test_protocol_mail_links_the_public_version_when_public() -> None:
         store={MID: _meeting(), GID: gremium},
         results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None)  # noqa: SLF001
+    await _service(session, mail_queue=mail)._send(proto, None)
 
     assert len(mail.sent) == 1
     text = mail.sent[0].text
@@ -324,7 +324,7 @@ async def test_protocol_mail_hides_a_withheld_public_version() -> None:
         store={MID: _meeting(), GID: gremium},
         results=[result("a@x.de"), result()],
     )
-    await _service(session, mail_queue=mail)._send(proto, None)  # noqa: SLF001
+    await _service(session, mail_queue=mail)._send(proto, None)
 
     assert "/protokolle/" not in mail.sent[0].text
 

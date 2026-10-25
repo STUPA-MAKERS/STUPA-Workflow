@@ -4,7 +4,6 @@
     [title]="'admin.groupMappings.title' | t"
   />
 
-  <!-- Three separate mappings. They do not depend on each other. -->
   @for (sec of sections(); track sec.kind) {
     <section class="gm__section" [attr.aria-labelledby]="'gm-' + sec.kind + '-title'">
       <app-section-header [headingId]="'gm-' + sec.kind + '-title'" [heading]="key(sec.kind, 'title') | t">
@@ -53,7 +52,6 @@
   <p class="gm__foot">{{ 'admin.groupMappings.reserved' | t }}</p>
 </section>
 
-<!-- Add or edit one mapping. The fields depend on the section. -->
 <app-dialog
   [open]="!!dialog()"
   [title]="dialogTitle() | t"

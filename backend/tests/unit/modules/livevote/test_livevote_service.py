@@ -184,10 +184,10 @@ def _no_audit_chain(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     import app.modules.livevote.service.lifecycle as lifecycle_mod
 
-    async def _record(_session, **_kw):  # noqa: ANN001, ANN202
+    async def _record(_session, **_kw):
         return None
 
-    async def _no_open_vote(_self, _meeting_id):  # noqa: ANN001, ANN202
+    async def _no_open_vote(_self, _meeting_id):
         return None
 
     monkeypatch.setattr(lifecycle_mod, "audit_record", _record)
@@ -422,7 +422,7 @@ async def test_service_list_empty_returns_empty() -> None:
     assert out == []
 
 
-def _principal():  # noqa: ANN202
+def _principal():
     from app.modules.auth.principal import Principal
 
     # For an admin, the permission flags short-circuit without a gremium query
@@ -470,7 +470,7 @@ async def test_service_patch_protokollant_locked_after_finalize(
     """A final protocol locks the protocol writer and returns 409."""
     meeting = _meeting()
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return True
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -495,7 +495,7 @@ def _audit_capture(monkeypatch: pytest.MonkeyPatch) -> list[dict]:
 
     calls: list[dict] = []
 
-    async def _record(session, **kw):  # noqa: ANN001, ANN202
+    async def _record(session, **kw):
         calls.append(kw)
 
     monkeypatch.setattr(livevote_lifecycle_mod, "audit_record", _record)
@@ -515,7 +515,7 @@ async def test_service_delete_finalized_requires_special_permission(
 
     meeting = _meeting(status="closed")
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return True
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -526,7 +526,7 @@ async def test_service_delete_finalized_requires_special_permission(
     # The manager holds `session.manage` through a gremium role of the meeting.
     from app.modules.admin import gremium_roles as gremium_roles_mod
 
-    async def _manages(_s, _sub, perm, _now=None):  # noqa: ANN001, ANN202
+    async def _manages(_s, _sub, perm, _now=None):
         return {meeting.gremium_id} if perm == "session.manage" else set()
 
     monkeypatch.setattr(gremium_roles_mod, "gremium_ids_with_permission", _manages)
@@ -550,7 +550,7 @@ async def test_service_delete_unfinalized_is_audited(
     """A normal delete also goes into the audit log with finalizedProtocol=False."""
     meeting = _meeting()
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return False
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -596,7 +596,7 @@ async def test_pool_substitute_sees_committee_timeline(
     member_g = uuid4()
     pool_g = uuid4()
 
-    async def _members(_session, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_session, _sub, now=None):
         return {member_g}
 
     monkeypatch.setattr(livevote_permissions_mod, "gremium_member_ids", _members)
@@ -640,7 +640,7 @@ async def test_assert_can_read_denies_non_member(monkeypatch: pytest.MonkeyPatch
     meeting = Meeting(gremium_id=uuid4(), title="GV")
     meeting.id = uuid4()
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)
@@ -659,7 +659,7 @@ async def test_assert_can_read_allows_member(monkeypatch: pytest.MonkeyPatch) ->
     meeting = Meeting(gremium_id=uuid4(), title="GV")
     meeting.id = uuid4()
 
-    async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _member(_s, _sub, now=None):
         return {meeting.gremium_id}
 
     monkeypatch.setattr(mod, "gremium_member_ids", _member)
@@ -695,7 +695,7 @@ async def test_view_all_is_live_participant_without_membership(
     from app.modules.livevote.service import permissions as mod
     from tests._support.auth_fakes import fake_session
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)
@@ -720,7 +720,7 @@ async def test_view_all_can_read_foreign_meeting(
     meeting = Meeting(gremium_id=uuid4(), title="GV")
     meeting.id = uuid4()
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(mod, "gremium_member_ids", _none)

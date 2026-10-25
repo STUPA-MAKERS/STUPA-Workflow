@@ -41,8 +41,6 @@ export class FinalizeProtocolDialogComponent {
   protected readonly withheld = signal(false);
 
   constructor() {
-    // Each opening starts from the stored value: a protocol held back as a draft
-    // stays held back unless the reader switches it.
     effect(() => {
       if (this.open()) untracked(() => this.withheld.set(this.initialWithheld()));
     });

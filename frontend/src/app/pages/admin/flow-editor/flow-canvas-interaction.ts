@@ -93,13 +93,11 @@ export class FlowCanvasInteraction {
   pointerMove(event: PointerEvent): void {
     const temp = this.host.tempEdge();
     if (this.connectFrom && temp) {
-      // The line starts at the dot that was pressed and follows the pointer.
       const p = this.toSvg(event);
       this.host.tempEdge.set({ ...temp, x2: p.x, y2: p.y });
       return;
     }
     if (this.panGrab) {
-      // Shift the view so the world point under the cursor is `panGrab` again.
       const now = this.toSvg(event);
       const v = this.ensureView();
       this.host.view.set({
@@ -191,7 +189,6 @@ export class FlowCanvasInteraction {
   }
 
   private applyZoom(v: ViewRect, factor: number, center: Point): void {
-    // Clamp zoom relative to the content width (0.2×…6×).
     const base = this.host.contentBounds().w;
     const minW = base / 6;
     const maxW = base * 5;

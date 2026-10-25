@@ -15,7 +15,6 @@
       (valueChange)="setKind($event)"
     />
 
-    <!-- One area of one height for every kind, so the dialog does not change its height. -->
     <div class="aid__area" [attr.data-kind]="kind()">
       @if (kind() === 'application') {
         <app-search-pill
@@ -112,7 +111,6 @@
     <button type="submit" hidden></button>
   </form>
 
-  <!-- An empty list: the shared empty state with one way on. -->
   <ng-template #empty>
     @if (emptyCase() === 'noMatch') {
       <app-empty-state shape="choice"

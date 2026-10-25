@@ -44,7 +44,7 @@ SECRET_CONFIG = {**CONFIG, "secret": True}
 async def _count(session: AsyncSession, model: type, vote_ids: list[uuid.UUID]) -> int:
     return (
         await session.scalar(
-            select(func.count()).select_from(model).where(model.vote_id.in_(vote_ids))  # type: ignore[attr-defined]
+            select(func.count()).select_from(model).where(model.vote_id.in_(vote_ids))
         )
     ) or 0
 

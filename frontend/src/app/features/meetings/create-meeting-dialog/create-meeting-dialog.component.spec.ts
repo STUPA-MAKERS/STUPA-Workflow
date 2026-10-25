@@ -79,7 +79,7 @@ describe('CreateMeetingDialogComponent', () => {
     expect(within(dialog).getByRole('button', { name: 'Weiter' })).toBeDisabled();
   });
 
-  it('goes to step 2 with a prefilled title and lists only members who can keep the minutes (O20)', async () => {
+  it('goes to step 2 with a prefilled title and lists only members who can keep the minutes', async () => {
     const { http, cmp, fixture } = await setup();
     flushGremien(http, fixture);
     await pickOption(screen.getByLabelText(/Gremium/), 'Studierendenparlament');
@@ -293,7 +293,7 @@ describe('CreateMeetingDialogComponent', () => {
     expect(cmp.title()).toBe('Studierendenparlament meeting on 10 November 2026');
   });
 
-  describe('public participation (#17)', () => {
+  describe('public participation', () => {
     it('locks the switch for a gremium with a quorum and sends it for one without', async () => {
       localStorage.setItem('ap.locale', 'de');
       const { http, cmp, fixture } = await setup();

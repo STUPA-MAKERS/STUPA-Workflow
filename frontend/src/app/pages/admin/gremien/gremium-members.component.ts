@@ -143,7 +143,6 @@ export class GremiumMembersComponent {
   );
 
   constructor() {
-    // The breadcrumb names the gremium, not the page ("Gremien › Studierendenparlament").
     const frame = inject(PageFrameService);
     const url =
       '/' +

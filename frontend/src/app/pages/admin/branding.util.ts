@@ -16,7 +16,7 @@ export function isAllowedLinkUrl(url: string | null | undefined): boolean {
   try {
     return ALLOWED_LINK_SCHEMES.includes(new URL(u).protocol);
   } catch {
-    return false; // a relative or invalid URL lands here and is rejected
+    return false;
   }
 }
 

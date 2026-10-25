@@ -134,7 +134,7 @@ describe('VoteCardComponent', () => {
       expect(screen.queryByRole('button', { name: 'Abstimmung schließen' })).toBeNull();
     });
 
-    it('lets a voter cast once; the ballot never changes (O11)', async () => {
+    it('lets a voter cast once; the ballot never changes', async () => {
       const { on, fixture } = await setup({ canVote: true });
       const options = screen.getAllByRole('button', { name: /^(Ja|Nein|Enthaltung)$/ });
       expect(options).toHaveLength(3);
@@ -187,7 +187,7 @@ describe('VoteCardComponent', () => {
       expect(screen.queryByText('Angenommen')).toBeNull();
     });
 
-    it('names a rejection, also a tie (O18), and a missed quorum', async () => {
+    it('names a rejection, also a tie, and a missed quorum', async () => {
       await setup({ vote: vote({ status: 'closed', result: 'tie', counts: { yes: 1, no: 1 } }) });
       expect(screen.getByText('Abgelehnt')).toBeInTheDocument();
     });
@@ -200,7 +200,7 @@ describe('VoteCardComponent', () => {
   });
 
   describe('a planned or cancelled vote', () => {
-    it('opens and deletes a planned vote while the meeting is live (O24)', async () => {
+    it('opens and deletes a planned vote while the meeting is live', async () => {
       const { on } = await setup({ vote: vote({ status: 'draft', majorityRule: 'absolute', secret: true }) });
       expect(screen.getByText('Abstimmung vorbereitet')).toBeInTheDocument();
       expect(screen.getByText('Absolute Mehrheit · geheime Abstimmung')).toBeInTheDocument();
@@ -255,7 +255,7 @@ describe('VoteCardComponent', () => {
     });
   });
 
-  describe('a vote with guests (#17)', () => {
+  describe('a vote with guests', () => {
     it('shows the room while open', async () => {
       await setup({ vote: vote({ guestsVote: true, majorityRule: 'simple', presentMembers: 19, presentGuests: 7 }) });
       expect(screen.getByText('19 Mitglieder + 7 Gäste anwesend')).toBeInTheDocument();

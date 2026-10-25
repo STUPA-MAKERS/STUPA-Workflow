@@ -10,7 +10,7 @@ import type {
  *
  * One top budget with two fiscal years. Three sub cost centres carry their own colour,
  * one sub cost centre inherits it, and the rest have none, so the page shows every
- * colour case (O19). The rollups are consistent: a parent sums its children plus what it
+ * colour case. The rollups are consistent: a parent sums its children plus what it
  * keeps for itself.
  */
 
@@ -130,14 +130,12 @@ function build(spec: Spec, parent: BudgetTreeNode | null): BudgetTreeNode {
     hiddenInBudget: false,
     viewGremiumId: null,
     decisionGremiumId: spec.decision ?? null,
-    // The own value, else the effective value of the parent (as the API serves it).
     effectiveDecisionGremiumId: spec.decision ?? parent?.effectiveDecisionGremiumId ?? null,
     decisionGremiumSourceId: spec.decision ? spec.id : (parent?.decisionGremiumSourceId ?? null),
     fiscalStartMonth: 1,
     fiscalStartDay: 1,
     byFiscalYear: [
       alloc(FY_CURRENT, allocated, bound, expended, income, requested),
-      // The previous year: the same allocation, all spent.
       alloc(FY_PREVIOUS, allocated, 0, allocated * 0.9),
     ],
     children: [],

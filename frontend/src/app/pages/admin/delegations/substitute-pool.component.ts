@@ -177,7 +177,6 @@ export class SubstitutePoolComponent {
           next: (rows) => {
             const seen = new Set<string>();
             const list: PoolMember[] = [];
-            // A deactivated or expired member represents nobody.
             for (const m of rows) {
               if (!isActiveMembership(m) || seen.has(m.principalId)) continue;
               seen.add(m.principalId);
@@ -220,14 +219,13 @@ export class SubstitutePoolComponent {
     this.search.set(q);
   }
 
-  /** Without a name and an e-mail: "Ohne Namen" (D7), never the `sub`. */
+  /** Without a name and an e-mail: "Ohne Namen", never the `sub`. */
   protected label(p: AdminPrincipal): string {
     return personLabel(p, this.i18n);
   }
 
   protected pick(p: AdminPrincipal): void {
     this.selected.set(p);
-    // The name goes into the field without a new search.
     this.search.sync(this.label(p));
     this.candidates.set([]);
   }

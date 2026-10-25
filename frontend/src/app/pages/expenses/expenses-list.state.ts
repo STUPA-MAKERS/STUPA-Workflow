@@ -64,14 +64,15 @@ export class ExpensesListState {
 
   readonly exporting = signal(false);
 
+  /**
+   * It does not reload, because the component adopts the URL filters first and then fires exactly
+   * one reload; a second, unfiltered request can resolve late and overwrite the filtered list.
+   */
   constructor() {
     this.api.tree().subscribe({
       next: (tree) => this.budgetTree.set(tree),
       error: () => this.budgetTree.set([]),
     });
-    // Do not reload here. The component adopts the URL filters first, then fires
-    // exactly one reload. A second, unfiltered request can resolve late and overwrite
-    // the filtered list.
   }
 
   setKind(k: '' | ExpenseKind): void {
@@ -162,9 +163,10 @@ export class ExpensesListState {
    * `loading` keeps its narrow meaning of "nothing to show yet". The old total stays
    * for the same reason: a number a moment out of date reads better than a 0 that was
    * never true.
+   *
+   * The filter state changes here, so every older in-flight response is stale.
    */
   reload(): void {
-    // The filter state changes here, so every older in-flight response is stale.
     this.fetchEpoch++;
     this.nextOffset = 0;
     this.loading.set(this.items().length === 0);
@@ -209,7 +211,7 @@ export class ExpensesListState {
     this.api.listExpenses({ ...this.filterParams(), limit: windowLimit, offset: 0 }).subscribe({
       next: (page) => {
         this.refreshing.set(false);
-        if (epoch !== this.fetchEpoch) return; // a reload ran meanwhile
+        if (epoch !== this.fetchEpoch) return;
         this.total.set(page.total);
         this.items.set(page.items);
         this.nextOffset = page.offset + page.items.length;
@@ -224,7 +226,7 @@ export class ExpensesListState {
       .listExpenses({ ...this.filterParams(), limit: this.PAGE, offset: this.nextOffset })
       .subscribe({
         next: (page) => {
-          if (epoch !== this.fetchEpoch) return; // fired for an older filter state
+          if (epoch !== this.fetchEpoch) return;
           this.total.set(page.total);
           this.items.update((cur) => (initial ? page.items : [...cur, ...page.items]));
           this.nextOffset = page.offset + page.items.length;

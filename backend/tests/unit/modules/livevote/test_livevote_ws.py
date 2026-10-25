@@ -64,7 +64,7 @@ def _vote_out(meeting_id: UUID) -> VoteOut:
         meetingId=meeting_id,
         eligibleGroup="stupa",
         config=_CONFIG,
-        status="open",  # type: ignore[arg-type]
+        status="open",
         secret=False,
         tally=TallyOut(counts={"yes": 1, "no": 0}, eligible=5, quorumMet=False, leading="yes"),
     )
@@ -121,7 +121,7 @@ class _FakeVotingService:
 
     async def cast(
         self, vote_id: UUID, principal: Principal, choice: str, *, now, as_delegation: bool = False
-    ) -> None:  # noqa: ANN001
+    ) -> None:
         if self._exc is not None:
             raise self._exc
         self.casts.append((vote_id, choice, principal.sub))
@@ -167,7 +167,7 @@ def _voter(groups: set[str] | None = None) -> Principal:
     return Principal(sub="p", permissions={"vote.cast"}, groups=members)
 
 
-def _recv(ws) -> dict:  # noqa: ANN001 — Starlette-Test-WS
+def _recv(ws) -> dict:  # Starlette-Test-WS
     """Return the next event and skip the presence frames.
 
     The `viewers` broadcast fires asynchronously on a connect or a disconnect. It can
@@ -394,7 +394,7 @@ def _auth_db(*, naive: bool):
     principal_row = PrincipalRow(
         sub="member", email=None, display_name="M", oidc_groups=[]
     )
-    principal_row.id = pid  # type: ignore[assignment]
+    principal_row.id = pid
     assignment = RoleAssignment(
         principal_id=pid, role_id=uuid4(), gremium_id=_GREMIUM,
         valid_from=vf, valid_until=vu,

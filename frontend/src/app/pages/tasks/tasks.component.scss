@@ -68,12 +68,12 @@
   gap: 2px;
 }
 .tasks__amount {
-  font-size: 0.8125rem; /* 13px */
+  font-size: 0.8125rem;
   white-space: nowrap;
 }
 .tasks__waiting {
   color: var(--color-text-muted);
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 .tasks__chev {
@@ -103,7 +103,6 @@
   .tasks__month {
     padding-inline: var(--space-1);
   }
-  /* The whole row is the target; the title needs the room more than the chevron. */
   .tasks__chev {
     display: none;
   }
@@ -143,7 +142,7 @@
   align-items: center;
   gap: 5px;
   color: var(--color-text-muted);
-  font-size: 0.75rem; /* 12px */
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 .tasks__due[data-tone='overdue'] {

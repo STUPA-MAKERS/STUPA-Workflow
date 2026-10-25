@@ -149,7 +149,7 @@ export class BrandingService {
   /** True after the public config loaded. A failed load keeps it false. */
   readonly loaded = this._loaded.asReadonly();
 
-  /** The upload limits of the wizard (Z4). The backend defaults until the config loads. */
+  /** The upload limits of the wizard. The backend defaults until the config loads. */
   readonly attachmentLimits = this._attachmentLimits.asReadonly();
 
   /** The free texts of the branding (Freitexte), per locale. Empty until loaded. */
@@ -182,14 +182,16 @@ export class BrandingService {
     () => this._configuredName().trim() || this.i18n.translate('home.heading'),
   );
 
+  /**
+   * index.html links the built-in icons; an upload replaces each of them, and an empty slot puts
+   * the built-in href back.
+   */
   constructor() {
     effect(() => this.title.setTitle(this.appName()));
     effect(() => {
       const preview = this._accentPreview();
       applyAccent(preview === undefined ? this._accent() : preview);
     });
-    // index.html links the built-in icons; an upload replaces each of them, and an
-    // empty slot puts the built-in href back.
     const builtIn = new Map<HTMLLinkElement, string>();
     effect(() => {
       const upload = this._logos().favicon;

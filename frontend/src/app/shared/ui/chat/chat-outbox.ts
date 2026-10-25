@@ -150,10 +150,13 @@ export class ChatOutbox<T> {
     this.items.set([]);
   }
 
+  /**
+   * A cleared outbox (another thread) drops a late answer. The server keeps refused drafts unbound,
+   * so they go now, not at the hourly purge.
+   */
   private run(id: string, req: ChatSend): void {
     this.post(req).subscribe({
       next: (result) => {
-        // A cleared outbox (another thread) drops a late answer.
         if (!this.requests.delete(id)) return;
         this.items.update((list) => list.filter((m) => m.id !== id));
         this.delivered(result);
@@ -163,7 +166,6 @@ export class ChatOutbox<T> {
         const refused = filesRefused(err);
         const lost = refused ? new Set(req.attachmentIds ?? []) : missingFiles(err);
         if (lost) this.markLost(id, req, lost);
-        // The server keeps refused drafts unbound: they go now, not at the hourly purge.
         if (refused && lost?.size && req.draftToken) this.dropDrafts([...lost], req.draftToken);
         this.setState(id, 'failed');
         this.failed(err);

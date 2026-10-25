@@ -13,11 +13,12 @@ that count is a best-effort value.
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import re
 import subprocess
-from typing import Any, Protocol
+from typing import Any, LiteralString, Protocol
 
 from .config import Config
 
@@ -27,8 +28,8 @@ class DbError(RuntimeError):
 
 
 class Db(Protocol):
-    def query(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]: ...
-    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int: ...
+    def query(self, sql: LiteralString, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]: ...
+    def execute(self, sql: LiteralString, params: tuple[Any, ...] = ()) -> int: ...
     def close(self) -> None: ...
     @property
     def label(self) -> str: ...
@@ -69,13 +70,14 @@ class DirectDb:
         self._label = label
         try:
             import psycopg
-            from psycopg.rows import dict_row
+            from psycopg.rows import DictRow, dict_row
         except ImportError as exc:  # pragma: no cover - optional dep
             raise DbError(
                 "direct mode needs psycopg (pip install 'psycopg[binary]')."
             ) from exc
         try:
-            self._conn = psycopg.connect(
+            # `connect` returns `Self`, so the row type comes from the subscripted class.
+            self._conn = psycopg.Connection[DictRow].connect(
                 dsn,
                 autocommit=True,
                 row_factory=dict_row,
@@ -88,7 +90,7 @@ class DirectDb:
     def label(self) -> str:
         return self._label
 
-    def query(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    def query(self, sql: LiteralString, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         try:
             with self._conn.cursor() as cur:
                 cur.execute(sql, params)
@@ -96,7 +98,7 @@ class DirectDb:
         except Exception as exc:  # A psycopg error becomes the DbError that callers expect.
             raise DbError(str(exc).strip() or type(exc).__name__) from exc
 
-    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int:
+    def execute(self, sql: LiteralString, params: tuple[Any, ...] = ()) -> int:
         try:
             with self._conn.cursor() as cur:
                 cur.execute(sql, params)
@@ -105,10 +107,9 @@ class DirectDb:
             raise DbError(str(exc).strip() or type(exc).__name__) from exc
 
     def close(self) -> None:
-        try:
+        # Closing a broken connection must not raise.
+        with contextlib.suppress(Exception):
             self._conn.close()
-        except Exception:  # noqa: BLE001 — closing a broken connection must not raise
-            pass
 
 
 _TAG_RE = re.compile(r"\b(?:INSERT \d+|UPDATE|DELETE|SELECT)\s+(\d+)\b")
@@ -157,13 +158,13 @@ class DockerDb:
             raise DbError((proc.stderr or proc.stdout or "psql failed").strip())
         return proc.stdout
 
-    def query(self, sql: str, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
+    def query(self, sql: LiteralString, params: tuple[Any, ...] = ()) -> list[dict[str, Any]]:
         out = self._psql(render(sql, params), csv_out=True)
         reader = csv.DictReader(io.StringIO(out))
         # psql --csv emits an empty string for NULL. Map it back to None.
         return [{k: (v if v != "" else None) for k, v in row.items()} for row in reader]
 
-    def execute(self, sql: str, params: tuple[Any, ...] = ()) -> int:
+    def execute(self, sql: LiteralString, params: tuple[Any, ...] = ()) -> int:
         out = self._psql(render(sql, params), csv_out=False)
         match = None
         for line in out.splitlines():

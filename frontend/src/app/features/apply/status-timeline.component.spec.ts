@@ -252,7 +252,7 @@ describe('StatusTimelineComponent', () => {
     );
   });
 
-  it('F1: notes the deviations of a decision, and nothing for a decision as requested', async () => {
+  it('Notes the deviations of a decision, and nothing for a decision as requested', async () => {
     const { comp } = await setup(fakeApi({ timeline: () => of([]), versions: () => of([]) }));
     await screen.findByRole('heading', { level: 1 });
     const base = { toStateId: 's9', toState: null, label: 'Bewilligt', actor: null, at: '2026-06-05T10:00:00Z', note: null, voteId: null, voteDeleted: false };

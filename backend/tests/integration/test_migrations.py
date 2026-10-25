@@ -17,7 +17,7 @@ from sqlalchemy import Connection, Engine, text
 from sqlalchemy.exc import IntegrityError
 
 
-def _new_type(conn) -> str:  # noqa: ANN001
+def _new_type(conn) -> str:
     return conn.execute(
         text("INSERT INTO application_type (key) VALUES (:k) RETURNING id"),
         {"k": "t-" + str(conn.execute(text("SELECT gen_random_uuid()")).scalar())},
@@ -66,7 +66,7 @@ def test_partial_unique_one_active_form_version(engine: Engine) -> None:
             ),
             {"t": type_id},
         )
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(
                 "INSERT INTO form_version (application_type_id, version, active) "
@@ -91,7 +91,7 @@ def test_partial_unique_one_initial_state(engine: Engine) -> None:
             ),
             {"f": fv},
         )
-    with pytest.raises(IntegrityError), engine.begin() as conn:  # noqa: PT012
+    with pytest.raises(IntegrityError), engine.begin() as conn:
         conn.execute(
             text(
                 "INSERT INTO state (flow_version_id, key, is_initial) "
@@ -257,7 +257,7 @@ def test_drop_type_flows_repairs_legacy_duplicates(engine: Engine) -> None:
         ).scalar_one()
 
     with engine.begin() as conn:
-        for stmt in mod._UPGRADE:  # noqa: SLF001
+        for stmt in mod._UPGRADE:
             conn.execute(text(stmt))
 
     with engine.connect() as conn:
@@ -370,14 +370,14 @@ def test_drop_global_meeting_permissions(alembic_cfg: Config, engine: Engine) ->
             {"r": custom},
         )
 
-    def _gremium_perms(conn) -> dict[str, list[str]]:  # noqa: ANN001
+    def _gremium_perms(conn) -> dict[str, list[str]]:
         rows = conn.execute(
             text("SELECT key, permissions FROM gremium_role WHERE gremium_id = :g"),
             {"g": gid},
         ).all()
         return {r[0]: list(r[1]) for r in rows}
 
-    def _dropped(conn) -> list[tuple[str, str]]:  # noqa: ANN001
+    def _dropped(conn) -> list[tuple[str, str]]:
         return [
             (r[0], r[1])
             for r in conn.execute(
@@ -504,14 +504,14 @@ def test_drop_global_vote_permissions(
             {"r": custom},
         )
 
-    def _gremium_perms(conn) -> dict[str, list[str]]:  # noqa: ANN001
+    def _gremium_perms(conn) -> dict[str, list[str]]:
         rows = conn.execute(
             text("SELECT key, permissions FROM gremium_role WHERE gremium_id = :g"),
             {"g": gid},
         ).all()
         return {r[0]: list(r[1]) for r in rows}
 
-    def _dropped(conn) -> list[tuple[str, str]]:  # noqa: ANN001
+    def _dropped(conn) -> list[tuple[str, str]]:
         return [
             (r[0], r[1])
             for r in conn.execute(
@@ -689,7 +689,7 @@ def test_vote_closed_at_backfill_and_allow_change_strip(
             names = ", ".join(["eligible_group", "config", "status", *cols])
             values = ", ".join([":g", "CAST(:c AS jsonb)", ":s", *(f":{k}" for k in cols)])
             return conn.execute(
-                text(f"INSERT INTO vote ({names}) VALUES ({values}) RETURNING id"),  # noqa: S608
+                text(f"INSERT INTO vote ({names}) VALUES ({values}) RETURNING id"),
                 {"g": "g", "c": config, "s": status, **cols},
             ).scalar_one()
 
@@ -774,7 +774,7 @@ def test_vote_closed_at_backfill_and_allow_change_strip(
     command.upgrade(alembic_cfg, "head")
 
 
-def _agenda_fk_rule(conn) -> str:  # noqa: ANN001
+def _agenda_fk_rule(conn) -> str:
     """Return `confdeltype` of the foreign key on `vote.agenda_item_id` (c, n, ...)."""
     return conn.execute(
         text(
@@ -1016,7 +1016,7 @@ def test_guest_application_settings_and_unlimited_links(
     command.upgrade(alembic_cfg, "head")
 
 
-def _self_status_check(conn) -> tuple[str, bool] | None:  # noqa: ANN001
+def _self_status_check(conn) -> tuple[str, bool] | None:
     """Return the definition and `convalidated` of the self-status check, or None."""
     row = conn.execute(
         text(
@@ -1112,11 +1112,11 @@ def test_attendance_self_status_check_not_valid(
     command.upgrade(alembic_cfg, "head")
 
 
-def _has_table(conn, name: str) -> bool:  # noqa: ANN001
+def _has_table(conn, name: str) -> bool:
     return conn.execute(text("SELECT to_regclass(:n)"), {"n": name}).scalar_one() is not None
 
 
-def _attachment_columns(conn) -> dict[str, str]:  # noqa: ANN001
+def _attachment_columns(conn) -> dict[str, str]:
     return dict(
         conn.execute(
             text(

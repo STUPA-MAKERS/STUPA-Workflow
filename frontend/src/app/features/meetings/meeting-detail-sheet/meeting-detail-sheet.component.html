@@ -21,8 +21,6 @@
       }
     </app-sheet-bar>
 
-    <!-- Every part draws its dot before it; the line clips the dot of the first part on
-         each line, so a dot shows only between two parts, also after a wrap. -->
     <p class="sheet-line ms__line">
       <span class="ms__parts">
         <span class="ms__part">
@@ -89,8 +87,6 @@
                   <span class="ms__topTitle ell" [title]="row.title">
                     <span class="sr-only">{{ 'meetings.agenda.top' | t: { n: row.number } }}: </span>{{ row.title }}
                   </span>
-                  <!-- A sub line only for an application or a non-public item: the number
-                       names the TOP, and "Freitext" says nothing. -->
                   @if (row.item.applicationId || row.item.nonPublic) {
                     <span class="ms__topSub">
                       @if (row.item.applicationId) {

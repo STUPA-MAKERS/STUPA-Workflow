@@ -44,6 +44,9 @@ export const BEAMER_IDLE_MS = 2500;
  * that hides again after `BEAMER_IDLE_MS` without movement, so the projector shows no
  * control while nobody touches the mouse. Leaving goes back to the page that opened the
  * beamer (`?from=`, see `beamerUrl`) and ends a fullscreen mode.
+ *
+ * The route has no chrome, so the back control is the only way back without the browser (Escape
+ * also leaves). It hides while the pointer rests, so the projector shows no control.
  */
 @Component({
   selector: 'app-beamer',
@@ -80,7 +83,7 @@ export class BeamerComponent implements OnDestroy {
   /** The vote on the screen as `GET /votes/{id}` gave it. */
   private readonly loaded = signal<Vote | null>(null);
   private requested: string | null = null;
-  /** The join link of a public meeting (#17) and the present members. */
+  /** The join link of a public meeting and the present members. */
   private readonly link = signal<JoinLink | null>(null);
   private readonly presentMembers = signal(0);
 
@@ -137,7 +140,6 @@ export class BeamerComponent implements OnDestroy {
       return closed?.voteId === v.id ? this.closedByFrame(v, closed) : this.openView(v);
     }
     if (v.status !== 'closed') return null;
-    // A result stays only while the room stays on the agenda item of the vote.
     const item = this.currentItemId();
     if (item && v.agendaItemId && v.agendaItemId !== item) return null;
     return this.view(v, {
@@ -169,8 +171,6 @@ export class BeamerComponent implements OnDestroy {
     this.session = this.live.open(meetingId, { beamer: true });
     if (routeId) this.loadMeeting(routeId);
 
-    // A new state of the room (another item, a handover, a close) can change the agenda
-    // and the votes of the meeting: read them again.
     let first = true;
     effect(() => {
       const state = this.session.meeting();
@@ -189,7 +189,6 @@ export class BeamerComponent implements OnDestroy {
         if (id) this.load(id);
       });
     });
-    // A new join code (rotated) or the public participation switched on: read the link.
     effect(() => {
       const code = this.session.guestCounts()?.joinCode;
       const on = this.publicJoin();
@@ -199,7 +198,6 @@ export class BeamerComponent implements OnDestroy {
         }
       });
     });
-    // The close: read the vote again for the exact turnout and the quorum.
     effect(() => {
       const closed = this.session.result();
       untracked(() => {
@@ -311,12 +309,14 @@ export class BeamerComponent implements OnDestroy {
     });
   }
 
+  /**
+   * A read can arrive after the read of a newer vote (a vote closes and the room opens the next one
+   * at once), so only the vote that the screen shows now is kept.
+   */
   private load(id: string, force = false): void {
     if (!force && id === this.requested) return;
     this.requested = id;
     this.api.getVote(id, { quiet: true }).subscribe({
-      // A read can arrive after the read of a newer vote (a vote closes and the room
-      // opens the next one at once). Keep only the vote that the screen shows now.
       next: (v) => {
         if (v.id === this.targetId()) this.loaded.set(v);
       },

@@ -185,8 +185,6 @@
   gap: var(--space-2);
 }
 @include bp.phone {
-  /* On a phone the row is a card, and the card paints the colour: the cells of a card
-     are transparent. The form takes the padding of a card. */
   :host .bt__table ::ng-deep .dt__table tbody tr.dt__detail-row {
     display: block;
     padding: 0;
@@ -199,7 +197,6 @@
   .bt__childActions {
     justify-content: flex-end;
   }
-  /* A card names its depth with a small step only, and its title wraps. */
   .bt__node {
     padding-inline-start: calc(var(--bt-depth, 0) * 0.5rem);
   }
@@ -207,7 +204,6 @@
     flex: 1 1 auto;
     width: auto;
   }
-  /* A card has no fold column: the title starts on the edge of the card. */
   .bt__foldGap {
     display: none;
   }

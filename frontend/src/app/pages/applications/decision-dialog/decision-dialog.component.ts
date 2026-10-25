@@ -31,7 +31,7 @@ const DECISION_CODES: Record<string, Parameters<I18nService['translate']>[0]> = 
 };
 
 /**
- * Fire a transition into an accepted state of the cost center (F1, `allowsDecision`).
+ * Fire a transition into an accepted state of the cost center (`allowsDecision`).
  *
  * The dialog offers the decision: switched off, the transition fires as before
  * ("as requested, no conditions"). Switched on, it takes the approved amount and the

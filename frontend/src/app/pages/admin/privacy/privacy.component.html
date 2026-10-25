@@ -1,7 +1,6 @@
 <section class="pv admin-page">
   <app-page-header [flush]="true" [title]="'admin.privacy.title' | t" />
 
-  <!-- Erasure requests (GDPR Art. 17) -->
   <section class="pv__queue" aria-labelledby="pv-queue">
     <h2 class="section-title pv__secTitle" id="pv-queue">{{ 'admin.privacy.queueTitle' | t }}</h2>
     @if (loading() || erasures().length) {
@@ -45,7 +44,6 @@
   </section>
 
   <div class="pv__cards">
-    <!-- Access export (GDPR Art. 15) -->
     <section class="pv__card" aria-labelledby="pv-auskunft">
       <h2 class="section-title" id="pv-auskunft">{{ 'admin.privacy.auskunftTitle' | t }}</h2>
       <form class="pv__form" (submit)="$event.preventDefault(); exportAuskunft()">
@@ -64,10 +62,8 @@
       </form>
     </section>
 
-    <!-- Account erasure (GDPR Art. 17) -->
     <section class="pv__card" aria-labelledby="pv-principal">
       <h2 class="section-title" id="pv-principal">{{ 'admin.privacy.principalTitle' | t }}</h2>
-      <!-- D1: a person picker (name or e-mail), never a raw id. -->
       <form class="pv__form" (submit)="$event.preventDefault(); askPrincipalErase()">
         @if (person(); as p) {
           <div class="pv__person">
@@ -117,7 +113,6 @@
     </section>
   </div>
 
-  <!-- Retention (GDPR Art. 5(1)(e)) -->
   <section class="pv__card pv__retention" aria-labelledby="pv-retention">
     <div class="pv__retentionText">
       <h2 class="section-title" id="pv-retention">{{ 'admin.privacy.retentionTitle' | t }}</h2>

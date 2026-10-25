@@ -322,11 +322,9 @@ export class TicketDetailComponent {
         items: [{ id: 'reset', label: this.t('tickets.detail.resetNew'), icon: 'history' }],
       });
     }
-    // The closing action and the block stand apart from the status change, behind a rule.
     const apart: RowMenuItem[] = [];
     if (isOpen(t.status))
       apart.push({ id: 'duplicate', label: this.t('tickets.detail.duplicate'), icon: 'copy' });
-    // An anonymized ticket has no sender any more, and nobody blocks themselves.
     if (!t.anonymizedAt && !this.ownReport(t.reporter)) {
       apart.push(
         t.senderBlocked
@@ -335,7 +333,6 @@ export class TicketDetailComponent {
       );
     }
     if (apart.length) sections.push({ items: apart });
-    // A new ticket can be a duplicate, any other can go back to "Neu": never empty.
     return sections;
   });
 
@@ -402,7 +399,6 @@ export class TicketDetailComponent {
       authorLabel: this.manager ? this.reporter() : null,
       body: t.body,
       at: t.createdAt,
-      // The reporter reads the own report on the right, without an edit.
       own: !this.manager,
       canEdit: false,
       visibility: this.visibilityOptions().length ? 'public' : null,
@@ -467,7 +463,6 @@ export class TicketDetailComponent {
   });
 
   constructor() {
-    // The route is `tickets/:id`, so the id is always there.
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((pm) => this.load(pm.get('id')!));
     if (!this.manager) return;
     this.api.assignees().subscribe({
@@ -486,7 +481,6 @@ export class TicketDetailComponent {
 
   private load(id: Uuid): void {
     const seq = ++this.seq;
-    // A newly opened ticket takes what the list read ahead; a reload reads fresh.
     const opened = id !== this.id;
     if (opened) {
       this.id = id;

@@ -17,7 +17,7 @@ async def login() -> dict:
     The login opens the platform OAuth page. Use this tool when calls fail with auth
     errors, or to switch users.
     """
-    await api()._token(force_login=True)  # noqa: SLF001 — intentional re-auth
+    await api()._token(force_login=True)  # intentional re-auth
     return await api().get("/auth/me")
 
 

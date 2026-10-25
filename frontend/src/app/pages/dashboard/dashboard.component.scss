@@ -115,7 +115,7 @@
   padding: 6px 10px;
   border-radius: var(--radius-pill);
   color: var(--color-accent-text);
-  font-size: 0.8125rem; /* 13px */
+  font-size: 0.8125rem;
   font-weight: var(--fw-semibold);
   text-decoration: none;
   white-space: nowrap;
@@ -192,7 +192,6 @@
 }
 :host(.dash--wide) .dash__panel {
   flex: 1 1 auto;
-  /* Room for "Antrag stellen" below the last row. */
   padding-bottom: calc(56px + var(--space-6));
   min-height: 0;
   overflow-y: auto;
@@ -204,14 +203,14 @@
   @include fade.fade-y(var(--dash-fade));
 }
 
-/* A title takes up to two lines in the table, then the ellipsis. */
+/* A title takes up to two lines in the table, then the ellipsis.
+   The clamp uses a margin, not a padding, because the clamp cuts at the content box and a
+   padding would show the top of the third line. */
 .dash__cellTitle {
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  /* A margin, not a padding: the clamp cuts at the content box, and a padding would show
-     the top of the third line. */
   margin-block: 6px;
   font-weight: var(--fw-medium);
   overflow-wrap: anywhere;

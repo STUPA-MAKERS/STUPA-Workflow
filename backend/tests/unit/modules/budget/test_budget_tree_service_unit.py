@@ -34,7 +34,7 @@ from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from tests._support.auth_fakes import fake_session, result
 
 
-def _budget(  # noqa: ANN001
+def _budget(
     *, id=None, parent_id=None, path_key="VS", gremium_id=None, key="VS", name="N",
     fiscal_start_month=1, fiscal_start_day=1,
 ):
@@ -47,7 +47,7 @@ def _budget(  # noqa: ANN001
     return b
 
 
-def _fy(*, id=None, budget_id=None, year=2026, active=True):  # noqa: ANN001
+def _fy(*, id=None, budget_id=None, year=2026, active=True):
     start = date(year, 1, 1)
     end = date(year, 12, 31)
     f = FiscalYear(budget_id=budget_id, year=year, start_date=start, end_date=end, active=active)
@@ -55,13 +55,13 @@ def _fy(*, id=None, budget_id=None, year=2026, active=True):  # noqa: ANN001
     return f
 
 
-def _alloc(*, budget_id, fy_id, allocated):  # noqa: ANN001
+def _alloc(*, budget_id, fy_id, allocated):
     a = BudgetAllocation(budget_id=budget_id, fiscal_year_id=fy_id, allocated=Decimal(allocated))
     a.id = uuid.uuid4()
     return a
 
 
-def _app(*, id=None, budget_id=None, fiscal_year_id=None, amount=None):  # noqa: ANN001
+def _app(*, id=None, budget_id=None, fiscal_year_id=None, amount=None):
     a = Application(
         type_id=uuid.uuid4(), form_version_id=uuid.uuid4(), flow_version_id=uuid.uuid4(),
         budget_id=budget_id, fiscal_year_id=fiscal_year_id, amount=amount, data={},

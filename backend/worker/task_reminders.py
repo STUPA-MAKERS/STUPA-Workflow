@@ -107,7 +107,7 @@ async def process_task_reminders(
                     state=state,
                 ):
                     sent += 1
-            except Exception:  # noqa: BLE001 - one case must not break the cycle
+            except Exception:  # one case must not break the cycle
                 logger.exception("task reminder failed (application=%s)", app_id)
     return sent
 

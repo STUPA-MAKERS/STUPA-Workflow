@@ -985,7 +985,7 @@ def test_mcp_package_bakes_url_json_safe(
         assert member is not None
         source = member.read().decode("utf-8")
     ns: dict[str, object] = {}
-    exec(compile(source, "_baked.py", "exec"), ns)  # noqa: S102
+    exec(compile(source, "_baked.py", "exec"), ns)
     assert ns["BASE_URL"] == hostile.rstrip("/")
 
 
@@ -1282,7 +1282,7 @@ async def test_oidc_callback_deactivated_account_forbidden(
     monkeypatch.setattr(service.oidc, "verify_id_token", _verify)
 
     deactivated = PrincipalRow(sub="s1")
-    deactivated.active = False  # type: ignore[assignment]
+    deactivated.active = False
     db = fake_session(result(deactivated))  # the upsert finds a deactivated row
     with pytest.raises(ForbiddenError):
         await service.oidc_callback(db, settings, code="c", verifier="v", nonce="n")

@@ -107,7 +107,7 @@ class _FakeService:
         self.session = _FakeAuditSession()
         self.added_mentions: list[UUID] = []
 
-    async def create(  # noqa: ANN001
+    async def create(
         self,
         payload,
         *,
@@ -123,7 +123,7 @@ class _FakeService:
         self.created_email_confirmed = email_confirmed
         return _FakeApp(uuid4()), str(payload.applicant_email)
 
-    async def get(  # noqa: ANN001
+    async def get(
         self,
         application_id,
         *,
@@ -141,7 +141,7 @@ class _FakeService:
         self.last_allow_unconfirmed = allow_unconfirmed
         return _out(application_id, with_pii=include_pii)
 
-    async def patch(  # noqa: ANN001
+    async def patch(
         self,
         application_id,
         data,
@@ -155,18 +155,18 @@ class _FakeService:
         self.last_preserve_pii = preserve_pii
         return _out(application_id, with_pii=False)
 
-    async def delete(self, application_id, *, actor=None):  # noqa: ANN001
+    async def delete(self, application_id, *, actor=None):
         self.deleted = application_id
         self.deleted_actor = actor
 
-    async def set_archived(  # noqa: ANN001
+    async def set_archived(
         self, application_id, *, archived, actor=None, strip_pii_fields=False
     ):
         self.archived_call = (application_id, archived, actor)
         self.archived_strip = strip_pii_fields
         return _out(application_id, with_pii=False)
 
-    async def timeline(  # noqa: ANN001
+    async def timeline(
         self,
         application_id,
         *,
@@ -182,7 +182,7 @@ class _FakeService:
             )
         ]
 
-    async def versions(  # noqa: ANN001
+    async def versions(
         self,
         application_id,
         *,
@@ -197,18 +197,18 @@ class _FakeService:
         self.versions_strip_pii = strip_pii
         return [VersionOut(version=1, data={"title": "X"}, diff=None, changedBy="x", at=_NOW)]
 
-    async def list_applications(self, **kwargs):  # noqa: ANN003
+    async def list_applications(self, **kwargs):
         self.list_kwargs = kwargs
         item = ApplicationListItem(
             id=uuid4(), typeId=uuid4(), state=_state(), createdAt=_NOW, updatedAt=_NOW
         )
         return Page(items=[item], total=1, limit=kwargs["limit"], offset=kwargs["offset"])
 
-    async def name_maps(self, locale="de"):  # noqa: ANN001
+    async def name_maps(self, locale="de"):
         self.name_maps_called = True
         return {}, {}
 
-    async def add_comment(  # noqa: ANN001
+    async def add_comment(
         self,
         application_id,
         *,
@@ -247,11 +247,11 @@ class _FakeService:
             ],
         )
 
-    async def mentionable(self, application_id):  # noqa: ANN001
+    async def mentionable(self, application_id):
         self.mentionable_for = application_id
         return [PersonRef(principal_id=uuid4(), display_name="Ada")]
 
-    async def list_comments(  # noqa: ANN001
+    async def list_comments(
         self,
         application_id,
         *,
@@ -267,7 +267,7 @@ class _FakeService:
         self.last_viewer_is_applicant = viewer_is_applicant
         return []
 
-    async def update_comment(  # noqa: ANN001
+    async def update_comment(
         self,
         application_id,
         comment_id,
@@ -299,7 +299,7 @@ class _FakeService:
             at=_NOW,
         )
 
-    async def delete_comment(  # noqa: ANN001
+    async def delete_comment(
         self,
         application_id,
         comment_id,
@@ -336,10 +336,10 @@ def app(fake_service: _FakeService, sent: list[tuple[str, UUID]]) -> FastAPI:
     application = create_app()
     application.dependency_overrides[get_applications_service] = lambda: fake_service
 
-    async def _no_mail(settings, email, application_id, pool):  # noqa: ANN001, ANN202
+    async def _no_mail(settings, email, application_id, pool):
         sent.append((email, application_id))
 
-    async def _no_comment_mail(*args):  # noqa: ANN002, ANN202 — background task without a DB
+    async def _no_comment_mail(*args):  # background task without a DB
         pass
 
     application.dependency_overrides[get_magic_link_sender] = lambda: _no_mail

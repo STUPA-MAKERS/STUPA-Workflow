@@ -6,7 +6,7 @@ import { readArtifacts } from './helpers';
 test.use({ storageState: ADMIN_STATE });
 
 /**
- * Scenario 6 (testing.md §3.6): admin config. The editor adds a question and
+ * Scenario 6: admin config. The editor adds a question and
  * **persists** a new form version.
  *
  * Proof of persistence: the success toast "Gespeichert." fires only on a 2xx from
@@ -18,7 +18,7 @@ test.use({ storageState: ADMIN_STATE });
  * types, and the editor sits at `/admin/forms/{typeId}`. It was renamed from
  * form-builder to form-editor, fields became questions grouped in sections, the save
  * control is "Speichern", and the `[data-testid="form-json"]` mirror no longer
- * exists. The key and label inputs kept their labels. Since the redesign (FE12b) the
+ * exists. The key and label inputs kept their labels. Since the redesign the
  * questions are listed in an outline, and the card of the selected question holds the
  * fields.
  */

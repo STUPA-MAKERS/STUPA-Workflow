@@ -42,7 +42,7 @@ export class MeetingDialogsService {
   readonly agendaOpen = signal(false);
   /** "Abstimmung öffnen" for this agenda item of the loaded meeting. */
   readonly voteItem = signal<AgendaItem | null>(null);
-  /** "Protokollführung übergeben" to this member of the loaded live meeting (Z3). */
+  /** "Protokollführung übergeben" to this member of the loaded live meeting. */
   readonly handoverTarget = signal<Attendance | null>(null);
   /** The handover request runs. */
   readonly handoverSaving = signal(false);
@@ -84,7 +84,7 @@ export class MeetingDialogsService {
     if (this.session.meeting()?.id === id) void this.router.navigate(['/meetings']);
   }
 
-  /** The close dialog closed the meeting. The protocol stays a draft (O13). */
+  /** The close dialog closed the meeting. The protocol stays a draft. */
   meetingClosed(updated: Meeting): void {
     this.closeOpen.set(false);
     this.applyUpdated(updated);
@@ -123,9 +123,9 @@ export class MeetingDialogsService {
   }
 
   /**
-   * Hand the minutes of a live meeting over (Z3): `now` at once, `next_item` with the
+   * Hand the minutes of a live meeting over: `now` at once, `next_item` with the
    * next agenda item. A refusal the dialog can explain stays in the dialog: 422
-   * `protokollant_needs_protocol_write` (O20), 409 `no_next_item` (the last TOP) and
+   * `protokollant_needs_protocol_write`, 409 `no_next_item` (the last TOP) and
    * 409 `already_protokollant`. Any other refusal is a toast.
    */
   handOver(m: Meeting, principalId: Uuid, mode: HandoverMode): void {

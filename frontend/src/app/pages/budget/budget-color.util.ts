@@ -1,7 +1,7 @@
 import type { BudgetTreeNode } from './budget-tree.api';
 
 /**
- * The display colours of the cost centres (O19, gaps D6).
+ * The display colours of the cost centres.
  *
  * A cost centre can carry its own colour (`BudgetTreeNode.color`), for example the colour
  * of a faculty. {@link nodeColors} gives every node one display colour, and every view of
@@ -86,6 +86,9 @@ export function shadeColor(hex: string, step: number): string {
  *
  * `inherited` is the colour above the given roots. A gremium-scoped tree starts at a sub
  * cost centre whose parent is not in the response, so its roots inherit nothing.
+ *
+ * An inherited colour that a sibling holds as its own starts at step 1, so the two never look the
+ * same.
  */
 export function nodeColors(
   roots: readonly BudgetTreeNode[],
@@ -93,8 +96,6 @@ export function nodeColors(
 ): Map<string, string> {
   const out = new Map<string, string>();
   const walk = (nodes: readonly BudgetTreeNode[], above: string | null, top: boolean): void => {
-    // An inherited colour that a sibling holds as its own starts at step 1, so the two
-    // never look the same.
     const steps = new Map<string, number>();
     for (const n of nodes) {
       const own = ownColor(n);

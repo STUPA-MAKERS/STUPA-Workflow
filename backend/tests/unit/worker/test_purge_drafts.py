@@ -28,7 +28,7 @@ TOKEN_RUNS: list[datetime] = []
 def _no_token_purge(monkeypatch: pytest.MonkeyPatch) -> None:
     TOKEN_RUNS.clear()
 
-    async def _tokens(_maker: Any, now: datetime) -> int:  # noqa: ANN401
+    async def _tokens(_maker: Any, now: datetime) -> int:
         TOKEN_RUNS.append(now)
         return 1
 
@@ -49,7 +49,7 @@ class _Storage:
 def _batches(monkeypatch: pytest.MonkeyPatch, batches: list[tuple[int, list[str]]]) -> None:
     queue = list(batches)
 
-    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:  # noqa: ANN401
+    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:
         assert now == NOW
         return queue.pop(0)
 
@@ -77,7 +77,7 @@ async def test_purge_uses_the_current_time_by_default(
 ) -> None:
     seen: list[datetime] = []
 
-    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:  # noqa: ANN401
+    async def _batch(_maker: Any, now: datetime) -> tuple[int, list[str]]:
         seen.append(now)
         return 0, []
 
@@ -109,7 +109,7 @@ def test_storage_and_sessionmaker_fallbacks(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 class _Rows:
-    def __init__(self, rows: list[Any]) -> None:  # noqa: ANN401
+    def __init__(self, rows: list[Any]) -> None:
         self._rows = rows
 
     def all(self) -> list[Any]:
@@ -117,7 +117,7 @@ class _Rows:
 
 
 class _Session:
-    def __init__(self, rows: list[Any]) -> None:  # noqa: ANN401
+    def __init__(self, rows: list[Any]) -> None:
         self.rows = rows
         self.statements: list[str] = []
         self.committed = 0
@@ -128,7 +128,7 @@ class _Session:
     async def __aexit__(self, *_exc: object) -> bool:
         return False
 
-    async def execute(self, stmt: Any) -> _Rows:  # noqa: ANN401
+    async def execute(self, stmt: Any) -> _Rows:
         self.statements.append(str(stmt))
         return _Rows(self.rows if len(self.statements) == 1 else [])
 

@@ -99,7 +99,7 @@
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
-  font-size: 0.84375rem; /* 13.5px */
+  font-size: 0.84375rem;
   font-weight: var(--fw-medium);
   white-space: nowrap;
   cursor: pointer;
@@ -149,7 +149,6 @@
 .sd__pop {
   position: absolute;
   bottom: calc(100% + var(--space-2));
-  /* The end edge of the minute-taker chip (set by the component when it opens). */
   inset-inline-end: var(--sd-pop-end, 0px);
   z-index: 2;
   display: flex;
@@ -176,7 +175,9 @@
   }
 }
 
-/* Phone: one row for the step and the vote, one row for the chips. */
+/* Phone: one row for the step and the vote, one row for the chips.
+   The attendance chip keeps its full text and the keeper chip shortens its name, because a
+   centred chip narrower than its content pushes the icon out over its start edge. */
 @include bp.phone {
   .sd {
     min-height: 0;
@@ -201,9 +202,6 @@
   .sd__chips {
     flex: 1 1 100%;
   }
-  /* The attendance chip keeps its full text; the keeper chip takes the rest of the row
-     and shortens its name. A centred chip narrower than its content would push the icon
-     out over its start edge. */
   .sd__chip {
     flex: 0 0 auto;
     justify-content: center;
@@ -214,7 +212,7 @@
   }
 }
 
-/* The open join requests on the attendance chip (#17). */
+/* The open join requests on the attendance chip. */
 .sd__badge {
   display: inline-grid;
   place-items: center;

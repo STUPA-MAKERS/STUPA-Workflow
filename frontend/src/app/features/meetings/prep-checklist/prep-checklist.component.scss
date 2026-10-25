@@ -92,8 +92,6 @@
   .pc {
     padding: var(--space-5) var(--space-4);
   }
-  /* Icon and text in one row, the button always on its own row below the text: every
-     card has the same layout, whatever the length of its text. */
   .pc__card {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr);

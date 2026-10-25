@@ -102,6 +102,9 @@ export interface InvoiceFormHost {
  * erkannt" and, when an invoice with the same number exists, warns about it with
  * "Vorhandene öffnen" (N31). Number, supplier and gross are required for a new invoice.
  * The status is a segmented control "Offen | Bezahlt".
+ *
+ * The receipt shows as one file card, not as pages, because the server sends a PDF as a download
+ * only.
  */
 @Component({
   selector: 'app-invoice-form',

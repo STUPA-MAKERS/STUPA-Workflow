@@ -465,7 +465,7 @@ def test_tree_without_permission_is_gremium_scoped(
     """
     import app.modules.admin.gremium_roles as gr
 
-    async def _members(session, sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(session, sub, now=None):
         return set()
 
     monkeypatch.setattr(gr, "gremium_member_ids", _members)

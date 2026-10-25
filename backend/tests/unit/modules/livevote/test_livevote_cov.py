@@ -106,7 +106,7 @@ def res(*rows: Any) -> _Result:
 
 
 class _Bind:
-    class dialect:  # noqa: D106
+    class dialect:
         name = "sqlite"
 
 
@@ -293,7 +293,7 @@ async def test_can_manage_admin_bypass_and_scope_cap() -> None:
 async def test_can_manage_via_gremium_permission(monkeypatch: pytest.MonkeyPatch) -> None:
     gid = uuid4()
 
-    async def _perms(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _perms(_s, _sub, _perm, now=None):
         return {gid}
 
     _patch_gids(monkeypatch, _perms)
@@ -329,7 +329,7 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     assert await svc.can_write(m, _admin()) is True
 
     # 2) No manage permission, but the principal is the protokollant.
-    async def _no_perm(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _no_perm(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _no_perm)
@@ -340,7 +340,7 @@ async def test_can_write_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     # 3) No manage permission and no protokollant, but a protocol.write role.
     gid = m.gremium_id
 
-    async def _write(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
+    async def _write(_s, _sub, perm, now=None):
         return {gid} if perm == "protocol.write" else set()
 
     _patch_gids(monkeypatch, _write)
@@ -354,7 +354,7 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.can_manage_votes(m, _admin()) is True
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -366,7 +366,7 @@ async def test_can_manage_votes_paths(monkeypatch: pytest.MonkeyPatch) -> None:
     # The vote.manage role branch.
     gid = m.gremium_id
 
-    async def _vm(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
+    async def _vm(_s, _sub, perm, now=None):
         return {gid} if perm == "vote.manage" else set()
 
     _patch_gids(monkeypatch, _vm)
@@ -390,7 +390,7 @@ async def test_can_vote_agent_token_is_false(monkeypatch: pytest.MonkeyPatch) ->
     """Voting stays human, so a scoped OAuth token never sees the flag."""
     m = _meeting()
 
-    async def _cast(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
+    async def _cast(_s, _sub, perm, now=None):
         return {m.gremium_id} if perm == "vote.cast" else set()
 
     _patch_gids(monkeypatch, _cast)
@@ -404,7 +404,7 @@ async def test_can_vote_via_role(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
     gid = m.gremium_id
 
-    async def _cast(_s, _sub, perm, now=None):  # noqa: ANN001, ANN202
+    async def _cast(_s, _sub, perm, now=None):
         return {gid} if perm == "vote.cast" else set()
 
     _patch_gids(monkeypatch, _cast)
@@ -415,7 +415,7 @@ async def test_can_vote_via_role(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_can_vote_via_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -427,7 +427,7 @@ async def test_can_vote_via_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_can_vote_denied(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -440,7 +440,7 @@ async def test_is_member_admin_and_member(monkeypatch: pytest.MonkeyPatch) -> No
     svc = MeetingService(_QueueSession())  # type: ignore[arg-type]
     assert await svc.is_member(gid, _principal(roles=["admin"])) is True
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {gid}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -452,7 +452,7 @@ async def test_is_member_admin_and_member(monkeypatch: pytest.MonkeyPatch) -> No
 async def test_is_participant_member(monkeypatch: pytest.MonkeyPatch) -> None:
     gid = uuid4()
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {gid}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -473,7 +473,7 @@ async def test_is_participant_view_all() -> None:
 async def test_is_participant_delegation(monkeypatch: pytest.MonkeyPatch) -> None:
     mid = uuid4()
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
@@ -504,7 +504,7 @@ async def test_visible_gremium_ids_member_union_pool(
 ) -> None:
     mg, pg = uuid4(), uuid4()
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {mg}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -808,7 +808,7 @@ async def test_list_with_gremium_filter_and_visibility(
 ) -> None:
     m = _meeting()
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {m.gremium_id}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -862,7 +862,7 @@ async def test_decorate_non_admin_protokollant_flag(
     m.protokollant_id = my
     from types import SimpleNamespace
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -899,7 +899,7 @@ async def test_list_filter_gremien_non_admin_visibility(
 ) -> None:
     g1 = uuid4()
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {g1}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -941,7 +941,7 @@ async def test_list_timeline_past_with_cursor_and_gremium(
     ts = datetime(2026, 6, 10, 9, 0)
     cursor = _encode_cursor(datetime(2026, 6, 16, 9, 0), uuid4())
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {m.gremium_id}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -1021,7 +1021,7 @@ async def test_search_timeline_pagination_and_gremium(
     m1, m2 = _meeting(), _meeting(gremium_id=None)
     m2.gremium_id = m1.gremium_id
 
-    async def _members(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _members(_s, _sub, now=None):
         return {m1.gremium_id}
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _members)
@@ -1052,7 +1052,7 @@ async def test_search_timeline_pagination_and_gremium(
 
 # service.py: create and _resolve_protokollant
 async def test_create_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -1097,7 +1097,7 @@ async def test_resolve_protokollant_not_found() -> None:
 async def test_resolve_protokollant_not_member(monkeypatch: pytest.MonkeyPatch) -> None:
     from types import SimpleNamespace
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(handover_mod, "gremium_member_ids", _none)
@@ -1112,10 +1112,10 @@ async def test_resolve_protokollant_needs_protocol_write(monkeypatch: pytest.Mon
 
     gid = uuid4()
 
-    async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _member(_s, _sub, now=None):
         return {gid}
 
-    async def _no_keepers(_s, _gid, now=None):  # noqa: ANN001, ANN202
+    async def _no_keepers(_s, _gid, now=None):
         return set()
 
     monkeypatch.setattr(handover_mod, "gremium_member_ids", _member)
@@ -1131,12 +1131,12 @@ async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 
     gid = uuid4()
 
-    async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _member(_s, _sub, now=None):
         return {gid}
 
     pid = uuid4()
 
-    async def _keepers(_s, _gid, now=None):  # noqa: ANN001, ANN202
+    async def _keepers(_s, _gid, now=None):
         return {pid}
 
     monkeypatch.setattr(handover_mod, "gremium_member_ids", _member)
@@ -1149,7 +1149,7 @@ async def test_resolve_protokollant_ok(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_patch_wants_manage_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -1163,10 +1163,10 @@ async def test_patch_wants_manage_forbidden(monkeypatch: pytest.MonkeyPatch) -> 
 async def test_patch_wants_write_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
-    async def _nomember(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _nomember(_s, _sub, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -1217,7 +1217,7 @@ async def test_patch_protokollant_finalized_conflict(
 ) -> None:
     m = _meeting()
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return True
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -1234,13 +1234,13 @@ async def test_patch_protokollant_resolved(monkeypatch: pytest.MonkeyPatch) -> N
     m = _meeting()
     new_pid = uuid4()
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return False
 
-    async def _member(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _member(_s, _sub, now=None):
         return {m.gremium_id}
 
-    async def _keepers(_s, _gid, now=None):  # noqa: ANN001, ANN202
+    async def _keepers(_s, _gid, now=None):
         return {new_pid}
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -1347,7 +1347,7 @@ async def test_patch_current_item_forbidden_without_the_minutes(
 ) -> None:
     m = _meeting(status="live")
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -1473,7 +1473,7 @@ async def test_agenda_item_has_vote_excludes_cancelled() -> None:
     svc = MeetingService(sess)  # type: ignore[arg-type]
     await svc.agenda_item_has_vote(uuid4())
     rendered = str(
-        sess.last_statement.compile(  # type: ignore[attr-defined]
+        sess.last_statement.compile(
             compile_kwargs={"literal_binds": True}
         )
     )
@@ -1505,7 +1505,7 @@ async def test_vote_eligible_count() -> None:
 async def test_assert_can_read_delegation_branch(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
@@ -2353,7 +2353,7 @@ class _FakeAgendaService:
     async def item(self, meeting_id: UUID, item_id: UUID) -> Any:
         return self.item_row
 
-    async def add(  # noqa: ANN001
+    async def add(
         self, meeting_id: UUID, application_id, title, non_public=False, *, actor
     ) -> list[Any]:
         self.calls.append("add")
@@ -2375,14 +2375,14 @@ class _FakeAgendaService:
         self.actors.append(actor)
         return []
 
-    async def set_body(  # noqa: ANN001
+    async def set_body(
         self, meeting_id, item_id, body=None, title=None, non_public=None, *, actor
     ) -> list[Any]:
         self.calls.append("set_body")
         self.actors.append(actor)
         return []
 
-    async def set_done(self, meeting_id, item_id, *, done, actor) -> list[Any]:  # noqa: ANN001
+    async def set_done(self, meeting_id, item_id, *, done, actor) -> list[Any]:
         self.calls.append(f"set_done:{done}")
         self.actors.append(actor)
         return []
@@ -2396,8 +2396,8 @@ class _FakeVotingService:
         self.deleted: list[Any] = []
         self._vote = SimpleNamespace(id=uuid4(), meeting_id=None)
 
-    async def create_internal(  # noqa: ANN201
-        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False, actor=None  # noqa: ANN001, E501
+    async def create_internal(
+        self, application_id, payload, *, meeting_id, agenda_item_id, planned_ok=False, actor=None
     ):
         self.created.append((application_id, meeting_id, agenda_item_id))
         self.actor = actor
@@ -2405,7 +2405,7 @@ class _FakeVotingService:
         self.last_payload = payload
         return self._vote
 
-    async def open(self, vote_id, *, now, actor=None, eligible_count=None):  # noqa: ANN001
+    async def open(self, vote_id, *, now, actor=None, eligible_count=None):
         self.opened_eligible = eligible_count
         from app.modules.voting.schemas import TallyOut, VoteOut
         from app.shared.config_schemas import VoteConfig
@@ -2418,12 +2418,12 @@ class _FakeVotingService:
             config=VoteConfig.model_validate(
                 {"options": ["yes", "no"], "majorityRule": "simple"}
             ),
-            status="open",  # type: ignore[arg-type]
+            status="open",
             secret=False,
             tally=TallyOut(counts={}, eligible=0, quorumMet=True),
         )
 
-    async def delete(self, vote_id, *, meeting_id, actor):  # noqa: ANN001
+    async def delete(self, vote_id, *, meeting_id, actor):
         self.deleted.append((vote_id, meeting_id, actor))
 
 
@@ -2784,7 +2784,7 @@ def test_set_agenda_body_passes_the_state_rules_to_the_service(
     async def _refuse(*_a: Any, **_kw: Any) -> list[Any]:
         raise ConflictError("not started", code="meeting_not_started")
 
-    fakes["agenda"].set_body = _refuse  # type: ignore[assignment]
+    fakes["agenda"].set_body = _refuse
     _login(app)
     r = client.patch(f"/api/meetings/{uuid4()}/agenda/{uuid4()}", json={"body": "x"})
     assert r.status_code == 409
@@ -2945,7 +2945,7 @@ def test_open_vote_application_already_has_vote_conflict(
     async def _has_vote(item_id: UUID) -> bool:
         return True
 
-    fakes["meeting"].agenda_item_has_vote = _has_vote  # type: ignore[assignment]
+    fakes["meeting"].agenda_item_has_vote = _has_vote
     _login(app)
     r = client.post(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
@@ -2964,7 +2964,7 @@ def test_open_vote_application_not_in_vote_state_conflict(
     async def _kind(application_id: UUID) -> str | None:
         return "normal"
 
-    fakes["meeting"].application_state_kind = _kind  # type: ignore[assignment]
+    fakes["meeting"].application_state_kind = _kind
     _login(app)
     r = client.post(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
@@ -2984,7 +2984,7 @@ def test_open_vote_stale_agenda_item_of_another_gremium_conflict(
     async def _other(application_id: UUID) -> UUID | None:
         return uuid4()
 
-    fakes["meeting"].application_vote_gremium = _other  # type: ignore[assignment]
+    fakes["meeting"].application_vote_gremium = _other
     _login(app)
     r = client.post(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
@@ -3007,7 +3007,7 @@ def test_open_vote_default_quorum_from_gremium(
     async def _quorum(gremium_id: UUID) -> int | None:
         return 60
 
-    fakes["meeting"].gremium_quorum_percent = _quorum  # type: ignore[assignment]
+    fakes["meeting"].gremium_quorum_percent = _quorum
     _login(app)
     r = client.post(
         f"/api/meetings/{uuid4()}/votes", json={"agendaItemId": str(uuid4())}
@@ -3103,7 +3103,7 @@ def test_open_prepared_guest_vote_counts_present_and_guests(
     async def _present(meeting_id: UUID) -> int:
         return 3
 
-    fakes["meeting"].present_member_count = _present  # type: ignore[attr-defined]
+    fakes["meeting"].present_member_count = _present
     _login(app)
     r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
     assert r.status_code == 200, r.text
@@ -3151,7 +3151,7 @@ def test_open_prepared_loose_guest_vote_ok(app: FastAPI, client: TestClient, fak
     async def _present(meeting_id: UUID) -> int:
         return 0
 
-    fakes["meeting"].present_member_count = _present  # type: ignore[attr-defined]
+    fakes["meeting"].present_member_count = _present
     _login(app)
     assert client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open").status_code == 200
 
@@ -3165,7 +3165,7 @@ def test_open_prepared_vote_application_left_vote_state(
     async def _kind(application_id: UUID) -> str | None:
         return "normal"
 
-    fakes["meeting"].application_state_kind = _kind  # type: ignore[assignment]
+    fakes["meeting"].application_state_kind = _kind
     _login(app)
     r = client.post(f"/api/meetings/{out.id}/votes/{vote_id}/open")
     assert r.status_code == 409
@@ -3280,7 +3280,7 @@ class _AuthMeetings:
         self.last = _meeting_out()
         return self.last
 
-    async def is_participant(self, meeting_id, gremium_id, principal) -> bool:  # noqa: ANN001
+    async def is_participant(self, meeting_id, gremium_id, principal) -> bool:
         return self._participant
 
 
@@ -3468,7 +3468,7 @@ async def test_broker_publisher_all_events() -> None:
         meetingId=mid,
         eligibleGroup="g",
         config=cfg,
-        status="open",  # type: ignore[arg-type]
+        status="open",
         secret=False,
         tally=TallyOut(counts={"yes": 1}, eligible=2, quorumMet=True, leading="yes"),
     )
@@ -3510,7 +3510,7 @@ async def test_broker_publisher_skips_unbound_votes() -> None:
         meetingId=None,
         eligibleGroup="g",
         config=cfg,
-        status="open",  # type: ignore[arg-type]
+        status="open",
         secret=False,
         tally=TallyOut(counts={}, eligible=0, quorumMet=True),
     )
@@ -3539,7 +3539,7 @@ async def test_assert_can_read_visible_returns() -> None:
 async def test_assert_can_read_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, now=None):
         return set()
 
     monkeypatch.setattr(permissions_mod, "gremium_member_ids", _none)
@@ -3600,7 +3600,7 @@ async def test_list_timeline_upcoming_with_cursor() -> None:
 async def test_delete_forbidden(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
     _patch_gids(monkeypatch, _none)
@@ -3614,7 +3614,7 @@ async def test_delete_finalized_requires_permission(
 ) -> None:
     m = _meeting(status="closed")
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return True
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -3638,7 +3638,7 @@ async def test_delete_ok_audits(monkeypatch: pytest.MonkeyPatch) -> None:
     m = _meeting()
     calls: list[dict[str, Any]] = []
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return False
 
     async def _record(session: Any, **kw: Any) -> None:
@@ -3667,14 +3667,14 @@ async def test_delete_deletes_the_votes_and_audits_their_ids(
     calls: list[dict[str, Any]] = []
     order: list[str] = []
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return False
 
     async def _record(session: Any, **kw: Any) -> None:
         order.append("audit")
         calls.append(kw)
 
-    async def _delete_votes(self, meeting_id, *, actor):  # noqa: ANN001, ANN202
+    async def _delete_votes(self, meeting_id, *, actor):
         assert (meeting_id, actor) == (m.id, "mgr")
         order.append("votes")
         return vote_ids
@@ -3717,7 +3717,7 @@ async def test_write_delete_names_the_reason_and_does_not_commit(
 async def test_check_deletable_writes_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
     """The check runs the refusal rules only; it returns whether the protocol is final."""
 
-    async def _final(self, _mid):  # noqa: ANN001, ANN202
+    async def _final(self, _mid):
         return True
 
     monkeypatch.setattr(MeetingService, "_protocol_final", _final)
@@ -3733,10 +3733,10 @@ async def test_delete_forbidden_deletes_no_vote(monkeypatch: pytest.MonkeyPatch)
 
     m = _meeting()
 
-    async def _none(_s, _sub, _perm, now=None):  # noqa: ANN001, ANN202
+    async def _none(_s, _sub, _perm, now=None):
         return set()
 
-    async def _delete_votes(self, meeting_id, *, actor):  # noqa: ANN001, ANN202
+    async def _delete_votes(self, meeting_id, *, actor):
         raise AssertionError("no vote may be deleted")
 
     _patch_gids(monkeypatch, _none)

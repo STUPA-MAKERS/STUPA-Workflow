@@ -75,7 +75,7 @@ import type {
   ChatSend,
   ChatVisibility,
 } from './chat.models';
-import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, linkify, newCount } from './chat.util';
+import { CHAT_MAX_FILES, buildItems, chatFileUrl, dayKey, isPending, newCount } from './chat.util';
 
 /** The log counts as "at the newest message" this close to its end, in px. */
 const BOTTOM_SLACK = 24;
@@ -119,11 +119,12 @@ function pad(n: number): string {
 @Pipe({ name: 'chatBody', standalone: true })
 export class ChatBodyPipe implements PipeTransform {
   private readonly sanitizer = inject(DomSanitizer);
+  /**
+   * The result holds no markup of the author, because `markdownToSafeHtml` escapes the whole input
+   * before it writes any tag, and `highlightMentions` only wraps escaped text.
+   */
   transform(body: string, mentions?: readonly PersonRef[] | null): SafeHtml {
-    // `markdownToSafeHtml` escapes the whole input before it writes any tag, and
-    // `linkify` and `highlightMentions` only wrap escaped text, so the result holds no
-    // markup of the author.
-    const html = linkify(markdownToSafeHtml(body));
+    const html = markdownToSafeHtml(body);
     const names = (mentions ?? []).flatMap((p) => (p.displayName ? [p.displayName] : []));
     return this.sanitizer.bypassSecurityTrustHtml(highlightMentions(html, names));
   }
@@ -373,6 +374,10 @@ export class ChatComponent {
   private scanStep = 0;
   private scanTimer: ReturnType<typeof setTimeout> | null = null;
 
+  /**
+   * The files of another thread never go into this one, nor do its running uploads; the same thread
+   * in a re-created chat keeps them.
+   */
   constructor() {
     effect(() => {
       const key = this.draftKey();
@@ -384,13 +389,10 @@ export class ChatComponent {
         this.stick = true;
         this.atBottom.set(true);
         this.editingId.set(null);
-        // The files of another thread never go into this one, nor do its running uploads.
-        // The same thread in a re-created chat keeps them.
         if (this.thread.key !== key && (this.drafts.files().length || this.drafts.busy())) {
           void this.drafts.discard();
         }
         this.thread.key = key;
-        // A new thread starts on the default visibility (public first), never on the last one.
         this.visibility.set(this.visibilityOptions()[0] ?? null);
       });
     });
@@ -398,7 +400,6 @@ export class ChatComponent {
       const people = this.composerPeople();
       untracked(() => {
         this.composerMentions.setPeople(people);
-        // A switch to public closes an open list.
         if (!people.length) this.composerMentions.close();
       });
     });
@@ -496,7 +497,6 @@ export class ChatComponent {
     const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
     if (dayKey(date) === dayKey(today)) return this.i18n.translate('chat.today');
     if (dayKey(date) === dayKey(yesterday)) return this.i18n.translate('chat.yesterday');
-    // "Do, 08.10.": the weekday without its abbreviation dot, as everywhere in the app.
     const locale = this.i18n.formatLocale();
     const weekday = new Intl.DateTimeFormat(locale, { weekday: 'short' }).format(date).replace(/\.$/, '');
     const opts: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit' };
@@ -653,9 +653,7 @@ export class ChatComponent {
       }));
     }
     this.send.emit(req);
-    // The message owns the files now: the next one starts a new draft.
     this.drafts.clear();
-    // The chosen visibility stays for the next message of the thread.
     this.onDraft('');
     this.scrollToEnd();
   }
@@ -846,11 +844,12 @@ export class ChatComponent {
   /**
    * "Bearbeiten" on a failed message: its text goes back into the composer, ahead of a
    * draft typed since, and the failed message leaves the thread.
+   *
+   * The resend keeps the visibility the message had, not the one the composer shows now.
    */
   protected editFailed(msg: ChatMessage): void {
     const draft = this.draft().trim();
     this.onDraft(draft ? `${msg.body}\n\n${draft}` : msg.body);
-    // The resend keeps the visibility the message had, not the one the composer shows now.
     if (msg.visibility && this.segmentOptions().some((o) => o.value === msg.visibility)) {
       this.visibility.set(msg.visibility);
     }
@@ -929,14 +928,13 @@ export class ChatComponent {
     this.saveEdit();
   }
 
+  /** Without a mention list the chat knows no names, so the mentions of the message stay. */
   protected saveEdit(event?: Event): void {
     event?.preventDefault();
     const id = this.editingId();
     const body = this.editDraft().trim();
     if (id === null || !body) return;
     const msg = this.messages().find((m) => m.id === id);
-    // Without a list the chat knows no names, so the mentions of the message stay. A
-    // stored mention of a person who left the list stays while the text still names them.
     const listed = this.editPeople();
     const known = new Set(listed.map((p) => p.principalId));
     const people = listed.length

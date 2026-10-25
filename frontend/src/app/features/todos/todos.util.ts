@@ -363,7 +363,6 @@ export function applyMove<B extends TileBoard>(board: B, cardId: Uuid, move: Tod
     at = rest.findIndex((c) => c.id === move.beforeId);
   }
   if (at < 0) {
-    // The end of the column: after its last card, else where the column order puts it.
     const last = rest.map((c) => c.columnId).lastIndexOf(move.columnId);
     at = last >= 0 ? last + 1 : rest.length;
   }

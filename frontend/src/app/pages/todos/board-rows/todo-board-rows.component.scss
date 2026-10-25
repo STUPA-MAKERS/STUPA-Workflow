@@ -149,7 +149,6 @@
 }
 .br__doneIcon {
   flex: none;
-  /* The done mark ends the column head, as the done tag on the board. */
   margin-inline-start: auto;
   align-self: center;
   color: var(--color-on-selected);

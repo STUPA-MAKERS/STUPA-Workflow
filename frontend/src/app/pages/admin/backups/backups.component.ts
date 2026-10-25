@@ -57,6 +57,10 @@ const POLL_TIMEOUT_MS = 30 * 60 * 1000;
  * a restore needs the confirmation word typed in its own dialog, and a pinned archive
  * has to be unpinned before it can be deleted. Retention keeps the newest archives; a
  * pinned archive and a copy taken before a restore do not count.
+ *
+ * A disabled import shows its reason, because a dead control with no reason reads as a broken page:
+ * an import decrypts the archive to verify it and needs the private key, which the API does not
+ * have here.
  */
 @Component({
   selector: 'app-admin-backups',
@@ -314,6 +318,10 @@ export class BackupsComponent implements OnDestroy {
     () => this.restoreConfirmText().trim().toUpperCase() === 'RESTORE',
   );
 
+  /**
+   * The restore replaces the session table, so this session dies with it. The page says so rather
+   * than letting the next request fail with an unexplained 401.
+   */
   protected doRestore(): void {
     const row = this.confirmRestore();
     if (!row || !this.restoreArmed()) return;
@@ -322,8 +330,6 @@ export class BackupsComponent implements OnDestroy {
       next: () => {
         this.confirmRestore.set(null);
         this.busy.set(false);
-        // The restore replaces the session table, so this session dies with it. Say so
-        // rather than letting the next request fail with an unexplained 401.
         this.toast.show(
           this.i18n.translate('admin.backups.toast.restoreStarted'),
           'warning',

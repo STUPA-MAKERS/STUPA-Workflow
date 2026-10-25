@@ -64,7 +64,7 @@ describe('meetings-display.util', () => {
     expect(variants).not.toContain('accent');
   });
 
-  it('gives a member only the labels "Anwesend" and "Abwesend" (Z2)', () => {
+  it('gives a member only the labels "Anwesend" and "Abwesend"', () => {
     expect(memberAttendanceKey('present')).toBe('meetings.attendance.selfPresent');
     expect(memberAttendanceKey('excused')).toBe('meetings.attendance.selfExcused');
     expect(memberAttendanceKey('absent')).toBe('meetings.attendance.selfExcused');
@@ -146,7 +146,7 @@ describe('meetings-display.util', () => {
       expect(meetingTimeText({ ...base, startTime: null }, 'de')).toEqual({ text: '', since: false });
     });
 
-    it('shows a live meeting as "since" its real start (O9)', () => {
+    it('shows a live meeting as "since" its real start', () => {
       const live = { ...base, status: 'live', startedAt: at(18, 4) } as Meeting;
       expect(meetingTimeText(live, 'de')).toEqual({ text: '18:04', since: true });
       // Started before the real start was stored: the planned start.

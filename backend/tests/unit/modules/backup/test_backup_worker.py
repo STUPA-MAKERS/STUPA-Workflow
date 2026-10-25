@@ -28,14 +28,14 @@ from worker import backup as task
 BACKUP_ID = uuid4()
 # The real service factory. The autouse fixture below replaces `task._service`, so the
 # reference is taken at import time.
-_REAL_SERVICE = task._service  # noqa: SLF001
+_REAL_SERVICE = task._service
 CREATED_AT = datetime(2026, 9, 1, 22, 5, 0, tzinfo=UTC)
 
 
 def _row(backup_id: UUID = BACKUP_ID, **kw: object) -> Backup:
     # The model defaults apply at flush, and a double never flushes for real.
     defaults: dict[str, object] = {"kind": "manual", "status": "pending", "pinned": False}
-    row = Backup(**{**defaults, **kw})  # type: ignore[arg-type]
+    row = Backup(**{**defaults, **kw})
     row.id = backup_id
     row.created_at = CREATED_AT
     return row
@@ -148,7 +148,7 @@ class _FakeArchives:
 
     async def get_file(self, key: str, path: str) -> None:
         self.fetched.append(key)
-        with open(path, "wb") as handle:  # noqa: PTH123 — a plain temp path from the task
+        with open(path, "wb") as handle:  # a plain temp path from the task
             handle.write(b"cipher")
 
 
@@ -474,7 +474,7 @@ async def test_on_startup_puts_the_settings_and_both_storages_in_the_context() -
 
 @pytest.mark.asyncio
 async def test_dispose_engine_tolerates_a_sessionmaker_without_an_engine() -> None:
-    await task._dispose_engine({"backup_sessionmaker": object()})  # noqa: SLF001
+    await task._dispose_engine({"backup_sessionmaker": object()})
 
 
 def test_the_service_factory_wires_the_context_storages() -> None:

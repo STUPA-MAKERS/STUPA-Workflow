@@ -41,7 +41,6 @@
         @for (p of permissions; track p) {
           <span class="rm__colPerm" role="columnheader">
             <span class="rm__colLabel">{{ permLabel(p) | t }}</span>
-            <!-- The key may break after its dot, never inside a word. -->
             <span class="mono rm__colKey">{{ keyHead(p) }}.<wbr />{{ keyTail(p) }}</span>
           </span>
         }

@@ -50,7 +50,7 @@ describe('voteSnippet', () => {
     expect(snip.startsWith('> [!abstimmung] **Soll X gefördert werden?**')).toBe(true);
   });
 
-  it('names the round in the head of a runoff (F2)', () => {
+  it('names the round in the head of a runoff', () => {
     const election = vote({ kind: 'election', question: 'Vorsitz', counts: null } as Partial<MeetingVote>);
     expect(voteSnippetHead(election)).toBe('> [!abstimmung] **Vorsitz**');
     expect(voteSnippetHead({ ...election, round: 2 } as MeetingVote)).toBe(
@@ -119,7 +119,7 @@ describe('renderMarkdown', () => {
     expect(bad).not.toContain('href');
   });
 
-  it('rejects a link whose URL contains a double-quote (no attribute break-out, AUD-064)', () => {
+  it('rejects a link whose URL contains a double-quote (no attribute break-out)', () => {
     const out = renderMarkdown('[x](https://e"x=)');
     // A URL that carries a quote must never become an href attribute. The Markdown link
     // stays text; the autolink stops before the escaped quote.

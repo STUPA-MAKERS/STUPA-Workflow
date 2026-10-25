@@ -271,7 +271,7 @@ class RedisReplayGuard:
             stored = await self._client.set(  # type: ignore[attr-defined]
                 f"{self._prefix}{key}", "1", nx=True, ex=ttl_seconds
             )
-        except Exception as exc:  # noqa: BLE001 - Redis down -> process-local fallback
+        except Exception as exc:  # Redis down -> process-local fallback
             logging.getLogger("app.altcha").warning(
                 "altcha replay store unavailable, falling back to per-worker guard: %s",
                 exc,

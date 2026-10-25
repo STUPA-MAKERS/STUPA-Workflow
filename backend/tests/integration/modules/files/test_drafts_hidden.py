@@ -125,7 +125,7 @@ async def test_item_routes_answer_404_for_a_draft_even_for_an_admin(
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
+        object_storage: ObjectStorage = storage
         return FilesService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files
@@ -150,7 +150,7 @@ async def test_service_paths_ignore_a_draft(
     app_id = await _app(maker)
     draft_id = await _clean_draft(maker, settings, storage)
     async with maker() as session:
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         assert await files.list_for_application(app_id) == []
         app = await session.get(Application, app_id)
         assert app is not None
@@ -190,7 +190,7 @@ async def test_a_bound_attachment_is_still_visible(
         )
         session.add(bound)
         await session.commit()
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         listed = await files.list_for_application(app_id)
         assert [a.id for a in listed] == [bound.id]
         app = await session.get(Application, app_id)
@@ -225,7 +225,7 @@ async def test_a_comment_file_is_no_application_attachment(
         )
         session.add(row)
         await session.commit()
-        files = FilesService(session, storage=storage, settings=settings)  # pyright: ignore[reportArgumentType]
+        files = FilesService(session, storage=storage, settings=settings)
         assert row.id not in {a.id for a in await files.list_for_application(app_id)}
         app = await session.get(Application, app_id)
         assert app is not None
@@ -235,7 +235,7 @@ async def test_a_comment_file_is_no_application_attachment(
     api = build_api(migrated[1], settings, monkeypatch)
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        object_storage: ObjectStorage = storage  # pyright: ignore[reportAssignmentType]
+        object_storage: ObjectStorage = storage
         return FilesService(session, storage=object_storage, settings=request_settings)
 
     api.dependency_overrides[get_files_service] = _files

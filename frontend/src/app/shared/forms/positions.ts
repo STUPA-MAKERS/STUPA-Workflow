@@ -6,7 +6,7 @@
  * position. A position can opt out of comparison offers (`noOffers`) with a reason; it
  * then needs exactly one offer. The total of all positions goes into `amount`.
  *
- * Comparison offers stay tagged attachments (O5): an offer has no file reference.
+ * Comparison offers stay tagged attachments: an offer has no file reference.
  */
 
 /** One offer of a position. */

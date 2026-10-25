@@ -716,7 +716,7 @@ class ProtocolService:
             except ServiceUnavailableError:
                 await self.session.rollback()
                 result.transient += 1
-            except Exception:  # noqa: BLE001 - one bad protocol must not stop the job
+            except Exception:  # one bad protocol must not stop the job
                 logger.exception("public backfill failed (protocol=%s)", protocol_id)
                 await self.session.rollback()
                 await self._count_render_failure(protocol_id)

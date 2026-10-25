@@ -98,7 +98,7 @@ async def test_assign_from_field_runs_once_per_idempotency_key(
         transition_id=uuid4(),
         status_event_id=uuid4(),
     )
-    dispatcher = FlowExtrasActionDispatcher(_maker(session))  # type: ignore[arg-type]
+    dispatcher = FlowExtrasActionDispatcher(_maker(session))
 
     await dispatcher.dispatch(actions)
     assert app.budget_id == node_id

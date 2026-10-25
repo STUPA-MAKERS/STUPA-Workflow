@@ -121,12 +121,12 @@ export class OAuthConsentComponent {
     this.submit(false, []);
   }
 
+  /** It goes back to the local loopback callback of the MCP client; the URL can carry error=…. */
   private submit(approve: boolean, scopes: string[]): void {
     this.submitting.set(true);
     this.error.set(null);
     this.api.submitConsent({ approve, scopes, lifetime: this.lifetime() }).subscribe({
       next: (r) => {
-        // Go back to the local loopback callback of the MCP client. The URL can carry error=…
         this.location.assign(r.redirect);
       },
       error: () => {

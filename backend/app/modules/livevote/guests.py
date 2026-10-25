@@ -247,7 +247,7 @@ class GuestService:
                     admitted=admitted,
                     pending=pending,
                 )
-        except Exception:  # noqa: BLE001 - the broadcast is best effort
+        except Exception:  # the broadcast is best effort
             logger.warning("guest broadcast failed (meeting=%s)", meeting_id)
 
     async def _audit(
@@ -876,7 +876,7 @@ class GuestService:
         if self.publisher is not None:
             try:
                 await self.publisher.vote_tally(await voting.get(vote_id))
-            except Exception:  # noqa: BLE001 - the broadcast is best effort
+            except Exception:  # the broadcast is best effort
                 logger.warning("vote_tally broadcast failed (vote=%s)", vote_id)
         return accepted
 

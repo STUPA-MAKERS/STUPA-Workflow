@@ -41,7 +41,7 @@ def load_config(pyproject: Path) -> tuple[list[str], float]:
 
 def parse_classes(coverage_xml: Path) -> list[ClassCoverage]:
     """Read every <class> entry of coverage.xml with its file name and branch rate."""
-    root = ElementTree.parse(coverage_xml).getroot()  # noqa: S314 — our own artifact
+    root = ElementTree.parse(coverage_xml).getroot()  # our own artifact
     result: list[ClassCoverage] = []
     for cls in root.iter("class"):
         filename = cls.get("filename", "")

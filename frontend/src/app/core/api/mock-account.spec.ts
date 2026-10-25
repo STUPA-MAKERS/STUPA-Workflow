@@ -7,7 +7,7 @@ import { mockAccount } from './mock-account';
 import { mockApiInterceptor } from './mock-api.interceptor';
 import type { ConsentRequest, McpSetup, NotificationPreference, OAuthGrant } from './models';
 
-describe('mockAccount (FE13 demo data)', () => {
+describe('mockAccount (demo data)', () => {
   afterEach(() => localStorage.removeItem('mockNoMcp'));
 
   it('serves the switches of the server catalogue and stores a PUT', () => {

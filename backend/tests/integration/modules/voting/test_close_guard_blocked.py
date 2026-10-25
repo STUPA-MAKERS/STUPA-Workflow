@@ -57,7 +57,7 @@ class _CommitCounter:
 
 
 async def _assert_blocked(
-    session: AsyncSession, vote_id, app_id, voting_state, branch: str, reason: str  # noqa: ANN001
+    session: AsyncSession, vote_id, app_id, voting_state, branch: str, reason: str
 ) -> None:
     vote = await session.get(Vote, vote_id)
     assert vote is not None

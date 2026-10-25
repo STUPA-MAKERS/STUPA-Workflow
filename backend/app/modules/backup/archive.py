@@ -146,7 +146,7 @@ def identity_from_str(value: str) -> x25519.Identity:
             continue
         try:
             return x25519.Identity.from_str(stripped)
-        except Exception:  # noqa: S112 — a comment line is not a key, try the next
+        except Exception:  # a comment line is not a key, try the next
             continue
     raise ArchiveError("the age identity file holds no usable private key")
 

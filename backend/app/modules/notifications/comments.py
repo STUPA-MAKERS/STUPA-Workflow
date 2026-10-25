@@ -270,9 +270,9 @@ async def send_comment_notifications(
         return 0
 
     idem = ("comment", str(comment_id), template_key)
-    tpl = await service._get_template_by_key(template_key)  # noqa: SLF001
+    tpl = await service._get_template_by_key(template_key)
     if tpl is not None:
-        ok = await service._render_and_enqueue(  # noqa: SLF001
+        ok = await service._render_and_enqueue(
             tpl,
             recipients,
             context=context,
@@ -298,7 +298,7 @@ async def send_comment_notifications(
         to=tuple(recipients),
         subject=rendered.subject,
         text=append_link_text(rendered.text, link.url, link.label(rendered.lang)),
-        html=service._layout_html(rendered, "comment", link),  # noqa: SLF001
+        html=service._layout_html(rendered, "comment", link),
         idempotency_key=compute_idempotency_key(*idem),
     )
-    return int(await service._enqueue(msg))  # noqa: SLF001
+    return int(await service._enqueue(msg))

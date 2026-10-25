@@ -37,6 +37,6 @@ def wire_storage(app: FastAPI, storage: MemoryStorage) -> None:
     """Serve the attachment routes from ``storage``."""
 
     def _files(session: DbSession, request_settings: SettingsDep) -> FilesService:
-        return FilesService(session, storage=storage, settings=request_settings)  # pyright: ignore[reportArgumentType]
+        return FilesService(session, storage=storage, settings=request_settings)
 
     app.dependency_overrides[get_files_service] = _files

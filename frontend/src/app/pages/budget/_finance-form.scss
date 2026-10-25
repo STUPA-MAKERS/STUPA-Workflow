@@ -29,7 +29,6 @@
   background: var(--color-surface-1);
 }
 .ff--sheet {
-  /* The fields sit on the sheet (surface 2): one step up, so they stand out from it. */
   @include sc.raised-fields($muted-label: false);
 }
 

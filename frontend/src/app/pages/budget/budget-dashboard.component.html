@@ -2,10 +2,6 @@
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
   <app-note kind="error" icon="alert" role="alert" retryable (retry)="load()">{{ 'budget.error' | t }}</app-note>
 } @else if (loading()) {
-  <!-- Never the empty state while loading. "There are no cost centres" and "they have
-       not arrived yet" are different claims, and the first one is false during every
-       load. The placeholder holds the shape of the layout, the two columns of the wide
-       layout included, so the page does not jump when the data arrives. -->
   <div class="bd" [class.bd--wide]="wide()" aria-busy="true">
     <section class="bd__pane" aria-hidden="true">
       <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
@@ -20,9 +16,6 @@
   </div>
 } @else if (emptyReason() === 'noFiscalYear') {
   <h1 class="bd__title">{{ 'nav.budget' | t }}</h1>
-  <!-- Cost centres exist; the fiscal year does not. "Nothing is created yet" names the
-       wrong cause here, so this branch names the fiscal year and links the page that
-       creates one. -->
   <div class="bd__empty">
     <app-empty-state plain icon="cal"
       fill
@@ -68,7 +61,6 @@
             <app-icon name="down" [size]="15" />
           </button>
           <ng-container *ngTemplateOutlet="yearChip" />
-          <!-- The page reaches the overview without the picker, as on the wide layout. -->
           <button
             type="button"
             class="chip"
@@ -82,25 +74,18 @@
       </div>
     }
 
-    <!-- Not a `<main>`: the shell already wraps the routed page in one. -->
     <article
       class="bd__sheet bd__main"
       [attr.aria-labelledby]="wide() ? 'bd-title' : null"
       [attr.aria-label]="wide() ? null : pathLabel()"
     >
-      <!-- Wide: the shared bar of every detail sheet stays on top. The breadcrumb of the
-           cost centre is its kicker, the actions sit at its end on the same axis. -->
       @if (wide()) {
         <app-sheet-bar class="bd__bar">
           <app-budget-crumbs appSheetBarKicker [nodes]="breadcrumbs()" (pick)="selectKs($event)" />
           <ng-container *ngTemplateOutlet="actions" />
         </app-sheet-bar>
       }
-      <!-- The wide layout scrolls the sheet inside itself, with a fade at an end only where
-           more content is. The card keeps its background; only the content fades. -->
       <div class="bd__sheetBody" appScrollFade="y">
-        <!-- Narrower layouts name the path in the chip above and put the actions beside the
-             page title, so the sheet starts with the figures. -->
         @if (wide()) {
           <h2 id="bd-title" class="bd__name ell" [title]="current()?.name ?? ''">
             {{ current()?.name }}
@@ -118,8 +103,6 @@
           }
         </dl>
 
-        <!-- A cost centre without sub cost centres has nothing to distribute: the chart
-             would be one ring of its own amount, so only the utilisation shows. -->
         <div class="bd__cols" [class.bd__cols--single]="!hasChildren()">
           @if (hasChildren()) {
             <section class="bd__sec" aria-labelledby="bd-dist">
@@ -155,9 +138,6 @@
             </div>
             <ul class="bd__usage">
               @for (row of usageRows(); track row.node.id) {
-                <!-- Each bar has the colour of its cost centre, so a shared legend cannot match it.
-                     The tooltip of the row and the label of the bar name the amounts instead.
-                     The bar is only 6px high, so the whole row carries the tooltip. -->
                 <li class="bd__urow" [style.--color-accent]="row.color" [title]="usageLabel(row)">
                   <div class="bd__uline">
                     <div class="bd__ucell">
@@ -168,8 +148,6 @@
                         [disabled]="row.node.id === selectedKsId()"
                         (click)="drillInto(row.node)"
                       >{{ row.node.name }}</button>
-                      <!-- A phone has no room for the "Beantragt" column, so the amount goes
-                           below the name there. CSS shows exactly one of the two. -->
                       <span class="bd__ureq">
                         {{ 'budget.dash.fig.requested' | t }}:
                         <span class="mono">{{ row.figures.requested ? moneyShort(row.figures.requested, row.node.currency) : '—' }}</span>
@@ -234,8 +212,6 @@
     </article>
   </div>
 
-  <!-- Below the wide layout: the shared side sheet, from the start or on a phone from the
-       bottom. The search stays in place and only the tree scrolls. -->
   @if (!wide()) {
     <app-side-sheet
       [side]="phone() ? 'bottom' : 'start'"
@@ -247,15 +223,8 @@
     </app-side-sheet>
   }
 
-  <!-- The pane: year, overview, search and the cost-centre tree. The wide layout shows it
-       beside the sheet; a narrower one shows the search and the tree in the side sheet.
-       The chips and the search stay in place; only the tree scrolls, with a fade at an
-       end where more rows are. -->
   <ng-template #treePane>
     <div class="bd__paneBody" [class.bd__paneBody--side]="!wide()">
-      <!-- Wide: the search and then the chips under the title, as in every list column.
-           Below the wide layout the year and the overview chips sit on the page, beside
-           the path chip, so the side sheet holds only the search and the tree. -->
       <app-search-pill [size]="wide() ? 'lg' : 'md'" [placeholder]="'budget.dash.search' | t" [(value)]="query" />
       @if (wide()) {
         <div class="bd__chips">
@@ -321,8 +290,6 @@
     </div>
   </ng-template>
 
-  <!-- A phone has no room for two buttons beside the title, so the actions go into a
-       "more" menu there. -->
   <ng-template #actions>
     @if (phone()) {
       @if (actionSections()[0].items.length) {
@@ -353,7 +320,6 @@
     />
   </ng-template>
 
-  <!-- The sunburst covers the whole subtree of the selected cost centre. -->
   <app-dialog
     [open]="overviewOpen()"
     [title]="'budget.overview.title' | t"

@@ -26,7 +26,6 @@ export function applyRawFormat(raw: RawText, format: MarkdownFormat): RawText {
 
 function toggleMark({ text, start, end }: RawText, mark: string): RawText {
   const n = mark.length;
-  // The stars on both sides: two are bold, one is italic, three are both.
   const stars = Math.min(starsBefore(text, start), starsAfter(text, end));
   const has = n === 2 ? stars >= 2 : stars % 2 === 1;
   if (has) {

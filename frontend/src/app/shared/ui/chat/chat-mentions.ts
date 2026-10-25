@@ -193,9 +193,9 @@ export class MentionPicker {
     return `${this.listId}-${i}`;
   }
 
+  /** "@Name " after a whole name is a finished mention, not a search for a longer name. */
   update(text: string, caret: number): void {
     const found = this.people().length ? mentionQuery(text, caret) : null;
-    // "@Name " after a whole name is a finished mention, not a search for a longer name.
     const done = found !== null && /\s$/.test(found.query) && this.isName(found.query.trim());
     const s = done ? null : found;
     if (s === null || s.start !== this.dismissedAt) this.dismissedAt = null;

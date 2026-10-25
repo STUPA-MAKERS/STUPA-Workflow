@@ -1,3 +1,4 @@
+import { linkify } from '@shared/markdown/linkify';
 import type { ChatMessage } from './chat.models';
 import {
   appendOnce,
@@ -5,7 +6,6 @@ import {
   chatFileUrl,
   dayKey,
   isPending,
-  linkify,
   newCount,
   toChatAttachments,
   withScanStates,

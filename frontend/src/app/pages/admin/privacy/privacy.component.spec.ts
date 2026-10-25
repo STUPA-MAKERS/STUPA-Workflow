@@ -266,7 +266,7 @@ describe('PrivacyComponent', () => {
     expect(screen.getByRole('button', { name: 'Konto löschen' })).toBeDisabled();
   });
 
-  it('picks the person by name or e-mail, never by a raw id (D1)', async () => {
+  it('picks the person by name or e-mail, never by a raw id', async () => {
     jest.useFakeTimers({ advanceTimers: true });
     const { api, fixture } = await setup();
     expect(screen.queryByLabelText(/UUID/)).toBeNull();
@@ -289,7 +289,7 @@ describe('PrivacyComponent', () => {
     jest.useRealTimers();
   });
 
-  it('shows the sub as a tooltip only for a nameless person (D7)', async () => {
+  it('shows the sub as a tooltip only for a nameless person', async () => {
     const { fixture } = await setup();
     const cmp = fixture.componentInstance as unknown as { pickPerson: (p: AdminPrincipal) => void };
     cmp.pickPerson(ANNA);

@@ -118,7 +118,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
   });
 
-  it('lets the lead set the four states, "Offen" as a reset (O15)', async () => {
+  it('lets the lead set the four states, "Offen" as a reset', async () => {
     const { statusChange, reset } = await setup();
     const mika = row('Mika Mitglied');
     const radios = within(mika).getAllByRole('radio');
@@ -168,7 +168,7 @@ describe('AttendanceSheetComponent', () => {
     expect(radio('Entschuldigt')).toHaveAttribute('tabindex', '0');
   });
 
-  it('counts an excuse and an absence as one "abwesend" for a member (Z2)', async () => {
+  it('counts an excuse and an absence as one "abwesend" for a member', async () => {
     await setup({ meeting: meeting({ canControl: false }) });
     const counts = [...(sheet().querySelectorAll('.as__counts > span') as NodeListOf<HTMLElement>)];
     expect(counts.map((c) => c.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
@@ -189,7 +189,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getByText('(du)')).toBeInTheDocument();
   });
 
-  it('gives a member only the own row, as present or absent (Z2)', async () => {
+  it('gives a member only the own row, as present or absent', async () => {
     const { statusChange } = await setup({ meeting: meeting({ canControl: false }) });
     const own = row('Pia Protokoll');
     expect(within(own).getAllByRole('radio').map((r) => r.textContent?.trim())).toEqual(['Anwesend', 'Abwesend']);
@@ -210,7 +210,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(own).getAllByRole('radio').every((r) => r.getAttribute('aria-checked') === 'false')).toBe(true);
   });
 
-  it('gives the open own row the tab stop on "Abwesend" while a delegation blocks "Anwesend" (O23)', async () => {
+  it('gives the open own row the tab stop on "Abwesend" while a delegation blocks "Anwesend"', async () => {
     const roster: Attendance[] = [{ ...ROSTER[0], status: null, source: null }, ...ROSTER.slice(1)];
     await setup(
       { meeting: meeting({ canControl: false }), attendance: roster },
@@ -221,7 +221,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(own).getByRole('radio', { name: 'Abwesend' })).toHaveAttribute('tabindex', '0');
   });
 
-  it('locks the own row of a member once the lead set it (O15)', async () => {
+  it('locks the own row of a member once the lead set it', async () => {
     const roster: Attendance[] = [{ ...ROSTER[0], source: 'lead', status: 'excused' }];
     await setup({ meeting: meeting({ canControl: false }), attendance: roster });
     expect(within(sheet()).queryByRole('radiogroup')).toBeNull();
@@ -275,7 +275,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).queryByRole('textbox', { name: 'Grund' })).toBeNull();
   });
 
-  it('blocks "present" for a member with a delegation and revokes it (O23, O6)', async () => {
+  it('blocks "present" for a member with a delegation and revokes it', async () => {
     const { http, fixture } = await setup({}, [delegation()]);
     const jonas = row('Vera Vertretung');
     const present = within(jonas).getByRole('radio', { name: 'Anwesend' });
@@ -488,7 +488,7 @@ describe('AttendanceSheetComponent', () => {
     expect(within(sheet()).getByRole('searchbox', { name: 'Mitglied suchen' })).toHaveValue('');
   });
 
-  describe('O6: the lead enters a substitute from the pool', () => {
+  describe('The lead enters a substitute from the pool', () => {
     const menu = (name: string) => within(sheet()).queryByRole('button', { name: `Aktionen für ${name}` });
 
     it('offers the entry for a missing member without a delegation', async () => {

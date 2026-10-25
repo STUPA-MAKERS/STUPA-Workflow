@@ -123,14 +123,14 @@ class ApiClient:
             try:
                 body = resp.json()
                 message = body.get("detail") or body.get("title") or message
-            except Exception:  # noqa: BLE001
+            except Exception:
                 pass
             raise ApiError(resp.status_code, message)
         if resp.status_code == 204 or not resp.content:
             return {"status": "ok"}
         try:
             return resp.json()
-        except Exception:  # noqa: BLE001
+        except Exception:
             return {"raw": resp.text}
 
     async def get(self, path: str, **kw: Any) -> Any:

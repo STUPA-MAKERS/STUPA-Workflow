@@ -58,7 +58,8 @@ npx playwright test             # E2E against the compose stack
 The jobs start in parallel, as a flat fan-out, not one after another. The required jobs
 are `be-lint`, `be-typecheck`, `be-unit`, `be-integration`, `be-contract` (Schemathesis),
 `fe-unit`, `coverage-gate`, `image-build-smoke` (main pushes only), `typst`, `mcp`
-(ruff and pytest of the MCP server) and `compose`. `e2e` (Playwright against the compose stack), `restore-smoke` and
+(ruff, basedpyright and pytest of the MCP server), `admin-cli` (ruff and basedpyright
+of the admin CLI) and `compose`. `e2e` (Playwright against the compose stack), `restore-smoke` and
 `real-stack-smoke` stay opt-in. A label, a manual run or a repo variable starts them. A
 red pull request stays blocked.
 

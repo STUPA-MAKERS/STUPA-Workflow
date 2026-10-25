@@ -186,9 +186,11 @@ export class GremiumDetailComponent {
     return [{ items }];
   });
 
+  /**
+   * On a phone the tabs beside the active one render too, because a swipe shows them before they
+   * are active.
+   */
   constructor() {
-    // The tab of the URL opens and stays rendered; a new gremium starts afresh. On a
-    // phone the tabs beside it open too, because a swipe shows them before they are active.
     let shownId: string | null = null;
     effect(() => {
       const id = this.id();
@@ -205,7 +207,6 @@ export class GremiumDetailComponent {
       if (open.some((t) => !seen.has(t))) this.visited.set(new Set([...seen, ...open]));
     });
 
-    // The breadcrumb names the gremium, not the page.
     const frame = inject(PageFrameService);
     effect(() => {
       const g = this.gremium();

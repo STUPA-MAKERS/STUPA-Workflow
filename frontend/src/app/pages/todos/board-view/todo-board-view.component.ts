@@ -225,10 +225,9 @@ export class TodoBoardViewComponent {
     return { from: cols[kb.fromCol].id, over: cols[kb.col].id };
   }
 
+  /** A pointer drag computes its move from the shown lists, so a held card goes back first. */
   onDragStart(col: TodoColumn): void {
-    // The card lifts (after the long press on a touch screen): a short pulse says so.
     haptic('lift');
-    // A pointer drag computes its move from the shown lists, so a held card goes back first.
     this.cancelKeyDrag();
     this.ptr.set({ from: col.id, over: col.id });
   }
@@ -300,7 +299,6 @@ export class TodoBoardViewComponent {
     const target = this.list(col).filter((c) => c.id !== cardId);
     const held = this.board().cards.find((c) => c.id === cardId);
     if (!held) {
-      // A card of another board: the page moves it over.
       this.dropIn.emit({ cardId, move: dropMove(target, event.currentIndex, toCol) });
       return;
     }

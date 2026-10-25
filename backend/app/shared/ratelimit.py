@@ -117,6 +117,6 @@ class RedisRateLimiter:
                 )
                 return RateLimitResult(allowed=False, retry_after=max(1, retry_after))
             return RateLimitResult(allowed=True, retry_after=0)
-        except Exception as exc:  # noqa: BLE001 - fail-open: availability over throttling
+        except Exception as exc:  # fail-open: availability over throttling
             logger.warning("rate-limit backend unavailable, allowing request: %s", exc)
             return RateLimitResult(allowed=True, retry_after=0)

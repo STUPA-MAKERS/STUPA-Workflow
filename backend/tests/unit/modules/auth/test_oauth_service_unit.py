@@ -24,7 +24,7 @@ async def test_exchange_code_expired_rejected() -> None:
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.exchange_code(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             code="c",
             code_verifier="v",
             redirect_uri="r",
@@ -58,7 +58,7 @@ async def test_exchange_code_atomic_claim_lost_rejected(
     db = fake_session(result(row), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.exchange_code(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             code="c",
             code_verifier="v",
             redirect_uri="r",
@@ -89,7 +89,7 @@ async def test_refresh_tokens_atomic_rotate_lost_rejected() -> None:
     db = fake_session(result(row), result(principal), result())
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             refresh_token="rt",
             client_id="mcp",
             now=NOW,
@@ -105,7 +105,7 @@ async def test_refresh_tokens_client_mismatch_rejected() -> None:
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             refresh_token="rt",
             client_id="mcp",
             now=NOW,
@@ -122,7 +122,7 @@ async def test_refresh_tokens_expired_rejected() -> None:
     db = fake_session(result(row))
     with pytest.raises(oauth.OAuthError) as exc:
         await oauth_service.refresh_tokens(
-            db,  # pyright: ignore[reportArgumentType]
+            db,
             refresh_token="rt",
             client_id="mcp",
             now=NOW,

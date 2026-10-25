@@ -27,13 +27,15 @@ export class PrefetchService {
   private readonly budgets = inject(BudgetTreeApi);
   private done = false;
 
+  /**
+   * Failure is silent on purpose: nothing waits on this, and the page that needs the tree asks
+   * again and reports its own error.
+   */
   constructor() {
     effect(() => {
       if (this.done || !this.auth.isAuthenticated()) return;
       if (!this.canSeeBudgets()) return;
       this.done = true;
-      // Failure is silent on purpose: nothing is waiting on this, and the page that
-      // really needs the tree asks for it again and reports its own error.
       this.budgets.tree().subscribe({ error: () => undefined });
     });
   }

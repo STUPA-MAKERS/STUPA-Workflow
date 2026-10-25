@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 _AMOUNT_TARGET = "amount"
 
 
-def _field_from_row(row: Any) -> FormFieldDef:  # noqa: ANN401 — form_field row
+def _field_from_row(row: Any) -> FormFieldDef:  # form_field row
     """Convert a `form_field` row to a `FormFieldDef`.
 
     The mapping uses camelCase input keys, as `forms.service` does.

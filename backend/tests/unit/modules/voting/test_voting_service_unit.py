@@ -433,11 +433,11 @@ class _FakeFlow:
     def __init__(self, session: object, dispatcher: object) -> None:
         self._available: list[TransitionOut] = _FakeFlow.available
 
-    async def available_transitions(self, application_id, principal):  # noqa: ANN001
+    async def available_transitions(self, application_id, principal):
         _FakeFlow.calls.append("called")
         return self._available
 
-    async def stage_branch(self, application_id, branch, principal, *, note=None, vote_id=None):  # noqa: ANN001
+    async def stage_branch(self, application_id, branch, principal, *, note=None, vote_id=None):
         _FakeFlow.branch_calls.append(branch)
         _FakeFlow.notes.append(note)
         _FakeFlow.vote_ids.append(vote_id)
@@ -447,7 +447,7 @@ class _FakeFlow:
             raise NotFoundError(f"no '{branch}' transition")
         return SimpleNamespace(transition=SimpleNamespace(id=_FakeFlow.branch.id))
 
-    async def after_commit(self, staged):  # noqa: ANN001
+    async def after_commit(self, staged):
         _FakeFlow.after.append(True)
         return TransitionResult(
             newStateId=_FakeFlow.new_state, statusEventId=uuid4(), dispatchedActions=[]

@@ -1,12 +1,8 @@
 @if (loading()) {
-  <!-- The loaded sheet with bars in place of the text: the same header, columns and
-       sections, so nothing moves when the application arrives. The sheet itself and the
-       fixed headings show at once, the bars after 300ms (`skel-in`). -->
   <article class="ad ad--busy" [class.ad--split]="split()" aria-busy="true">
     <header class="sheet-head ad__head" aria-hidden="true">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle class="sheet-title ad__title skel-in"><span class="skel-text ad__skelTitle"></span></h2>
-        <!-- The action "Kommentare" and the menu. -->
         <span class="ad__skelIcon ad__skelComments skel-in"><span class="skel-box"></span></span>
         <span class="ad__skelIcon skel-in"><span class="skel-box"></span></span>
       </app-sheet-bar>
@@ -53,11 +49,8 @@
   </div>
 } @else if (app(); as application) {
   @if (editing()) {
-    <!-- Edit mode (board Anträge-Bearbeiten): the same sheet holds the form. -->
     <article class="ad ad--edit" [class.ad--split]="split()" aria-labelledby="ad-edit-title">
       <header class="ad__editBar">
-        <!-- A phone keeps the title and one action on the line: "Abbrechen" becomes the
-             close button at the start. -->
         @if (phone()) {
           <app-button
             variant="text"
@@ -76,7 +69,6 @@
         }
         <span class="ad__editFade" aria-hidden="true"></span>
       </header>
-      <!-- No form element: Enter in a field must not save the whole application. -->
       <div class="ad__edit fe-form">
         <formly-form [form]="editForm" [fields]="editFields()" [model]="editModel" (modelChange)="editDirty.set(true)" />
       </div>
@@ -85,9 +77,6 @@
       }
     </article>
   } @else {
-    <!-- C: another application is on its way. This one stays, dimmed and inert after
-         300ms, and the bar on top says the next one is loading. -->
-    <!-- A file dropped anywhere on the application becomes an attachment. -->
     <article
       class="ad"
       animate.enter="motion-fade-in"
@@ -110,7 +99,6 @@
       <header class="sheet-head ad__head">
         <app-sheet-bar [bleed]="split()">
           <h2 appSheetBarTitle id="ad-title" class="sheet-title ad__title">{{ title() }}</h2>
-          <!-- The comments open in a sheet over the page; the count waits for the thread. -->
           <app-button
             class="ad__commentsBtn"
             variant="text"
@@ -131,8 +119,6 @@
             }
           </app-button>
           @if (!phone()) {
-            <!-- Outside the edit right: `application.share` decides who may read the
-                 record, not who may edit it. -->
             @if (canShare()) {
               <app-button
                 variant="text"
@@ -149,8 +135,6 @@
                 (click)="startEdit(application)"
               ><app-icon name="edit" /></app-button>
             }
-            <!-- `application.archive` is its own right. No confirmation: the same button
-                 brings the application back. -->
             @if (canArchive()) {
               <app-button
                 variant="text"
@@ -170,8 +154,6 @@
           }
         </app-sheet-bar>
 
-        <!-- Every part draws its dot before it (CSS). The line clips the dot of the first
-             part on each line, so a dot shows only between two items, also after a wrap. -->
         <p class="sheet-line ad__line ad__seps">
           <span class="ad__parts">
             @if (application.state) {
@@ -183,7 +165,6 @@
               <span class="ad__part ell" [title]="type">{{ type }}</span>
             }
             @if (application.amount !== null) {
-              <!-- F1: the approved amount, the requested one struck through next to it. -->
               <span class="ad__part"><app-amount [amount]="amount(application)" [approved]="approvedAmount(application)" /></span>
             }
           </span>
@@ -206,13 +187,10 @@
             }
           </div>
         } @else if (canTransition() && transitionsLoading()) {
-          <!-- The buttons keep their place while the transitions load. -->
           <ng-container *ngTemplateOutlet="transitionsSkel" />
         }
 
         @if (application.archivedAt) {
-          <!-- An archived application looks like an active one, and someone arriving from a
-               link has no other way to know. -->
           <app-note class="ad__archived" icon="archive" role="status">
             {{ 'applications.detail.archivedNotice' | t: { at: (application.archivedAt | ldate) } }}
           </app-note>
@@ -232,8 +210,6 @@
           </div>
         </div>
       } @else {
-        <!-- Every page stays in the DOM, so the attachment count and the scroll of a list
-             survive a tab change; on a phone a swipe moves to the next page. -->
         <app-tab-pager
           class="ad__tabs"
           idPrefix="ad"
@@ -264,11 +240,6 @@
       }
     </article>
 
-    <!-- "Kommentare": the thread and the composer in a sheet over the page, from the end
-         on a wide screen and from the bottom on a phone. The chat fills the sheet: the
-         log scrolls inside and the composer stays at its foot. The chat exists only while
-         the sheet shows (open, or still sliding out): projected content lives even where
-         the sheet does not render it, and a hidden chat would mark the thread as seen. -->
     <app-side-sheet
       #commentsSheet
       [(open)]="commentsOpen"
@@ -300,7 +271,6 @@
   }
 }
 
-<!-- F1 "Beschluss": the decision on the application, hidden before one. -->
 <ng-template #decision let-application>
   @if (application.decision) {
     <app-decision-section
@@ -311,7 +281,6 @@
   }
 </ng-template>
 
-<!-- "Details": receipt, last change, applicant, cost centre. -->
 <ng-template #details let-application>
   <section class="ad__sec" aria-labelledby="ad-details">
     <h3 id="ad-details" class="sec ad__secTitle">{{ 'applications.detail.details' | t }}</h3>
@@ -345,8 +314,6 @@
           ? ('applications.detail.budgetWithYear' | t: { year: fiscalLabel(application.fiscalYearId) })
           : ('applications.budget.field' | t)"
       >
-        <!-- "Keine" only without a cost centre. A cost centre outside the tree of this
-             reader (or a tree that did not load) shows a dash, never "Keine". -->
         @if (!application.budgetId) {
           {{ 'applications.budget.none' | t }}
         } @else {
@@ -372,7 +339,6 @@
   <app-todo-linked-list kind="application" headingId="ad-todos" [targetId]="application.id" />
 </ng-template>
 
-<!-- The answers of the form by section (O19). -->
 <ng-template #answers let-application>
   @if (formLoading()) {
     <ng-container *ngTemplateOutlet="answersSkel" />
@@ -395,10 +361,8 @@
   />
 </ng-template>
 
-<!-- "Verlauf": the status changes and the versions with their changes, by day. -->
 <ng-template #history>
   <section id="ad-history" class="ad__sec" tabindex="-1" [attr.aria-labelledby]="split() ? 'ad-history-title' : null">
-    <!-- In a tab the tab names the section. -->
     @if (split()) {
       <h3 id="ad-history-title" class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
     }
@@ -490,9 +454,6 @@
   (done)="onAgendaDone()"
 />
 
-<!-- ---------------------------------------------------------------- loading shapes
-     Each one mirrors the section it stands for: the same heading, the same row group and
-     58px field rows. Fixed headings are real text; headings of the form are bars. -->
 <ng-template #transitionsSkel>
   <div class="ad__transitions skel-in" aria-hidden="true">
     <span class="skel-box ad__skelButton"></span>
@@ -553,7 +514,6 @@
 <ng-template #historySkel>
   <section class="ad__sec" aria-hidden="true">
     <h3 class="sec ad__secTitle">{{ 'applications.detail.tab.history' | t }}</h3>
-    <!-- The shape of one day of `app-history`: the date, then its entries. -->
     <div class="ad__skelDay skel-in">
       <p class="cap ad__skelDate"><span class="skel-text skel-text--muted"></span></p>
       <div class="rowgroup">

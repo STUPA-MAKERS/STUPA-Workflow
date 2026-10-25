@@ -177,8 +177,6 @@ export class MeetingDetailSheetComponent {
   readonly agendaRows = computed<AgendaRow[]>(() => {
     const agenda = this.data()?.agenda ?? [];
     const m = this.meeting();
-    // Only a stored tick marks an item as done ("TOP abhaken"), in any state of the
-    // meeting. Only a live meeting has a "now".
     const nowId = m.status === 'live' ? m.currentAgendaItemId : null;
     return agenda.map((item, index) => ({
       item,
@@ -226,7 +224,6 @@ export class MeetingDetailSheetComponent {
   });
 
   constructor() {
-    // Read the parts again when another meeting shows, not on each update of the same one.
     let shownId: string | null = null;
     effect(() => {
       const m = this.meeting();
@@ -264,7 +261,6 @@ export class MeetingDetailSheetComponent {
     const quiet = <T>(req: Observable<T>): Observable<T | null> =>
       req.pipe(catchError(() => of(null)));
     const reads = meetingSheetReads(this.api, this.delegationsApi, m);
-    // `combineLatest`: the parts the list read ahead paint at once, a newer answer again.
     combineLatest({
       agenda: quiet(reads.agenda),
       attendance: quiet(reads.attendance),

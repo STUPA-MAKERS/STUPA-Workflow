@@ -113,14 +113,13 @@ export class ShellComponent {
     return this.auth.isAuthenticated() ? 'rail' : 'public';
   });
 
+  /** The app initializer starts the same request, and `ensureLoaded` shares it. */
   constructor() {
-    // The app initializer starts the same request; `ensureLoaded` shares it.
     this.auth
       .ensureLoaded()
       .pipe(takeUntilDestroyed())
       .subscribe(() => this.sessionKnown.set(true));
 
-    // `wide`, `fab`, `footer` and `chrome` come from the route data. The deepest active route wins.
     this.router.events
       .pipe(
         filter((e) => e instanceof NavigationEnd),

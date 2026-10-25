@@ -298,9 +298,9 @@ describe('BudgetDashboardComponent', () => {
       const rows = view.c.treeRows() as { node: { id: string }; color: string; swatch: boolean }[];
       const row = (id: string) => rows.find((r) => r.node.id === id);
       expect(row('b-800')?.color).toBe('#0075bf');
-      // O19: the colour of the faculty above.
+      // The colour of the faculty above.
       expect(row('b-810')?.color).toBe('#0075bf');
-      // No colour of its own or above: the palette colour of its position (gaps D6).
+      // No colour of its own or above: the palette colour of its position.
       expect(row('b-vs')?.color).toBe(PALETTE[0]);
       expect(row('b-900')?.color).toBe(PALETTE[1]);
       expect(rows.map((r) => [r.node.id, r.swatch])).toEqual([

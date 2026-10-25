@@ -16,7 +16,7 @@ describe('LanguageSelectComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.removeItem('ap.locale'));
 
-  it('shows the code with a globe, and never a native select (D8)', async () => {
+  it('shows the code with a globe, and never a native select', async () => {
     await setup('code');
     expect(screen.getByRole('button', { name: 'Sprache: DE' })).toBeInTheDocument();
     expect(document.querySelector('select')).toBeNull();

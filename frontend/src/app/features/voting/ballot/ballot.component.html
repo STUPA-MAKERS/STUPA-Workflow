@@ -144,8 +144,6 @@
   </div>
 }
 
-<!-- The candidates of an election (F2). One seat: radio rows and a separate
-     "Enthaltung" row. Several seats: check boxes, the counter and "Ganz enthalten". -->
 <ng-template #cands let-row="row" let-cast="cast" let-label="label">
   @let busy = pending() !== null;
   @let multi = multiSeat();
@@ -215,7 +213,6 @@
 </ng-template>
 
 
-<!-- A date poll: one row per date with Ja, Vielleicht and Nein, three equal buttons. -->
 <ng-template #dates let-row="row" let-cast="cast" let-label="label">
   @let busy = pending() !== null;
   <div class="ballot__dates" role="group" [attr.aria-label]="label">

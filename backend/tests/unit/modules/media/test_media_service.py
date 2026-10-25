@@ -98,7 +98,7 @@ async def test_upload_scans_the_client_bytes_before_the_decode(
 async def test_upload_without_scanner_in_production_is_503() -> None:
     service = MediaService(
         MediaSession(),  # pyright: ignore[reportArgumentType]
-        storage=MediaStorage(),  # pyright: ignore[reportArgumentType]
+        storage=MediaStorage(),
         settings=load_settings(environment="production"),
     )
     with pytest.raises(ServiceUnavailableError, match="Virus scan"):

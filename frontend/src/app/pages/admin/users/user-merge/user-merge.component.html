@@ -35,7 +35,6 @@
                   @if (c.email) {
                     <span sub class="mono">{{ c.email }}</span>
                   }
-                  <!-- Wide: a column at the end. Narrow: a line below the e-mail. -->
                   <span sub class="um__hitLogin um__hitLogin--sub">
                     {{ 'admin.users.col.lastLogin' | t }}:
                     {{ c.lastLogin ? (c.lastLogin | ldate: 'mediumDate') : ('admin.users.never' | t) }}
@@ -65,7 +64,6 @@
             <span>{{ previewError() | t }}</span>
           </app-note>
         } @else {
-          <!-- From the old account into the account that stays. -->
           <div class="um__pair">
             <div class="um__card">
               <span class="um__cardLbl">{{ 'admin.users.merge.from' | t }}</span>

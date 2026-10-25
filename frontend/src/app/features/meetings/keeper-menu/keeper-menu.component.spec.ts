@@ -15,7 +15,7 @@ async function setup(m: Meeting, attendance: Attendance[] = ATTENDANCE, inSheet 
 }
 
 describe('KeeperMenuComponent', () => {
-  it('lists the members with protocol.write, the current one marked (O20)', async () => {
+  it('lists the members with protocol.write, the current one marked', async () => {
     const { pick } = await setup(meeting(), WITH_VOTER);
     expect(screen.getByText('Protokollführung übergeben an')).toBeInTheDocument();
     expect(screen.queryByText('Vera Votum')).toBeNull();

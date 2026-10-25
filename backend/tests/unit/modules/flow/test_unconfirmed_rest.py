@@ -44,25 +44,25 @@ async def test_load_app_hides_unconfirmed_from_routes() -> None:
     app = _app(confirmed=False)
     svc = FlowService(fake_session(result(app)))
     with pytest.raises(NotFoundError):
-        await svc._load_app(app.id, allow_unconfirmed=False)  # noqa: SLF001
+        await svc._load_app(app.id, allow_unconfirmed=False)
 
 
 async def test_load_app_keeps_unconfirmed_for_internal_callers() -> None:
     app = _app(confirmed=False)
     svc = FlowService(fake_session(result(app)))
-    assert await svc._load_app(app.id) is app  # noqa: SLF001
+    assert await svc._load_app(app.id) is app
 
 
 async def test_load_app_returns_confirmed_to_routes() -> None:
     app = _app(confirmed=True)
     svc = FlowService(fake_session(result(app)))
-    assert await svc._load_app(app.id, allow_unconfirmed=False) is app  # noqa: SLF001
+    assert await svc._load_app(app.id, allow_unconfirmed=False) is app
 
 
 async def test_load_app_missing_404() -> None:
     svc = FlowService(fake_session(result()))
     with pytest.raises(NotFoundError):
-        await svc._load_app(uuid4(), allow_unconfirmed=False)  # noqa: SLF001
+        await svc._load_app(uuid4(), allow_unconfirmed=False)
 
 
 @pytest.mark.parametrize(

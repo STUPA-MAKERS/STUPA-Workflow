@@ -10,8 +10,6 @@
     (scroll)="onScroll()"
   >
     @if (loading()) {
-      <!-- The thread is on its way: bubbles in place of the messages, never "Noch keine
-           Nachrichten", which would say there is nothing. -->
       <app-skeleton class="chat__skel skel-in" variant="bubbles" [count]="5" [label]="'chat.loading' | t" />
     } @else {
       @for (item of items(); track item.key) {
@@ -342,7 +340,6 @@
   }
 </app-file-viewer>
 
-<!-- The files of a message: under the bubble, and read-only under its edit (files stay as sent). -->
 <ng-template #msgFiles let-m>
   @if (m.attachments?.length) {
     <ul class="chat__files">
@@ -394,8 +391,6 @@
   }
 </ng-template>
 
-<!-- The "@" list of a text box: above the composer, below an edit. The text box keeps the
-     focus; the arrows, Enter and Tab work through it, a click takes a person. -->
 <ng-template #mentionList let-p let-below="below">
   @if (p.open()) {
     <ul

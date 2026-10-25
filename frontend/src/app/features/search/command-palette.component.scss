@@ -207,13 +207,11 @@ app-status-text.pal__rowSub {
 }
 
 @include bp.phone {
-  /* Below the status bar of an installed iOS app (0 in a browser tab). */
   .pal {
     top: calc(var(--space-4) + var(--app-top-safe-area, 0px));
     max-height: calc(100dvh - 2 * var(--space-4) - var(--app-top-safe-area, 0px));
     border-radius: var(--radius-xl);
   }
-  /* The key hints are keyboard advice. */
   .pal__keys,
   .pal__enter {
     display: none;
@@ -231,10 +229,10 @@ app-status-text.pal__rowSub {
   pointer-events: none;
   animation: pal-fade var(--motion-xs) var(--ease-exit) reverse forwards;
 }
+/* The individual transform properties keep the centring transform of .pal. */
 @keyframes pal-in {
   from {
     opacity: 0;
-    /* The individual properties, so the centring transform of .pal stays. */
     translate: 0 calc(var(--motion-shift-sm) * -1);
     scale: var(--motion-scale-in);
   }

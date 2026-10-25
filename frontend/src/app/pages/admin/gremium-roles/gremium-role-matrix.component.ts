@@ -48,7 +48,7 @@ let nextId = 0;
  *
  * One row per role: the name, "Pflichtrolle" for a forced role, the OIDC groups that give
  * the role (from the gremium role mappings; for `member` the membership groups), one box
- * per right of the fixed catalogue (O7, "Protokoll freigeben" included) and the actions.
+ * per right of the fixed catalogue ("Protokoll freigeben" included) and the actions.
  * A box saves at once. In a narrow container the header goes away and the boxes become
  * chips with their names under the role.
  *
@@ -137,7 +137,6 @@ export class GremiumRoleMatrixComponent implements OnInit {
       },
     });
     if (this.canGroups()) {
-      // The group lines are extra information. A failed read leaves them out.
       this.api.listRoleMappings().subscribe({
         next: (m) => this.roleMappings.set(m.filter((x) => x.gremiumId === id)),
         error: () => this.roleMappings.set([]),
@@ -184,7 +183,11 @@ export class GremiumRoleMatrixComponent implements OnInit {
       .map((m) => m.oidcGroup);
   }
 
-  /** A box saves the new rights of its role at once; a failure puts the box back. */
+  /**
+   * A box saves the new rights of its role at once; a failure puts the box back.
+   *
+   * The box shows the old state again, also when the binding did not change.
+   */
   protected toggle(r: GremiumRole, p: string, event: Event): void {
     const box = event.target as HTMLInputElement;
     const on = box.checked;
@@ -204,7 +207,6 @@ export class GremiumRoleMatrixComponent implements OnInit {
       error: () => {
         this.done(r.id);
         this.replace({ ...r, permissions: before });
-        // The box shows the old state again, also when the binding did not change.
         box.checked = !on;
         this.toast.error(this.i18n.translate('admin.common.saveFailed'));
       },

@@ -48,7 +48,7 @@ AUDITS: list[dict[str, Any]] = []
 def _audit(monkeypatch: pytest.MonkeyPatch) -> None:
     AUDITS.clear()
 
-    async def _record(session: object, **kw: Any) -> None:  # noqa: ANN401
+    async def _record(session: object, **kw: Any) -> None:
         AUDITS.append(kw)
 
     monkeypatch.setattr(files_service, "audit_record", _record)
@@ -128,7 +128,7 @@ async def test_row_removed_before_the_audit_flush_is_skipped(
         async def rollback(self) -> None:
             self.rolled_back += 1
 
-    async def _stale(session: object, **kw: Any) -> None:  # noqa: ANN401
+    async def _stale(session: object, **kw: Any) -> None:
         raise StaleDataError("row is gone")
 
     monkeypatch.setattr(files_service, "audit_record", _stale)
