@@ -161,7 +161,7 @@ class LogPanel:
         """Return the number of log lines that fit above the input and the status."""
         try:
             rows = get_app().output.get_size().rows
-        except Exception:  # noqa: BLE001 — fall back when no app is running yet
+        except Exception:  # fall back when no app is running yet
             rows = 24
         buffer = self._context.buffer
         state = buffer.complete_state
@@ -173,7 +173,7 @@ class LogPanel:
     def _term_columns(self) -> int:
         try:
             return get_app().output.get_size().columns
-        except Exception:  # noqa: BLE001 — fall back when no app is running yet
+        except Exception:  # fall back when no app is running yet
             return 120
 
     def log_fragments(self) -> StyleAndTextTuples:
