@@ -52,9 +52,10 @@ describe('rounded sheet styles', () => {
     }
     expect(rule(meetingPage, '.mp__body--wide .mp__votes')).toMatch(/border-radius: var\(--radius-xl\);/);
     // Below wide the body is the one scroll area: its edges are the card edges, with their
-    // radius and the shared fade (rule is nested in the below-wide media query).
+    // radius, and they cut the cards without a fade (rule is nested in the below-wide
+    // media query).
     expect(meetingPage).toMatch(
-      /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);[^}]*@include fade\.fade-y/,
+      /\.mp__body:not\(\.mp__body--wide\) \{[^}]*margin-inline: var\(--space-3\);[^}]*padding-inline: 0;[^}]*border-radius: var\(--radius-xl\);[^}]*overscroll-behavior: contain;\n\s*\}/,
     );
     // The side column shares its scroll rule with the agenda; the radius is a rule of its own.
     expect(followView).toMatch(
