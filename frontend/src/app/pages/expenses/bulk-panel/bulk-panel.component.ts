@@ -104,11 +104,6 @@ export class BulkPanelComponent {
     this.rows().filter((r) => !!r.applicationId || !!r.parentExpenseId),
   );
 
-  protected readonly pickedCostCentre = computed(() => {
-    const id = this.budgetId();
-    return id ? costCentreLabel(this.costCentres(), id, null) : null;
-  });
-
   protected readonly canReassign = computed(
     () => !!this.budgetId() || !!this.category().trim(),
   );

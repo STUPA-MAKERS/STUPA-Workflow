@@ -254,7 +254,6 @@ export class FormEditorComponent {
       (this.typeChanged() || (this.savedForm() !== null && this.formSnapshot() !== this.savedForm())),
   );
 
-  protected readonly fieldTypes = FIELD_TYPES;
   protected readonly typeMenu = TYPE_MENU;
   protected readonly fieldTypeOptions: SelectOption[] = TYPE_MENU.map((t) => ({
     value: t,
