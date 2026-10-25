@@ -364,3 +364,19 @@
 .td__skelAdd .skel-text {
   width: 7rem;
 }
+
+/* Phone, one pane: the rule under the head and the line under the tabs run over the page
+   gutter (`.page-shell`, --space-4 on a phone) to the screen edges, as on the boards;
+   the head and the tabs keep their place. */
+@include bp.phone {
+  .td:not(.td--split) .td__head {
+    margin-inline: calc(-1 * var(--space-4));
+    padding-inline: var(--space-4);
+  }
+  .td:not(.td--split) .td__tabs {
+    margin-inline: calc(-1 * var(--space-4));
+  }
+  .td:not(.td--split) .td__tabs ::ng-deep .tabs {
+    padding-inline: var(--space-4);
+  }
+}

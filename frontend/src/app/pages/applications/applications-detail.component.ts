@@ -72,6 +72,7 @@ import {
   type TabItem,
   TabsComponent,
   ToastService,
+  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -143,6 +144,7 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SwipeTabsDirective,
     AmountComponent,
     DropOverlayComponent,
     FileDropDirective,

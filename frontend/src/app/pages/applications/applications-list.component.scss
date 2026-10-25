@@ -225,7 +225,7 @@
 @include bp.phone {
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .apps__chips {
-    @include lp.phone-chips(--apps-chip-fade);
+    @include lp.phone-chips;
   }
   .apps__month {
     padding-inline: var(--space-1);

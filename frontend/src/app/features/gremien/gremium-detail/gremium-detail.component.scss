@@ -143,4 +143,12 @@
   .gd__body {
     padding-top: var(--space-4);
   }
+  /* One pane at a time: the line under the tabs runs over the page gutter (`.page-shell`,
+     --space-4 on a phone) to the screen edges; the tabs keep their place. */
+  .gd:not(.gd--split) .gd__tabs {
+    margin-inline: calc(-1 * var(--space-4));
+  }
+  .gd:not(.gd--split) .gd__tabs ::ng-deep .tabs {
+    padding-inline: var(--space-4);
+  }
 }

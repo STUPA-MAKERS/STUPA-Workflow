@@ -28,6 +28,7 @@ import {
   SkeletonComponent,
   type TabItem,
   TabsComponent,
+  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
@@ -67,6 +68,7 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gd-host--split]': 'split()' },
   imports: [
+    SwipeTabsDirective,
     TranslatePipe,
     ButtonComponent,
     IconComponent,

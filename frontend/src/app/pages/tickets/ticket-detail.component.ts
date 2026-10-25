@@ -76,6 +76,7 @@ import {
   type TabItem,
   TabsComponent,
   ToastService,
+  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 import { browserLabel, viewportLabel } from '../../features/help/report-context';
 import { TodoLinkedListComponent } from '../../features/todos/linked-list/todo-linked-list.component';
@@ -184,6 +185,7 @@ export function fromMine(m: MyTicketDetail, reporter: TicketReporter): TicketDet
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SwipeTabsDirective,
     FormsModule,
     NgTemplateOutlet,
     RouterLink,

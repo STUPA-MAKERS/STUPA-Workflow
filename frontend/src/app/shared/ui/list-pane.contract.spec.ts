@@ -45,7 +45,7 @@ describe('the list pane pages', () => {
     }
   });
 
-  it('keeps the fades in one partial, for the rows and for the chips', () => {
+  it('keeps the fades in one partial, for the rows', () => {
     const kitFade = join(APP, '../../vendor/ui-kit/src/styles/_scroll-fade.scss');
     const fade = readFileSync(kitFade, 'utf8');
     expect(fade).toContain('@mixin fade-y($size');
@@ -54,6 +54,11 @@ describe('the list pane pages', () => {
     expect(existsSync(join(APP, 'shared/ui/_scroll-fade.scss'))).toBe(false);
     const pane = read('shared/ui/_list-pane.scss');
     expect(pane).toContain("@use 'scroll-fade' as fade;");
-    expect(pane).toContain('@include fade.fade-x(var(#{$fade}));');
+  });
+
+  it('cuts the phone chips at the screen edges, not with a fade', () => {
+    const pane = read('shared/ui/_list-pane.scss');
+    expect(pane).not.toContain('fade.fade-x');
+    expect(pane).toMatch(/@mixin phone-chips \{[^}]*margin-inline: calc\(-1 \* var\(--space-4\)\);/);
   });
 });

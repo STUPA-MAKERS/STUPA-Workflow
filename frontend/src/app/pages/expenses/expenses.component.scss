@@ -164,7 +164,7 @@
 @include bp.phone {
   /* One row of chips that scrolls sideways; an end fades while more chips lie past it. */
   .exp__chips {
-    @include lp.phone-chips(--exp-chip-fade);
+    @include lp.phone-chips;
   }
   /* A phone row gives the sub line more width, so a cost-centre name stays readable:
      less padding, a smaller gap to the amount and narrower dots. */

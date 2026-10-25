@@ -142,10 +142,7 @@
 
 @include bp.phone {
   .tk__chips {
-    @include lp.phone-chips(--tk-chip-fade, $fade-ends: false);
-  }
-  .tk__chips {
-    @include fade.fade-x(var(--tk-chip-fade), $both: false);
+    @include lp.phone-chips;
   }
   .tk__groupTitle {
     padding-inline: var(--space-1);

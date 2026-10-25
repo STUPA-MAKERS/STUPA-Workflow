@@ -72,7 +72,13 @@
       (activeChange)="selectTab($event)"
     />
 
-    <div class="gd__body" [class.gd__body--fill]="split() && tab() === 'anwesenheit'">
+    <div
+      class="gd__body"
+      [class.gd__body--fill]="split() && tab() === 'anwesenheit'"
+      [appSwipeTabs]="tabs()"
+      [appSwipeTabsActive]="tab()"
+      (appSwipeTabsActiveChange)="selectTab($event)"
+    >
       <section
         class="gd__panel"
         role="tabpanel"

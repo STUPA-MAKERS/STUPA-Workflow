@@ -48,6 +48,7 @@ import {
   StatusTextComponent,
   type TabItem,
   TabsComponent,
+  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
@@ -135,6 +136,7 @@ type Loaded<T> = T | null | undefined;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SwipeTabsDirective,
     NoteComponent,
     NgTemplateOutlet,
     RouterLink,

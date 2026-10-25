@@ -147,7 +147,13 @@
 </aside>
 
 <!-- The work list: one table, two tabs. -->
-<section class="dash__work" [attr.aria-label]="'dashboard.work.label' | t">
+<section
+  class="dash__work"
+  [attr.aria-label]="'dashboard.work.label' | t"
+  [appSwipeTabs]="tabs()"
+  [appSwipeTabsActive]="tab()"
+  (appSwipeTabsActiveChange)="setTab($event)"
+>
   <div class="dash__tabbar">
     <app-tabs
       #tabBar
