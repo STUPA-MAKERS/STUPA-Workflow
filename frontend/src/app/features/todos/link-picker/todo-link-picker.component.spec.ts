@@ -6,7 +6,7 @@ import { asPhone } from '../../../../testing/todo-fixtures';
 import { TodoLinkPickerComponent, linkKey } from './todo-link-picker.component';
 
 const HITS: TodoLinkTarget[] = [
-  { kind: 'application', targetId: 'a-1', title: 'Haushalt 2027', detail: null },
+  { kind: 'application', targetId: 'a-1', title: 'Haushalt 2027', detail: {} },
   { kind: 'meeting', targetId: 'm-1', title: 'Sondersitzung Haushalt', detail: { date: '2026-11-03' } },
   { kind: 'agenda_item', targetId: 't-1', title: 'TOP Haushalt', detail: { position: 2 } },
   { kind: 'todo', targetId: 'k-2', title: 'Haushalt Kapitel 3', detail: { boardName: 'StuPa' } },

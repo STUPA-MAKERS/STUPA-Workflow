@@ -20,6 +20,10 @@ function vote(overrides: Partial<MeetingVote> = {}): MeetingVote {
     counts: { yes: 12, no: 3, abstain: 1 },
     leading: 'yes',
     closesAt: null,
+    voted: 16,
+    present: 16,
+    revealed: true,
+    failedReason: null,
     ...overrides,
   };
 }

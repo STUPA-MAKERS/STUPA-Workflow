@@ -132,7 +132,7 @@ describe('GremiumMembersComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const members = jest.fn(() => throwError(() => new Error('x')));
+    const members = jest.fn((): ReturnType<GremienApiService['members']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ members }) });
     restore = view.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Mitglieder konnten nicht geladen werden.');

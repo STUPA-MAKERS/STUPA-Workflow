@@ -160,7 +160,7 @@ describe('GremienComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const overview = jest.fn(() => throwError(() => new Error('x')));
+    const overview = jest.fn((): ReturnType<GremienApiService['overview']> => throwError(() => new Error('x')));
     const s = await start('/gremien', { overview });
     restore = s.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Gremien konnten nicht geladen werden.');

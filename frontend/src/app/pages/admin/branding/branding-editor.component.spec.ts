@@ -58,7 +58,7 @@ const STUB_CFG: SiteConfig = { version: 3, branding: emptyBranding() };
 
 /** Each test gets a fresh branding, because the editor changes the object in place. */
 async function setupWithStub(
-  api: Partial<Record<keyof AdminApiService, unknown>>,
+  api: Partial<Record<keyof AdminApiService, jest.Mock>>,
   section: BrandingSection = 'branding',
 ) {
   const toast = { success: jest.fn(), error: jest.fn() };

@@ -14,7 +14,7 @@ const ITEM: ApplicationListItem = {
   id: 'app-1',
   typeId: 't1',
   title: 'Flyer für die Hochschulgruppen-Messe',
-  state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: null, editAllowed: true },
+  state: { id: 's1', key: 'submitted', label: 'Eingereicht', color: null, editAllowed: true, kind: 'normal' },
   gremiumId: null,
   amount: '480.00',
   currency: 'EUR',

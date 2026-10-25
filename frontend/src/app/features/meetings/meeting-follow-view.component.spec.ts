@@ -7,7 +7,7 @@ import {
 import { provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
 import userEvent from '@testing-library/user-event';
-import type { Delegation, MeetingDelegationContext } from '@core/api/delegations.service';
+import type { Delegation, MeetingDelegationContext, VoteDelegationStatus } from '@core/api/delegations.service';
 import type { AgendaItem, Attendance, Meeting, Vote } from '@core/api/models';
 import { MEDIA } from '@stupa-makers/ui-kit';
 import { AGENDA, DELEGATION_CONTEXT, item, matchMediaQueries, meeting, vote } from '../../../testing/meeting-fixtures';
@@ -107,7 +107,10 @@ async function setup(opts: Options = {}) {
     view.fixture.detectChanges();
   };
   /** Answer the reads of the vote card. */
-  const voteReads = (v: Vote, status = { blocked: false, delegatedToName: null, exercising: false, delegatedByName: null }) => {
+  const voteReads = (
+    v: Vote,
+    status: VoteDelegationStatus = { blocked: false, delegatedToName: null, exercising: false, delegatedByName: null },
+  ) => {
     http.match(`/api/votes/${v.id}`).forEach((r) => r.flush(v));
     http.match(`/api/delegations/votes/${v.id}/status`).forEach((r) => r.flush(status));
     view.fixture.detectChanges();

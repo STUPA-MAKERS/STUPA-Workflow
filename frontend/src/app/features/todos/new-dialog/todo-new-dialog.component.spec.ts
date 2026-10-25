@@ -142,13 +142,13 @@ describe('TodoNewDialogComponent', () => {
   it('adds a picked target, takes a linked one off and removes a chip', async () => {
     const { cmp, open, fixture } = await setup();
     open();
-    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: {} });
     fixture.detectChanges();
     expect(screen.getByText('Ticket · Login')).toBeInTheDocument();
     expect(cmp.linkedKeys().has('ticket:t-7')).toBe(true);
-    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: null });
+    cmp.pickLink({ kind: 'ticket', targetId: 't-7', title: 'Login', detail: {} });
     expect(cmp.links()).toEqual([]);
-    cmp.pickLink({ kind: 'todo', targetId: 'k-9', title: 'Andere', detail: null });
+    cmp.pickLink({ kind: 'todo', targetId: 'k-9', title: 'Andere', detail: {} });
     fixture.detectChanges();
     fireEvent.click(screen.getByRole('button', { name: 'Verknüpfung mit To-Do · Andere entfernen' }));
     expect(cmp.links()).toEqual([]);

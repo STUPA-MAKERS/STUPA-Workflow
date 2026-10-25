@@ -37,7 +37,7 @@ function fakeDrafts(files: DraftFile[] = [], pending: PendingUpload[] = []) {
     count: computed(() => usable().length),
     bytes: computed(() => usable().reduce((s, f) => s + f.size, 0)),
     filesOf: (key: string | null) => list().filter((f) => f.fieldKey === key),
-    upload: jest.fn(async (fs: File[]) => {
+    upload: jest.fn(async (fs: File[], _opts?: { fieldKey?: string | null }) => {
       const added = fs.map((f, i) => draft(`n${i}`, { filename: f.name }));
       list.update((l) => [...l, ...added]);
       return { uploaded: added, failed: [{ filename: 'bad.exe', reason: 'apply.files.error.type' }] };

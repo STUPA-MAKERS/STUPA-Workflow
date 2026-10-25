@@ -334,7 +334,7 @@ describe('DraftAttachmentsService', () => {
   });
 
   it('takes a lost file of another field only off the list, and ignores a failed delete', async () => {
-    const remove = jest.fn(() => throwError(() => httpError(500)));
+    const remove = jest.fn((_id: string) => throwError(() => httpError(500)));
     const { svc } = setup({ remove });
     await svc.upload([file('a.pdf'), file('b.pdf')], { fieldKey: 'receipt' });
     svc.markFailed({
@@ -399,7 +399,7 @@ describe('DraftAttachmentsService', () => {
   it('queues a second call behind the first, so both files share one draft token', async () => {
     const answers = [new Subject<DraftUpload>(), new Subject<DraftUpload>(), new Subject<DraftUpload>()];
     let n = 0;
-    const upload = jest.fn(() => answers[n++]);
+    const upload = jest.fn((_f: File, _o: { token?: string | null }) => answers[n++]);
     const land = (i: number, id: string) => {
       answers[i].next({ attachment: attachment(id), draftToken: 'tok', draftExpiresAt: '2999-01-01T00:00:00Z' });
       answers[i].complete();

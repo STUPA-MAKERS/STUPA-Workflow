@@ -133,7 +133,7 @@ describe('GremiumMeetingsComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const meetings = jest.fn(() => throwError(() => new Error('x')));
+    const meetings = jest.fn((): ReturnType<GremienApiService['meetings']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ meetings }) });
     restore = view.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Sitzungen konnten nicht geladen werden.');

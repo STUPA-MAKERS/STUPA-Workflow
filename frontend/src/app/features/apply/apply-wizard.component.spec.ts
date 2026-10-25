@@ -338,7 +338,7 @@ describe('ApplyWizardComponent', () => {
     sessionStorage.setItem(`${DRAFT_PREFIX}t9`, JSON.stringify({ v: 1, model: { title: 'Alt' } }));
     sessionStorage.setItem('ap.other', 'keep');
     const s = await setup({ form: PLAIN, loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     await pickType(s);
     s.comp.next();
     s.fixture.detectChanges();
@@ -421,7 +421,7 @@ describe('ApplyWizardComponent', () => {
 
   it('shows the account and the PII fields in the contact step of a signed-in user', async () => {
     const s = await setup({ loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     await pickType(s);
     expect(s.comp.stepKeys()).toHaveLength(4);
     expect(s.comp.steps()[2].hint).toBe('IBAN');
@@ -437,7 +437,7 @@ describe('ApplyWizardComponent', () => {
 
   it('falls back to the display name when the account has no e-mail', async () => {
     const s = await setup({ loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     const auth = s.fixture.debugElement.injector.get(
       (await import('@core/auth/auth.service')).AuthService,
     );
@@ -624,7 +624,7 @@ describe('ApplyWizardComponent', () => {
       throw new Error('blocked');
     });
     const s = await setup({ form: PLAIN, loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     await pickType(s);
     s.comp.next();
     s.comp.persistDraft();
@@ -747,7 +747,7 @@ describe('ApplyWizardComponent', () => {
 
   it('names a single part without a list and a type without a name', async () => {
     const s = await setup({ form: PLAIN, loggedIn: true });
-    await waitFor(() => expect(s.comp.loggedIn()).toBe(true));
+    await waitFor(() => expect(s.comp['loggedIn']()).toBe(true));
     s.comp.selectType('t1');
     expect(s.comp.steps()[1].hint).toBe('Antrag');
     s.comp.types.set([]);

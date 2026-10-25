@@ -12,7 +12,7 @@ import type {
   Role,
 } from '../admin.models';
 import { AdminApiService } from '../admin-api.service';
-import { GroupMappingsComponent } from './group-mappings.component';
+import { GroupMappingsComponent, type MappingKind } from './group-mappings.component';
 
 const GLOBAL: GroupMapping[] = [
   { id: 'm1', oidcGroup: 'stupa-vorstand', roleId: 'r1' },
@@ -67,6 +67,8 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
     ...over,
   };
 }
+
+type ApiMethod = keyof ReturnType<typeof makeApi>;
 
 function makeToast() {
   return { success: jest.fn(), error: jest.fn() };
@@ -357,7 +359,7 @@ describe('GroupMappingsComponent', () => {
     expect(api.createGroupMapping).not.toHaveBeenCalled();
   });
 
-  it.each([
+  it.each<[MappingKind, ApiMethod, ApiMethod, Record<string, string>]>([
     ['global', 'createGroupMapping', 'listGroupMappings', { roleId: 'r1' }],
     ['membership', 'createMembershipMapping', 'listMembershipMappings', { gremiumId: 'g1' }],
     ['role', 'createRoleMapping', 'listRoleMappings', { gremiumRoleId: 'gr1' }],
@@ -376,7 +378,7 @@ describe('GroupMappingsComponent', () => {
     expect(api[list]).toHaveBeenCalledTimes(2);
   });
 
-  it.each([
+  it.each<[MappingKind, string, ApiMethod, Record<string, string>]>([
     ['global', 'm1', 'updateGroupMapping', { oidcGroup: 'stupa-vorstand', roleId: 'r2' }],
     ['membership', 'mm1', 'updateMembershipMapping', { oidcGroup: 'stupa-mitglieder', gremiumId: 'g2' }],
     ['role', 'rm1', 'updateRoleMapping', { oidcGroup: 'stupa-praesidium', gremiumRoleId: 'gr2' }],
@@ -415,7 +417,7 @@ describe('GroupMappingsComponent', () => {
     expect(c.dialog()).toBeNull();
   });
 
-  it.each([
+  it.each<[MappingKind, string, ApiMethod, ApiMethod]>([
     ['global', 'm1', 'deleteGroupMapping', 'listGroupMappings'],
     ['membership', 'mm1', 'deleteMembershipMapping', 'listMembershipMappings'],
     ['role', 'rm1', 'deleteRoleMapping', 'listRoleMappings'],

@@ -1,6 +1,6 @@
 import { BehaviorSubject, of } from 'rxjs';
 import { provideHttpClient } from '@angular/common/http';
-import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { HttpTestingController, provideHttpClientTesting, type TestRequest } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap, provideRouter } from '@angular/router';
 import { render, screen, within } from '@testing-library/angular';
@@ -63,6 +63,8 @@ const EXPENSE: Expense = {
   category: 'Werbung',
   invoiceId: null,
   invoiceNumber: null,
+  parentExpenseId: null,
+  childCount: 0,
   createdAt: '2026-05-30T09:00:00Z',
 };
 
@@ -1551,7 +1553,7 @@ describe('ExpensesComponent (infinite scroll)', () => {
    * A visible sentinel makes loadMore fetch the second page; a hidden one runs no further request.
    */
   it('observes the sentinel and loads more when it intersects', async () => {
-    let trigger: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+    let trigger = null as ((entries: { isIntersecting: boolean }[]) => void) | null;
     const disconnect = jest.fn();
     const observe = jest.fn();
     class IOStub {
@@ -2356,7 +2358,7 @@ function transferPage(items: unknown[] = [TRANSFER], total = items.length) {
 /** Open the transfers tab and answer the first page. */
 async function openTransfers(
   ctx: Awaited<ReturnType<typeof setup>>,
-  body: unknown = transferPage(),
+  body: Parameters<TestRequest['flush']>[0] = transferPage(),
 ) {
   await userEvent.click(await screen.findByRole('radio', { name: 'Überträge' }));
   ctx.http.expectOne((r) => r.url.endsWith('/budget-transfers') && r.method === 'GET').flush(body);

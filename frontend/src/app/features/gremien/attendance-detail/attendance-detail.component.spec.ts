@@ -143,7 +143,7 @@ describe('AttendanceDetailComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const memberAttendanceFn = jest.fn(() => throwError(() => new Error('x')));
+    const memberAttendanceFn = jest.fn((): ReturnType<GremienApiService['memberAttendance']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ memberAttendance: memberAttendanceFn }) });
     restore = view.restore;
     await view.openWith(ONE);

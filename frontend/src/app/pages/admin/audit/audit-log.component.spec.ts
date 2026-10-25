@@ -840,7 +840,7 @@ describe('AuditLogComponent', () => {
   });
 
   it('observes the sentinel and loads more when it intersects', async () => {
-    let trigger: ((entries: { isIntersecting: boolean }[]) => void) | null = null;
+    let trigger = null as ((entries: { isIntersecting: boolean }[]) => void) | null;
     const disconnect = jest.fn();
     const observe = jest.fn();
     class IOStub {

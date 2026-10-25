@@ -197,7 +197,7 @@ describe('withScanStates and appendOnce', () => {
   });
 
   it('takes only the scan states of a read, keeps every message on screen and the same objects without a change', () => {
-    const plain = { id: 'm0', body: 'ohne' };
+    const plain: { id: string; body: string; attachments?: ReturnType<typeof file>[] } = { id: 'm0', body: 'ohne' };
     const same = { id: 'm1', body: 'a', attachments: [file('f1', 'clean')] };
     const scanning = { id: 'm2', body: 'neu', attachments: [file('f2', 'scanning'), file('f3', 'scanning')] };
     const delivered = { id: 'm3', body: 'nach dem Lesen', attachments: [file('f4', 'scanning')] };

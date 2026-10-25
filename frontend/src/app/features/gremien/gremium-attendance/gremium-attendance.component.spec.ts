@@ -193,7 +193,7 @@ describe('GremiumAttendanceComponent', () => {
   });
 
   it('reports a failed read and reads again', async () => {
-    const attendanceFn = jest.fn(() => throwError(() => new Error('x')));
+    const attendanceFn = jest.fn((): ReturnType<GremienApiService['attendance']> => throwError(() => new Error('x')));
     const view = await setup({ api: gremienApiMock({ attendance: attendanceFn }) });
     restore = view.restore;
     expect(screen.getByRole('alert')).toHaveTextContent('Die Anwesenheit konnte nicht geladen werden.');
