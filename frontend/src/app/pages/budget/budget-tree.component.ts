@@ -49,7 +49,8 @@ import { AdminApiService } from '../admin/admin-api.service';
 import { FabComponent } from '@shared/ui/fab/fab.component';
 import { PageHeaderComponent } from '@shared/ui/page-header/page-header.component';
 import { PALETTE, resolveNodeColors } from './budget-color.util';
-import { BudgetTreeApi, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { BudgetTreeApi, FISCAL_YEAR_CLOSED, type BudgetTreeNode, type FiscalYear } from './budget-tree.api';
+import { problemCode } from '@core/api/problem';
 import { formatMoney } from '@shared/format-money';
 
 /** A visible tree row: a node, its depth and whether it has children. */
@@ -224,6 +225,8 @@ export class BudgetTreeComponent {
   readonly fyDelete = signal<FiscalYear | null>(null);
   /** Translated reason why the delete was refused (409), else `null`. */
   readonly fyDeleteBlocked = signal<string | null>(null);
+  /** The fiscal year to close, or to reopen when it is closed. */
+  readonly fyCloseTarget = signal<FiscalYear | null>(null);
 
   readonly selectedTop = computed<BudgetTreeNode | null>(
     () => this.tree().find((n) => n.id === this.selectedTopId()) ?? null,
@@ -253,15 +256,16 @@ export class BudgetTreeComponent {
     return this.i18n.translate('budget.tree.topChip', { name: t.name, key: t.key, cutoff: this.cutoffLabel() });
   });
 
-  /** The fiscal years as segments, newest first; an inactive year says so. */
+  /** The fiscal years as segments, newest first; an inactive or a closed year says so. */
   readonly fyOptions = computed<SegmentedOption[]>(() =>
     [...this.fiscalYears()]
       .sort((a, b) => b.year - a.year)
       .map((fy) => ({
         value: fy.id,
-        label: fy.active
-          ? this.i18n.translate('budget.tree.fyChip', { year: fy.display })
-          : this.i18n.translate('budget.tree.fyChipInactive', { year: fy.display }),
+        label: this.i18n.translate(
+          fy.closedAt ? 'budget.tree.fyChipClosed' : fy.active ? 'budget.tree.fyChip' : 'budget.tree.fyChipInactive',
+          { year: fy.display },
+        ),
       })),
   );
 
@@ -456,7 +460,11 @@ export class BudgetTreeComponent {
             id: 'limit',
             label: t('budget.tree.setLimit'),
             icon: 'euro',
-            disabledReason: this.selectedFyId() ? null : t('budget.tree.noFy'),
+            disabledReason: !this.selectedFyId()
+              ? t('budget.tree.noFy')
+              : this.selectedFyClosed()
+                ? t('budget.fy.closedError')
+                : null,
           },
           { id: 'child', label: t('budget.tree.addChild'), icon: 'plus' },
         ],
@@ -465,8 +473,9 @@ export class BudgetTreeComponent {
     ];
   });
 
-  /** The ⋮ menu of a fiscal year. The row itself opens the edit. */
-  readonly fyMenu = computed<RowMenuSection[]>(() => [
+  /** The ⋮ menu of an open fiscal year. The row itself opens the edit. */
+  private readonly fyMenuOpen = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'close', label: this.i18n.translate('budget.tree.fyClose'), icon: 'lock' }] },
     {
       items: [
         { id: 'delete', label: this.i18n.translate('budget.tree.fyDelete'), icon: 'trash', danger: true },
@@ -474,8 +483,29 @@ export class BudgetTreeComponent {
     },
   ]);
 
+  /** The ⋮ menu of a closed fiscal year: a closed year cannot be deleted. */
+  private readonly fyMenuClosed = computed<RowMenuSection[]>(() => [
+    { items: [{ id: 'reopen', label: this.i18n.translate('budget.tree.fyReopen'), icon: 'undo' }] },
+    {
+      items: [
+        {
+          id: 'delete',
+          label: this.i18n.translate('budget.tree.fyDelete'),
+          icon: 'trash',
+          danger: true,
+          disabledReason: this.i18n.translate('budget.fy.closedError'),
+        },
+      ],
+    },
+  ]);
+
+  fyMenu(fy: FiscalYear): RowMenuSection[] {
+    return fy.closedAt ? this.fyMenuClosed() : this.fyMenuOpen();
+  }
+
   onFyMenu(fy: FiscalYear, item: RowMenuItem): void {
     if (item.id === 'delete') this.askFyDelete(fy);
+    else this.askFyClose(fy);
   }
 
   onRowMenu(node: BudgetTreeNode, item: RowMenuItem): void {
@@ -840,14 +870,25 @@ export class BudgetTreeComponent {
         this.limitNode.set(null);
         this.reload();
       },
-      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+      error: (err: unknown) =>
+        this.toast.error(
+          this.i18n.translate(
+            problemCode(err) === FISCAL_YEAR_CLOSED ? 'budget.fy.closedError' : 'budget.tree.toast.failed',
+          ),
+        ),
     });
   }
 
-  /** The label of the selected fiscal year ("2026"), for the limit dialog. */
-  readonly selectedFyLabel = computed(
-    () => this.fiscalYears().find((fy) => fy.id === this.selectedFyId())?.display ?? '',
+  /** The selected fiscal year, or null. */
+  private readonly selectedFy = computed(
+    () => this.fiscalYears().find((fy) => fy.id === this.selectedFyId()) ?? null,
   );
+
+  /** The label of the selected fiscal year ("2026"), for the limit dialog. */
+  readonly selectedFyLabel = computed(() => this.selectedFy()?.display ?? '');
+
+  /** Whether the selected fiscal year is closed. Its limits are then frozen. */
+  readonly selectedFyClosed = computed(() => !!this.selectedFy()?.closedAt);
 
   // Fiscal years, which live inside the budget.
   patchFyYear(value: string): void {
@@ -918,6 +959,36 @@ export class BudgetTreeComponent {
             ),
           ),
       });
+  }
+
+  askFyClose(fy: FiscalYear): void {
+    this.fyOpen.set(false);
+    this.fyCloseTarget.set(fy);
+  }
+
+  closeFyClose(): void {
+    this.fyCloseTarget.set(null);
+    this.fyOpen.set(true);
+  }
+
+  /** Close the target year, or reopen it when it is closed. */
+  doFyClose(): void {
+    const fy = this.fyCloseTarget();
+    const top = this.selectedTopId();
+    if (!fy || !top) return;
+    const close = !fy.closedAt;
+    this.api.setFiscalYearClosed(top as Uuid, fy.id, close).subscribe({
+      next: () => {
+        this.toast.success(
+          this.i18n.translate(close ? 'budget.tree.toast.fyClosed' : 'budget.tree.toast.fyReopened', {
+            year: fy.display,
+          }),
+        );
+        this.closeFyClose();
+        this.loadFiscalYears(top);
+      },
+      error: () => this.toast.error(this.i18n.translate('budget.tree.toast.failed')),
+    });
   }
 
   askFyDelete(fy: FiscalYear): void {

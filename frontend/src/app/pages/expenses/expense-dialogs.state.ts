@@ -5,13 +5,14 @@ import { downloadBlob, liveSearch, type SelectOption, ToastService } from '@stup
 import type { Uuid } from '@core/api/models';
 import {
   BudgetTreeApi,
+  FISCAL_YEAR_CLOSED,
   type Expense,
   type ExpenseKind,
   type FiscalYear,
   type Invoice,
   type PaymentMethod,
 } from '../budget/budget-tree.api';
-import { problemDetail } from '@core/api/problem';
+import { problemCode, problemDetail } from '@core/api/problem';
 import { findTopBudgetNode } from '../budget/expense-display.util';
 import type { ExpensesListState } from './expenses-list.state';
 import type { ExpenseSubBookingsState } from './expense-sub-bookings.state';
@@ -193,7 +194,13 @@ export class ExpenseDialogsState {
   }
 
   private failureText(err: unknown): string {
+    if (problemCode(err) === FISCAL_YEAR_CLOSED) return this.i18n.translate('budget.fy.closedError');
     return problemDetail(err) || this.i18n.translate('expenses.toast.failed');
+  }
+
+  /** The generic failure text, or the closed-year text for 409 `fiscal_year_closed`. */
+  private failedText(err: unknown): string {
+    return this.i18n.translate(problemCode(err) === FISCAL_YEAR_CLOSED ? 'budget.fy.closedError' : 'expenses.toast.failed');
   }
 
   /**
@@ -307,9 +314,11 @@ export class ExpenseDialogsState {
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
         this.rememberTopYear(top.id, fys);
-        // Offer every fiscal year. An inactive one is allowed on purpose.
-        this.fiscalYearOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
-        const active = fys.filter((f) => f.active);
+        // Offer every open fiscal year. An inactive one is allowed on purpose; a closed
+        // one takes no booking.
+        const open = fys.filter((f) => !f.closedAt);
+        this.fiscalYearOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
+        const active = open.filter((f) => f.active);
         if (active.length === 1) this.newFiscalYearId.set(active[0].id);
       },
       error: () => this.fiscalYearOptions.set([]),
@@ -446,9 +455,9 @@ export class ExpenseDialogsState {
           this.toast.success(this.i18n.translate('expenses.toast.saved'));
           this.loadInvoices();
         },
-        error: () => {
+        error: (err) => {
           this.list.saving.set(false);
-          this.toast.error(this.i18n.translate('expenses.toast.failed'));
+          this.toast.error(this.failedText(err));
         },
       });
   }
@@ -482,9 +491,9 @@ export class ExpenseDialogsState {
         this.toast.success(this.i18n.translate('expenses.toast.deleted'));
         this.onDeleted?.(e);
       },
-      error: () => {
+      error: (err) => {
         this.list.saving.set(false);
-        this.toast.error(this.i18n.translate('expenses.toast.failed'));
+        this.toast.error(this.failedText(err));
       },
     });
   }
@@ -573,8 +582,10 @@ export class ExpenseDialogsState {
     this.api.listFiscalYears(top.id).subscribe({
       next: (fys: FiscalYear[]) => {
         this.rememberTopYear(top.id, fys);
-        this.transferFyOptions.set(fys.map((f) => ({ value: f.id, label: f.display })));
-        const active = fys.filter((f) => f.active);
+        // A closed fiscal year takes no transfer.
+        const open = fys.filter((f) => !f.closedAt);
+        this.transferFyOptions.set(open.map((f) => ({ value: f.id, label: f.display })));
+        const active = open.filter((f) => f.active);
         if (active.length === 1) this.tFiscalYearId.set(active[0].id);
       },
       error: () => this.transferFyOptions.set([]),

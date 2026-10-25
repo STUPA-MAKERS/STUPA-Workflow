@@ -126,6 +126,16 @@ describe('BudgetTreeApi', () => {
     req.flush(null);
   });
 
+  it.each([
+    [true, 'close'],
+    [false, 'reopen'],
+  ])('setFiscalYearClosed(%s) POSTs /budgets/:id/fiscal-years/:fy/%s', (closed, action) => {
+    api.setFiscalYearClosed('n-1', 'fy-1', closed).subscribe();
+    const req = http.expectOne(`${BASE}/budgets/n-1/fiscal-years/fy-1/${action}`);
+    expect(req.request.method).toBe('POST');
+    req.flush({});
+  });
+
   it('setAllocation PUTs /budgets/:id/allocations/:fy', () => {
     api.setAllocation('n-1', 'fy-1', '500').subscribe();
     const req = http.expectOne(`${BASE}/budgets/n-1/allocations/fy-1`);

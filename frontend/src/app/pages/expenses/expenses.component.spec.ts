@@ -2439,6 +2439,21 @@ describe('ExpensesComponent — transfers tab', () => {
     ctx.http.verify();
   });
 
+  it('names a closed fiscal year on a refused patch instead of the pair', async () => {
+    const ctx = await setup();
+    await openTransfers(ctx);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = ctx.fixture.componentInstance as any;
+    const { error } = toastSpies(c);
+    c.openTransferEdit(TRANSFER);
+    c.saveTransferEdit(new Event('submit'));
+    ctx.http
+      .expectOne('/api/budget-transfers/tr-1')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenCalledWith('Das Haushaltsjahr ist abgeschlossen.');
+    ctx.http.verify();
+  });
+
   it('deletes a transfer with both of its bookings', async () => {
     const ctx = await setup();
     await openTransfers(ctx);
@@ -3246,5 +3261,88 @@ describe('ExpensesComponent (row swipe)', () => {
     expect(reader.swipeLeft()).toBeNull();
     reader.selectWith(EXPENSE);
     expect(reader.selecting()).toBe(false);
+  });
+});
+
+describe('ExpensesComponent (closed fiscal year)', () => {
+  beforeEach(() => localStorage.setItem('ap.locale', 'de'));
+
+  const CLOSED: FiscalYear = { ...FY_OLD, id: 'fy-closed', active: true, closedAt: '2026-03-01T00:00:00Z' };
+  const closedText = 'Das Haushaltsjahr ist abgeschlossen.';
+
+  it('offers no closed year for a booking or a transfer', () => {
+    const { cmp, http } = build({ tree: ROOT_TREE });
+    dlg(cmp).onPickBudget('child-1');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    expect(dlg(cmp).fiscalYearOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    // The closed year is active too, but only the open one counts for the preselection.
+    expect(dlg(cmp).newFiscalYearId()).toBe('fy-active');
+    dlg(cmp).onTransferFrom('child-1');
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    expect(dlg(cmp).transferFyOptions()).toEqual([{ value: 'fy-active', label: '2026' }]);
+    expect(dlg(cmp).tFiscalYearId()).toBe('fy-active');
+  });
+
+  it('marks a closed year and freezes its bookings in the detail', () => {
+    const booking = { ...EXPENSE, budgetId: 'child-1', fiscalYearId: 'fy-closed' };
+    const { cmp, http } = build({ tree: ROOT_TREE, expenses: page([booking]) });
+    cmp.selectedId.set('e-1');
+    TestBed.tick();
+    http.expectOne((r) => r.url.endsWith('/budgets/top-1/fiscal-years')).flush([FY_ACTIVE, CLOSED]);
+    http.match(() => true);
+    expect(cmp.fyLabel('fy-closed')).toBe('2025 · abgeschlossen');
+    expect(cmp.fyLabel('fy-active')).toBe('2026');
+    expect(cmp.canChange('fy-closed')).toBe(false);
+    expect(cmp.canChange('fy-active')).toBe(cmp.canManage());
+  });
+
+  it('a reopened year drops out of the closed set on the next load', () => {
+    const { cmp } = build({ tree: ROOT_TREE });
+    cmp.closedFys.set(new Set(['fy-active']));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = cmp as any;
+    c.fyRequested.clear();
+    c.loadFyLabels('child-1');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (TestBed.inject(HttpTestingController) as any)
+      .expectOne((r: { url: string }) => r.url.endsWith('/budgets/top-1/fiscal-years'))
+      .flush([FY_ACTIVE]);
+    expect(cmp.closedFys().has('fy-active')).toBe(false);
+  });
+
+  it('names the closed year when the server refuses a booking change', () => {
+    const { cmp, http } = build();
+    const { error } = toastSpies(cmp);
+    dlg(cmp).newDescription.set('x');
+    dlg(cmp).newAmount.set('1');
+    dlg(cmp).newApplicationId.set('app-1');
+    cmp.create(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/expenses') && r.method === 'POST')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
+
+    cmp.openEdit(EXPENSE);
+    cmp.saveEdit(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'PATCH')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
+
+    cmp.confirmDelete.set(EXPENSE);
+    cmp.doDelete();
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/e-1') && r.method === 'DELETE')
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
+
+    cmp.openCreateSub(PARENT);
+    subs(cmp).subAmount.set('10');
+    subs(cmp).subDescription.set('Teil');
+    subs(cmp).createSub(new Event('submit'));
+    http
+      .expectOne((r) => r.url.endsWith('/budget-expenses/parent-1/sub-bookings'))
+      .flush({ status: 409, code: 'fiscal_year_closed' }, { status: 409, statusText: 'Conflict' });
+    expect(error).toHaveBeenLastCalledWith(closedText);
   });
 });
