@@ -1,11 +1,10 @@
 """Drop ``render_job``: applications no longer render a PDF.
 
 The table had one producer and one consumer, both in the application-PDF path, and both
-are gone. Protocols render through pytex directly and never used it.
+are gone. Protocols render through the typst service directly and never used it.
 
-The stored objects live under the ``pdf/`` prefix of the attachment bucket and are NOT
-removed here — a migration has no MinIO credentials. ``scripts/drop_application_pdfs.py``
-clears them, and the deployment notes say to run it.
+The stored objects under the ``pdf/`` prefix of the attachment bucket are not removed here,
+because a migration has no MinIO credentials.
 """
 
 from __future__ import annotations
