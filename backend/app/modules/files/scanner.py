@@ -2,7 +2,7 @@
 
 The worker scans an uploaded attachment with the ``clamd`` INSTREAM command, after the
 upload (quarantine). ``scan_or_raise`` scans in the request, before the upload is
-stored: invoice PDFs, Markdown images and CD logos use it. The module imports
+stored: invoice PDFs, Markdown images, CD logos and inline branding logos use it. The module imports
 ``clamd`` lazily, because only a configured scanner needs it.
 """
 
