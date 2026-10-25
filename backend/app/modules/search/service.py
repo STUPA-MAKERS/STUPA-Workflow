@@ -30,8 +30,8 @@ from app.modules.applications.access import READ_ALL_PERMISSION, READ_PERMISSION
 from app.modules.budget.access import has_budget_read
 from app.modules.budget.tree_models import Budget
 from app.modules.search.schemas import SearchHit, SearchKind, SearchResults
-from app.search import dialect_of, trigram_rank
 from app.shared.i18n import resolve_i18n
+from app.shared.search import dialect_of, trigram_rank
 
 if TYPE_CHECKING:
     from app.modules.auth.principal import Principal

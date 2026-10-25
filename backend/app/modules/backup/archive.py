@@ -19,7 +19,7 @@ streams through them.
 
 The functions do the encoding and the encryption only. They run no subprocess and touch
 no database, so the unit tests cover them directly. `service.py` supplies the dump and
-the objects, and `tasks.py` runs the pg_dump/pg_restore subprocesses.
+the objects and runs the pg_dump/pg_restore subprocesses. `worker/backup.py` calls it.
 
 pyrage is a native extension without stubs, so the type checker cannot see through
 ``from .pyrage import *`` in its ``__init__``. The unit tests verify the imported

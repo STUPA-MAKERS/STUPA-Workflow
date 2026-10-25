@@ -7,7 +7,7 @@ The service owns three things:
   encrypted archive,
 * `apply_archive`, which puts an archive back.
 
-The heavy work runs in the arq worker (`tasks.py`), never in a request. A dump of the
+The heavy work runs in the arq worker (`worker/backup.py`), never in a request. A dump of the
 whole platform takes as long as it takes, and an API worker that blocks on it stops
 serving everyone else.
 

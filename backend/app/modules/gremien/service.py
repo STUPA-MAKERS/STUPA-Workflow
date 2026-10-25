@@ -90,9 +90,9 @@ from app.modules.voting.election import election_config, is_election
 from app.modules.voting.listing import read_scope
 from app.modules.voting.models import Ballot, SecretBallot, Vote
 from app.modules.voting.schemas import ElectionResultOut
-from app.search import escape_like
 from app.shared.config_schemas import VoteConfig
 from app.shared.errors import BadRequestError, NotFoundError, ValidationProblem
+from app.shared.search import escape_like
 
 #: The longest range of the attendance matrix, in months.
 MAX_MONTHS = 24

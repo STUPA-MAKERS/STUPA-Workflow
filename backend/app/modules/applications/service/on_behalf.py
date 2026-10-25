@@ -23,8 +23,8 @@ from app.modules.applications.schemas import (
     OnBehalfCreate,
 )
 from app.modules.applications.service.create import Capture, CreateOps
-from app.search import escape_like
 from app.shared.errors import ValidationProblem
+from app.shared.search import escape_like
 
 if TYPE_CHECKING:
     from app.modules.flow.dispatch import ActionDispatcher

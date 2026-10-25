@@ -26,9 +26,9 @@ from app.modules.budget.tree_schemas import (
     TransferRowOut,
     TransferUpdate,
 )
-from app.search import dialect_of, trigram_rank
 from app.shared.errors import ConflictError, NotFoundError, ValidationProblem
 from app.shared.paging import Page
+from app.shared.search import dialect_of, trigram_rank
 
 #: The fields a transfer patch may write. Both legs get the same value.
 _PATCHABLE: tuple[str, ...] = (

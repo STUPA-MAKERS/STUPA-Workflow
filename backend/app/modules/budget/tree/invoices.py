@@ -28,7 +28,6 @@ from app.modules.budget.tree_schemas import (
 from app.modules.files.mime import MimeRejected, validate_upload
 from app.modules.files.scanner import scan_or_raise
 from app.modules.files.storage import StorageError
-from app.search import dialect_of, trigram_rank
 from app.shared.errors import (
     NotFoundError,
     PayloadTooLargeError,
@@ -37,6 +36,7 @@ from app.shared.errors import (
     ValidationProblem,
 )
 from app.shared.filenames import sanitize_display_name, sanitize_storage_name
+from app.shared.search import dialect_of, trigram_rank
 
 logger = logging.getLogger("app.budget")
 

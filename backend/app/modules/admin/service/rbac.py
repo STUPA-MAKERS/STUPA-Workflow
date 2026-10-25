@@ -33,9 +33,9 @@ from app.modules.audit.actions import AuditAction
 from app.modules.auth.models import GroupMapping, Principal, Role, RolePermission
 from app.modules.auth.models import RoleAssignment as RoleAssignmentRow
 from app.modules.auth.sessions import end_principal_sessions
-from app.search import escape_like
 from app.shared.errors import ConflictError, NotFoundError
 from app.shared.permissions import PERMISSION_CATALOGUE
+from app.shared.search import escape_like
 
 
 def _assignment_out(row: RoleAssignmentRow) -> RoleAssignmentOut:

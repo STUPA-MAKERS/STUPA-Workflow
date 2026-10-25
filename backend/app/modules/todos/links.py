@@ -53,8 +53,8 @@ from app.modules.todos.models import LINK_KINDS, TodoBoard, TodoCard, TodoColumn
 from app.modules.todos.schemas import TodoLinkDetail, TodoLinkTarget
 from app.modules.voting.listing import read_scope as vote_read_scope
 from app.modules.voting.models import Vote
-from app.search import dialect_of, escape_like, trigram_rank
 from app.shared.errors import ForbiddenError
+from app.shared.search import dialect_of, escape_like, trigram_rank
 
 #: The most hits of one kind in the link picker.
 PER_KIND = 5
