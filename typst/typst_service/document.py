@@ -104,7 +104,7 @@ def _span(keeper: Mapping[str, str]) -> str:
     start = f"TOP {keeper['from_top']}" if keeper.get("from_top") else keeper.get("from", "")
     end = f"TOP {keeper['to_top']}" if keeper.get("to_top") else keeper.get("to", "")
     if start and end:
-        return f"{start} – {end}"  # noqa: RUF001 - an en dash between start and end
+        return f"{start} – {end}"  # an en dash between start and end
     if start:
         return f"ab {start}"
     if end:
@@ -176,7 +176,7 @@ def _items(options: Mapping[str, object], *keys: str) -> list[str]:
     for key in keys:
         value = options.get(key)
         if isinstance(value, list) and value:
-            return [str(v) for v in value if str(v).strip()]  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+            return [str(v) for v in value if str(v).strip()]
         if isinstance(value, str) and value.strip():
             return [v.strip() for v in value.split(",") if v.strip()]
     return []
@@ -212,7 +212,7 @@ def _data_lines(options: Mapping[str, object], keepers: list[dict[str, str]]) ->
     if datum:
         rows.append(["Datum", format_date(datum)])
     beginn = _scalar(options, "beginn", "start") or started_time
-    span = " – ".join(  # noqa: RUF001 - an en dash between start and end
+    span = " – ".join(  # an en dash between start and end
         t for t in (beginn, _scalar(options, "ende", "end")) if t
     )
     if span:
@@ -258,7 +258,7 @@ def _logo(entry: str, assets: Collection[str]) -> dict[str, str]:
 def _logo_list(options: Mapping[str, object], key: str) -> list[str] | None:
     value = options.get(key)
     if isinstance(value, list):
-        return [str(v) for v in value]  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+        return [str(v) for v in value]
     if isinstance(value, str) and value:
         return [value]
     return None

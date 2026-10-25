@@ -123,7 +123,7 @@ def _parse_config(raw: bytes) -> dict[str, object]:
         raise _BadRequest(f"config is not valid JSON: {exc.msg}") from None
     if not isinstance(parsed, dict):
         raise _BadRequest("config must be a JSON object")
-    return parsed  # pyright: ignore[reportUnknownVariableType]
+    return parsed
 
 
 def _asset_name(value: UploadFile | str) -> str:

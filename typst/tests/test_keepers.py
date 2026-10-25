@@ -167,7 +167,7 @@ def test_started_at_fills_a_missing_date_and_start() -> None:
     source = "---\nstarted_at: '2026-06-20 18:04'\nende: '20:00'\n---\n"
     doc = build_document(source, variant=None)
     assert _row(doc, "Datum") == "20.06.2026, 18:04"
-    assert _row(doc, "Zeit") == "18:04 – 20:00"  # noqa: RUF001 - an en dash
+    assert _row(doc, "Zeit") == "18:04 – 20:00"  # an en dash
     # An explicit `datum` and `beginn` win.
     assert _row(build_document(KEEPERS_DOC, variant=None), "Datum") == "20.06.2026, 18:04"
     doc = build_document("---\nstarted_at: 'gestern'\n---\n", variant=None)
