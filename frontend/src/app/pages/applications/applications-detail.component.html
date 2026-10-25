@@ -92,9 +92,6 @@
       class="ad"
       animate.enter="motion-fade-in"
       [class.ad--split]="split()"
-      [appSwipeTabs]="tabs()"
-      [appSwipeTabsActive]="tab()"
-      (appSwipeTabsActiveChange)="selectTab($event)"
       [class.ad--stale]="switching()"
       [attr.inert]="switching() ? '' : null"
       [attr.aria-busy]="switching() || null"
@@ -235,46 +232,35 @@
           </div>
         </div>
       } @else {
-        <app-tabs
-          #tabBar
+        <!-- Every page stays in the DOM, so the attachment count and the scroll of a list
+             survive a tab change; on a phone a swipe moves to the next page. -->
+        <app-tab-pager
           class="ad__tabs"
           idPrefix="ad"
           [ariaLabel]="title()"
           [tabs]="tabs()"
           [active]="tab()"
+          [paged]="phone()"
           (activeChange)="selectTab($event)"
-        />
-        <!-- Every panel stays in the DOM, so the attachment count and the scroll of a list
-             survive a tab change. -->
-        <section
-          class="ad__panel"
-          role="tabpanel"
-          [id]="tabBar.panelId('app')"
-          [attr.aria-labelledby]="tabBar.tabId('app')"
-          [hidden]="tab() !== 'app'"
         >
-          <ng-container *ngTemplateOutlet="decision; context: { $implicit: application }" />
-          <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
-          <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
-        </section>
-        <section
-          class="ad__panel"
-          role="tabpanel"
-          [id]="tabBar.panelId('history')"
-          [attr.aria-labelledby]="tabBar.tabId('history')"
-          [hidden]="tab() !== 'history'"
-        >
-          <ng-container *ngTemplateOutlet="history" />
-        </section>
-        <section
-          class="ad__panel"
-          role="tabpanel"
-          [id]="tabBar.panelId('files')"
-          [attr.aria-labelledby]="tabBar.tabId('files')"
-          [hidden]="tab() !== 'files'"
-        >
-          <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
-        </section>
+          <ng-template appTabPage="app">
+            <section class="ad__panel">
+              <ng-container *ngTemplateOutlet="decision; context: { $implicit: application }" />
+              <ng-container *ngTemplateOutlet="details; context: { $implicit: application }" />
+              <ng-container *ngTemplateOutlet="answers; context: { $implicit: application }" />
+            </section>
+          </ng-template>
+          <ng-template appTabPage="history">
+            <section class="ad__panel">
+              <ng-container *ngTemplateOutlet="history" />
+            </section>
+          </ng-template>
+          <ng-template appTabPage="files">
+            <section class="ad__panel">
+              <ng-container *ngTemplateOutlet="files; context: { $implicit: application }" />
+            </section>
+          </ng-template>
+        </app-tab-pager>
       }
     </article>
 

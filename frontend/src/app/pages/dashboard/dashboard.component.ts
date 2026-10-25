@@ -47,8 +47,9 @@ import {
   type StatusKind,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
-  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 // By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
 // it uses.
@@ -136,12 +137,13 @@ type Loaded<T> = T | null | undefined;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SwipeTabsDirective,
     NoteComponent,
     NgTemplateOutlet,
     RouterLink,
     IconComponent,
     TranslatePipe,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     DataTableComponent,
     CellDirective,
@@ -266,18 +268,41 @@ export class DashboardComponent {
   }
 
   /** `true` while the request of the open tab has not answered. */
-  readonly tabLoading = computed(() => this.source() === undefined);
+  readonly tabLoading = computed(() => this.loadingOf(this.tab()));
   /** `true` when the request of the open tab failed. */
-  readonly tabError = computed(() => this.source() === null);
+  readonly tabError = computed(() => this.errorOf(this.tab()));
 
-  private readonly source = computed<Loaded<unknown>>(() => {
-    switch (this.tab()) {
-      case 'mine':
-        return this.mine();
-      default:
-        return this.tasks();
-    }
-  });
+  /**
+   * The state of one tab. On a phone each tab has its own page beside the others, so a
+   * swipe shows the next tab with its rows before it is the open tab.
+   */
+  loadingOf(tab: string): boolean {
+    return this.sourceOf(tab) === undefined;
+  }
+
+  errorOf(tab: string): boolean {
+    return this.sourceOf(tab) === null;
+  }
+
+  rowsOf(tab: string): WorkRow[] {
+    return tab === 'mine' ? this.mineRows() : this.taskRows();
+  }
+
+  /** The rows of the tab are empty (and loaded). */
+  emptyOf(tab: string): boolean {
+    return !this.loadingOf(tab) && !this.errorOf(tab) && this.rowsOf(tab).length === 0;
+  }
+
+  /** "Alle … öffnen" of the tab. */
+  allLinkOf(tab: string): { key: TranslationKey; link: string; query: Record<string, string> | null } {
+    return tab === 'mine'
+      ? { key: 'dashboard.all.mine', link: '/applications', query: { mine: 'true' } }
+      : { key: 'dashboard.all.tasks', link: '/tasks', query: null };
+  }
+
+  private sourceOf(tab: string): Loaded<unknown> {
+    return tab === 'mine' ? this.mine() : this.tasks();
+  }
 
   private readonly rowCap = computed(() => (this.phone() ? PHONE_ROWS : ROWS));
 
@@ -296,26 +321,11 @@ export class DashboardComponent {
   );
 
   /** The rows of the open tab are empty (and loaded). */
-  readonly tabEmpty = computed(() => {
-    if (this.tabLoading() || this.tabError()) return false;
-    switch (this.tab()) {
-      case 'mine':
-        return this.mineRows().length === 0;
-      default:
-        return this.taskRows().length === 0;
-    }
-  });
+  readonly tabEmpty = computed(() => this.emptyOf(this.tab()));
 
   /** No own application yet: the empty tab gets the card "Antrag stellen" beside it. */
   readonly newUser = computed(() => this.mine()?.total === 0);
 
-  /** "Alle … öffnen" of the open tab. */
-  readonly allLink = computed<{ key: TranslationKey; link: string; query: Record<string, string> | null }>(
-    () =>
-      this.tab() === 'mine'
-        ? { key: 'dashboard.all.mine', link: '/applications', query: { mine: 'true' } }
-        : { key: 'dashboard.all.tasks', link: '/tasks', query: null },
-  );
 
   /** The columns of "Offene Aufgaben" and "Meine Anträge". */
   readonly workColumns = computed<ColumnDef[]>(() => [
@@ -464,8 +474,7 @@ export class DashboardComponent {
 
 
   /** Send the request of the open tab again after it failed. */
-  retryTab(): void {
-    const tab = this.tab();
+  retryTab(tab: string = this.tab()): void {
     const source = tab === 'mine' ? this.mine : this.tasks;
     this.reloads.get(source)?.();
   }

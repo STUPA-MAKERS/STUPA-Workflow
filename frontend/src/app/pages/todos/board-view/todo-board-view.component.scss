@@ -264,44 +264,18 @@
     --bv-gutter: var(--space-4);
   }
 }
-/* The tab bar and its line run over the page gutter to the screen edges, so a long tab
-   scrolls out at the edge. The tabs draw no mark of their own
-   (also not on hover): the ink below moves with the swipe. */
-.bv__tabBar {
-  position: relative;
-  flex: none;
-  min-width: 0;
-  margin-inline: calc(-1 * var(--bv-gutter));
+/* The tab pager of the kit: the tab bar, its line and the pages run over the page gutter
+   to the screen edges. A page reaches down to the bottom bar; its last card scrolls clear
+   of the floating "+ To-Do" (56px, --space-4 above the bar). The top padding is the room
+   under the tab line at rest. */
+.bv__tabPager {
+  --tab-pager-bleed: var(--bv-gutter);
+  --tab-pager-page-top: var(--space-3);
+  --tab-pager-page-bottom: calc(56px + 2 * var(--space-4));
 }
-.bv__tabBar::after {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: var(--border-width);
-  background: var(--color-border);
-  pointer-events: none;
-}
-.bv__tabBar ::ng-deep .tabs {
-  padding-inline: var(--bv-gutter);
-  border-bottom-color: transparent;
-}
-.bv__tabBar ::ng-deep .tabs .tabs__tab.tabs__tab--on {
-  box-shadow: none;
-}
-.bv__ink {
-  position: absolute;
-  bottom: var(--border-width);
-  left: 0;
-  width: 0;
-  z-index: 1;
-  height: 3px;
-  background: var(--color-accent);
-  pointer-events: none;
-}
-/* The pager runs over the page gutter to the screen edges, so a card that moves away
-   leaves at the edge of the screen; each page gives the gutter back inside. */
+/* The pager of the skeleton (`todo-board-skeleton`) in the geometry of the tab pager: it
+   runs over the page gutter to the screen edges, and each page gives the gutter back
+   inside. */
 .bv__pager {
   display: grid;
   flex: 1 1 0;
@@ -323,9 +297,6 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  /* The page reaches down to the bottom bar; its last card scrolls clear of the floating
-     "+ To-Do" (56px, --space-4 above the bar). The top padding is the room under the tab
-     line at rest. */
   padding: var(--space-3) var(--bv-gutter) 0;
   padding-bottom: calc(56px + 2 * var(--space-4));
   overflow-y: auto;
@@ -340,7 +311,7 @@
   gap: var(--space-2);
 }
 /* An empty column: "Keine Karten" in the middle of the page. */
-.bv__page--empty .bv__phoneCards {
+.bv__phoneCards--empty {
   align-items: center;
   justify-content: center;
 }

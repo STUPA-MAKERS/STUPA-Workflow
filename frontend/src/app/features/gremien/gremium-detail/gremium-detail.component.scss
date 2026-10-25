@@ -103,6 +103,10 @@
 .gd__tabs {
   flex: none;
 }
+/* One pane: the pages of the tabs (`app-tab-pager`) have the room of the body above. */
+.gd__pager {
+  --tab-pager-page-top: 22px;
+}
 
 /* ------------------------------------------------------------------ body */
 .gd__body {
@@ -143,12 +147,10 @@
   .gd__body {
     padding-top: var(--space-4);
   }
-  /* One pane at a time: the line under the tabs runs over the page gutter (`.page-shell`,
+  /* The line under the tabs and the pages run over the page gutter (`.page-shell`,
      --space-4 on a phone) to the screen edges; the tabs keep their place. */
-  .gd:not(.gd--split) .gd__tabs {
-    margin-inline: calc(-1 * var(--space-4));
-  }
-  .gd:not(.gd--split) .gd__tabs ::ng-deep .tabs {
-    padding-inline: var(--space-4);
+  .gd__pager {
+    --tab-pager-bleed: var(--space-4);
+    --tab-pager-page-top: var(--space-4);
   }
 }

@@ -70,9 +70,10 @@ import {
   SideSheetComponent,
   StatusTextComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
   ToastService,
-  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 import {
   BudgetTreeApi,
@@ -144,7 +145,6 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SwipeTabsDirective,
     AmountComponent,
     DropOverlayComponent,
     FileDropDirective,
@@ -169,6 +169,8 @@ const COMMENTS_FRAGMENT = /^comment(?:s|-(.+))$/;
     DialogComponent,
     IconComponent,
     SelectFieldComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     CostCentreSelectComponent,
     AttachmentsPanelComponent,

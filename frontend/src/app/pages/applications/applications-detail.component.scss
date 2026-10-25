@@ -222,6 +222,7 @@
   min-width: min(100%, 22rem);
 }
 .ad__tabs {
+  --tab-pager-page-top: var(--space-5);
   margin-top: calc(-1 * var(--space-5));
 }
 .ad__panel {
@@ -402,16 +403,21 @@
 
 /* Phone, one pane: the rule under the head and the line under the tabs run over the page
    gutter (`.page-shell`, --space-4 on a phone) to the screen edges, as on the boards;
-   the head and the tabs keep their place. */
+   the head and the tabs keep their place. The pages of the tabs run to the edges too, so
+   a page that a swipe moves leaves at the edge of the screen. */
 @include bp.phone {
   .ad:not(.ad--split) .ad__head {
     margin-inline: calc(-1 * var(--space-4));
     padding-inline: var(--space-4);
   }
   .ad:not(.ad--split) .ad__tabs {
+    --tab-pager-bleed: var(--space-4);
+  }
+  /* The busy sheet draws the bar alone. */
+  .ad:not(.ad--split) app-tabs.ad__tabs {
     margin-inline: calc(-1 * var(--space-4));
   }
-  .ad:not(.ad--split) .ad__tabs ::ng-deep .tabs {
+  .ad:not(.ad--split) app-tabs.ad__tabs ::ng-deep .tabs {
     padding-inline: var(--space-4);
   }
 }

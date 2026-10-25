@@ -57,15 +57,7 @@
 } @else if (ticket(); as ticket) {
   <!-- The ticket fades in where its skeleton was (the load-stable geometry keeps it in
        place), so the swap is not a cut. -->
-  <article
-    class="td"
-    animate.enter="motion-fade-in"
-    [class.td--split]="split()"
-    aria-labelledby="td-title"
-    [appSwipeTabs]="tabs()"
-    [appSwipeTabsActive]="tab()"
-    (appSwipeTabsActiveChange)="selectTab($event)"
-  >
+  <article class="td" animate.enter="motion-fade-in" [class.td--split]="split()" aria-labelledby="td-title">
     <header class="sheet-head td__head">
       <app-sheet-bar [bleed]="split()">
         <h2 appSheetBarTitle id="td-title" class="sheet-title td__title">{{ ticket.title }}</h2>
@@ -144,33 +136,27 @@
         </div>
       </div>
     } @else {
-      <app-tabs
-        #tabBar
+      <app-tab-pager
         class="td__tabs"
         idPrefix="td"
         [ariaLabel]="ticket.title"
         [tabs]="tabs()"
         [active]="tab()"
+        [paged]="phone()"
+        [fill]="phone()"
         (activeChange)="selectTab($event)"
-      />
-      <section
-        class="td__panel td__panel--log"
-        role="tabpanel"
-        [id]="tabBar.panelId('log')"
-        [attr.aria-labelledby]="tabBar.tabId('log')"
-        [hidden]="tab() !== 'log'"
       >
-        <ng-container *ngTemplateOutlet="log" />
-      </section>
-      <section
-        class="td__panel td__panel--details"
-        role="tabpanel"
-        [id]="tabBar.panelId('details')"
-        [attr.aria-labelledby]="tabBar.tabId('details')"
-        [hidden]="tab() !== 'details'"
-      >
-        <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
-      </section>
+        <ng-template appTabPage="log">
+          <section class="td__panel td__panel--log">
+            <ng-container *ngTemplateOutlet="log" />
+          </section>
+        </ng-template>
+        <ng-template appTabPage="details">
+          <section class="td__panel td__panel--details">
+            <ng-container *ngTemplateOutlet="details; context: { $implicit: ticket }" />
+          </section>
+        </ng-template>
+      </app-tab-pager>
     }
   </article>
 }

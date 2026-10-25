@@ -472,9 +472,16 @@
   align-self: flex-end;
   margin-inline-end: -4px;
 }
-/* Phone: the rule under the tabs runs over the page gutter (`.page-shell`, --space-4 on a
-   phone) to the screen edges; the tabs keep their place. */
-:host(.dash--phone) .dash__tabbar {
-  margin-inline: calc(-1 * var(--space-4));
-  padding-inline: var(--space-4);
+/* Phone: the tabs and their pages (`app-tab-pager`). The line under the tabs and the
+   pages run over the page gutter (`.page-shell`, --space-4 on a phone) to the screen
+   edges; the tabs keep their place. A page holds the rows and "Alle … öffnen". */
+:host(.dash--phone) .dash__pager {
+  --tab-pager-bleed: var(--space-4);
+  --tab-pager-page-top: var(--space-2);
+}
+.dash__page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
 }

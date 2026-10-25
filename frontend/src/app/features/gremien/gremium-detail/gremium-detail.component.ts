@@ -1,3 +1,4 @@
+import { NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -6,6 +7,7 @@ import {
   effect,
   inject,
   signal,
+  untracked,
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -27,8 +29,9 @@ import {
   SheetBarTitleDirective,
   SkeletonComponent,
   type TabItem,
+  TabPageDirective,
+  TabPagerComponent,
   TabsComponent,
-  SwipeTabsDirective,
 } from '@stupa-makers/ui-kit';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { CalendarSubscribeComponent } from '../../meetings/calendar-subscribe/calendar-subscribe.component';
@@ -68,10 +71,12 @@ export type GremiumTab = (typeof GREMIUM_TABS)[number];
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '[class.gd-host--split]': 'split()' },
   imports: [
-    SwipeTabsDirective,
+    NgTemplateOutlet,
     TranslatePipe,
     ButtonComponent,
     IconComponent,
+    TabPageDirective,
+    TabPagerComponent,
     TabsComponent,
     EmptyStateComponent,
     RowMenuComponent,
@@ -114,7 +119,7 @@ export class GremiumDetailComponent {
     return (GREMIUM_TABS as readonly string[]).includes(t ?? '') ? (t as GremiumTab) : 'sitzungen';
   });
   /** The tabs that were open once for this gremium: their panels stay rendered. */
-  readonly visited = signal<ReadonlySet<GremiumTab>>(new Set());
+  readonly visited = signal<ReadonlySet<string>>(new Set());
   /** The number of meetings, once the tab "Sitzungen" loaded them. */
   readonly meetingCount = signal<number | null>(null);
 
@@ -182,18 +187,22 @@ export class GremiumDetailComponent {
   });
 
   constructor() {
-    // The tab of the URL opens and stays rendered; a new gremium starts afresh.
+    // The tab of the URL opens and stays rendered; a new gremium starts afresh. On a
+    // phone the tabs beside it open too, because a swipe shows them before they are active.
     let shownId: string | null = null;
     effect(() => {
       const id = this.id();
       const tab = this.tab();
+      const i = GREMIUM_TABS.indexOf(tab);
+      const open = this.phone() ? GREMIUM_TABS.filter((_, j) => Math.abs(j - i) <= 1) : [tab];
       if (id !== shownId) {
         shownId = id;
         this.meetingCount.set(null);
-        this.visited.set(new Set([tab]));
+        this.visited.set(new Set(open));
         return;
       }
-      if (!this.visited().has(tab)) this.visited.set(new Set([...this.visited(), tab]));
+      const seen = untracked(this.visited);
+      if (open.some((t) => !seen.has(t))) this.visited.set(new Set([...seen, ...open]));
     });
 
     // The breadcrumb names the gremium, not the page.
