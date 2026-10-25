@@ -35,12 +35,12 @@ function makeApi(over: Partial<Record<string, jest.Mock>> = {}) {
   };
 }
 
+/** NgModel writes its value after a microtask. */
 async function setup(gremium: Gremium | null, api = makeApi()) {
   const view = await render(GremiumDialogComponent, {
     providers: [{ provide: AdminApiService, useValue: api }],
     componentInputs: { open: true, gremium, cdVariants: CD },
   });
-  // NgModel writes its value after a microtask.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   const saved = jest.fn();
@@ -59,11 +59,11 @@ const save = () =>
 describe('GremiumDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The slug of a stored gremium never changes, so the dialog shows the stored one. */
   it('loads every setting of the gremium, the recipients included', async () => {
     const { api } = await setup(STUPA);
     expect(screen.getByRole('heading', { name: 'Gremium bearbeiten' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: /Name/ })).toHaveValue('Studierendenparlament');
-    // The slug of a stored gremium never changes, so the dialog shows the stored one.
     expect(screen.getByText('studierendenparlament')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'CD-Variante' })).toHaveTextContent('StuPa-Protokoll');
     expect(screen.getByRole('combobox', { name: 'Standardsprache' })).toHaveTextContent('Deutsch');
@@ -85,13 +85,14 @@ describe('GremiumDialogComponent', () => {
     expect(api.getGremiumMailRecipients).toHaveBeenCalledWith('g-1');
   });
 
+  /** The switches are delegation, delegation to externals and the public protocol page. */
   it('has no switch to change a ballot after casting', async () => {
     await setup(STUPA);
     expect(screen.queryByText(/Stimme nach Abgabe/)).toBeNull();
-    // Delegation, delegation to externals, and the public protocol page.
     expect(screen.getAllByRole('switch')).toHaveLength(3);
   });
 
+  /** The quorum is a percent, so 150 becomes 100. */
   it('saves every setting and then the recipients', async () => {
     const { api, saved } = await setup(STUPA);
     await pickOption(screen.getByRole('combobox', { name: 'CD-Variante' }), 'AStA');
@@ -115,7 +116,6 @@ describe('GremiumDialogComponent', () => {
       allowVoteDelegation: true,
       delegationLeadMinutes: 30,
       delegationAllowExternal: true,
-      // The quorum is a percent: 150 becomes 100.
       quorumPercent: 100,
     });
     expect(api.setGremiumMailRecipients).toHaveBeenCalledWith('g-1', [
@@ -164,6 +164,7 @@ describe('GremiumDialogComponent', () => {
     );
   });
 
+  /** The page learns that the base data is saved, but the dialog stays open. */
   it('changes the new gremium on a second save after the recipients failed', async () => {
     const api = makeApi({
       setGremiumMailRecipients: jest
@@ -180,7 +181,6 @@ describe('GremiumDialogComponent', () => {
     expect(within(dialog()).getByRole('alert')).toHaveTextContent(
       /eine Empfänger-Adresse ist ungültig/,
     );
-    // The page learns that the base data is saved, but the dialog stays open.
     expect(baseSaved).toHaveBeenCalledWith(expect.objectContaining({ created: true }));
     expect(saved).not.toHaveBeenCalled();
     await userEvent.click(save());
@@ -208,13 +208,13 @@ describe('GremiumDialogComponent', () => {
     );
   });
 
+  /** The empty field would delete the stored list, so it stays locked. */
   it('keeps the stored recipients when their read failed', async () => {
     const api = makeApi({
       getGremiumMailRecipients: jest.fn(() => throwError(() => ({ status: 503 }))),
     });
     const { saved } = await setup(STUPA, api);
     expect(within(dialog()).getByRole('alert')).toHaveTextContent('Speichern ändert sie nicht.');
-    // The empty field would delete the stored list, so it stays locked.
     expect(within(dialog()).getByRole('textbox', { name: /Protokoll-Empfänger/ })).toBeDisabled();
     await userEvent.clear(screen.getByRole('spinbutton', { name: 'Quorum (%)' }));
     await userEvent.type(screen.getByRole('spinbutton', { name: 'Quorum (%)' }), '60');

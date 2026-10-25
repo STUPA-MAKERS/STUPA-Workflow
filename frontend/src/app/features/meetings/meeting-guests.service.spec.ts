@@ -109,6 +109,7 @@ describe('MeetingGuestsService', () => {
     expect(svc.guests().some((g) => g.id === 'g-9')).toBe(false);
   });
 
+  /** A short or an unchanged name sends nothing. */
   it('admits, rejects, removes and renames a guest', () => {
     svc.sync(PUBLIC);
     svc.admit(guestRow());
@@ -120,7 +121,6 @@ describe('MeetingGuestsService', () => {
     svc.rename(guestRow({ id: 'g-2', status: 'admitted' }), '  Neu Name ');
     expect(api['renameMeetingGuest']).toHaveBeenCalledWith('m-1', 'g-2', 'Neu Name');
     expect(svc.guests().find((g) => g.id === 'g-2')?.displayName).toBe('Neu Name');
-    // A short or an unchanged name sends nothing.
     svc.rename(guestRow(), 'J');
     svc.rename(guestRow(), 'Jana Roth');
     expect(api['renameMeetingGuest']).toHaveBeenCalledTimes(1);
@@ -142,12 +142,12 @@ describe('MeetingGuestsService', () => {
     expect(api['admitAllMeetingGuests']).not.toHaveBeenCalled();
   });
 
+  /** With nothing open there is nothing to send. */
   it('admits every open request at once', () => {
     svc.sync(PUBLIC);
     svc.admitAll();
     expect(api['admitAllMeetingGuests']).toHaveBeenCalledWith('m-1');
     expect(toast.success).toHaveBeenCalledWith('1 Gäste zugelassen.');
-    // Nothing open: nothing to send.
     svc.guests.set([]);
     svc.admitAll();
     expect(api['admitAllMeetingGuests']).toHaveBeenCalledTimes(1);
@@ -164,13 +164,13 @@ describe('MeetingGuestsService', () => {
     expect(svc.busy()).toBeNull();
   });
 
+  /** The same code from the meeting again causes no second link read. */
   it('rotates the join code, drops the open requests and reports a refusal', () => {
     svc.sync(PUBLIC);
     svc.rotate();
     expect(svc.joinLink()?.joinCode).toBe('9XH2TR');
     expect(svc.pending()).toEqual([]);
     expect(toast.success).toHaveBeenCalled();
-    // Same code from the meeting again: no second link read.
     svc.sync({ ...PUBLIC, joinCode: '9XH2TR' });
     expect(api['getJoinLink']).toHaveBeenCalledTimes(1);
     api['rotateJoinCode'].mockReturnValue(throwError(() => ({ error: {} })));

@@ -118,6 +118,7 @@ interface Opts {
   holdList?: boolean;
 }
 
+/** The row menu renders its items after a timer, so it needs change detection on its own. */
 async function start(url = '/applications', opts: Opts = {}) {
   const perms = new Set(opts.perms ?? ALL);
   const rail = { refresh: jest.fn() };
@@ -144,7 +145,6 @@ async function start(url = '/applications', opts: Opts = {}) {
   const http = TestBed.inject(HttpTestingController);
   const harness = await RouterTestingHarness.create();
   const cmp = await harness.navigateByUrl(url, ApplicationsListComponent);
-  // The row menu renders its items after a timer; it needs change detection on its own.
   harness.fixture.autoDetectChanges(true);
   if (opts.types === 'error') {
     http.expectOne((r) => r.url === '/api/application-types').flush({}, { status: 500, statusText: 'x' });
@@ -215,6 +215,7 @@ describe('ApplicationsListComponent', () => {
       expect(within(sept).getAllByRole('listitem')).toHaveLength(2);
     });
 
+    /** Without an amount there is no placeholder. */
     it('shows title, status text, type and amount; an archived row says so', async () => {
       await start();
       expect(screen.getByRole('link', { name: 'Zuschuss Kennenlernwochenende' })).toBeInTheDocument();
@@ -223,17 +224,16 @@ describe('ApplicationsListComponent', () => {
       expect(items.filter((li) => within(li).queryByText('Förderantrag')).length).toBe(3);
       expect(screen.getByText('1.250,00 €')).toBeInTheDocument();
       expect(screen.getByText('Archiviert')).toBeInTheDocument();
-      // No amount, no placeholder.
       const trikots = screen.getByRole('link', { name: 'Trikots' }).closest('app-list-item')!;
       expect(trikots.querySelector('.amt__value')).toBeNull();
     });
 
+    /** An amount that the browser cannot read stays as the server sent it. */
     it('names an untitled row and leaves an unknown type and a missing state out', async () => {
       await start('/applications', {
         rows: [row({ title: '  ', typeId: 'unknown', state: null, amount: 'abc', currency: null })],
       });
       expect(screen.getByRole('link', { name: 'Ohne Titel' })).toBeInTheDocument();
-      // An amount the browser cannot read stays as the server sent it.
       expect(screen.getByText('abc')).toBeInTheDocument();
       expect(document.querySelector('.apps__dot')).toBeNull();
     });
@@ -246,12 +246,12 @@ describe('ApplicationsListComponent', () => {
       expect(document.querySelector('.apps__dot')).toBeNull();
     });
 
+    /** The chevron is decoration, and the row menu stays the control. */
     it('puts a chevron in the place of the row menu in the full-width list', async () => {
       const { cmp } = await start();
       expect(cmp.split()).toBe(false);
       const chevrons = document.querySelectorAll('.apps__menuSlot .apps__chev');
       expect(chevrons).toHaveLength(ROWS.length);
-      // The chevron is decoration. The row menu stays the control.
       expect(chevrons[0].getAttribute('aria-hidden')).toBe('true');
     });
 
@@ -288,15 +288,17 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.groups()).toEqual([]);
     });
 
+    /**
+     * The heading of the first group and the rows in the geometry of `app-list-item` show at once
+     * (`skel-in`), so the page never opens blank. In one column the rows sit in a row group, as the
+     * loaded rows do.
+     */
     it('holds the place of the loaded list while it loads: a month heading and rows', async () => {
       const { first, harness, cmp } = await start('/applications', { holdList: true });
       const el = harness.fixture.nativeElement as HTMLElement;
-      // The heading of the first group and the rows in the geometry of `app-list-item`,
-      // shown at once (`skel-in`), so the page never opens blank.
       expect(el.querySelector('.apps__skel')).toHaveClass('skel-in');
       expect(el.querySelector('.apps__skel h2.apps__month .skel-text')).not.toBeNull();
       expect(el.querySelectorAll('.apps__skel .sk__item')).toHaveLength(12);
-      // One column: the rows sit in a row group, as the loaded rows do.
       expect(el.querySelector('.sk__items')).toHaveClass('rowgroup');
       expect(cmp.reloading()).toBe(false);
       first!.flush(page(ROWS));
@@ -334,12 +336,12 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.reloading()).toBe(false);
     });
 
+    /** Only the reload goes out, because it would drop a page appended to the old rows anyway. */
     it('loads no further page while a reload is out', async () => {
       const { http, router, cmp } = await start('/applications', { rows: [ROWS[0]], total: 2 });
       await router.navigateByUrl('/applications?q=Zu');
       const req = http.expectOne(LIST);
       cmp.loadMore();
-      // Only the reload: a page appended to the old rows would be dropped by it anyway.
       expect(http.match(LIST)).toHaveLength(0);
       req.flush(page([ROWS[0]], 2));
     });
@@ -490,6 +492,10 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.archived()).toBe('false');
     });
 
+    /**
+     * With several choices the menu stays open. Unchecking the last state drops the param. The
+     * reset in the menu clears all states.
+     */
     it('checks and unchecks states in the status menu, each as a repeated param', async () => {
       const { cmp, harness } = await start();
       const http = TestBed.inject(HttpTestingController);
@@ -507,16 +513,13 @@ describe('ApplicationsListComponent', () => {
       const list = screen.getByRole('listbox', { name: 'Status' });
       expect(list).toHaveAttribute('aria-multiselectable', 'true');
       expect(await reloadAfter('Eingereicht')).toEqual(['s1']);
-      // Several choices: the menu stays open.
       expect(await reloadAfter('In Prüfung')).toEqual(['s1', 's2']);
       expect(screen.getByRole('option', { name: 'In Prüfung' })).toHaveAttribute('aria-selected', 'true');
       expect(cmp.stateChipLabel()).toBe('Eingereicht, In Prüfung');
       expect(screen.getByRole('button', { name: 'Status: Eingereicht, In Prüfung' })).toBeInTheDocument();
       expect(await reloadAfter('Eingereicht')).toEqual(['s2']);
-      // Unchecking the last state drops the param.
       expect(await reloadAfter('In Prüfung')).toBeNull();
       expect(await reloadAfter('In Prüfung')).toEqual(['s2']);
-      // The reset in the menu clears all states.
       await userEvent.click(document.querySelector<HTMLElement>('.fs__reset')!);
       await harness.fixture.whenStable();
       const reload = http.expectOne(LIST);
@@ -578,9 +581,12 @@ describe('ApplicationsListComponent', () => {
       expect(screen.queryByRole('button', { name: 'Typ' })).not.toBeInTheDocument();
     });
 
+    /**
+     * There is no native select: every chip opens the menu of the app. A single choice closes the
+     * menu, and the focus goes back to the chip. Back on the default the param goes away.
+     */
     it('filters by type and by archive through the menus of the chips', async () => {
       const { cmp, http, harness } = await start();
-      // No native select: every chip opens the menu of the app.
       expect(document.querySelector('.apps__chips select')).toBeNull();
       const pick = async (chip: string, option: string) => {
         await userEvent.click(screen.getByRole('button', { name: chip }));
@@ -594,7 +600,6 @@ describe('ApplicationsListComponent', () => {
       };
       expect((await pick('Typ', 'Förderantrag')).get('type')).toBe('t1');
       expect(cmp.typeChipLabel()).toBe('Förderantrag');
-      // A single choice closes the menu and the focus goes back to the chip.
       expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Typ: Förderantrag' }));
 
@@ -604,7 +609,6 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.archivedChipLabel()).toBe('Archiv: Alle');
       harness.detectChanges();
 
-      // Back to the default: the param goes away.
       expect((await pick('Archiv: Alle', 'Ohne archivierte')).has('archived')).toBe(false);
       expect((await pick('Typ: Förderantrag', 'Alle Typen')).has('type')).toBe(false);
     });
@@ -615,6 +619,7 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.typeChipLabel()).toBe('Typ');
     });
 
+    /** The sheet opens again with the applied values as its draft. */
     it('applies the amount and the date range of "Weitere Filter" and clears them', async () => {
       const { cmp, http, harness } = await start();
       await userEvent.click(screen.getByRole('button', { name: 'Weitere Filter' }));
@@ -636,7 +641,6 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.moreCount()).toBe(3);
       expect(screen.getByRole('button', { name: 'Weitere Filter, 3 aktiv' })).toBeInTheDocument();
 
-      // The sheet opens again with the applied values as its draft.
       cmp.openMore();
       expect(cmp.draftAmountMin()).toBe('100');
       expect(cmp.draftCreatedTo()).toBe('2026-06-30');
@@ -649,6 +653,10 @@ describe('ApplicationsListComponent', () => {
       req.flush(page(ROWS));
     });
 
+    /**
+     * Escape, the scrim or a swipe closes the sheet, and nothing is applied. The next page and the
+     * export send no unapplied value. A new open of the sheet starts from the applied values again.
+     */
     it('drops the draft of "Weitere Filter" when the sheet closes without "Anwenden"', async () => {
       const restore = stubDownload();
       try {
@@ -657,14 +665,12 @@ describe('ApplicationsListComponent', () => {
         harness.detectChanges();
         cmp.draftAmountMin.set('500');
         cmp.draftCreatedFrom.set('2026-01-01');
-        // Escape, the scrim or a swipe: the sheet closes, nothing is applied.
         cmp.sheet.set(null);
         harness.detectChanges();
         expect(cmp.moreCount()).toBe(0);
         expect(cmp.activeFilterCount()).toBe(0);
         expect(screen.getByRole('button', { name: 'Weitere Filter' })).toBeInTheDocument();
 
-        // The next page and the export send no unapplied value.
         cmp.loadMore();
         const more = http.expectOne(LIST);
         expect(more.request.params.has('amountMin')).toBe(false);
@@ -676,7 +682,6 @@ describe('ApplicationsListComponent', () => {
         expect(xlsx.request.params.has('amountMin')).toBe(false);
         xlsx.flush(new Blob(['x']));
 
-        // A new open of the sheet starts from the applied values again.
         cmp.openMore();
         expect(cmp.draftAmountMin()).toBe('');
         expect(cmp.draftCreatedFrom()).toBe('');
@@ -701,6 +706,7 @@ describe('ApplicationsListComponent', () => {
       }
     });
 
+    /** An emptied search drops the param. */
     it('debounces the search and writes q to the URL', async () => {
       jest.useFakeTimers();
       try {
@@ -713,7 +719,6 @@ describe('ApplicationsListComponent', () => {
         await new Promise((r) => setTimeout(r));
         expect(router.url).toBe('/applications?q=fest');
         http.expectOne(LIST).flush(page(ROWS));
-        // An emptied search drops the param.
         jest.useFakeTimers();
         cmp.onSearch('  ');
         jest.advanceTimersByTime(400);
@@ -750,11 +755,11 @@ describe('ApplicationsListComponent', () => {
       req.flush(page(ROWS));
     });
 
+    /** A search that still waits for its debounce must not undo the reset. */
     it('resets every filter in the signals and in the URL', async () => {
       const { go, cmp, http, harness, router } = await start();
       await go('/applications?state=s1&type=t1&q=x&archived=all&amountMin=5&mine=true&sort=amount');
       expect(cmp.activeFilterCount()).toBe(6);
-      // A search still waiting for its debounce must not undo the reset.
       cmp.onSearch('pending');
       await userEvent.click(screen.getByRole('button', { name: 'Zurücksetzen' }));
       await harness.fixture.whenStable();
@@ -833,12 +838,12 @@ describe('ApplicationsListComponent', () => {
       }
     });
 
+    /** A call from elsewhere (the phone menu) sends nothing either. */
     it('hides the export while mine is set', async () => {
       const { go, cmp, http } = await start();
       expect(screen.getByRole('button', { name: 'Exportieren' })).toBeInTheDocument();
       await go('/applications?mine=true');
       expect(screen.queryByRole('button', { name: 'Exportieren' })).not.toBeInTheDocument();
-      // A call from elsewhere (the phone menu) sends nothing either.
       cmp.onExport();
       http.expectNone((r) => r.url === '/api/applications/export.xlsx');
     });
@@ -869,6 +874,7 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.phoneMenuSections().flatMap((s) => s.items.map((i) => i.id))).not.toContain('capture');
     });
 
+    /** "Zur Liste" closes the form first, and without the form it closes the detail. */
     it('opens the form in the detail pane and then the new application', async () => {
       const { cmp, http, router, harness, settle } = await start('/applications', { perms: CAPTURE });
       await userEvent.click(screen.getByRole('button', { name: 'Antrag erfassen' }));
@@ -876,7 +882,6 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.capturing()).toBe(true);
       expect(cmp.captureInPane()).toBe(true);
       expect(screen.getByRole('heading', { name: 'Antrag erfassen' })).toBeInTheDocument();
-      // "Zur Liste" closes the form first.
       cmp.onBack();
       expect(cmp.capturing()).toBe(false);
       cmp.openCapture();
@@ -888,7 +893,6 @@ describe('ApplicationsListComponent', () => {
       await settle();
       expect(cmp.capturing()).toBe(false);
       expect(router.url).toBe('/applications/app-9');
-      // Without the form, "Zur Liste" closes the detail.
       cmp.onBack();
       await settle();
       expect(router.url).toBe('/applications');
@@ -911,10 +915,14 @@ describe('ApplicationsListComponent', () => {
   });
 
   describe('list and detail', () => {
+    /**
+     * The title is a real link with the filters, so it also opens in a new tab. The list stays,
+     * hidden in the one-pane layout: the filters did not change, so nothing reloads, and the open
+     * row is marked.
+     */
     it('opens a row in the detail and keeps the filters', async () => {
       const { go, router, cmp, harness } = await start();
       await go('/applications?q=fest');
-      // The title is a real link with the filters, so it also opens in a new tab.
       const link = screen.getByRole('link', { name: 'Flyer für die Hochschulgruppen-Messe' });
       expect(link).toHaveAttribute('href', '/applications/app-2?q=fest');
       await userEvent.click(link);
@@ -922,8 +930,6 @@ describe('ApplicationsListComponent', () => {
       harness.detectChanges();
       expect(router.url).toBe('/applications/app-2?q=fest');
       expect(cmp.selectedId()).toBe('app-2');
-      // The list stays (one pane at a time here, so hidden): the filters did not change,
-      // so nothing reloads, and the open row is marked.
       expect(
         screen.getByRole('link', { name: 'Flyer für die Hochschulgruppen-Messe', hidden: true }),
       ).toHaveAttribute('aria-current', 'true');
@@ -936,8 +942,8 @@ describe('ApplicationsListComponent', () => {
       expect(screen.getByText('detail')).toBeInTheDocument();
     });
 
+    /** The server lists only the own applications, and the page asks the same way. */
     it('opens the deep link of an owner without application.read', async () => {
-      // The server lists only the own applications; the page asks the same way.
       const { cmp } = await start('/applications/app-1', { perms: [] });
       expect(cmp.selectedId()).toBe('app-1');
       expect(screen.getByText('detail')).toBeInTheDocument();
@@ -969,6 +975,10 @@ describe('ApplicationsListComponent', () => {
       expect(nav).toHaveBeenCalledWith('/apply');
     });
 
+    /**
+     * A deleted application leaves the list; the other rows stay, without a request. An unknown id
+     * changes nothing.
+     */
     it('keeps every loaded page when the detail changes an application', async () => {
       const first = Array.from({ length: 20 }, (_, i) => row({ id: `p0-${i}`, title: `Antrag ${i}` }));
       const second = Array.from({ length: 5 }, (_, i) => row({ id: `p1-${i}`, title: `Antrag ${20 + i}` }));
@@ -986,12 +996,10 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.items().map((i) => i.id)).toContain('p1-3');
       expect(cmp.hasMore()).toBe(false);
 
-      // A deleted application leaves the list; the other rows stay, without a request.
       pageService.notify({ id: 'p1-4', kind: 'deleted', source: 'detail' });
       http.verify();
       expect(cmp.items()).toHaveLength(24);
       expect(cmp.total()).toBe(24);
-      // An unknown id changes nothing.
       pageService.notify({ id: 'gone', kind: 'deleted', source: 'detail' });
       expect(cmp.total()).toBe(24);
     });
@@ -1020,12 +1028,12 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.items()).toHaveLength(3);
     });
 
+    /** Its own notices do not reload it a second time. */
     it('tells the detail the layout and reloads when the detail changed an application', async () => {
       const { pageService, http, cmp } = await start();
       expect(pageService.split()).toBe(cmp.split());
       pageService.notify({ id: 'app-1', kind: 'updated', source: 'detail' });
       http.expectOne(LIST).flush(page(ROWS));
-      // Its own notices do not reload it a second time.
       pageService.notify({ id: 'app-1', kind: 'updated', source: 'list' });
       http.verify();
     });
@@ -1041,6 +1049,7 @@ describe('ApplicationsListComponent', () => {
       addsToAgenda: true,
     };
 
+    /** A second action waits for the first. */
     it('loads the transitions only when the menu opens, and fires one', async () => {
       const { http, harness, toast, rail, pageService, cmp } = await start();
       const success = jest.spyOn(toast, 'success');
@@ -1052,7 +1061,6 @@ describe('ApplicationsListComponent', () => {
       const post = http.expectOne((r) => r.method === 'POST' && r.url === '/api/applications/app-1/transition');
       expect(post.request.body).toEqual({ transitionId: 'tr-1' });
       expect(cmp.busyRow()).toBe('app-1');
-      // A second action waits for the first.
       cmp.onRowAction(cmp.items()[0], { kind: 'archive' });
       post.flush({ newStateId: 's2', statusEventId: 'e', dispatchedActions: [] });
       expect(success).toHaveBeenCalledWith('Status geändert.');
@@ -1110,6 +1118,10 @@ describe('ApplicationsListComponent', () => {
       expect(struck[0].textContent?.replace(/\u00a0/g, ' ')).toBe('1.250,00 €');
     });
 
+    /**
+     * The row stays where it is, because the dialog asks for the meeting and nothing fires yet.
+     * After the dialog fires, the list loads its rows again.
+     */
     it('opens the agenda dialog for a transition onto the agenda and reloads after it', async () => {
       const { http, harness, router, cmp } = await start();
       await openRowMenu(http, 'Zuschuss Kennenlernwochenende', [{ ...AGENDA, agendaGremiumId: 'g1' }], () =>
@@ -1117,7 +1129,6 @@ describe('ApplicationsListComponent', () => {
       );
       await userEvent.click(screen.getByRole('menuitem', { name: 'Auf Tagesordnung setzen' }));
       harness.detectChanges();
-      // The row stays where it is: the dialog asks for the meeting, nothing fires yet.
       expect(router.url).not.toBe('/applications/app-1');
       expect(cmp.agendaOpen()).toBe(true);
       expect(cmp.agendaFor()?.item.id).toBe('app-1');
@@ -1126,7 +1137,6 @@ describe('ApplicationsListComponent', () => {
       harness.detectChanges();
       expect(screen.getByRole('dialog', { name: /Auf Tagesordnung setzen/ })).toBeInTheDocument();
 
-      // The dialog fired: the list loads its rows again.
       cmp.onAgendaDone();
       http.expectOne(LIST).flush(page(ROWS));
       cmp.agendaFor.set(null);
@@ -1180,11 +1190,11 @@ describe('ApplicationsListComponent', () => {
       http.expectOne(LIST).flush(page(ROWS));
     });
 
+    /** The list runs one row action at a time. */
     it('reports a failed archive', async () => {
       const { http, cmp, toast } = await start();
       const error = jest.spyOn(toast, 'error');
       cmp.onRowAction(cmp.items()[0], { kind: 'archive' });
-      // One row action at a time.
       cmp.onRowAction(cmp.items()[1], { kind: 'archive' });
       cmp.onRowAction(cmp.items()[1], {
         kind: 'transition',
@@ -1195,6 +1205,7 @@ describe('ApplicationsListComponent', () => {
       expect(cmp.busyRow()).toBeNull();
     });
 
+    /** The row leaves the list without a new request. */
     it('deletes only after the red confirmation', async () => {
       const { http, harness, toast, cmp } = await start();
       const success = jest.spyOn(toast, 'success');
@@ -1212,7 +1223,6 @@ describe('ApplicationsListComponent', () => {
       http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/applications/app-2').flush(null);
       expect(success).toHaveBeenCalled();
       expect(cmp.deleteFor()).toBeNull();
-      // The row leaves the list without a new request.
       http.verify();
       expect(cmp.items().map((i) => i.id)).toEqual(['app-1', 'app-3']);
       expect(cmp.total()).toBe(2);

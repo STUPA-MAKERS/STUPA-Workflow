@@ -1,4 +1,3 @@
-/* The route has no chrome (route data `chrome: false`): the page is the screen. */
 :host {
   display: flex;
   flex-direction: column;
@@ -6,8 +5,6 @@
   background: var(--color-bg);
 }
 
-/* Hidden on the projector. A pointer movement (`--shown`), a hover or the keyboard
-   shows it in the top start corner; it fades out again when the pointer rests. */
 .beamer__exit {
   position: fixed;
   inset-block-start: var(--space-3);

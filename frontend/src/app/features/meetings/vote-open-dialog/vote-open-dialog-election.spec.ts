@@ -45,12 +45,17 @@ describe('VoteOpenDialogComponent · election', () => {
     expect(cmp.kind()).toBe('motion');
   });
 
+  /**
+   * Guests vote in an election only when the lead switches them on. A person is a candidate once,
+   * and a free name that is already on the list stays out (case and spaces ignored). A roster
+   * member picked after a free name of the same spelling makes a pair that the server refuses, so
+   * the dialog blocks the submit until one entry goes.
+   */
   it('builds an election: round, seats, members and free names, reorder, remove', async () => {
     const { http, cmp, opened, container, fixture } = await setup();
     const user = userEvent.setup();
     await user.click(screen.getByRole('radio', { name: 'Wahl' }));
     expect(screen.getByRole('switch', { name: 'Geheime Wahl' })).toHaveAttribute('aria-checked', 'true');
-    // Guests vote in an election only when the lead switches them on.
     expect(screen.getByRole('switch', { name: 'Gäste stimmen mit ab' })).toHaveAttribute(
       'aria-checked',
       'false',
@@ -67,17 +72,14 @@ describe('VoteOpenDialogComponent · election', () => {
     cmp.addMember('p-2');
     await user.type(screen.getByLabelText('Freier Name'), '  Cem Aydin {Enter}');
     cmp.addMember('p-1');
-    cmp.addMember('p-1'); // a person is a candidate once
-    cmp.addMember('p-x'); // not on the roster
-    cmp.addFreeName(); // the field is empty again
-    // A free name that is already on the list stays out (case and spaces ignored).
+    cmp.addMember('p-1');
+    cmp.addMember('p-x');
+    cmp.addFreeName();
     await user.type(screen.getByLabelText('Freier Name'), 'cem  AYDIN');
     expect(screen.getByText('Dieser Name steht schon auf der Liste.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Hinzufügen' })).toBeDisabled();
     cmp.addFreeName();
     cmp.freeName.set('');
-    // A roster member picked after a free name of the same spelling: the server
-    // refuses the pair, so the dialog blocks the submit until one entry goes.
     cmp.removeCandidate(cmp.candidates().find((c) => c.principalId === 'p-1')!.key);
     cmp.freeName.set('Anna Berg');
     cmp.addFreeName();
@@ -94,7 +96,7 @@ describe('VoteOpenDialogComponent · election', () => {
     view(cmp).toEqual(['Ben Ott', 'Anna Berg', 'Cem Aydin']);
     await user.click(screen.getByRole('button', { name: 'Ben Ott nach unten' }));
     view(cmp).toEqual(['Anna Berg', 'Ben Ott', 'Cem Aydin']);
-    cmp.moveCandidate(0, -1); // the first one stays first
+    cmp.moveCandidate(0, -1);
     await user.click(screen.getByRole('button', { name: 'Ben Ott entfernen' }));
     view(cmp).toEqual(['Anna Berg', 'Cem Aydin']);
     expect(await runAxe(container)).toHaveNoViolations();
@@ -114,6 +116,7 @@ describe('VoteOpenDialogComponent · election', () => {
     expect(opened).toHaveBeenCalled();
   });
 
+  /** Without a name there is no submit. */
   it('names the Ja/Nein rule of a single candidate and keeps the seats in bounds', async () => {
     const { cmp } = await setup();
     cmp.setKind('election');
@@ -125,7 +128,6 @@ describe('VoteOpenDialogComponent · election', () => {
     expect(cmp.ruleSentence()).toMatch(/Jede Person hat eine Stimme/);
     cmp.addMember('p-1');
     expect(cmp.ruleSentence()).toMatch(/Eine Kandidatur/);
-    // No name: no submit.
     cmp.question.set('  ');
     expect(cmp.canSubmit()).toBe(false);
     cmp.setKind('nonsense');

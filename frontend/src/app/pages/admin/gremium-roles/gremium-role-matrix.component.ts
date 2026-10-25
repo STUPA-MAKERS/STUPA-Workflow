@@ -43,8 +43,7 @@ import { SectionHeaderComponent } from '@shared/ui/section-header/section-header
 let nextId = 0;
 
 /**
- * The roles of one gremium and their rights as a matrix (boards Verwaltung-Gremium-Dialog
- * background and Verwaltung-Gremiumrolle-Dialog).
+ * The roles of one gremium and their rights as a matrix.
  *
  * One row per role: the name, "Pflichtrolle" for a forced role, the OIDC groups that give
  * the role (from the gremium role mappings; for `member` the membership groups), one box

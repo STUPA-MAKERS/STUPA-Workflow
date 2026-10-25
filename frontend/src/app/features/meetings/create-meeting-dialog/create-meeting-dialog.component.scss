@@ -7,7 +7,6 @@
   @include df.form;
 }
 
-/* "Schritt 1 von 2": two thin segments, the done ones in the accent. */
 .cmd__steps {
   display: flex;
   align-items: center;
@@ -28,7 +27,6 @@
   @include df.hint;
 }
 
-/* Date, start and end side by side; one below the other on a phone. */
 .cmd__when {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr);

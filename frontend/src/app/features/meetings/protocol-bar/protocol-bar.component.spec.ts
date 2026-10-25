@@ -46,6 +46,10 @@ describe('ProtocolBarComponent', () => {
     expect(screen.queryByRole('link')).toBeNull();
   });
 
+  /**
+   * When nothing is redacted and nothing is sent yet, there is one PDF, and the bar does not claim
+   * a mail.
+   */
   it('links the PDFs of a final protocol', async () => {
     const { fixture } = await setup(
       closed(),
@@ -56,7 +60,6 @@ describe('ProtocolBarComponent', () => {
     expect(screen.getByRole('link', { name: 'PDF öffentlich' })).toHaveAttribute('href', '/pub.pdf');
     expect(screen.getByRole('link', { name: 'PDF intern' })).toHaveAttribute('target', '_blank');
     expect(screen.queryByRole('button', { name: 'Finalisieren & versenden' })).toBeNull();
-    // Nothing redacted and not sent yet: one PDF, and the bar does not claim a mail.
     fixture.componentRef.setInput('protocol', protocol({ status: 'final', isFinal: true, isLocked: true, pdfUrl: '/p.pdf' }));
     fixture.detectChanges();
     expect(screen.getByRole('status')).toHaveTextContent('Final · Das Protokoll ist final.');

@@ -92,12 +92,12 @@ describe('FormlyTextareaType (rendered)', () => {
     expect(ta.getAttribute('aria-describedby')).toBeNull();
   });
 
+  /** validation.show forces showError without touch or submit. */
   it('renders the error alert with default message when showError is forced', async () => {
     const { fixture } = await render(HostComponent, {
       providers: [provideFormly()],
       componentProperties: {
         model: {},
-        // validation.show forces showError without needing touch/submit.
         fields: [
           {
             key: 'note',

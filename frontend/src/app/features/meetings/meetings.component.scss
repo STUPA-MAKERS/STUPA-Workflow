@@ -6,11 +6,7 @@
   flex-direction: column;
   gap: var(--space-5);
 }
-/* The session page and the participant view are pane pages: the host takes the free
-   height of the main column of the shell and gives it to the page, which does not
-   scroll as a page. The dialogs are overlays; as flex items with the gap of the host
-   they would take space, so they get no box of their own. On a phone the page scrolls
-   as one and grows with its content. */
+// The dialogs are overlays: as flex items with the gap of the host they would take space.
 :host:has(> app-meeting-page, > app-meeting-follow-view) {
   flex: 1 1 0;
   min-height: 0;
@@ -26,9 +22,6 @@
   ) {
   display: contents;
 }
-/* The overview: one pane at a time it takes at least the free height and the page
-   scrolls; in a pane layout (`.pane-page`, see the host binding) it takes the free
-   height and only its panes scroll. */
 :host(:not(.pane-page)):has(> app-meetings-overview) {
   flex: 1 0 auto;
 }
@@ -39,8 +32,6 @@
   flex: 1 1 0;
   min-height: 0;
 }
-/* Legacy: meeting votes without an item show in a card below the session page. Then the
-   page scrolls as a page again, and the session page keeps the height of the window. */
 :host:has(> app-card) {
   flex: 1 0 auto;
 }
@@ -68,7 +59,6 @@
   flex-direction: column;
   gap: var(--space-3);
 }
-/* The loading placeholder of the session page: a bar, a body and a dock. */
 .mtg__loadShell {
   display: flex;
   flex-direction: column;

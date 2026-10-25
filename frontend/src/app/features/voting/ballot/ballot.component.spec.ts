@@ -81,6 +81,7 @@ describe('BallotComponent', () => {
     }
   });
 
+  /** The choices stay off while the ballot is on its way. */
   it('sends one ballot on a double click', async () => {
     const pending = new Subject<unknown>();
     const { caster, fixture } = await setup({ caster: () => pending });
@@ -88,7 +89,6 @@ describe('BallotComponent', () => {
     await user.click(choice('Ja'));
     await user.dblClick(confirmButton());
     expect(caster).toHaveBeenCalledTimes(1);
-    // The choices stay off while the ballot is on its way.
     expect(choice('Nein')).toBeDisabled();
     pending.next({ status: 'cast' });
     fixture.detectChanges();
@@ -148,6 +148,7 @@ describe('BallotComponent', () => {
     expect(castFailed).toHaveBeenCalledWith({ asDelegation: false, alreadyVoted: false, error: {} });
   });
 
+  /** The own row stays open, and the button moves to it. */
   it('casts the represented ballot with asDelegation', async () => {
     const { caster } = await setup({ proxyName: 'Jonas Weber' });
     const user = userEvent.setup();
@@ -161,7 +162,6 @@ describe('BallotComponent', () => {
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith('no', true);
     expect(screen.getByText('Für Jonas Weber abgegeben: Nein')).toBeInTheDocument();
-    // The own row stays open, and the button moves to it.
     expect(confirmButton()).toHaveTextContent('Stimme abgeben');
     await user.click(choice('Ja'));
     await user.click(confirmButton());
@@ -276,6 +276,7 @@ describe('BallotComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  /** The own row is cast and the represented row has no pick yet, so there is no confirm. */
   it('puts the rows side by side and shows the confirm only after a pick (columns)', async () => {
     const { fixture, caster } = await setup({ compact: true, columns: true, proxyName: 'Jonas Weber' });
     const user = userEvent.setup();
@@ -284,7 +285,6 @@ describe('BallotComponent', () => {
     await user.click(choice('Ja'));
     await user.click(confirmButton());
     expect(caster).toHaveBeenCalledWith('yes', false);
-    // The own row is cast; the represented row has no pick yet: no confirm.
     expect(screen.queryByRole('button', { name: /abgeben/ })).toBeNull();
     const proxy = screen.getByRole('group', { name: 'Als Vertretung für Jonas Weber' });
     await user.click(within(proxy).getByRole('button', { name: 'Nein' }));

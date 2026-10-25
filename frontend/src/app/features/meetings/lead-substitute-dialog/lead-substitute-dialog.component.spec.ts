@@ -64,6 +64,7 @@ describe('LeadSubstituteDialogComponent', () => {
     http.verify();
   });
 
+  /** With few substitutes there is no search field. */
   it('lists the pool of the member and enters the pick with the vote', async () => {
     const { dialog, submit, answer, http, created } = await setup();
     expect(within(dialog()).getByText('für Fritz Fehlend')).toBeInTheDocument();
@@ -73,7 +74,6 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(group).getAllByRole('radio')).toHaveLength(2);
     expect(within(group).getByText('Stellvertretung')).toBeInTheDocument();
     expect(within(group).getByText('Mitglied')).toBeInTheDocument();
-    // Few substitutes: no search field.
     expect(within(dialog()).queryByRole('searchbox')).toBeNull();
     expect(within(dialog()).getByText('Die Vertretung stimmt für Fritz Fehlend ab.')).toBeInTheDocument();
     expect(submit()).toBeDisabled();
@@ -89,6 +89,7 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(created).toHaveBeenCalledWith({ id: 'd-9' });
   });
 
+  /** A new opening starts again with the vote on; without a vote transfer there is no switch. */
   it('sends no vote when the switch is off or the platform has no vote transfer', async () => {
     const { dialog, submit, answer, http, fixture } = await setup();
     answer();
@@ -100,7 +101,6 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(first.request.body.delegateVoting).toBe(false);
     first.flush({ id: 'd-1' });
 
-    // A new opening starts again with the vote on; without a vote transfer there is no switch.
     fixture.componentRef.setInput('member', { ...FRITZ, principalId: 'pr-4', displayName: null, email: 'v@x.de' });
     fixture.detectChanges();
     http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-4`).flush(POOL);
@@ -113,6 +113,10 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(http.expectOne(`${BASE}/delegations`).request.body.delegateVoting).toBe(false);
   });
 
+  /**
+   * Without the context the vote transfer counts as off. "Erneut versuchen" reads the pool of the
+   * member again.
+   */
   it('says when the pool of the member is empty or does not load', async () => {
     const { dialog, answer, http, fixture } = await setup();
     answer([]);
@@ -129,9 +133,7 @@ describe('LeadSubstituteDialogComponent', () => {
     fixture.detectChanges();
     expect(within(dialog()).getByText('für —')).toBeInTheDocument();
     expect(within(dialog()).getByText('Der Pool konnte nicht geladen werden.')).toBeInTheDocument();
-    // Without the context the vote transfer counts as off.
     expect(within(dialog()).queryByRole('switch')).toBeNull();
-    // "Erneut versuchen" reads the pool of the member again.
     within(dialog()).getByRole('button', { name: 'Erneut versuchen' }).click();
     fixture.detectChanges();
     http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-9`).flush([]);
@@ -157,6 +159,7 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(dialog()).getByText('Ohne Namen')).toBeInTheDocument();
   });
 
+  /** The answers for Fritz fail late, and they must not mark the pool of Vera as failed. */
   it('ignores late answers of an earlier opening in a dialog that is open for another member', async () => {
     const { dialog, http, fixture } = await setup();
     const stalePool = http.expectOne(POOL_URL);
@@ -165,7 +168,6 @@ describe('LeadSubstituteDialogComponent', () => {
     fixture.detectChanges();
     const pool = http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-4`);
     const context = http.expectOne(CONTEXT_URL);
-    // The answers for Fritz fail late; they must not mark the pool of Vera as failed.
     stalePool.flush(null, { status: 500, statusText: 'Error' });
     staleContext.flush(null, { status: 500, statusText: 'Error' });
     fixture.detectChanges();
@@ -178,6 +180,9 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(dialog()).getByText('Die Vertretung stimmt für Vera ab.')).toBeInTheDocument();
   });
 
+  /**
+   * The late context of Fritz says "no delegation", and the dialog for Vera keeps its own gates.
+   */
   it('ignores a late context of an earlier opening', async () => {
     const { dialog, http, fixture } = await setup();
     http.expectOne(POOL_URL).flush(POOL);
@@ -187,7 +192,6 @@ describe('LeadSubstituteDialogComponent', () => {
     http.expectOne(`${BASE}/delegations/meetings/m-1/recipients?delegatorId=pr-4`).flush(POOL);
     const context = http.expectOne(CONTEXT_URL);
     context.flush({ ...CTX, allowVoteDelegation: true });
-    // The late context of Fritz says "no delegation"; Vera's dialog keeps its own gates.
     staleContext.flush({ ...CTX, allowVoteDelegation: false });
     fixture.detectChanges();
     expect(within(dialog()).queryByText('Dieses Gremium lässt keine Vertretung zu.')).toBeNull();
@@ -213,6 +217,7 @@ describe('LeadSubstituteDialogComponent', () => {
     expect(within(dialog()).getByText('Kein Mitglied gefunden.')).toBeInTheDocument();
   });
 
+  /** The English detail of the server never reaches the toast. */
   it('reports a refusal of the server and closes on cancel', async () => {
     const { dialog, submit, answer, http, closed, created } = await setup();
     answer();
@@ -221,7 +226,6 @@ describe('LeadSubstituteDialogComponent', () => {
     http
       .expectOne(`${BASE}/delegations`)
       .flush({ detail: 'Recipient must be a pool substitute of the member.' }, { status: 403, statusText: 'Forbidden' });
-    // The English detail of the server never reaches the toast.
     expect(toast.error).toHaveBeenCalledWith('Vertretung konnte nicht eingetragen werden.');
     expect(toast.error).not.toHaveBeenCalledWith('Recipient must be a pool substitute of the member.');
     await userEvent.click(submit());

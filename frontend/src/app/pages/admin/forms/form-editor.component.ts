@@ -71,7 +71,7 @@ const TYPE_MENU_HEIGHT = 9 * 36 + 16;
 type QPos = QuestionPos;
 
 /**
- * Form editor (boards Admin-Formular-Editor and Admin-Formular-Editor-Kosten), built
+ * Form editor, built
  * around explicit **question groups**.
  *
  * Each group is one wizard step. The group title is the step heading. On save the groups

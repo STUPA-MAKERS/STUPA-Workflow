@@ -82,7 +82,7 @@ export interface CostCentreGroup {
 }
 
 /**
- * The cost-centre field of the finance forms (board "Buchung · Kostenstelle wählen").
+ * The cost-centre field of the finance forms.
  *
  * The closed field is a filled field like `app-select`: the label, then the swatch, the
  * name and the path key of the pick in mono. The whole field opens the list. The list

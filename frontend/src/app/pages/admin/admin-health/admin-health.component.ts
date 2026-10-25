@@ -43,7 +43,7 @@ type BackupState = { status: 'loading' } | { status: 'ok'; list: BackupList } | 
 type ErasureState = { status: 'loading' } | { status: 'ok'; open: number } | { status: 'error' };
 
 /**
- * "Zustand" at the top of the admin navigation (board Verwaltung): three tiles that each
+ * "Zustand" at the top of the admin navigation: three tiles that each
  * link to their page. The tiles show on the home page and in the column beside every
  * admin page; the tile of the open page is marked.
  *

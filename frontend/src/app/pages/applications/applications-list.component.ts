@@ -140,7 +140,7 @@ type FilterSheet = 'more' | null;
 
 /**
  * The applications page: the list pane with search and filters, and the detail of the
- * open application beside it (board Anträge).
+ * open application beside it.
  *
  * The routes `/applications` and `/applications/:id` share this page. The detail is the
  * child route in the outlet of the detail pane, so the list keeps its rows and its scroll
@@ -152,10 +152,12 @@ type FilterSheet = 'more' | null;
  *
  * The export hides while `mine` is set, because the export has no `mine` filter and would export
  * more rows than the list shows.
+ *
+ * It is a pane page (`styles.scss`): the panes fill the free height and scroll by
+ * themselves.
  */
 @Component({
   selector: 'app-applications-list',
-  // A pane page (styles.scss): the panes fill the free height and scroll by themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -374,7 +376,7 @@ export class ApplicationsListComponent implements OnDestroy {
     { value: 'all', label: this.i18n.translate('applications.list.filter.archivedAll') },
   ]);
 
-  /** The search placeholder with the number of applications, as on the board. */
+  /** The search placeholder with the number of applications. */
   readonly searchPlaceholder = computed(() => {
     if (this.loading() && this.total() === 0) return this.i18n.translate('applications.list.searchPlain');
     if (this.total() === 1) return this.i18n.translate('applications.list.searchCountOne');
@@ -470,7 +472,6 @@ export class ApplicationsListComponent implements OnDestroy {
     return sections;
   });
 
-  // --- row actions --------------------------------------------------------
   /** The row whose links the share dialog shows. */
   readonly shareFor = signal<Uuid | null>(null);
   readonly shareOpen = signal(false);
@@ -551,14 +552,10 @@ export class ApplicationsListComponent implements OnDestroy {
     return formatMoney(item.amount, this.i18n.formatLocale(), { currency: item.currency }) || item.amount;
   }
 
-  // --- navigation ---------------------------------------------------------
-
   /** Open a row in the detail pane. The filters stay in the URL. */
   open(id: Uuid): void {
     void this.router.navigate(['/applications', id], { queryParamsHandling: 'preserve' });
   }
-
-  // --- capture on behalf -------------------------------------------------
 
   openCapture(): void {
     this.capturing.set(true);
@@ -589,8 +586,6 @@ export class ApplicationsListComponent implements OnDestroy {
   private readSelection(): void {
     this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
-
-  // --- filters ------------------------------------------------------------
 
   /**
    * The search. After about 250 ms of debounce it writes the `q` query param and
@@ -705,8 +700,6 @@ export class ApplicationsListComponent implements OnDestroy {
     this.loadingMore.set(true);
     this.fetch('more');
   }
-
-  // --- row actions --------------------------------------------------------
 
   onRowAction(item: ApplicationListItem, action: RowAction): void {
     switch (action.kind) {
@@ -898,8 +891,6 @@ export class ApplicationsListComponent implements OnDestroy {
     }
   }
 
-  // --- loading ------------------------------------------------------------
-
   private navigate(queryParams: Record<string, string | number | readonly string[] | null>): void {
     void this.router.navigate([], {
       relativeTo: this.route.firstChild ?? this.route,
@@ -927,8 +918,10 @@ export class ApplicationsListComponent implements OnDestroy {
       param: 'archived',
       signal: this.archived as WritableSignal<string>,
       empty: 'false',
-      // Anything that is not one of the two non-default values is the default, so a
-      // hand-edited URL cannot leave the filter in a state no control shows.
+      /**
+       * Anything that is not one of the two non-default values is the default, so a
+       * hand-edited URL cannot leave the filter in a state no control shows.
+       */
       parse: (raw) => (raw === 'true' || raw === 'all' ? raw : 'false'),
     },
   ];

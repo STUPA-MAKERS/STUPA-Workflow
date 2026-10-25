@@ -9,12 +9,14 @@ import { SimplifyPathPipe, simplifyPathKey } from './budget-path';
  * and these cases keep it from creeping back.
  */
 describe('simplifyPathKey', () => {
+  /**
+   * The first three shapes are the ones that a collapsing implementation shortens; the rest have no
+   * chain to collapse.
+   */
   it.each([
-    // Each of these was collapsed by the previous implementation.
     'VSM-8-81-810-330',
     'VSM-6-60-120',
     '8-81-810',
-    // These were already left alone, and still are.
     'VSM-800-04',
     'VSM-81-82',
     'VSM-9-81',

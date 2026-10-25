@@ -71,8 +71,8 @@ describe('evalJsonLogic', () => {
     expect(evalJsonLogic({ not: [true] })).toBe(false);
   });
 
+  /** asArgs wraps a scalar. `not` requires arity 1, so this call passes. */
   it('treats a single (non-array) operand as a one-element arg list', () => {
-    // asArgs wraps a scalar. `not` requires arity 1, so this call passes.
     expect(evalJsonLogic({ not: false })).toBe(true);
   });
 
@@ -95,24 +95,26 @@ describe('evalJsonLogic', () => {
     expect(() => evalJsonLogic({ '-': [1, 2, 3] })).toThrow(/1 \(negate\) or 2 operands/);
   });
 
+  /** The first element of an array path is not a string, so the same guard fires. */
   it('rejects a non-string var path', () => {
     expect(() => evalJsonLogic({ var: 5 })).toThrow(/var path must be a string/);
-    // The first element of an array path is not a string, so the same guard fires.
     expect(() => evalJsonLogic({ var: [5, 'fb'] })).toThrow(/var path must be a string/);
   });
 
+  /** An empty array path gives p='', which resolves to the whole ctx. */
   it('resolves var with null/undefined path to the whole ctx', () => {
     expect(evalJsonLogic({ var: null }, { a: 1 })).toEqual({ a: 1 });
     expect(evalJsonLogic({ var: undefined }, { a: 1 })).toEqual({ a: 1 });
-    // An empty array path gives p='', which resolves to the whole ctx.
     expect(evalJsonLogic({ var: [] }, { a: 1 })).toEqual({ a: 1 });
   });
 
+  /**
+   * An array index out of range gives the fallback, which defaults to null. An index into a value
+   * that is neither an array nor a record gives the fallback.
+   */
   it('returns the fallback when a dot path misses (object and array index)', () => {
     expect(evalJsonLogic({ var: ['a.b', 'fb'] }, { a: {} })).toBe('fb');
-    // An array index out of range gives the fallback, which defaults to null.
     expect(evalJsonLogic({ var: 'list.5' }, { list: ['a'] })).toBeNull();
-    // An index into a value that is neither an array nor a record gives the fallback.
     expect(evalJsonLogic({ var: 'a.b' }, { a: 'scalar' })).toBeNull();
   });
 
@@ -133,14 +135,16 @@ describe('isFieldVisible', () => {
     expect(isFieldVisible(cond, { needs_detail: false })).toBe(false);
   });
 
+  /** `>` on a missing var (null) throws, and the field counts as visible, not skipped. */
   it('is conservatively visible when evaluation errors (backend parity)', () => {
-    // `>` on a missing var (null) throws, and the field counts as visible, not skipped.
     expect(isFieldVisible({ '>': [{ var: 'y' }, 0] }, {})).toBe(true);
   });
 
+  /**
+   * The ownKeys trap of this proxy throws a TypeError, not a JsonLogicError, and isFieldVisible
+   * must not swallow it.
+   */
   it('rethrows non-JsonLogicError exceptions (unexpected failures bubble up)', () => {
-    // The ownKeys trap of this proxy throws a TypeError, not a JsonLogicError.
-    // isFieldVisible must NOT swallow it.
     const boom = new Proxy(
       {},
       {

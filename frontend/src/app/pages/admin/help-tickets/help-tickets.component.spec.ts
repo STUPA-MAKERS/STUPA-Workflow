@@ -113,6 +113,7 @@ describe('isHttpUrl', () => {
 describe('HelpTicketsComponent', () => {
   afterEach(() => localStorage.clear());
 
+  /** With nothing changed neither "Speichern" nor "Verwerfen" shows. */
   it('shows the stored settings, with nothing to save', async () => {
     const { api } = await setup();
     expect(api.getHelpTickets).toHaveBeenCalledTimes(1);
@@ -122,7 +123,6 @@ describe('HelpTicketsComponent', () => {
     expect(sw('Neue Meldungen per E-Mail')).toHaveAttribute('aria-checked', 'true');
     expect(sw('Erledigte Meldungen anonymisieren')).toHaveAttribute('aria-checked', 'true');
     expect(screen.getByRole('button', { name: /nach 12 Monaten/ })).toBeInTheDocument();
-    // Nothing changed: neither "Speichern" nor "Verwerfen" shows.
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Verwerfen' })).toBeNull();
   });
@@ -245,9 +245,9 @@ describe('HelpTicketsComponent', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Die Einstellungen konnten nicht geladen werden.');
   });
 
+  /** The form shows in its loaded shape: the field and the switch rows with their labels. */
   it('shows the skeleton while it loads', async () => {
     const { fixture } = await setup({ api: { getHelpTickets: jest.fn(() => new Subject()), putHelpTickets: jest.fn() } });
-    // The form in its loaded shape: the field and the switch rows with their labels.
     expect(document.querySelector('.ht__skelField')).not.toBeNull();
     expect(document.querySelectorAll('.ht__skelSwitch')).toHaveLength(3);
     expect(screen.getByRole('status')).toHaveTextContent('Wird geladen');
@@ -278,10 +278,14 @@ describe('HelpTicketsComponent', () => {
       expect(screen.getByRole('link', { name: 'T-0042' })).toHaveAttribute('href', '/tickets/t42');
     });
 
+    /**
+     * No separator is its own flex item: every child of the wrapping row is a part. The mixins of
+     * the ui-kit give a wrapping row that starts one separator early, and a dot in a box of the
+     * separator width before every part.
+     */
     it('draws the dots in CSS, so a wrapped line never starts or ends with one', async () => {
       await setup({ perms: ['admin.site', 'ticket.manage'] });
       const meta = document.querySelector('.ht__blocks li .ht__meta');
-      // No separator is its own flex item: every child of the wrapping row is a part.
       const parts = [...(meta?.querySelector('.ht__parts')?.children ?? [])];
       expect(parts.map((p) => p.className)).toEqual(['ht__part', 'ht__part', 'ht__part']);
       expect(parts.map((p) => p.textContent?.trim())).toEqual(['gesperrt am 14.10.2026', 'T-0042', '3 abgefangene Meldungen']);
@@ -291,8 +295,6 @@ describe('HelpTicketsComponent', () => {
       expect(rule('.ht__meta')).toMatch(/overflow-x: clip;/);
       expect(rule('.ht__parts')).toMatch(/@include dots\.list\(var\(--ht-sep\)\);/);
       expect(rule('.ht__part')).toMatch(/@include dots\.part\(var\(--ht-sep\)/);
-      // The mixins of the ui-kit: a wrapping row that starts one separator early, and a
-      // dot in a box of the separator width before every part.
       const dots = readFileSync(join(__dirname, '../../../../../vendor/ui-kit/src/styles/_dot-parts.scss'), 'utf8');
       expect(dots).toMatch(/@mixin list\(\$sep\) \{[^}]*flex-wrap: wrap;[^}]*margin-inline-start: calc\(-1 \* #\{\$sep\}\);/);
       expect(dots).toMatch(/&::before \{[^}]*width: \$sep;[^}]*content: '·' \/ '';/);
@@ -378,6 +380,7 @@ describe('HelpTicketsComponent', () => {
       expect(screen.getByText('Die gesperrten Absender konnten nicht geladen werden.')).toBeInTheDocument();
     });
 
+    /** An unblock before the list arrives leaves an empty list. */
     it('shows a skeleton while the blocks load', async () => {
       const { fixture } = await setup({
         perms: ['admin.site', 'ticket.manage'],
@@ -385,7 +388,6 @@ describe('HelpTicketsComponent', () => {
       });
       expect(document.querySelectorAll('.ht__skelBlocks li')).toHaveLength(1);
       expect(document.querySelector('.ht__blocks')).toBeNull();
-      // An unblock before the list arrived leaves an empty list.
       (fixture.componentInstance as unknown as { unblock(b: TicketBlockedSender): void }).unblock(BLOCKS[0]);
       fixture.detectChanges();
       expect(screen.getByText('Keine gesperrten Absender.')).toBeInTheDocument();

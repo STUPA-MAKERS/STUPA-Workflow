@@ -69,8 +69,8 @@ describe('FormlySelectType (rendered)', () => {
     expect(host.model['cat']).toBe('b');
   });
 
+  /** Formly defaults props.placeholder to '', so the field shows the default prompt. */
   it('renders the required marker and the default prompt, with no row to clear', async () => {
-    // Formly defaults props.placeholder to '': the field shows the default prompt.
     const { host } = await renderField(
       {
         key: 'c',
@@ -105,9 +105,11 @@ describe('FormlySelectType (rendered)', () => {
     expect(screen.queryByRole('option', { name: de['formly.select.placeholder'] })).toBeNull();
   });
 
+  /**
+   * The test renders the type directly, without the formly prop init, so props.placeholder stays
+   * undefined and the default-placeholder fallback of the template fires.
+   */
   it('falls back to the default prompt when placeholder is genuinely undefined', async () => {
-    // Render the type directly, without the formly prop init, so props.placeholder
-    // stays undefined and the default-placeholder fallback of the template fires.
     await render(FormlySelectType, {
       componentInputs: {
         field: {
@@ -200,8 +202,10 @@ describe('FormlySelectType (getters)', () => {
 });
 
 describe('FormlySelectType (English locale)', () => {
-  // The German texts are fallbacks in the catalog, not literals in the template.
-  // An English session must therefore read English.
+  /**
+   * The German texts are fallbacks in the catalog, not literals in the template, so an English
+   * session reads English.
+   */
   beforeEach(() => localStorage.setItem('ap.locale', 'en'));
   afterEach(() => localStorage.removeItem('ap.locale'));
 

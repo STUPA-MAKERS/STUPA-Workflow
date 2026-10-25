@@ -1,11 +1,6 @@
 @use 'breakpoints' as bp;
 @use 'dot-parts' as dots;
 
-/* The shared parts of the four sub-tabs of a gremium: the chip row, a group of rows with
-   its heading, and a sub line with a dot between its parts. The arrow at the end of a
-   row is `app-row-chevron`. */
-
-/* The chips (and a search) in one row; on a phone the chips scroll sideways. */
 @mixin tools {
   display: flex;
   flex-wrap: wrap;
@@ -43,7 +38,6 @@
   color: var(--color-accent-text);
 }
 
-/* A sub line: the parts with a dot between two of them. */
 @mixin parts($part) {
   display: inline;
   @include dots.between($part);

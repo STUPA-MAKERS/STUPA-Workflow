@@ -1,4 +1,4 @@
-/* The mark sits on the top end of the icon pill (56 × 32) of the rail and the phone bar. */
+// On the top end of the 56 × 32 icon pill of the rail and the phone bar.
 :host {
   display: contents;
 }
@@ -20,7 +20,6 @@
   line-height: 1;
 }
 
-/* In the flow of a row (the "Mehr" sheet), not on an icon. */
 .mark__count--inline {
   position: static;
   flex: none;
@@ -30,7 +29,6 @@
   font-size: 11px;
 }
 
-/* The ring in the colour behind the bar separates the dot from the icon stroke. */
 .mark__live {
   position: absolute;
   top: 4px;

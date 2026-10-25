@@ -14,8 +14,6 @@ import { toFormatLocale } from '@core/i18n/i18n.service';
 import { monthShort } from '@shared/date-format';
 import { resolveI18n } from '@shared/forms/i18n-text';
 
-// ------------------------------------------------------------------ roles
-
 /** The fixed roles first, the roles of the gremium between them, as on the server. */
 const ROLE_ORDER: Readonly<Record<string, number>> = { vorstand: 0, manager: 1, member: 3 };
 
@@ -32,8 +30,6 @@ export function localized(
 ): string {
   return resolveI18n(text, locale) || fallback;
 }
-
-// ------------------------------------------------------------------ months
 
 /** `YYYY-MM` of a date (local time). */
 export function monthKey(date: Date): string {
@@ -106,8 +102,6 @@ export function semesterOf(range: MonthRange): { summer: boolean; year: number }
   if (shiftMonth(range.from, 5) !== range.to || (month !== '04' && month !== '10')) return null;
   return { summer: month === '04', year: Number(range.from.slice(0, 4)) };
 }
-
-// ------------------------------------------------------------------ attendance
 
 /** How one cell of the matrix shows. */
 export interface CellView {
@@ -239,8 +233,6 @@ export function oneDecimal(value: number, locale: string): string {
   }).format(value);
 }
 
-
-// ------------------------------------------------------------------ CSV
 
 /**
  * A CSV text for a spreadsheet: semicolons, CRLF and a byte order mark, so a German

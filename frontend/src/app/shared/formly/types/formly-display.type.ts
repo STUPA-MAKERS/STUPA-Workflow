@@ -30,7 +30,6 @@ import { FieldType, type FieldTypeConfig } from '@ngx-formly/core';
   `,
   styles: [
     `
-      /* A section heading: the accent heading of the global \`.sec\` class. */
       .display__heading {
         margin-top: var(--space-3);
         padding: 0 var(--space-1);

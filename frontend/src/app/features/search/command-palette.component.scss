@@ -1,6 +1,5 @@
 @use 'breakpoints' as bp;
 
-/* The palette sits above everything, including any dialog the page below might own. */
 .pal__scrim {
   position: fixed;
   inset: 0;
@@ -8,8 +7,6 @@
   background: var(--color-scrim);
 }
 
-/* A centred sheet near the top: a palette is a thing you type into and dismiss. Centred
-   in the viewport, the results would land below the fold. */
 .pal {
   position: fixed;
   z-index: calc(var(--z-dialog) + 2);
@@ -53,8 +50,6 @@
 .pal__input::placeholder {
   color: var(--color-text-subtle);
 }
-/* The whole sheet is the focus surface; a ring around the bare field inside it reads
-   as a second control. */
 .pal__input:focus {
   outline: none;
 }
@@ -76,7 +71,6 @@
   outline: 2px solid var(--color-focus-ring);
   outline-offset: -2px;
 }
-/* A keyboard has Escape: the key shows. A phone has none: a cross shows. */
 .pal__x {
   display: none;
 }
@@ -127,8 +121,6 @@
   border-radius: var(--radius-field);
   cursor: pointer;
 }
-/* One highlight, driven by the keyboard. Hover writes to the same signal, so the
-   pointer and the arrow keys can never disagree about which row is selected. */
 .pal__row--active {
   background: var(--color-selected);
 }
@@ -155,7 +147,6 @@
 app-status-text.pal__rowSub {
   font-weight: var(--fw-regular);
 }
-/* The matching letters, in the accent: the reader sees why the row is there. */
 .pal__rowText {
   --highlight-bg: transparent;
   --highlight-color: var(--color-accent-text);
@@ -218,7 +209,6 @@ app-status-text.pal__rowSub {
   }
 }
 
-/* Motion: the palette drops in from above and grows to its size; it fades out faster. */
 .pal--entering {
   animation: pal-in var(--motion-fast) var(--ease-enter);
 }
@@ -229,7 +219,7 @@ app-status-text.pal__rowSub {
   pointer-events: none;
   animation: pal-fade var(--motion-xs) var(--ease-exit) reverse forwards;
 }
-/* The individual transform properties keep the centring transform of .pal. */
+// The individual transform properties keep the centring transform of `.pal`.
 @keyframes pal-in {
   from {
     opacity: 0;

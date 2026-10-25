@@ -15,8 +15,6 @@
   color: var(--color-text-muted);
 }
 
-/* The MCP card steps up from what it sits on: surface 2 on the sheet of the frame,
-   surface 1 on the page background (see `surface.context`). */
 .gr__mcp {
   display: flex;
   flex-direction: column;
@@ -61,7 +59,6 @@
   padding-left: var(--space-6);
 }
 
-/* A command and a URL are copyable values: they wrap, they are never cut. */
 .gr__cmd {
   padding: 2px var(--space-2);
   border-radius: var(--radius-sm);
@@ -88,8 +85,7 @@
 .gr__configTitle {
   color: var(--color-text-muted);
 }
-/* 13 px on a 20 px line, as on the board. The `code` inside takes the size of the
-   block, not the smaller size of the global `code` rule. */
+// The `code` inside takes the size of the block, not the smaller size of the global `code` rule.
 .gr__json {
   margin: 0;
   padding: 0 var(--space-4) var(--space-4);
@@ -148,8 +144,6 @@
   font-weight: var(--fw-medium);
 }
 
-/* "Erstellt … · Läuft ab …": the dot ends the first item, so a wrapped line never
-   starts with it. */
 .gr__meta {
   display: flex;
   flex-wrap: wrap;

@@ -20,6 +20,7 @@ function wire(over: Partial<AttachmentOutWire> = {}): AttachmentOutWire {
   };
 }
 
+/** The hydration GET (existing attachments) answers empty on init. */
 async function setup(canUpload = true, canDelete?: boolean) {
   const view = await render(AttachmentsPanelComponent, {
     inputs: { applicationId: APP_ID, canUpload, canDelete },
@@ -31,7 +32,6 @@ async function setup(canUpload = true, canDelete?: boolean) {
   });
   const http = view.fixture.debugElement.injector.get(HttpTestingController);
   const toast = view.fixture.debugElement.injector.get(ToastService);
-  // Empty the hydration GET (existing attachments) on init.
   http
     .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
     .flush([]);
@@ -117,6 +117,7 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /** The guards also hold when a caller bypasses the template. */
   it('uploads but offers no delete when canDelete is false (locked state)', async () => {
     const { http, detectChanges, fixture } = await setup(true, false);
     await uploadFile();
@@ -126,7 +127,6 @@ describe('AttachmentsPanelComponent', () => {
     expect(screen.getByText('plan.pdf')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Anhang löschen' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-    // The guards also hold when a caller bypasses the template.
     const cmp = fixture.componentInstance;
     cmp.remove(cmp.attachments()[0]);
     cmp.toggleSelect('att-1', true);
@@ -179,6 +179,7 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /** The sibling 'b' takes the unchanged branch of the map. */
   it('quarantines only the failing attachment, leaving siblings untouched (409)', async () => {
     const { http, detectChanges, fixture } = await setup();
     const cmp = fixture.componentInstance;
@@ -200,7 +201,6 @@ describe('AttachmentsPanelComponent', () => {
 
     const byId = new Map(cmp.attachments().map((x) => [x.id, x.scanState]));
     expect(byId.get('a')).toBe('quarantined');
-    // The sibling 'b' takes the unchanged branch of the map.
     expect(byId.get('b')).toBe('clean');
     http.verify();
   });
@@ -288,16 +288,17 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /** The flag stays set, and no POST goes out, which http.verify confirms. */
   it('guards against a concurrent upload while one is in flight', async () => {
     const { http, fixture } = await setup();
     const cmp = fixture.componentInstance;
     cmp.uploading.set(true);
     cmp['upload']([new File(['x'], 'a.pdf', { type: 'application/pdf' })]);
-    // The flag stays set. No POST goes out, which http.verify confirms.
     expect(cmp.uploading()).toBe(true);
     http.verify();
   });
 
+  /** Only the first request goes out, because concatMap holds the second one back. */
   it('uploads several files sequentially (concatMap) and toasts once', async () => {
     const { http, detectChanges, toast } = await setup();
     const success = jest.spyOn(toast, 'success');
@@ -307,7 +308,6 @@ describe('AttachmentsPanelComponent', () => {
       new File(['b'], 'b.pdf', { type: 'application/pdf' }),
     ]);
 
-    // Only the first request goes out. concatMap holds the second one back.
     const first = http.expectOne(uploadUrl);
     first.flush(wire({ id: 'att-a', filename: 'a.pdf' }), { status: 201, statusText: 'Created' });
     const second = http.expectOne(uploadUrl);
@@ -425,6 +425,7 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.scan('quarantined').kind).toBe('error');
   });
 
+  /** Before the list arrives nothing shows, because "0" would be a claim, not a count. */
   it('reports the number of attachments after the load and after each change', async () => {
     const counts: number[] = [];
     const view = await render(AttachmentsPanelComponent, {
@@ -437,7 +438,6 @@ describe('AttachmentsPanelComponent', () => {
       ],
     });
     const http = view.fixture.debugElement.injector.get(HttpTestingController);
-    // Nothing before the list arrived: "0" would be a claim, not a count.
     view.detectChanges();
     expect(counts).toEqual([]);
     http
@@ -469,7 +469,7 @@ describe('AttachmentsPanelComponent', () => {
     expect(counts).toEqual([0]);
   });
 
-  // Bulk select
+  /** The clear button of the bar drops the selection. */
   it('tracks per-row selection and shows the bulk bar only with a selection', async () => {
     const { http, detectChanges, fixture } = await setup();
     const cmp = fixture.componentInstance;
@@ -496,7 +496,6 @@ describe('AttachmentsPanelComponent', () => {
     expect(within(bar).getByRole('status')).toHaveTextContent('1 ausgewählt');
     expect(within(bar).getByRole('button', { name: 'Auswahl löschen' })).toBeInTheDocument();
 
-    // The clear button of the bar drops the selection.
     await userEvent.click(within(bar).getByRole('button', { name: 'Auswahl aufheben' }));
     detectChanges();
     expect(cmp.selectedCount()).toBe(0);
@@ -512,6 +511,10 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /**
+   * concatMap sends the DELETE requests one after the other, and refreshAfterBulk lists the
+   * attachments again.
+   */
   it('bulk-deletes selected attachments and clears them from the list', async () => {
     const { http, detectChanges, toast, fixture } = await setup();
     const cmp = fixture.componentInstance;
@@ -531,7 +534,6 @@ describe('AttachmentsPanelComponent', () => {
     cmp.toggleSelect('a', true);
     cmp.toggleSelect('b', true);
     cmp.bulkDelete();
-    // concatMap sends the DELETE requests one after the other.
     http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, {
       status: 204,
       statusText: 'No Content',
@@ -540,7 +542,6 @@ describe('AttachmentsPanelComponent', () => {
       status: 204,
       statusText: 'No Content',
     });
-    // refreshAfterBulk lists the attachments again.
     http
       .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
       .flush([]);
@@ -566,6 +567,11 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /**
+   * The first DELETE succeeds and the second one fails. refreshAfterBulk lists again: 'b' is still
+   * there and 'a' is gone. 'b' stays selected for a retry, and 'a' drops out because the list lost
+   * it.
+   */
   it('keeps remaining selections on a partial bulk-delete failure (list reload succeeds)', async () => {
     const { http, detectChanges, toast, fixture } = await setup();
     const cmp = fixture.componentInstance;
@@ -585,7 +591,6 @@ describe('AttachmentsPanelComponent', () => {
     cmp.toggleSelect('a', true);
     cmp.toggleSelect('b', true);
     cmp.bulkDelete();
-    // The first DELETE succeeds and the second one fails.
     http.expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/a').flush(null, {
       status: 204,
       statusText: 'No Content',
@@ -593,7 +598,6 @@ describe('AttachmentsPanelComponent', () => {
     http
       .expectOne((r) => r.method === 'DELETE' && r.url === '/api/attachments/b')
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
-    // refreshAfterBulk lists again: 'b' is still there and 'a' is gone.
     http
       .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
       .flush([wire({ id: 'b', filename: 'b.pdf' })]);
@@ -602,12 +606,12 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.bulkDeleting()).toBe(false);
     expect(error).toHaveBeenCalledWith('Anhang konnte nicht gelöscht werden.');
     expect(cmp.attachments().map((a) => a.id)).toEqual(['b']);
-    // 'b' stays selected for a retry. 'a' drops out because the list lost it.
     expect(cmp.isSelected('b')).toBe(true);
     expect(cmp.isSelected('a')).toBe(false);
     http.verify();
   });
 
+  /** The list reload fails, so the panel removes the attempted ids locally. */
   it('falls back to local removal when the post-bulk list reload fails', async () => {
     const { http, detectChanges, fixture } = await setup();
     const cmp = fixture.componentInstance;
@@ -629,7 +633,6 @@ describe('AttachmentsPanelComponent', () => {
       status: 204,
       statusText: 'No Content',
     });
-    // The list reload fails, so the panel removes the attempted ids locally.
     http
       .expectOne((r) => r.method === 'GET' && r.url === `/api/applications/${APP_ID}/attachments`)
       .flush({ title: 'e' }, { status: 500, statusText: 'Server Error' });
@@ -640,7 +643,6 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  // Drag and drop (the counting of `appFileDrop` has its own spec)
   const pdf = () => new File(['x'], 'drop.pdf', { type: 'application/pdf' });
   const panel = (container: Element) => container.querySelector('.att') as HTMLElement;
 
@@ -662,10 +664,11 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /** The drop is not prevented, so the page keeps the drag. */
   it('takes no drop without upload permission', async () => {
     const { http, detectChanges, container } = await setup(false);
     const enter = fireEvent.dragEnter(panel(container), { dataTransfer: { types: ['Files'] } });
-    expect(enter).toBe(true); // not prevented: the page keeps the drag
+    expect(enter).toBe(true);
     detectChanges();
     expect(screen.queryByText('Dateien zum Hochladen ablegen')).not.toBeInTheDocument();
     fireEvent.drop(panel(container), { dataTransfer: { types: ['Files'], files: [pdf()] } });
@@ -697,7 +700,11 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
-  // Preview in the full-screen kit viewer
+  /**
+   * canPreview accepts a clean PDF and rejects a scanning file or a foreign mime type. The
+   * `inline=1` flag keeps Content-Disposition inline, so the file renders instead of downloading.
+   * One file shows no arrows.
+   */
   it('offers a preview only for clean images/PDFs and opens the PDF in the viewer', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
@@ -705,7 +712,6 @@ describe('AttachmentsPanelComponent', () => {
     detectChanges();
 
     const cmp = fixture.componentInstance;
-    // canPreview accepts a clean PDF. It rejects a scanning file or a foreign mime type.
     expect(cmp.canPreview({ ...cmp.attachments()[0] })).toBe(true);
     expect(cmp.canPreview({ ...cmp.attachments()[0], scanState: 'scanning' })).toBe(false);
     expect(cmp.canPreview({ ...cmp.attachments()[0], mime: 'application/zip' })).toBe(false);
@@ -719,11 +725,8 @@ describe('AttachmentsPanelComponent', () => {
 
     expect(cmp.viewerOpen()).toBe(true);
     const viewer = screen.getByRole('dialog', { name: 'plan.pdf' });
-    // The `inline=1` flag keeps Content-Disposition inline. The file then renders
-    // instead of downloading.
     const frame = viewer.querySelector('iframe[title="plan.pdf"]');
     expect(frame?.getAttribute('src')).toBe('/api/attachments/att-1/download?sig=ok&inline=1');
-    // One file: no arrows.
     expect(within(viewer).queryByRole('button', { name: 'Nächste Datei' })).toBeNull();
 
     await userEvent.click(within(viewer).getByRole('button', { name: 'Vorschau schließen' }));
@@ -758,6 +761,12 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /**
+   * Only the clean image and the clean PDF are in the viewer, in the order of the list. Until the
+   * URL arrives the viewer shows the loading state and no frame. A second visit before the answer
+   * sends no second request. Back on the image the URL is known, so there is no request. The bar
+   * downloads the file it shows.
+   */
   it('steps through the previewable files, fetching each URL when the viewer reaches it', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
@@ -778,7 +787,6 @@ describe('AttachmentsPanelComponent', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Vorschau' })[1]);
     http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
     detectChanges();
-    // Only the clean image and the clean PDF are in the viewer, in the order of the list.
     expect(cmp.viewerItems().map((i) => i.name)).toEqual(['plan.pdf', 'foto.png']);
     const viewer = screen.getByRole('dialog', { name: 'foto.png' });
     expect(within(viewer).getByRole('button', { name: 'Nächste Datei' })).toBeDisabled();
@@ -786,28 +794,25 @@ describe('AttachmentsPanelComponent', () => {
     await userEvent.click(within(viewer).getByRole('button', { name: 'Vorherige Datei' }));
     detectChanges();
     expect(screen.getByRole('dialog', { name: 'plan.pdf' })).toBeInTheDocument();
-    // Until the URL arrives the viewer shows the loading state and no frame.
     expect(viewer.querySelector('iframe')).toBeNull();
     expect(within(viewer).getByRole('status')).toBeInTheDocument();
     const req = http.expectOne(dlUrl('att-1'));
-    // A second visit before the answer sends no second request.
     cmp.onViewerIndex(0);
     req.flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
     detectChanges();
     expect(viewer.querySelector('iframe')?.getAttribute('src')).toBe(
       '/api/attachments/att-1/download?inline=1',
     );
-    // Back to the image: its URL is known, so no request.
     cmp.onViewerIndex(1);
     detectChanges();
 
-    // The bar downloads the file it shows.
     await userEvent.click(within(viewer).getByRole('button', { name: 'Herunterladen' }));
     http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
     expect(open).toHaveBeenCalledWith('/api/attachments/att-9/download');
     http.verify();
   });
 
+  /** A late answer after the viewer closed changes nothing. */
   it('closes the viewer with the toast when the URL of the next file fails (409 quarantines it)', async () => {
     const { http, detectChanges, fixture, toast } = await setup();
     const error = jest.spyOn(toast, 'error');
@@ -828,7 +833,6 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.attachments()[1].scanState).toBe('quarantined');
     expect(error).toHaveBeenCalledTimes(1);
 
-    // A late answer after the viewer closed changes nothing.
     cmp.openPreview(pdfAtt);
     http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
     cmp.attachments.update((list) => [...list, { ...pdfAtt, id: 'att-5', filename: 'b.png', mime: 'image/png' }]);
@@ -847,6 +851,7 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /** A coarse pointer opens the system viewer instead of the kit viewer. */
   it('opens PDFs in the system viewer on coarse-pointer devices (images only in the viewer)', async () => {
     const { http, detectChanges, fixture } = await setup();
     await uploadFile();
@@ -866,7 +871,7 @@ describe('AttachmentsPanelComponent', () => {
     http.expectOne(dlUrl('att-1')).flush({ url: '/api/attachments/att-1/download', expiresIn: 120 });
 
     expect(open).toHaveBeenCalledWith('/api/attachments/att-1/download?inline=1');
-    expect(cmp.viewerOpen()).toBe(false); // system viewer instead of the viewer
+    expect(cmp.viewerOpen()).toBe(false);
 
     cmp.openPreview(cmp.attachments()[1]);
     http.expectOne(dlUrl('att-9')).flush({ url: '/api/attachments/att-9/download', expiresIn: 120 });
@@ -876,6 +881,11 @@ describe('AttachmentsPanelComponent', () => {
     http.verify();
   });
 
+  /**
+   * The 410 path and the generic error path reuse the attachment object directly. A file that left
+   * the list while its request ran opens no viewer. openPreview ignores further calls while a
+   * preview request is in flight.
+   */
   it('marks quarantined on 409 preview and toasts on 410/500', async () => {
     const { http, detectChanges, fixture, toast } = await setup();
     const error = jest.spyOn(toast, 'error');
@@ -890,18 +900,15 @@ describe('AttachmentsPanelComponent', () => {
     expect(cmp.viewerOpen()).toBe(false);
     expect(error).toHaveBeenCalledTimes(1);
 
-    // The 410 path and the generic error path reuse the attachment object directly.
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     http.expectOne(dlUrl('att-1')).flush({}, { status: 410, statusText: 'Gone' });
     expect(error).toHaveBeenCalledTimes(2);
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     http.expectOne(dlUrl('att-1')).flush({}, { status: 500, statusText: 'Err' });
     expect(error).toHaveBeenCalledTimes(3);
-    // A file that left the list while its request ran opens no viewer.
     cmp.openPreview({ ...cmp.attachments()[0], id: 'gone', scanState: 'clean' });
     http.expectOne(dlUrl('gone')).flush({ url: '/api/attachments/gone/download', expiresIn: 120 });
     expect(cmp.viewerOpen()).toBe(false);
-    // Guard: openPreview ignores further calls while a preview request is in flight.
     cmp.previewLoadingId.set('att-1');
     cmp.openPreview({ ...cmp.attachments()[0], scanState: 'clean' });
     cmp.previewLoadingId.set(null);

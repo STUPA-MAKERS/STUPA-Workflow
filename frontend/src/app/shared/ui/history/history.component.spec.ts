@@ -13,7 +13,7 @@ const at = (y: number, m: number, d: number, h: number, min: number) =>
 const YEAR = new Date().getFullYear();
 
 const ENTRIES: HistoryEntry[] = [
-  // Given out of order on purpose.
+  /** The entries are out of order on purpose. */
   { at: at(YEAR, 9, 26, 14, 12), icon: 'send', title: 'Eingereicht', kind: 'neutral', actor: 'Du' },
   {
     at: at(YEAR, 9, 28, 9, 40),
@@ -157,6 +157,7 @@ describe('HistoryComponent', () => {
     expect(lists[1].querySelector('time')).toBeNull();
   });
 
+  /** A field without a short value shows only its name. */
   it('lists the changed fields of an event with the old and the new value', async () => {
     const { container } = await render(HistoryComponent, {
       inputs: {
@@ -182,7 +183,6 @@ describe('HistoryComponent', () => {
     expect(items[0].querySelector('del')?.textContent).toBe('300');
     expect(items[0].querySelector('ins')?.textContent).toBe('350');
     expect(items[0].querySelector('.hist__arrow')).not.toBeNull();
-    // A field without a short value shows only its name.
     expect(items[1].querySelector('del, ins')).toBeNull();
     expect(items[1].textContent).not.toContain(':');
     expect(items[2].querySelector('del')).toBeNull();
@@ -193,6 +193,11 @@ describe('HistoryComponent', () => {
     expect(await runAxe(container)).toHaveNoViolations();
   });
 
+  /**
+   * When closed, there is a button per change with long values, and no values and no colon. Each
+   * line is one element; the leading spaces become the indent, and a tab counts four. The second
+   * change stays closed, and it has only the new side.
+   */
   it('opens the long values of a change below its line, each change on its own', async () => {
     const { container, fixture } = await render(HistoryComponent, {
       inputs: {
@@ -218,7 +223,6 @@ describe('HistoryComponent', () => {
       },
     });
     const items = () => [...container.querySelectorAll<HTMLElement>('.hist__changes > li')];
-    // Closed: a button per change with long values, no values, no colon.
     const buttons = screen.getAllByRole('button', { name: 'Werte anzeigen' });
     expect(buttons).toHaveLength(2);
     expect(items()[0].querySelector('del, ins')).toBeNull();
@@ -230,7 +234,6 @@ describe('HistoryComponent', () => {
     const open = screen.getByRole('button', { name: 'Werte ausblenden' });
     expect(open).toHaveAttribute('aria-expanded', 'true');
     const block = container.querySelector(`#${open.getAttribute('aria-controls')}`);
-    // One element per line; the leading spaces become the indent, a tab counts four.
     const lines = (sel: string) =>
       [...(block?.querySelectorAll<HTMLElement>(`${sel} .hist__line`) ?? [])].map((l) => [
         l.textContent,
@@ -247,7 +250,6 @@ describe('HistoryComponent', () => {
     ]);
     expect(block?.textContent).toContain('Vorher');
     expect(block?.textContent).toContain('Nachher');
-    // The second change stays closed; it has only the new side.
     expect(items()[1].querySelector('.hist__values')).toBeNull();
     await userEvent.click(within(items()[1]).getByRole('button'));
     fixture.detectChanges();

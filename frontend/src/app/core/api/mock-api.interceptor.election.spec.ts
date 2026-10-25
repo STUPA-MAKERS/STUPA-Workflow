@@ -82,12 +82,12 @@ describe('mockApiInterceptor — elections', () => {
     }
   });
 
+  /** After the lot the vote is decided, so there is no second lot. */
   it('draws the lot once: the first tied candidate is elected', async () => {
     const v = await post<Vote>(`/api/votes/${ELECTION}/draw-lot`);
     expect(v.result).toBe('elected');
     expect(v.electionResult?.elected).toEqual(['c1']);
     expect(v.electionResult?.lot).toMatchObject({ drawn: ['c1'], byName: 'Demo-Nutzer:in' });
-    // The vote is decided now: no second lot.
     await expect(post(`/api/votes/${ELECTION}/draw-lot`)).rejects.toMatchObject({
       status: 409,
       error: expect.objectContaining({ code: 'no_lot_pending' }),

@@ -7,7 +7,6 @@
   justify-content: center;
 }
 
-/* One centred column, as wide as the landing page (fill or centre). */
 .pp {
   display: flex;
   flex-direction: column;
@@ -126,7 +125,6 @@
   border-radius: var(--radius-sm);
 }
 
-/* The agenda in two columns; a number column on the left. */
 .pp__tops {
   margin: 0;
   padding: 0;
@@ -159,8 +157,7 @@
   gap: 6px;
   font-style: italic;
 }
-/* The results of one item wrap inside the column. The template drops the spaces between
-   the spans, so a plain run of spans has no break point and runs into the next column. */
+// The template drops the spaces between the spans, so the spans need a break point of their own.
 .pp__results {
   display: inline-flex;
   flex-wrap: wrap;

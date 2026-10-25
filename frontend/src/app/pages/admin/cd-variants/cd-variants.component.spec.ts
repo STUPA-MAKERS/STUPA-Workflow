@@ -89,8 +89,7 @@ async function setup(api: ReturnType<typeof makeApi> = makeApi()) {
 describe('AdminCdVariantsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
-  // --- list ---------------------------------------------------------------
-
+  /** The first variant starts open. */
   it('lists the variants with name, key, base and the gremien that use them', async () => {
     const { c } = await setup();
     expect(await screen.findByText('StuPa')).toBeInTheDocument();
@@ -98,7 +97,6 @@ describe('AdminCdVariantsComponent', () => {
     expect(screen.getByText('Basis: Protokoll · genutzt von Studierendenparlament, Fachschaftenrat')).toBeInTheDocument();
     expect(c.loading()).toBe(false);
     expect(c.loadError()).toBe(false);
-    // The first variant starts open.
     expect(c.isExpanded('cd-1')).toBe(true);
     expect(screen.getByRole('button', { name: /^Logos ausblenden/ })).toHaveAttribute('aria-expanded', 'true');
   });
@@ -125,12 +123,12 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.logoDetail({ ...TITLE_UPLOAD, size: undefined, fileName: undefined })).toBe('—');
   });
 
+  /** There are two bundled logos (HSRT, STUPA) and none for the upload. */
   it('explains under a bundled logo why it has no file', async () => {
     await setup();
     await screen.findByText('StuPa');
     const hint =
       'Dieses Logo liefert der PDF-Renderer mit. Der Server wandelt es beim nächsten Start in eine normal hochgeladene Datei um.';
-    // Two bundled logos (HSRT, STUPA), none for the upload.
     const lines = screen.getAllByText(hint).filter((el) => el.classList.contains('cdv__logoHint'));
     expect(lines).toHaveLength(2);
     expect(screen.getByText('wappen.png · 1,2 KB').parentElement).not.toHaveTextContent(hint);
@@ -161,6 +159,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.fileUrl(TITLE_UPLOAD)).toBe('/api/admin/cd-variant-logos/l-2/file');
   });
 
+  /** Each logo row has one ⋮ menu; only an upload offers the download. */
   it('collapses and expands the logo rows of a variant', async () => {
     const { c } = await setup();
     expect(screen.getByText('HSRT')).toBeInTheDocument();
@@ -170,7 +169,6 @@ describe('AdminCdVariantsComponent', () => {
     expect(screen.queryByText('HSRT')).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /^Logos anzeigen/ }));
     expect(c.isExpanded('cd-1')).toBe(true);
-    // Each logo row has one ⋮ menu; only an upload offers the download.
     expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: (HSRT|wappen\.png)/ })).toHaveLength(2);
     expect(c.logoMenu('title', 0, false, TITLE_LOGO)[0].items.map((i: { id: string }) => i.id)).toEqual(['down']);
     expect(c.logoMenu('title', 1, true, TITLE_UPLOAD)[0].items.map((i: { id: string }) => i.id)).toEqual(['up', 'download']);
@@ -192,13 +190,13 @@ describe('AdminCdVariantsComponent', () => {
     expect(remove).toHaveBeenCalledWith(VARIANT, TITLE_LOGO);
   });
 
+  /** The dialog names the variant and offers only the upload, with no source choice. */
   it('adds a logo from the card into the slot that the dialog picks', async () => {
     const { c, api, fixture } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Logo hinzufügen' }));
     await fixture.whenStable();
     fixture.detectChanges();
     expect(c.logoDraft()).toMatchObject({ variantId: 'cd-1', variantName: 'StuPa', slot: 'title' });
-    // The dialog names the variant and offers only the upload: no source choice.
     expect(screen.getByText('Variante StuPa')).toBeInTheDocument();
     expect(screen.queryByLabelText('Quelle')).not.toBeInTheDocument();
     const slots = screen.getByRole('radiogroup', { name: 'Position' });
@@ -217,8 +215,6 @@ describe('AdminCdVariantsComponent', () => {
     await setup(makeApi({ listCdVariants: jest.fn(() => of([{ ...VARIANT, logos: [] }])) }));
     expect(await screen.findByText('Noch keine Logos.')).toBeInTheDocument();
   });
-
-  // --- create / edit ------------------------------------------------------
 
   it('creates a variant through the dialog and generates the key from the name', async () => {
     const { api, c, toast } = await setup();
@@ -259,7 +255,7 @@ describe('AdminCdVariantsComponent', () => {
 
   it('canSave requires a name and a key that matches the slug pattern', async () => {
     const { c } = await setup();
-    expect(c.canSave()).toBe(false); // no dialog values yet
+    expect(c.canSave()).toBe(false);
     c.openCreate();
     c.patchName('  ');
     expect(c.canSave()).toBe(false);
@@ -280,11 +276,11 @@ describe('AdminCdVariantsComponent', () => {
     expect(api.createCdVariant).not.toHaveBeenCalled();
   });
 
+  /** The key is immutable, because a changed key answers 409, so the field stays locked. */
   it('edits a variant: the key stays read-only and only name/base go out', async () => {
     const { api, c, fixture } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: StuPa' }));
     expect(c.editingId()).toBe('cd-1');
-    // The key is immutable: a changed key answers 409, so the field stays locked.
     await fixture.whenStable();
     fixture.detectChanges();
     expect(screen.getByLabelText(/^Schlüssel/)).toBeDisabled();
@@ -297,6 +293,7 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.variants()[0].name).toBe('StuPa 2026');
   });
 
+  /** The dialog stays open, so the key can be fixed. */
   it('renders the 409 on create as a duplicate-key message', async () => {
     const { c, toast } = await setup(makeApi({ createCdVariant: jest.fn(() => httpError(409)) }));
     c.openCreate();
@@ -304,7 +301,7 @@ describe('AdminCdVariantsComponent', () => {
     c.submit(new Event('submit'));
     expect(c.formError()).toBe('admin.cdVariants.keyExists');
     expect(c.saving()).toBe(false);
-    expect(c.dialogOpen()).toBe(true); // stays open so the key can be fixed
+    expect(c.dialogOpen()).toBe(true);
     expect(toast.error).toHaveBeenCalledWith('Dieser Schlüssel ist bereits vergeben.');
   });
 
@@ -326,8 +323,6 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.dialogOpen()).toBe(false);
   });
 
-  // --- delete -------------------------------------------------------------
-
   it('deletes a variant after the confirmation', async () => {
     const { api, c, toast } = await setup();
     c.askDelete(VARIANT);
@@ -339,13 +334,14 @@ describe('AdminCdVariantsComponent', () => {
     expect(toast.success).toHaveBeenCalled();
   });
 
+  /** The dialog keeps the message. */
   it('names the 409 "still in use" reason instead of a generic failure', async () => {
     const { c, toast } = await setup(makeApi({ deleteCdVariant: jest.fn(() => httpError(409)) }));
     c.askDelete(VARIANT);
     c.doDelete();
     expect(c.deleteError()).toBe('admin.cdVariants.inUse');
     expect(c.deleting()).toBe(false);
-    expect(c.confirmDelete()).not.toBeNull(); // the dialog keeps the message
+    expect(c.confirmDelete()).not.toBeNull();
     expect(toast.error).toHaveBeenCalledWith(
       'Diese Variante ist noch einem Gremium zugewiesen. Ändere zuerst das Gremium.',
     );
@@ -368,12 +364,10 @@ describe('AdminCdVariantsComponent', () => {
     expect(api.deleteCdVariant).not.toHaveBeenCalled();
   });
 
-  // --- logos --------------------------------------------------------------
-
   it('uploads a logo file into the chosen slot', async () => {
     const { api, c, toast } = await setup();
     c.openLogoDialog(VARIANT, 'title');
-    expect(c.canSaveLogo()).toBe(false); // no file yet
+    expect(c.canSaveLogo()).toBe(false);
     const file = new File(['x'], 'neu.png', { type: 'image/png' });
     c.onFileSelected([file]);
     expect(c.canSaveLogo()).toBe(true);
@@ -403,13 +397,13 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.logoDraft().file).toBeNull();
   });
 
-  // --- square logo ----------------------------------------------------------
-
   describe('square logo', () => {
     let urls = 0;
 
-    // jsdom has no object URLs. The fakes stay after each test, because the fixture
-    // revokes its preview when the test bed tears it down after the test.
+    /**
+     * jsdom has no object URLs. The fakes stay after each test, because the fixture revokes its
+     * preview when the test bed tears it down after the test.
+     */
     beforeEach(() => {
       urls = 0;
       (URL.createObjectURL as unknown) = jest.fn(() => `blob:preview-${++urls}`);
@@ -428,6 +422,7 @@ describe('AdminCdVariantsComponent', () => {
       return view;
     }
 
+    /** The preview row carries the first gremium that uses the variant. */
     it('checks a square file, previews it as a gremium row and uploads it', async () => {
       const square: CdVariantLogo = {
         id: 'l-sq', slot: 'square', position: 0, fileName: 'quadrat.png', mime: 'image/png',
@@ -440,7 +435,7 @@ describe('AdminCdVariantsComponent', () => {
       const file = png();
       c.onFileSelected([file]);
       expect(c.logoDraft().checking).toBe(true);
-      expect(c.canSaveLogo()).toBe(false); // the size is not known yet
+      expect(c.canSaveLogo()).toBe(false);
       fixture.detectChanges();
       expect(screen.getByText('Bild wird geprüft …')).toBeInTheDocument();
       await fixture.whenStable();
@@ -448,7 +443,6 @@ describe('AdminCdVariantsComponent', () => {
       expect(c.readImageSize).toHaveBeenCalledWith('blob:preview-1');
       expect(c.verdict()).toBe('ok');
       expect(screen.getByText(/512 × 512 px · quadratisch, groß genug/)).toBeInTheDocument();
-      // The preview row carries the first gremium that uses the variant.
       expect(screen.getByText('So erscheint es in der Gremien-Liste')).toBeInTheDocument();
       expect(screen.getByText('Studierendenparlament')).toBeInTheDocument();
       expect(c.canSaveLogo()).toBe(true);
@@ -459,6 +453,7 @@ describe('AdminCdVariantsComponent', () => {
       expect(toast.success).toHaveBeenCalled();
     });
 
+    /** The other slots stay. */
     it('replaces the square logo that the variant held', async () => {
       const old: CdVariantLogo = { id: 'l-old', slot: 'square', position: 0, fileName: 'alt.png' };
       const next: CdVariantLogo = { id: 'l-new', slot: 'square', position: 0, fileName: 'neu.png' };
@@ -473,7 +468,7 @@ describe('AdminCdVariantsComponent', () => {
       const ids = c.variants()[0].logos.map((l: CdVariantLogo) => l.id);
       expect(ids).toContain('l-new');
       expect(ids).not.toContain('l-old');
-      expect(ids).toContain('l-1'); // the other slots stay
+      expect(ids).toContain('l-1');
     });
 
     it.each([
@@ -510,6 +505,7 @@ describe('AdminCdVariantsComponent', () => {
       expect(c.canSaveLogo()).toBe(false);
     });
 
+    /** The first preview URL goes when the second file comes. */
     it('ignores the size of a file that a later pick replaced', async () => {
       let resolveFirst: (s: { width: number; height: number }) => void = () => undefined;
       let rejectSecond: (e: Error) => void = () => undefined;
@@ -520,7 +516,6 @@ describe('AdminCdVariantsComponent', () => {
         .mockReturnValueOnce(new Promise((_, r) => (rejectSecond = r)));
       c.onFileSelected([png('a.png')]);
       c.onFileSelected([png('b.png')]);
-      // The first preview URL goes when the second file comes.
       expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview-1');
       c.closeLogoDialog();
       resolveFirst({ width: 512, height: 512 });
@@ -530,11 +525,12 @@ describe('AdminCdVariantsComponent', () => {
       expect(c.logoError()).toBeNull();
     });
 
+    /** The same slot keeps everything. */
     it('drops the picked file when the slot changes', async () => {
       const { c, fixture } = await squareSetup(Promise.resolve({ width: 512, height: 512 }));
       c.onFileSelected([png()]);
       await fixture.whenStable();
-      c.setSlot('square'); // the same slot keeps everything
+      c.setSlot('square');
       expect(c.logoDraft().file).not.toBeNull();
       c.setSlot('title');
       expect(c.logoDraft()).toMatchObject({ slot: 'title', file: null, previewUrl: null, size: null });
@@ -587,9 +583,9 @@ describe('AdminCdVariantsComponent', () => {
       expect(c.logoError()).toBe('admin.cdVariants.logoType');
     });
 
+    /** jsdom never loads the source, so the promise stays open; the call must not throw. */
     it('reads the size through an image element by default', async () => {
       const { c } = await setup();
-      // jsdom never loads the source, so the promise stays open; the call must not throw.
       expect(c.readImageSize('blob:x')).toBeInstanceOf(Promise);
     });
 
@@ -607,8 +603,7 @@ describe('AdminCdVariantsComponent', () => {
     });
   });
 
-  // --- list thumbnails -------------------------------------------------------
-
+  /** The square row comes first, and its menu has no move items. */
   it('shows the square logo before the name, else the initials', async () => {
     const square: CdVariantLogo = { id: 'l-sq', slot: 'square', position: 0, fileName: 'q.png' };
     const other: CdVariant = { id: 'cd-2', key: 'hsrt-inf', name: 'HSRT INF', baseVariant: 'report', logos: [] };
@@ -622,7 +617,6 @@ describe('AdminCdVariantsComponent', () => {
     expect(heads[0].getAttribute('src')).toBe('/api/admin/cd-variant-logos/l-sq/square');
     expect(heads[1]).toHaveTextContent('HI');
     expect(heads[1]).toHaveAttribute('title', 'Kein quadratisches Logo');
-    // The square row comes first and its menu has no move items.
     const rows = container.querySelectorAll('.cdv__logo');
     expect(rows[0]).toHaveTextContent('Quadratisch 1:1');
     expect(rows[0].querySelector('img.cdv__thumb')).not.toBeNull();
@@ -729,8 +723,10 @@ describe('AdminCdVariantsComponent', () => {
     expect(c.variants()[0].logos).toEqual([]);
   });
 
-  // A thrown string carries no status, and a non-numeric one is unusable. Both
-  // must fall back to the generic message instead of matching 409 by accident.
+  /**
+   * A thrown string carries no status, and a non-numeric one is unusable. Both must fall back to
+   * the generic message instead of matching 409 by accident.
+   */
   it.each([['boom'], [{ status: 'nope' }]])(
     'reads an error without a usable status as "no status" (%p)',
     async (thrown) => {

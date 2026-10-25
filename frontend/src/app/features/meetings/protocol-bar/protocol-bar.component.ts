@@ -14,8 +14,7 @@ interface BarState {
 }
 
 /**
- * The protocol bar on top of the sheet of a closed meeting (boards
- * Sitzung-Protokoll-Entwurf and Sitzung-Geschlossen).
+ * The protocol bar on top of the sheet of a closed meeting.
  *
  * - Draft: "Entwurf · Das Protokoll ist noch nicht versandt." and "Finalisieren &
  *   versenden" for a holder of `canFinalize` (write access plus the gremium right

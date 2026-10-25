@@ -24,12 +24,11 @@ describe('invoice figures', () => {
     expect(countedBookings(rows).map((b) => b.id)).toEqual(['p', 'o']);
   });
 
+  /** The rest is never negative. A backend without bookings sends none. */
   it('sums the expense bookings against the gross amount', () => {
     const bookings = [B({ id: 'a' }), B({ id: 'i', kind: 'income', amount: '30.00' }), B({ id: 'c', amount: '50.00' })];
     expect(bookedOn({ ...INV, linkedBookings: bookings })).toEqual({ booked: 150, gross: 250, open: 100 });
-    // Never a negative rest.
     expect(bookedOn({ ...INV, linkedBookings: [B({ amount: '300.00' })] })?.open).toBe(0);
-    // An older backend sends no bookings.
     expect(bookedOn(INV)).toBeNull();
   });
 });

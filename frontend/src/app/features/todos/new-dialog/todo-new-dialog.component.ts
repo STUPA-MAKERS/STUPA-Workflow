@@ -54,8 +54,8 @@ export interface NewTodoLink {
 }
 
 /**
- * "Neues To-Do" (frame 5): the dialog of the board ("+ To-Do"), of the ⋮ of a TOP and
- * of a ticket ("To-Do aus Ticket anlegen", frame 33).
+ * "Neues To-Do": the dialog of the board ("+ To-Do"), of the ⋮ of a TOP and
+ * of a ticket ("To-Do aus Ticket anlegen").
  *
  * Board and column start as the given board (or the board of the given Gremium, or the
  * first board of `boardKinds`), else the first board that takes cards; the column as the

@@ -12,6 +12,7 @@ const COLS: KeyDragColumns = {
 const lift = (): KeyDragPosition => ({ cardId: 'c1', col: 0, index: 1, fromCol: 0, fromIndex: 1 });
 
 describe('KanbanKeyDrag', () => {
+  /** Another card does not take keys while one is held. */
   it('lifts a card with Space only', () => {
     const drag = new KanbanKeyDrag<KeyDragPosition>();
     expect(drag.key(key('Enter'), 'c1', lift, COLS)).toEqual({ kind: 'none' });
@@ -19,10 +20,10 @@ describe('KanbanKeyDrag', () => {
     expect(drag.key(space, 'c1', lift, COLS)).toEqual({ kind: 'lift' });
     expect(space.defaultPrevented).toBe(true);
     expect(drag.held()).toMatchObject({ cardId: 'c1', col: 0, index: 1 });
-    // Another card does not take keys while one is held.
     expect(drag.key(key('ArrowDown'), 'c2', lift, COLS)).toEqual({ kind: 'none' });
   });
 
+  /** Column 1 has one other card, so the card goes to its end. */
   it('moves inside the column and across, and stops at the edges', () => {
     const drag = new KanbanKeyDrag<KeyDragPosition>();
     drag.key(key(' '), 'c1', lift, COLS);
@@ -34,7 +35,6 @@ describe('KanbanKeyDrag', () => {
     drag.key(key('ArrowDown'), 'c1', lift, COLS);
     drag.key(key('ArrowDown'), 'c1', lift, COLS);
     drag.key(key('ArrowRight'), 'c1', lift, COLS);
-    // Column 1 has one other card, so the card goes to its end.
     expect(drag.held()).toMatchObject({ col: 1, index: 1 });
     drag.key(key('ArrowRight'), 'c1', lift, COLS);
     expect(drag.held()).toMatchObject({ col: 2, index: 0 });

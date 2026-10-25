@@ -34,7 +34,8 @@ const R = 87;
 const INNER = 65;
 const CX = SIZE / 2;
 const CY = SIZE / 2;
-const GROW = 5; // radial growth on hover
+/** Radial growth of a slice on hover. */
+const GROW = 5;
 
 /**
  * Donut chart of a distribution with its legend ("Verteilung").

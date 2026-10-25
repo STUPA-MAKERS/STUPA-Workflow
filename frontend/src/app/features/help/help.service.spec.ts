@@ -1,6 +1,7 @@
 import { HelpService } from './help.service';
 
 describe('HelpService', () => {
+  /** The shell keeps the loaded dialog. */
   it('opens and closes the report dialog and remembers the first opening', () => {
     const help = new HelpService();
     expect(help.reportOpen()).toBe(false);
@@ -10,7 +11,6 @@ describe('HelpService', () => {
     expect(help.reportUsed()).toBe(true);
     help.closeReport();
     expect(help.reportOpen()).toBe(false);
-    // The shell keeps the loaded dialog.
     expect(help.reportUsed()).toBe(true);
   });
 });

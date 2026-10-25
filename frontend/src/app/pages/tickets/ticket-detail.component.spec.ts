@@ -421,6 +421,7 @@ describe('TicketDetailComponent', () => {
     ]);
   });
 
+  /** An anonymized ticket takes no note files. */
   it('offers the unblock for a blocked sender, and no block on an anonymized ticket', async () => {
     const { cmp, setGet, harness } = await start('/tickets/t40', {
       get: () => of(detail({ status: 'new', senderBlocked: true })),
@@ -432,7 +433,6 @@ describe('TicketDetailComponent', () => {
     await harness.navigateByUrl('/tickets/t41');
     harness.detectChanges();
     expect(cmp.menuSections().map((s) => s.items.map((i) => i.id))).toEqual([['reset']]);
-    // An anonymized ticket takes no note files.
     expect(
       harness.fixture.debugElement
         .query((d) => d.name === 'app-chat')
@@ -552,6 +552,7 @@ describe('TicketDetailComponent', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /Erledigt/ }));
   });
 
+  /** Without a question, a confirm does nothing. */
   it('asks first when open to-dos are linked, and completes them by default', async () => {
     const { cmp, api, todosApi, harness } = await start('/tickets/t40', {
       todos: of([
@@ -569,7 +570,6 @@ describe('TicketDetailComponent', () => {
     harness.detectChanges();
     expect(api.patch).toHaveBeenCalledWith('t40', { status: 'done', completeTodos: true });
     expect(todosApi.linked).toHaveBeenCalled();
-    // Without a question, a confirm does nothing.
     api.patch.mockClear();
     cmp.confirmClose();
     expect(api.patch).not.toHaveBeenCalled();
@@ -598,6 +598,7 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByText('Offenes To-Do mit erledigen')).toBeInTheDocument();
   });
 
+  /** The list shows the cards of the page and reads nothing itself. */
   it('lists the linked to-dos and links each to its board', async () => {
     const { cmp, todosApi } = await start('/tickets/t40', {
       todos: of([
@@ -612,16 +613,15 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByText('Plattform · In Arbeit')).toBeInTheDocument();
     expect(screen.getByRole('img', { name: 'Mara Keller, Gelöschte Person' })).toBeInTheDocument();
     expect(cmp.openTodos().map((c) => c.id)).toEqual(['c1']);
-    // The list shows the cards of the page and reads nothing itself.
     expect(todosApi.linked).toHaveBeenCalledTimes(1);
   });
 
+  /** The shared dialog starts from the ticket: its title and the link to it. */
   it('opens the to-do dialog and reloads after a new card', async () => {
     const { cmp, api, todosApi, harness } = await start('/tickets/t40', { split: true });
     await userEvent.click(screen.getByRole('button', { name: /To-Do anlegen/ }));
     harness.detectChanges();
     expect(cmp.todoOpen()).toBe(true);
-    // The shared dialog starts from the ticket: its title and the link to it.
     await harness.fixture.whenStable();
     harness.detectChanges();
     const dialog = screen.getByRole('dialog', { name: 'To-Do aus Ticket anlegen' });
@@ -683,18 +683,18 @@ describe('TicketDetailComponent', () => {
     expect(screen.getByRole('link', { name: 'Zur Liste' })).toHaveAttribute('href', '/tickets');
   });
 
+  /** The title opens the sheet on the line of the actions; no line stands above it. */
   it('names the ticket number in the line under the title, with no line above it', async () => {
     await start('/tickets/t40');
-    // The title opens the sheet on the line of the actions; no line stands above it.
     expect(document.querySelector('app-sheet-bar .sheet-bar__title [appSheetBarTitle]')).not.toBeNull();
     expect(document.querySelector('.sheet-bar__kicker')).toBeNull();
     expect(document.querySelector('.td__line .mono')?.textContent?.trim()).toBe('T-0040');
   });
 
+  /** Without a ticket the header parts fall back. */
   it('names a failed read', async () => {
     const { cmp } = await start('/tickets/t40', { get: () => throwError(() => new Error('down')) });
     expect(screen.getByRole('alert')).toHaveTextContent('Das Ticket konnte nicht geladen werden.');
-    // Without a ticket the header parts fall back.
     expect(cmp.reporter()).toBe('');
     expect(cmp.statusKind()).toBe('accent');
     expect(cmp.statusLabel()).toBe('Neu');
@@ -718,10 +718,12 @@ describe('TicketDetailComponent', () => {
     expect(cmp.ticket()).not.toBeNull();
   });
 
+  /**
+   * The skeleton has the loaded shape: the head, then the chat with its bubbles and its composer.
+   */
   it('shows the skeleton while the ticket loads', async () => {
     await start('/tickets/t40', { get: () => new Subject<TicketDetail>() });
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull();
-    // The loaded shape: the head, then the chat with its bubbles and its composer.
     expect(document.querySelector('.td__head .td__skelTitle')).not.toBeNull();
     expect(document.querySelectorAll('.td__chat .sk__msg').length).toBeGreaterThan(0);
     expect(document.querySelector('.td__chat .sk__composer')).not.toBeNull();
@@ -811,6 +813,7 @@ describe('TicketDetailComponent', () => {
     expect(cmp.saving()).toBeNull();
   });
 
+  /** The ticket itself is no candidate. */
   it('closes as a duplicate of a found ticket', async () => {
     const hits: TicketListItem[] = [
       detail(),
@@ -825,7 +828,6 @@ describe('TicketDetailComponent', () => {
     cmp.duplicateSearch.flush();
     await settle();
     expect(api.list).toHaveBeenCalledWith({ q: 'Fehler', limit: 8, offset: 0 });
-    // The ticket itself is no candidate.
     expect(cmp.duplicateHits().map((h) => h.id)).toEqual(['t12']);
     expect(screen.getByText('Erledigt', { selector: '.td__dupState' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Gleicher Fehler/ }));
@@ -940,6 +942,7 @@ describe('TicketDetailComponent', () => {
     }
   });
 
+  /** A reload of the same ticket (after a change) leaves the tab and the scroll. */
   it('opens a link to a note in the log and scrolls the note into view', async () => {
     const proto = Element.prototype as { scrollIntoView?: unknown };
     const before = proto.scrollIntoView;
@@ -951,7 +954,6 @@ describe('TicketDetailComponent', () => {
       await harness.fixture.whenStable();
       expect(cmp.tab()).toBe('log');
       expect(scroll).toHaveBeenCalledWith({ block: 'center' });
-      // A reload of the same ticket (after a change) leaves the tab and the scroll.
       cmp.tab.set('details');
       scroll.mockClear();
       (cmp as unknown as { show(t: unknown): void }).show(cmp.ticket());
@@ -1098,6 +1100,7 @@ describe('TicketDetailComponent', () => {
     expect(reportScanState({ ...a, scanned: false })).toBe('scanning');
   });
 
+  /** A failed read keeps the page; an answer for a ticket the user left is dropped. */
   it('reads the ticket again when the chat asks, for the scan state of its files', async () => {
     const { cmp, api, setGet, harness } = await start();
     const note = (scanState: 'scanning' | 'clean') =>
@@ -1120,7 +1123,6 @@ describe('TicketDetailComponent', () => {
     expect(api.get).toHaveBeenLastCalledWith('t40', { detail: false });
     expect(cmp.notes()[0].attachments[0].scanState).toBe('clean');
 
-    // A failed read keeps the page; an answer for a ticket the user left is dropped.
     setGet(() => throwError(() => new Error('offline')));
     cmp.refreshThread();
     expect(cmp.error()).toBe(false);
@@ -1132,12 +1134,15 @@ describe('TicketDetailComponent', () => {
     expect(cmp.ticket()!.id).toBe('t41');
   });
 
+  /**
+   * While the read is in flight, a note goes out, n1 goes away and the sender gets blocked. A
+   * report file that the read does not know keeps its state; a delivered note joins once.
+   */
   it('takes only the scan states of a background read, never older notes or an older block', async () => {
     const { cmp, setGet } = await start();
     const stale = new Subject<TicketDetail>();
     setGet(() => stale);
     cmp.refreshThread();
-    // While the read is in flight: a note goes out, n1 goes away, the sender gets blocked.
     cmp.sendNote({ body: 'Neu' });
     cmp.deleteNote({ id: 'n1' });
     cmp.onMenu({ id: 'block', label: '' });
@@ -1161,7 +1166,6 @@ describe('TicketDetailComponent', () => {
     expect(cmp.ticket()!.senderBlocked).toBe(true);
     expect(cmp.messages()[0].attachments![0].scanState).toBe('quarantined');
 
-    // A report file the read does not know keeps its state; a delivered note joins once.
     setGet(() => of(detail({ attachments: [], notes: [{ ...detail().notes[0], id: 'n9' }] })));
     cmp.refreshThread();
     expect(cmp.messages()[0].attachments![0].scanState).toBe('quarantined');

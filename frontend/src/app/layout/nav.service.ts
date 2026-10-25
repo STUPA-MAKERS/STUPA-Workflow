@@ -84,18 +84,20 @@ export interface NavItem {
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   { key: 'start', path: '/dashboard', labelKey: 'shell.nav.start', icon: 'home', permissions: [], place: 'main' },
-  // Without application.read these pages show only the applications and tasks of the user.
+  /** Without `application.read` these pages show only the applications and tasks of the user. */
   { key: 'applications', path: '/applications', labelKey: 'nav.applications', icon: 'file', permissions: [], place: 'main' },
   { key: 'tasks', path: '/tasks', labelKey: 'nav.tasks', icon: 'tasks', permissions: [], place: 'main' },
-  // Every session has at least the personal board.
+  /** Every session has at least the personal board. */
   { key: 'todos', path: '/todos', labelKey: 'nav.todos', icon: 'circleok', permissions: [], place: 'main' },
   {
     key: 'meetings',
     path: '/meetings',
     labelKey: 'nav.meetings',
     icon: 'users',
-    // Meetings are gremium business. The admin passes through `canInAnyGremium`. The
-    // only global key is the read right `meeting.view_all`.
+    /**
+     * Meetings are gremium business. The admin passes through `canInAnyGremium`. The only
+     * global key is the read right `meeting.view_all`.
+     */
     permissions: ['meeting.view_all'],
     gremiumPermissions: ['session.manage', 'protocol.write'],
     inAnyCommittee: true,
@@ -106,7 +108,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     path: '/gremien',
     labelKey: 'nav.gremien',
     icon: 'landmark',
-    // A member sees the own gremien; `gremium.view_all` (and the admin) sees every one.
+    /** A member sees the own gremien; `gremium.view_all` (and the admin) sees every one. */
     permissions: ['gremium.view_all'],
     inAnyCommittee: true,
     place: 'main',
@@ -126,7 +128,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     labelKey: 'nav.budget',
     icon: 'pie',
     permissions: BUDGET_PERMISSIONS,
-    // A gremium with an assigned cost centre sees the tab in scoped form.
+    /** A gremium with an assigned cost centre sees the tab in scoped form. */
     scopedBudgetView: true,
     place: 'main',
   },

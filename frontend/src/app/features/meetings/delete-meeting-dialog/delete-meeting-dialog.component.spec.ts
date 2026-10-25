@@ -35,6 +35,7 @@ function flushCount(http: HttpTestingController, votes: number) {
 }
 
 describe('DeleteMeetingDialogComponent', () => {
+  /** Without votes the dialog names none. */
   it('names what goes with a planned meeting and offers an outlined danger button', async () => {
     const { http } = await setup();
     flushCount(http, 0);
@@ -47,13 +48,12 @@ describe('DeleteMeetingDialogComponent', () => {
     const confirm = screen.getByRole('button', { name: 'Löschen' });
     expect(confirm).toHaveClass('btn--danger');
     expect(confirm).not.toHaveClass('btn--fill');
-    // Without votes the dialog names none.
     expect(screen.queryByText(/Abstimmung/)).toBeNull();
   });
 
   it('names the number of votes that go with the meeting', async () => {
     const { http, cmp, detectChanges } = await setup();
-    expect(cmp.votesText()).toBeNull(); // still loading
+    expect(cmp.votesText()).toBeNull();
     flushCount(http, 3);
     detectChanges();
     expect(screen.getByText('Mit der Sitzung werden 3 Abstimmungen gelöscht.')).toBeInTheDocument();
@@ -68,13 +68,13 @@ describe('DeleteMeetingDialogComponent', () => {
     expect(screen.getByText('Mit der Sitzung werden alle ihre Abstimmungen gelöscht.')).toBeInTheDocument();
   });
 
+  /** The answers of m-1 come late, so a count and an error change nothing. */
   it('drops a late answer for a meeting that is no longer in the dialog', async () => {
     const { http, cmp, fixture } = await setup();
     const first = http.expectOne(GET);
     fixture.componentRef.setInput('meeting', { ...PLANNED, id: 'm-2' });
     fixture.detectChanges();
     const second = http.expectOne({ method: 'GET', url: '/api/meetings/m-2' });
-    // The answers of m-1 come late: a count and an error change nothing.
     first.flush({ ...PLANNED, votes: [{ id: 'v-1' }, { id: 'v-2' }] });
     expect(cmp.voteCount()).toBeNull();
     fixture.componentRef.setInput('meeting', { ...PLANNED, id: 'm-3' });
@@ -95,11 +95,12 @@ describe('DeleteMeetingDialogComponent', () => {
     expect(toasts()).toContain('Sitzung gelöscht.');
   });
 
+  /** The dialog sends one request at a time. */
   it('names the open vote, another refusal and a bare error', async () => {
     const { http, cmp, deleted, toasts } = await setup();
     flushCount(http, 1);
     cmp.confirm();
-    cmp.confirm(); // one request at a time
+    cmp.confirm();
     http.expectOne(DELETE).flush({ code: 'open_vote' }, { status: 409, statusText: 'x' });
     expect(toasts()).toContain(
       'Eine Abstimmung der Sitzung ist noch offen. Bitte die Abstimmung zuerst schließen oder abbrechen.',

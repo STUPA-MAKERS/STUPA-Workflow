@@ -31,11 +31,11 @@ describe('LocalizedDatePipe', () => {
     expect(pipe.transform(NaN)).toBe('');
   });
 
+  /** The de-DE medium date contains the year. The rest depends on the locale data. */
   it('formats a Date instance directly (no re-construction)', () => {
     const pipe = pipeFor('de');
     const date = new Date('2026-06-16T09:05:00Z');
     const out = pipe.transform(date, 'mediumDate');
-    // The de-DE medium date contains the year. The rest depends on the locale data.
     expect(out).toContain('2026');
     expect(out).not.toBe('');
   });
@@ -47,42 +47,42 @@ describe('LocalizedDatePipe', () => {
     expect(pipe.transform(epoch, 'mediumDate')).toContain('2026');
   });
 
+  /**
+   * The month name stays English, but the day comes first ("5 Jan 2026"). The short date is
+   * DD/MM/YYYY, not MM/DD/YYYY. The 24 h clock shows no AM/PM in a time or in a timestamp.
+   */
   it('uses en-GB formatting for the English locale (day first, 24 h)', () => {
     const pipe = pipeFor('en');
-    // The month name stays English, but the day comes first ("5 Jan 2026").
     expect(pipe.transform('2026-01-05T12:00:00Z', 'mediumDate')).toMatch(/^\d{1,2} Jan 2026$/);
-    // The short date is DD/MM/YYYY, not MM/DD/YYYY.
     expect(pipe.transform('2026-07-01T12:00:00Z', 'short')).toMatch(/^\d{2}\/\d{2}\/\d{4},/);
-    // 24 h clock: no AM/PM in a time or in a timestamp.
     expect(pipe.transform('2026-09-03T19:50:00Z', 'time')).toMatch(/^\d{2}:\d{2}$/);
     expect(pipe.transform('2026-09-03T19:50:00Z', 'medium')).not.toMatch(/[AP]M/);
   });
 
+  /** de-DE puts the day before the month and joins them with dots (for example "05.01.2026"). */
   it('uses de-DE formatting for the German locale', () => {
     const pipe = pipeFor('de');
     const out = pipe.transform('2026-01-05T12:00:00Z', 'mediumDate');
-    // de-DE puts the day before the month and joins them with dots (for example "05.01.2026").
     expect(out).toMatch(/\d{2}\.\d{2}\.\d{4}/);
   });
 
+  /** The medium format includes a time part (":"). */
   it('defaults to the medium format (date + time) when none is given', () => {
     const pipe = pipeFor('de');
     const def = pipe.transform('2026-06-16T09:05:00Z');
     const explicit = pipe.transform('2026-06-16T09:05:00Z', 'medium');
     expect(def).toBe(explicit);
-    // The medium format includes a time part (":").
     expect(def).toContain(':');
   });
 
+  /** The time preset drops the year, and the mediumDate preset drops the time separator. */
   it('supports every declared format preset', () => {
     const pipe = pipeFor('de');
     const v = '2026-06-16T09:05:00Z';
     for (const fmt of ['short', 'medium', 'mediumDate', 'long', 'time'] as const) {
       expect(pipe.transform(v, fmt)).not.toBe('');
     }
-    // The time preset drops the year.
     expect(pipe.transform(v, 'time')).not.toContain('2026');
-    // The mediumDate preset drops the time separator.
     expect(pipe.transform(v, 'mediumDate')).not.toContain(':');
   });
 

@@ -9,7 +9,6 @@
   min-width: 0;
 }
 
-/* The person: avatar, name, e-mail, last login. */
 .ur__who {
   display: flex;
   align-items: flex-start;
@@ -38,7 +37,6 @@
   font-weight: var(--fw-regular);
   color: var(--color-text-muted);
 }
-/* An e-mail address wraps; it is never cut. */
 .ur__mail {
   font-size: var(--fs-sm);
   color: var(--color-text-muted);
@@ -74,7 +72,6 @@
   gap: var(--space-2);
 }
 
-/* One Gremium or one global role: the checkbox with its name, the ties below. */
 .ur__item {
   padding: var(--space-3);
   border-radius: var(--radius-lg);
@@ -118,7 +115,6 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
-/* A delegation of a live meeting stays: it reads as kept, not as removed. */
 .ur__line--kept .ur__lineText > span:first-child {
   color: var(--color-text-muted);
 }

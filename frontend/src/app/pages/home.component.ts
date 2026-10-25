@@ -14,7 +14,7 @@ import { parseDay } from '@shared/date-format';
 export const LATEST_COUNT = 3;
 
 /**
- * Public home page (board Oeffentlich-Start, variant A of the public protocols).
+ * Public home page.
  *
  * The body is equal choices: submit an application, read the public protocols, or sign
  * in as a Gremium member. The page cannot tell which kind of visitor it has, so it

@@ -87,10 +87,10 @@ async function openMenu(index: number): Promise<HTMLElement> {
 }
 
 describe('AgendaPaneComponent', () => {
+  /** The number badge names the TOP; a free-text item has no sub line at all. */
   it('counts the items and shows the kind of an application, an open vote and the NÖ tag', async () => {
     await setup({ meeting: meeting({ votes: [vote({ agendaItemId: 't-3' })] }) });
     expect(screen.getByRole('heading', { name: 'Tagesordnung · 3 TOPs' })).toBeInTheDocument();
-    // The number badge names the TOP; a free-text item has no sub line at all.
     const rows = screen.getAllByRole('listitem');
     expect(rows[0].querySelector('.li__subText')).toBeNull();
     expect(screen.queryByText(/Freitext|TOP 1/)).toBeNull();
@@ -109,11 +109,11 @@ describe('AgendaPaneComponent', () => {
     expect(screen.getByText('Noch keine Anträge auf der Tagesordnung.')).toBeInTheDocument();
   });
 
+  /** An item before "now" without a tick is not done. */
   it('marks the item that runs now and only the ticked items as done', async () => {
     const agenda = [AGENDA[0], AGENDA[1], { ...AGENDA[2], doneAt: '2026-10-15T16:30:00Z' }];
     const { container } = await setup({ meeting: meeting({ currentAgendaItemId: 't-2' }), agenda });
     const rows = screen.getAllByRole('listitem');
-    // An item before "now" without a tick is not done.
     expect(rows[0]).not.toHaveClass('ap__row--done');
     expect(within(rows[0]).queryByText('behandelt')).toBeNull();
     expect(within(rows[1]).getByText('jetzt')).toBeInTheDocument();
@@ -243,6 +243,7 @@ describe('AgendaPaneComponent', () => {
       expect(screen.getByRole('dialog', { name: 'TOP entfernen?' })).toHaveTextContent('„Unbenannter TOP“');
     });
 
+    /** A cancelled vote goes with its item. */
     it('disables the remove of an item with an open or closed vote and says why', async () => {
       const votes = [
         vote({ agendaItemId: 't-1', status: 'closed', result: 'passed' }),
@@ -257,7 +258,6 @@ describe('AgendaPaneComponent', () => {
       await userEvent.click(blocked);
       expect(on.remove).not.toHaveBeenCalled();
       await userEvent.keyboard('{Escape}');
-      // A cancelled vote goes with its item.
       menu = await openMenu(1);
       expect(within(menu).getByRole('menuitem', { name: 'TOP entfernen' })).not.toHaveAttribute('aria-disabled');
       await userEvent.keyboard('{Escape}');
@@ -326,6 +326,7 @@ describe('AgendaPaneComponent', () => {
     });
   });
 
+  /** A row in rename is no drag source. */
   it('renames inline: enter saves, escape cancels, blur saves', async () => {
     const { on, fixture } = await setup({ renamingTopId: 't-1', renameDraft: 'Begrüßung neu' });
     const input = screen.getByRole('textbox', { name: 'TOP umbenennen' });
@@ -337,10 +338,10 @@ describe('AgendaPaneComponent', () => {
     expect(on.cancelRename).toHaveBeenCalled();
     fireEvent.blur(input);
     expect(on.renameTop).toHaveBeenCalledTimes(2);
-    // A row in rename is no drag source.
     expect(draggable(fixture)).toEqual([false, true, true]);
   });
 
+  /** A drop at the same place moves nothing. */
   it('reorders by drag and drop with the lift and the drop box of the board (frame 7)', async () => {
     const { on, fixture } = await setup();
     expect(draggable(fixture)).toEqual([true, true, true]);
@@ -349,7 +350,6 @@ describe('AgendaPaneComponent', () => {
     expect(row.dragStartDelay).toEqual({ touch: 400, mouse: 0 });
     drop(fixture, 2, 0);
     expect(on.move).toHaveBeenCalledWith({ from: 2, to: 0 });
-    // A drop at the same place moves nothing.
     drop(fixture, 1, 1);
     expect(on.move).toHaveBeenCalledTimes(1);
   });

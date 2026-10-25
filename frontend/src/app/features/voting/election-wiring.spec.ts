@@ -61,6 +61,7 @@ describe('election wiring', () => {
     );
   });
 
+  /** An open election has no result lines; a vote without a question is a "Wahlgang". */
   it('writes the lot, the runoff and the single candidate', () => {
     const lot = electionSnippet(
       election({
@@ -87,7 +88,6 @@ describe('election wiring', () => {
     );
     expect(single).toContain('> Kandidatur: Anna');
     expect(single).toContain('> ja: 7, nein: 2, enthaltung: 1');
-    // An open election has no result lines; a vote without a question is a "Wahlgang".
     expect(electionSnippet(election({ question: null, electionResult: null }))).toBe(
       '> [!abstimmung] **Wahlgang**\n> Wahl · 2 Posten',
     );
@@ -96,6 +96,10 @@ describe('election wiring', () => {
     );
   });
 
+  /**
+   * A yes/no result without a candidate names nobody. The editor card of a vote whose election is
+   * not read yet has one seat.
+   */
   it('writes a vote without a round as the first one and keeps an unknown runoff id', () => {
     const snippet = electionSnippet(
       election({
@@ -105,7 +109,6 @@ describe('election wiring', () => {
     );
     expect(snippet).toContain('> Wahl · 2 Posten\n');
     expect(snippet).toContain('> Stichwahl (2. Wahlgang) um 1 Posten: Anna, gone');
-    // A yes/no result without a candidate names nobody.
     const empty = electionSnippet(
       election({
         election: { seats: 1, candidates: [], secret: true },
@@ -113,7 +116,6 @@ describe('election wiring', () => {
       }),
     );
     expect(empty).toContain('> Kandidatur: \n');
-    // The editor card of a vote whose election was not read yet: one seat.
     expect(voteResultInfo(election({ election: undefined, closedAt: null }), t, 'de').caption).toBe(
       'election.kind · election.seats.one',
     );
@@ -161,6 +163,7 @@ describe('election wiring', () => {
     ).toMatchObject({ election: null, round: 1 });
   });
 
+  /** A screen that joins after the close takes the counts of the frame. */
   it('takes the lot frame into the live result', () => {
     const subject = new Subject<ServerMessage>();
     const channel: MeetingChannel = {
@@ -172,7 +175,6 @@ describe('election wiring', () => {
     TestBed.configureTestingModule({ providers: [{ provide: LIVE_VOTE_SOURCE, useValue: source }] });
     const session = TestBed.inject(LiveVoteService).open('m-1', { beamer: true });
     const er: ElectionResult = { ...RESULT, elected: ['c1'], lot: { among: ['c1', 'c2'], seats: 1, drawn: ['c1'] } };
-    // A screen that joined after the close takes the counts of the frame.
     subject.next({ type: 'vote_lot_drawn', voteId: 'e1', result: 'elected', electionResult: er });
     expect(session.result()).toMatchObject({ voteId: 'e1', result: 'elected', counts: er.counts });
     subject.next({ type: 'vote_closed', voteId: 'e2', result: 'tie', counts: { c1: 1 }, failedReason: null });

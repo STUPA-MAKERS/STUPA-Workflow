@@ -4,7 +4,6 @@
   display: block;
 }
 
-/* One card in the middle of the page. */
 .cs {
   display: flex;
   justify-content: center;
@@ -53,7 +52,6 @@
   font-size: var(--fs-small);
   color: var(--color-text-muted);
 }
-/* A client id is a value to compare: it wraps, it is never cut. */
 .cs__clientId {
   color: var(--color-text);
   overflow-wrap: anywhere;
@@ -74,7 +72,6 @@
   padding: 0;
   list-style: none;
 }
-/* The whole row is the label of the box, so a press anywhere on it toggles. */
 .cs__scope app-checkbox {
   display: flex;
 }

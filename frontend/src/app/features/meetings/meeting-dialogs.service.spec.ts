@@ -120,6 +120,7 @@ describe('MeetingDialogsService', () => {
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
   });
 
+  /** The dialog closes after the handover. */
   it('hands the minutes over now or with the next item, and discards a planned handover', () => {
     const { svc, http, toasts } = setup();
     const member = { principalId: 'p-2', displayName: 'Mika', email: null, status: null, source: null, note: null, isSelf: false };
@@ -131,7 +132,6 @@ describe('MeetingDialogsService', () => {
     expect(now.request.body).toEqual({ principalId: 'p-2', mode: 'now' });
     now.flush(WIRE);
     expect(toasts()).toContain('Protokollführung übergeben.');
-    // The dialog closes after the handover.
     expect(svc.handoverTarget()).toBeNull();
     expect(svc.handoverSaving()).toBe(false);
     svc.handOver(M(), 'p-2', 'next_item');
@@ -147,6 +147,7 @@ describe('MeetingDialogsService', () => {
     expect(toasts()).toContain('Aktion fehlgeschlagen.');
   });
 
+  /** Another refusal is a toast, and the dialog stays open. */
   it('keeps a refusal the dialog can explain in the dialog (last TOP)', () => {
     const { svc, http, toasts } = setup();
     const member = { principalId: 'p-2', displayName: 'Mika', email: null, status: null, source: null, note: null, isSelf: false };
@@ -159,7 +160,6 @@ describe('MeetingDialogsService', () => {
       expect(svc.handoverSaving()).toBe(false);
     }
     expect(toasts()).toEqual([]);
-    // Another refusal is a toast; the dialog stays open.
     svc.handOver(M(), 'p-2', 'now');
     http.expectOne('/api/meetings/m-1/protokollant-handover').flush({ code: 'meeting_not_live', detail: 'nicht live' }, { status: 409, statusText: 'x' });
     expect(toasts()).toContain('Aktion fehlgeschlagen.: nicht live');

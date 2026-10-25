@@ -85,6 +85,10 @@ describe('AuditLogComponent — config diff + revert', () => {
     expect(c.diffOf(c.entries()[0])).toEqual(DIFF);
   });
 
+  /**
+   * The shared diff shows in its compact form: one code block, no cards. The revision id sits in
+   * the target line, and "version" reads as "Revision".
+   */
   it('shows the diff as one code block with "-" and "+" lines and the revision in the target', async () => {
     localStorage.setItem('ap.locale', 'de');
     const { c, fixture, container } = await setup({
@@ -107,7 +111,6 @@ describe('AuditLogComponent — config diff + revert', () => {
     );
     c.toggle(7);
     fixture.detectChanges();
-    // The shared diff in its compact form: one code block, no cards.
     const block = container.querySelector('app-config-diff .cfg-diff-code');
     expect(block).not.toBeNull();
     expect(container.querySelector('app-config-diff .cfg-diff')).toBeNull();
@@ -121,7 +124,6 @@ describe('AuditLogComponent — config diff + revert', () => {
     ]);
     expect(container.querySelector('.cfg-diff-code__del')).not.toBeNull();
     expect(container.querySelector('.cfg-diff-code__ins')).not.toBeNull();
-    // The revision id sits in the target line; "version" reads as "Revision".
     const details = container.querySelector('.al__details')?.textContent ?? '';
     expect(details).toContain('rev rev-2');
     expect(details).toContain('Revision');
@@ -166,13 +168,13 @@ describe('AuditLogComponent — config diff + revert', () => {
     expect(c.isRevertable(c.entries()[0])).toBe(true);
   });
 
+  /** The revert triggers a reload, so the component reads the audit log a second time. */
   it('reverts on confirm, then toasts success and reloads', async () => {
     const { c, revertAuditEntry, toast, api } = await setup();
     c.askRevert(c.entries()[0]);
     c.doRevert();
     expect(revertAuditEntry).toHaveBeenCalledWith(7);
     expect(toast.success).toHaveBeenCalled();
-    // The revert triggers a reload, so the component reads the audit log a second time.
     expect(api.listAuditLog).toHaveBeenCalledTimes(2);
   });
 

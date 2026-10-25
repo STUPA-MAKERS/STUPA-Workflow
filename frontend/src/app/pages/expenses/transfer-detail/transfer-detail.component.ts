@@ -21,7 +21,7 @@ import { SheetActionComponent } from '../../budget/sheet-action/sheet-action.com
 import { formatMoney } from '@shared/format-money';
 
 /**
- * The detail of a transfer (board Fin-Uebertraege): "Übertrag · HHJ 2025", the
+ * The detail of a transfer: "Übertrag · HHJ 2025", the
  * description, "von → nach · Betrag", the two bookings of the transfer (an expense on the
  * source and an income on the target), who booked it, the data, and the note that the
  * pair of cost centres is fixed.

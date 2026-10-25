@@ -259,8 +259,6 @@ export class PublicProtocolsComponent {
     };
   }
 
-  // Template helpers.
-
   protected dateOf(p: PublicProtocolSummary): Date | null {
     return parseDay(p.date);
   }

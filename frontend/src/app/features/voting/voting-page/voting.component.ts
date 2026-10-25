@@ -40,8 +40,6 @@ import {
   StatusTextComponent,
   StickyBarComponent,
 } from '@stupa-makers/ui-kit';
-// By path, not through the `@shared/ui` barrel, so this lazy chunk takes only the blocks
-// it uses.
 import { meetingVoteStatus, type StatusView } from '@shared/status-kind.util';
 import { PageFrameService } from '../../../layout/page-frame.service';
 import { LIVE_MAX_PAGES, LIVE_PAGE_LIMIT } from '../../../layout/rail-status.service';
@@ -110,7 +108,7 @@ export interface VoteGroup {
 }
 
 /**
- * "Abstimmungen" (`/voting`, boards Arbeit-Abstimmungen and Telefon-Abstimmen): the votes
+ * "Abstimmungen" (`/voting`): the votes
  * of the person as a list beside the open vote, like the applications and the tasks.
  *
  * - Left: `GET /votes`, the open votes first ("Offen"), then the drafts ("Entwürfe", only
@@ -128,11 +126,11 @@ export interface VoteGroup {
  *   connect was open before, so it does not open by itself. On the first load side by
  *   side the page opens the first open vote, as the board shows it.
  * - One pane at a time (narrow, phone): the list, then the vote with a way back.
+ * - Side by side it is a pane page (`styles.scss`): the panes fill the free height and
+ *   scroll by themselves.
  */
 @Component({
   selector: 'app-voting',
-  // A pane page (styles.scss): side by side the panes fill the free height and scroll by
-  // themselves.
   host: { '[class.pane-page]': 'split()' },
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -195,7 +193,7 @@ export class VotingComponent implements OnDestroy {
   /** The first open vote opens by itself once, on the first load side by side. */
   private autoOpened = false;
 
-  // Filters, from the query params.
+  /** The search text of the filters, from the query params. */
   readonly q = signal('');
   /**
    * The search field: it searches while the user types (`liveSearch`, debounced, from
@@ -372,8 +370,6 @@ export class VotingComponent implements OnDestroy {
     if (this.liveTimer) clearTimeout(this.liveTimer);
   }
 
-  // --- navigation ---------------------------------------------------------
-
   /** "Zur Liste" and the back of the phone header: close the vote, keep the filters. */
   closeDetail(): void {
     void this.router.navigate(['/voting'], { queryParamsHandling: 'preserve' });
@@ -389,8 +385,6 @@ export class VotingComponent implements OnDestroy {
   private readSelection(): void {
     this.selectedId.set(this.route.snapshot.firstChild?.paramMap.get('id') ?? null);
   }
-
-  // --- filters ------------------------------------------------------------
 
   setStatus(value: string): void {
     this.navigate({ status: value || null });
@@ -434,8 +428,6 @@ export class VotingComponent implements OnDestroy {
       queryParamsHandling: 'merge',
     });
   }
-
-  // --- loading ------------------------------------------------------------
 
   /** Load page 0 after a filter change. The rows stay until the new ones arrive. */
   protected reload(): void {
@@ -513,8 +505,6 @@ export class VotingComponent implements OnDestroy {
     }
     if (changed) this.seenGremien.set(next);
   }
-
-  // --- live ---------------------------------------------------------------
 
   private liveTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -609,8 +599,6 @@ export class VotingComponent implements OnDestroy {
       if (item.status === 'open' && item.meetingId) this.page.follow(item.meetingId);
     }
   }
-
-  // --- rows ---------------------------------------------------------------
 
   private toRow(item: VoteListItem): VoteRow {
     const ended = item.status === 'closed' || item.status === 'cancelled';

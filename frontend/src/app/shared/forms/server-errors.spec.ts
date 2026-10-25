@@ -46,6 +46,7 @@ describe('server-errors', () => {
     expect(findFieldByKey(fields, 'c')).toBeUndefined();
   });
 
+  /** A second change leaves the props alone. */
   it('marks a plain field until its value changes', () => {
     const f = field('title');
     const placed = applyServerErrors([{ fieldGroup: [f] }], [{ field: 'title', msg: 'bad' }], t);
@@ -56,7 +57,6 @@ describe('server-errors', () => {
     expect(f.options?.detectChanges).toHaveBeenCalledWith(f);
     f.formControl?.setValue('y');
     expect(f.props?.['errorText']).toBeUndefined();
-    // A second change leaves the props alone.
     f.props = { errorText: 'own' };
     f.formControl?.setValue('z');
     expect(f.props['errorText']).toBe('own');
@@ -87,13 +87,13 @@ describe('server-errors', () => {
     expect(applyServerErrors([noControl], [{ field: 'x', msg: 'm' }, { field: 'y', msg: 'm' }], t)).toBe(0);
   });
 
+  /** The value change after the field lost its props clears nothing and does not throw. */
   it('copes with fields without props and options', () => {
     const bare: FormlyFieldConfig = { key: 'a', formControl: new FormControl('') };
     const pos: FormlyFieldConfig = { key: 'p', type: 'positions', formControl: new FormControl([]) };
     expect(applyServerErrors([bare, pos], [{ field: 'a', msg: 'm' }, { field: 'p[0]', msg: 'm' }], t)).toBe(2);
     expect(bare.props?.['errorText']).toBe('T:forms.errors.server');
     expect(pos.props?.['serverErrors']).toEqual({ 0: 'T:forms.errors.server' });
-    // The value change after the field lost its props clears nothing and does not throw.
     delete bare.props;
     bare.formControl?.setValue('b');
   });

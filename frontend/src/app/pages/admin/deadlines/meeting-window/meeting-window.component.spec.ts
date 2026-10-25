@@ -16,6 +16,7 @@ function makeApi(initial: MeetingSettings = { openLeadMinutes: 60, confirmLeadMi
   };
 }
 
+/** ngModel writes the stored values into the fields after a tick. */
 async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] } = {}) {
   const api = opts.api ?? makeApi();
   const perms = new Set(opts.perms ?? ['admin.deadlines']);
@@ -27,7 +28,6 @@ async function setup(opts: { api?: Record<string, jest.Mock>; perms?: string[] }
       { provide: ToastService, useValue: toast },
     ],
   });
-  // ngModel writes the stored values into the fields after a tick.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -41,12 +41,12 @@ const confirmField = (): HTMLInputElement => screen.getByLabelText('Ohne Rückfr
 describe('MeetingWindowSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The section has no button of its own: the deadlines page shows "Speichern". */
   it('shows the stored minutes and saves new ones', async () => {
     const { api, toast, c } = await setup();
     expect(screen.getByRole('heading', { name: 'Sitzung eröffnen' })).toBeInTheDocument();
     expect(openField().value).toBe('60');
     expect(confirmField().value).toBe('10');
-    // The section has no button of its own: the deadlines page shows "Speichern".
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
     expect(c.dirty()).toBe(false);
     await userEvent.clear(openField());

@@ -59,10 +59,10 @@ function semantic(theme: 'light' | 'dark', name: string): string {
 
 describe('text on surface 3', () => {
   for (const theme of ['light', 'dark'] as const) {
+    /** If this changes, the overrides below can go. */
     it(`${theme}: muted text passes 4.5:1, subtle text does not`, () => {
       const bg = semantic(theme, '--color-surface-3');
       expect(ratio(semantic(theme, '--color-text-muted'), bg)).toBeGreaterThanOrEqual(4.5);
-      // If this changes, the overrides below can go.
       expect(ratio(semantic(theme, '--color-text-subtle'), bg)).toBeLessThan(4.5);
     });
   }
@@ -93,9 +93,11 @@ describe('text on surface 3', () => {
     expect(menu).not.toContain('--color-text-subtle');
   });
 
+  /**
+   * A block in a surface colour vanishes on that surface (the row menu is surface 3). A share of
+   * the text colour shows on all of them, so no menu needs an override.
+   */
   it('the skeleton blocks take a fill from the text colour, so they show on every surface', () => {
-    // A block in a surface colour vanished on that surface (the row menu is surface 3);
-    // a share of the text colour shows on all of them, and no menu needs an override.
     expect(globalStyles()).toMatch(/\n@use 'skeleton';/);
     expect(kitSkeleton()).toMatch(
       /\n\.skel \{[^}]*--skel-fill: color-mix\(in srgb, var\(--color-text\) 9%, transparent\);/,
@@ -136,10 +138,10 @@ describe('focus in the row menu (WCAG 2.4.7, 1.4.11)', () => {
 
 describe('text on the selected row', () => {
   for (const theme of ['light', 'dark'] as const) {
+    /** If this changes, the override below can go. */
     it(`${theme}: muted text passes 4.5:1, subtle text does not`, () => {
       const bg = semantic(theme, '--color-selected');
       expect(ratio(semantic(theme, '--color-text-muted'), bg)).toBeGreaterThanOrEqual(4.5);
-      // If this changes, the override below can go.
       expect(ratio(semantic(theme, '--color-text-subtle'), bg)).toBeLessThan(4.5);
     });
   }
@@ -171,11 +173,11 @@ describe('a table on a shared sheet steps up one surface', () => {
     expect(ld).toMatch(/:host\(\.ld--split\) \.ld__detail \{\s*@include surface\.context\(1\);/);
   });
 
+  /** The admin frame draws that sheet on surface 1. */
   it('the sheet of the wide admin frame sets the context of surface 1', () => {
     const global = scss('../../../styles.scss');
     expect(global).toContain("@use 'surface';");
     expect(global).toMatch(/\.af--split \.af__page \{\s*@include surface\.context\(1\);/);
-    // The admin frame still draws that sheet on surface 1.
     expect(scss('../../pages/admin/admin-frame/admin-frame.component.scss')).toMatch(
       /\.af--split \.af__page \{[^}]*background: var\(--color-surface-1\);/,
     );

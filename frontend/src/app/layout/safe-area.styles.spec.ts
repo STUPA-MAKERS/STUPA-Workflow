@@ -38,6 +38,7 @@ describe('safe-area styles', () => {
     expect(strip).toMatch(/background: var\(--color-bg\);/);
   });
 
+  /** An edge-to-edge page pulls the padding back, but not the inset. */
   it('starts every page below the status bar, in the top padding that pages pull back', () => {
     expect(rule(shell, '.main')).toMatch(
       /--main-pad-top: calc\(var\(--space-8\) \+ var\(--app-top-safe-area\)\);/,
@@ -48,7 +49,6 @@ describe('safe-area styles', () => {
     expect(rule(shell, '.frame--phone .main')).toMatch(
       /--main-pad-top: calc\(var\(--space-4\) \+ var\(--app-top-safe-area\)\);/,
     );
-    // An edge-to-edge page pulls the padding back, but not the inset.
     for (const page of [
       '../features/meetings/meeting-page/meeting-page.component.scss',
       '../features/meetings/meeting-follow-view.component.scss',

@@ -44,12 +44,14 @@ describe('WsService', () => {
   let svc: WsService;
   const realWs = globalThis.WebSocket;
 
+  /**
+   * The test mocks `LOCATION` through DI, because jsdom 26 and later block a redefinition of
+   * `window.location`. The default is http://localhost.
+   */
   beforeEach(() => {
     MockWebSocket.instances = [];
     MockWebSocket.startState = MockWebSocket.OPEN;
     (globalThis as { WebSocket: unknown }).WebSocket = MockWebSocket;
-    // Mock `LOCATION` through DI. jsdom 26 and later block a redefinition of
-    // `window.location`. The default is http://localhost.
     svc = TestBed.configureTestingModule({
       providers: [provideLocationMock(createLocationMock())],
     }).inject(WsService);
@@ -115,21 +117,22 @@ describe('WsService', () => {
     );
   });
 
+  /**
+   * A real socket starts in state CONNECTING. The `subscribe` that LiveVoteSession sends for its
+   * resync right after the connect must not be dropped, and without the buffer a real socket loses
+   * it. Nothing may be on the wire before the handshake. On open the channel flushes the buffered
+   * frames in order.
+   */
   it('queues frames sent while CONNECTING and flushes them on open', () => {
-    // A real socket starts in state CONNECTING. The `subscribe` that LiveVoteSession
-    // sends for its resync right after the connect must not be dropped. Without the
-    // buffer a real socket loses it.
     MockWebSocket.startState = MockWebSocket.CONNECTING;
     const ch = svc.connectMeeting('m-1');
     const sock = MockWebSocket.instances[0];
 
     ch.send({ type: 'subscribe' });
     ch.send({ type: 'cast', voteId: 'v1', choice: 'yes' });
-    // Nothing may be on the wire before the handshake.
     expect(sock.sent).toEqual([]);
 
     sock.openNow();
-    // On open the channel flushes the buffered frames in order.
     expect(sock.sent).toEqual([
       JSON.stringify({ type: 'subscribe' }),
       JSON.stringify({ type: 'cast', voteId: 'v1', choice: 'yes' }),

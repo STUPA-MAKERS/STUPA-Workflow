@@ -109,6 +109,10 @@ describe('ElectionResultComponent', () => {
     expect(screen.getByText('Die Stichwahl ist angelegt.')).toBeInTheDocument();
   });
 
+  /**
+   * The draw cannot be undone: the first click asks again, and "Abbrechen" steps back. One button
+   * serves both steps, so the second click of a double click does not draw.
+   */
   it('draws the lot of a tie; only a manager sees the button', async () => {
     const tie: ElectionResult = {
       counts: { c1: 2, c2: 2, c3: 0, c4: 0 },
@@ -125,9 +129,7 @@ describe('ElectionResultComponent', () => {
     expect(screen.getByText('Gleichstand: das Los steht aus')).toBeInTheDocument();
     expect(screen.getByText('Gleichstand zwischen Anna, Ben. Das Los entscheidet.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Los ziehen' }));
-    // The draw cannot be undone: the first click asks again, "Abbrechen" steps back.
     expect(screen.getByText('Das Los ist endgültig und lässt sich nicht zurücknehmen.')).toBeInTheDocument();
-    // One button for both steps: the second click of a double click does not draw.
     screen
       .getByRole('button', { name: /^Jetzt Los ziehen/ })
       .dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }));
@@ -211,11 +213,12 @@ describe('ElectionResultComponent', () => {
     expect(screen.queryByText(/Gewählt|Stichwahl|Niemand/)).toBeNull();
     expect(screen.queryByRole('button')).toBeNull();
   });
+  /** While busy there is no second request. */
   it('sends one action at a time, none without a vote id, and reports a bare refusal', async () => {
     const { http, fixture, toasts, changed } = await setup({});
     const cmp = fixture.componentInstance;
     cmp.startRunoff();
-    cmp.startRunoff(); // busy: no second request
+    cmp.startRunoff();
     cmp.drawLot();
     cmp.drawLot();
     http.expectOne({ method: 'POST', url: '/api/votes/e1/runoff' }).flush(null, { status: 500, statusText: 'Error' });

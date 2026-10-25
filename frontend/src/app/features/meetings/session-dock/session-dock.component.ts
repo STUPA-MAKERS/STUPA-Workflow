@@ -45,6 +45,10 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
  * sits on the viewport above the navigation bar. A pick in a live meeting
  * goes to the handover dialog of the page. The attendance chip opens the attendance sheet
  * of the page.
+ *
+ * On a phone the dock is a fixed layer above the page and holds the bottom sheet. While
+ * the sheet is open, the layer moves up to the dialog level, because otherwise the
+ * navigation bar covers the sheet and its scrim.
  */
 @Component({
   selector: 'app-session-dock',
@@ -62,9 +66,6 @@ export type DockPanel = 'none' | 'attendance' | 'protokollant';
   styleUrl: './session-dock.component.scss',
   host: {
     '(document:keydown.escape)': 'closePanel()',
-    // On a phone the dock is a fixed layer above the page. The bottom sheet lives in it,
-    // so the layer moves up to the dialog level while the sheet is open; else the
-    // navigation bar covers the sheet and its scrim.
     '[style.z-index]': "phone() && shownPanel() === 'protokollant' ? 'var(--z-dialog)' : null",
   },
 })

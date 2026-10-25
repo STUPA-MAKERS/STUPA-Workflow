@@ -45,6 +45,7 @@ function railStatusStub(tasks: number | null = 4, live = true) {
   return { taskCount: signal(tasks), ticketCount: signal<number | null>(null), live: signal(live), refresh: () => undefined };
 }
 
+/** The avatars read these. The config is not loaded, so they show the initials. */
 function brandingStub(
   over: {
     copyright?: Record<string, string> | null;
@@ -58,7 +59,6 @@ function brandingStub(
     markSrc: signal('assets/logos/stupa-mark.svg'),
     copyright: signal(over.copyright ?? null),
     legalLinks: signal(over.legalLinks ?? []),
-    // The avatars read these; the config is not loaded, so they show the initials.
     loaded: signal(false),
     gravatarEnabled: signal(true),
     wikiUrl: signal('https://wiki.example.org/handbook'),
@@ -83,6 +83,7 @@ function phoneViewport(): () => void {
   return () => (window.matchMedia = original);
 }
 
+/** The shell holds the update prompt, and the prompt needs SwUpdate. */
 async function setup(
   principal: Principal | null | 'pending',
   opts: { branding?: ReturnType<typeof brandingStub>; status?: ReturnType<typeof railStatusStub> } = {},
@@ -94,7 +95,6 @@ async function setup(
       provideHttpClient(),
       provideHttpClientTesting(),
       { provide: USE_MOCK_API, useValue: false },
-      // The shell holds the update prompt, and the prompt needs SwUpdate.
       { provide: SwUpdate, useValue: { isEnabled: false } },
       provideLocationMock(createLocationMock()),
       { provide: BrandingService, useValue: opts.branding ?? brandingStub() },
@@ -128,12 +128,12 @@ describe('ShellComponent', () => {
       expect(container.querySelector('main#main')).not.toBeNull();
     });
 
+    /** With nobody signed in there is no search palette either. */
     it('frames a signed-out visitor with the public bar and the footer, without navigation', async () => {
       const { container } = await setup(null);
       expect(screen.getByRole('button', { name: 'Anmelden' })).toBeInTheDocument();
       expect(mainNav()).not.toBeInTheDocument();
       expect(container.querySelector('app-site-footer')).not.toBeNull();
-      // Nobody signed in: no search palette either.
       expect(container.querySelector('app-command-palette')).toBeNull();
     });
 
@@ -147,17 +147,18 @@ describe('ShellComponent', () => {
       expect(container.querySelector('app-report-dialog')).not.toBeNull();
     });
 
+    /** No route with `footer: true` is open, so a signed-in page has no footer. */
     it('frames a signed-in principal with the rail, without the public bar', async () => {
       const { container } = await setup(MEMBER);
       expect(mainNav()).toBeInTheDocument();
       expect(container.querySelector('app-nav-rail')).not.toBeNull();
       expect(container.querySelector('app-bottom-bar')).toBeNull();
       expect(container.querySelector('app-public-header')).toBeNull();
-      // No route with `footer: true` is open: a signed-in page has no footer.
       expect(container.querySelector('app-site-footer')).toBeNull();
       expect(container.querySelector('app-command-palette')).not.toBeNull();
     });
 
+    /** Back on a normal page the frame returns. */
     it('shows a route with `chrome: false` (the beamer) without rail, bars or footer', async () => {
       const { router, fixture, container } = await setup(MEMBER);
       await router.navigateByUrl('/beamer');
@@ -167,7 +168,6 @@ describe('ShellComponent', () => {
       expect(container.querySelector('main')).not.toHaveClass('page-shell');
       expect(screen.getByRole('heading', { name: 'Seite' })).toBeInTheDocument();
 
-      // Back on a normal page the frame returns.
       await router.navigateByUrl('/dashboard');
       fixture.detectChanges();
       expect(mainNav()).toBeInTheDocument();
@@ -352,12 +352,12 @@ describe('ShellComponent', () => {
       expect(within(footer).getByText('© Verfasste Studierendenschaft')).toBeInTheDocument();
     });
 
+    /** The start page is a work page too, because whoever sees it is signed in. */
     it('leaves the footer out on a signed-in work page, and brings it back on a public page', async () => {
       const { router, fixture } = await setup(MEMBER, { branding });
       await router.navigateByUrl('/tasks');
       fixture.detectChanges();
       expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();
-      // The start page is a work page too: whoever sees it is signed in.
       await router.navigateByUrl('/dashboard');
       fixture.detectChanges();
       expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument();

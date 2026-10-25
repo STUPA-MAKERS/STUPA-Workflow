@@ -72,9 +72,11 @@ describe('the one list/detail geometry', () => {
     expect(LIST_PAGES).toEqual(expect.arrayContaining(KNOWN_LIST_PAGES));
   });
 
+  /**
+   * `.ld--split` belongs to app-list-detail. The column gets its height through `--ld-pane-height`,
+   * which the layout sets on its list slot while it splits.
+   */
   it('the list column does not read the state class of the layout', () => {
-    // `.ld--split` belongs to app-list-detail. The column gets its height through
-    // `--ld-pane-height`, which the layout sets on its list slot while it splits.
     const global = code(GLOBAL_STYLES);
     expect(global).not.toMatch(/\.ld--split[^{]*\.ld-pane/);
     expect(global).toMatch(/\.ld-pane\s*\{[^}]*height:\s*var\(--ld-pane-height,\s*auto\)/);
@@ -82,11 +84,11 @@ describe('the one list/detail geometry', () => {
     expect(layout).toMatch(/:host\(\.ld--split\) \.ld__list \{[^}]*--ld-pane-height:\s*100%/);
   });
 
+  /** The app loads the partial and defines neither token itself. */
   it('defines the column width and the gap once, in the list/detail partial of the kit', () => {
     const global = code(GLOBAL_STYLES);
     expect(global).toMatch(/--ld-list-width:\s*clamp\(/);
     expect(global).toMatch(/--ld-gap:/);
-    // The app loads the partial and defines neither token itself.
     const app = code(APP_STYLES);
     expect(app).toMatch(/meta\.load-css\('list-detail'\)/);
     expect(app).not.toMatch(/--ld-(list-width|gap)\s*:/);
@@ -103,11 +105,11 @@ describe('the one list/detail geometry', () => {
     expect(scss).toContain('gap: var(--ld-gap)');
   });
 
+  /** No fixed column width (such as 19rem, 24rem or 340px) stands next to it. */
   it.each(COLUMN_PAGES)('%s puts its column on the shared width and gap', (base) => {
     const scss = read(base, 'scss');
     expect(scss).toMatch(/grid-template-columns:\s*var\(--ld-list-width\)\s+minmax\(0,\s*1fr\)/);
     expect(scss).toMatch(/gap:\s*var\(--ld-gap\)/);
-    // No fixed column width next to it (19rem, 24rem and 340px were the old ones).
     expect(scss).not.toMatch(/grid-template-columns:\s*[\d.]+(px|rem)\b/);
   });
 
@@ -117,28 +119,35 @@ describe('the one list/detail geometry', () => {
     expect(html).toMatch(/<app-page-header\s[^>]*\[pane\]="true"/);
   });
 
+  /**
+   * The h1 is the one of app-page-header. Only the phone bar of the bulk actions of the bookings is
+   * an h1 of its own, because it replaces the header while rows are selected. A local title in the
+   * d2 size is a copy of the shared header.
+   */
   it.each([...LIST_PAGES, ...HEADER_ONLY_PAGES])('%s has no list header of its own', (base) => {
-    // The h1 is the one of app-page-header. Only the phone bar of the bulk actions of the
-    // bookings is an h1 of its own: it replaces the header while rows are selected.
     const html = read(base, 'html').replace(/<header class="exp__selBar"[\s\S]*?<\/header>/, '');
     expect(html).not.toMatch(/<h1[\s>]/);
     expect(html).toMatch(/<app-page-header\s[^>]*\[pane\]="true"/);
-    // A local title in the d2 size is a copy of the shared header.
     expect(read(base, 'scss')).not.toContain('--fs-d2');
   });
 
+  /**
+   * The tasks have no search. Every list column uses the large field; a phone may keep the compact
+   * one.
+   */
   it.each(LIST_PAGES)('%s puts its search into the shared filter bar', (base) => {
     const html = read(base, 'html');
-    if (!html.includes('<app-search-pill')) return; // the tasks have no search
+    if (!html.includes('<app-search-pill')) return;
     expect(html).toMatch(/<app-sticky-bar class="ld-pane__filters[\s"]/);
-    // The large field of every list column (a phone may keep the compact one).
     expect(html).not.toMatch(/<app-search-pill\s+size="md"/);
   });
 
+  /**
+   * A rule that reaches into the header (its `.ph__*` parts or its `.ph--*` modes) would move the
+   * title on one page only. Styling a control that a page projects into the header
+   * (`app-page-header app-button …`) is the business of the page.
+   */
   it('no component styles the shared header from outside', () => {
-    // A rule that reaches into the header (its `.ph__*` parts or its `.ph--*` modes)
-    // would move the title on one page only. Styling a control that a page projects into
-    // the header (`app-page-header app-button …`) is the page's own business.
     const intoHeader = /app-page-header[^{};]*\.ph(__|--)|::ng-deep\s*\.ph(__|--)(bar|text|heading|title|meta|subtitle|actions|pane|flush|rail)/;
     const offenders = appStyles()
       .filter((f) => !f.startsWith(PAGE_HEADER_DIR))

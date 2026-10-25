@@ -66,11 +66,13 @@ const PRINCIPALS: AdminPrincipal[] = [
   },
 ];
 
+/**
+ * The first mapping gives the same role as the bootstrap assignment, and the column shows it once.
+ * A reserved group never gives a role, not even through a mapping.
+ */
 const MAPPINGS: GroupMapping[] = [
   { id: 'gm-1', oidcGroup: 'stupa-referat', roleId: 'r-ref' },
-  // The same role as the bootstrap assignment. The column shows it once.
   { id: 'gm-2', oidcGroup: 'stupa-referat', roleId: 'r-admin' },
-  // A reserved group never gives a role, not even through a mapping.
   { id: 'gm-3', oidcGroup: 'vote:g-1', roleId: 'r-member' },
 ];
 
@@ -132,9 +134,11 @@ async function setup(
 describe('UsersComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * A global-search hit on a person lands here. A bare `/admin/users` opens the unfiltered list and
+   * leaves the reader to search the same name a second time.
+   */
   it('searches for the person the URL names', async () => {
-    // Where a global-search hit on a person lands. A bare `/admin/users` would open the
-    // unfiltered list and leave the reader to search the same name a second time.
     const api = makeApi();
     const { inst } = await setup(api, makeAuth(null), makeToast(), { q: 'kc|alex' });
     expect(api.listPrincipals).toHaveBeenCalledWith('kc|alex');
@@ -142,16 +146,18 @@ describe('UsersComponent', () => {
     expect(api.listPrincipals).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * The e-mail address shows in full; a principal without one shows none. There is no assign, edit
+   * or revoke control for roles.
+   */
   it('lists principals with the capitalized, read-only roles on one line', async () => {
     await setup();
     expect(screen.getByText('Alex Admin')).toBeInTheDocument();
     expect(screen.getByText('Administrator, Referent')).toBeInTheDocument();
     expect(screen.queryByText(/administrator/)).not.toBeInTheDocument();
     expect(screen.getByText('Keine Rollen zugewiesen.')).toBeInTheDocument();
-    // The e-mail address shows in full; a principal without one shows none.
     expect(screen.getByText('alex@x.de')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
-    // No role editing is left: no assign, edit or revoke control.
     expect(screen.queryByRole('button', { name: /Entziehen|Zuweisung|Rolle \+/ })).toBeNull();
   });
 
@@ -163,10 +169,12 @@ describe('UsersComponent', () => {
     expect(screen.getByText('Keine Gruppen.')).toBeInTheDocument();
   });
 
+  /**
+   * The scoped assignment is left out, the admin role appears once, and the vote: group gives
+   * nothing.
+   */
   it('roleIds merges the global bootstrap roles with the mapped roles', async () => {
     const { inst } = await setup();
-    // The scoped assignment is left out, the admin role appears once, the vote: group
-    // gives nothing.
     expect(inst.roleIds(PRINCIPALS[0])).toEqual(['r-admin', 'r-ref']);
     expect(inst.roleIds(PRINCIPALS[1])).toEqual([]);
   });
@@ -203,11 +211,11 @@ describe('UsersComponent', () => {
     expect(inst.mySub()).toBe('kc|alex');
   });
 
+  /** r-ref has no German label, so the key is the fallback. */
   it('roleLabel resolves locale→de→key, raw id when unknown', async () => {
     const { inst } = await setup();
     expect(inst.roleLabel('r-admin')).toBe('administrator');
     expect(inst.roleLabel('unknown')).toBe('unknown');
-    // r-ref has no German label, so the key is the fallback.
     expect(inst.roleLabel('r-ref')).toBe('referent');
   });
 
@@ -249,13 +257,13 @@ describe('UsersComponent', () => {
     beforeEach(() => jest.useFakeTimers());
     afterEach(() => jest.useRealTimers());
 
+    /** The debounce folds the four key presses into one request. */
     it('searches while the user types, without a "Suchen" button', async () => {
       const { api } = await setup();
       const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
       expect(screen.queryByRole('button', { name: 'Suchen' })).toBeNull();
       api.listPrincipals.mockClear();
       await user.type(screen.getByRole('searchbox', { name: 'Benutzer suchen' }), 'alex');
-      // The debounce folds the four key presses into one request.
       expect(api.listPrincipals).not.toHaveBeenCalled();
       jest.advanceTimersByTime(260);
       expect(api.listPrincipals).toHaveBeenCalledTimes(1);
@@ -308,13 +316,15 @@ describe('UsersComponent', () => {
     expect(toast.error).toHaveBeenCalled();
   });
 
+  /**
+   * Every row has a ⋮ menu that names its person, with no button beside it. Alex can be
+   * deactivated; Sam is the signed-in user.
+   */
   it('deactivates from the row menu, and the own account only with a reason', async () => {
     const { api, inst } = await setup(makeApi(), makeAuth('kc|sam'));
-    // Every row has a ⋮ menu that names its person; there is no button beside it.
     const menus = screen.getAllByRole('button', { name: /^Weitere Aktionen: / });
     expect(menus[0]).toHaveAccessibleName('Weitere Aktionen: Alex Admin');
     expect(screen.queryByRole('button', { name: /^Deaktivieren/ })).toBeNull();
-    // Alex can be deactivated; Sam is the signed-in user.
     const alex = inst.menuFor(PRINCIPALS[0])[0].items[0];
     expect(alex).toMatchObject({ id: 'deactivate', label: 'Deaktivieren', disabledReason: null });
     const sam = inst.menuFor(PRINCIPALS[1])[0].items[0];
@@ -474,10 +484,10 @@ describe('UsersComponent', () => {
       expect(inst.isStale(PRINCIPALS[1], now)).toBe(false);
     });
 
+    /** Every row has a menu, because the activation is always in it. */
     it('the row menu offers "Rechte entziehen …" only for a person with access', async () => {
       const api = makeApi({ listPrincipals: jest.fn(() => of(WITH_ACCESS)) });
       const { inst } = await setup(api, revokeAuth());
-      // Every row has a menu: the activation is always in it.
       expect(screen.getAllByRole('button', { name: /^Weitere Aktionen: / })).toHaveLength(2);
       const item = inst.menuFor(WITH_ACCESS[0])[1].items[0];
       expect(item).toMatchObject({ id: 'revoke', label: 'Rechte entziehen …', danger: true, disabledReason: null });

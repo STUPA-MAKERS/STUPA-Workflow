@@ -49,10 +49,10 @@ describe('TaskTodoComponent', () => {
     expect(page.loadTodos).toHaveBeenCalledTimes(1);
   });
 
+  /** The card detail gets the split: only on the sheet its bar bleeds into the padding. */
   it('is a sheet side by side and lies on the page one pane at a time', async () => {
     const wide = await start(true);
     expect(wide.harness.routeNativeElement).toHaveClass('tt--split');
-    // The card detail gets the split: only on the sheet its bar bleeds into the padding.
     expect(wide.harness.routeNativeElement?.querySelector('app-sheet-bar')).toHaveClass('sheet-bar--bleed');
     TestBed.resetTestingModule();
     const narrow = await start(true, false);

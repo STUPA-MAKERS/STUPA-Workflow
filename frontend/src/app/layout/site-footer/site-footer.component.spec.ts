@@ -47,6 +47,9 @@ describe('SiteFooterComponent', () => {
     expect(screen.getByRole('link', { name: 'Datenschutz' })).toBeInTheDocument();
   });
 
+  /**
+   * The copyright part is never empty, so the dot before the first link has a part on both sides.
+   */
   it.each([[''], ['   ']])(
     'falls back to the co-branding line for the copyright %j',
     async (text) => {
@@ -57,8 +60,6 @@ describe('SiteFooterComponent', () => {
         }),
       );
       const copy = container.querySelector('.ft__copy') as HTMLElement;
-      // The copyright part is never empty, so the dot before the first link has a part on
-      // both sides.
       expect(copy).toHaveTextContent('Eine Plattform des Studierendenparlaments');
     },
   );

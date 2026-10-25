@@ -92,10 +92,12 @@ describe('ApiClient', () => {
     http.expectOne((r) => r.url === '/api/application-types').flush(page);
   });
 
+  /**
+   * The server resolves the type name from its i18n map with the `lang` query parameter, which
+   * defaults to German. Without this parameter an English UI shows German type names, and no mapper
+   * downstream can repair that. `quiet` still keeps the background load out of the global overlay.
+   */
   it('asks /application-types for the active locale and follows a locale change', (done) => {
-    // The server resolves the type name from its i18n map with the `lang` query
-    // parameter, which defaults to German. Without this parameter an English UI
-    // shows German type names, and no mapper downstream can repair that.
     const i18n = TestBed.inject(I18nService);
     const page: Page<ApplicationTypeListItemWire> = { items: [], total: 0, limit: 20, offset: 0 };
 
@@ -111,14 +113,13 @@ describe('ApiClient', () => {
     const en = http.expectOne((r) => r.url === '/api/application-types');
     expect(en.request.params.get('lang')).toBe('en');
     expect(en.request.urlWithParams).toBe('/api/application-types?lang=en');
-    // `quiet` still keeps the background load out of the global overlay.
     expect(en.request.context.get(SKIP_LOADING)).toBe(true);
     en.flush(page);
 
-    // Leave the persisted locale as the suite found it.
     i18n.setLocale('de');
   });
 
+  /** The query repeats `state` once per chosen state. */
   it('serialises list query params and maps the page items', (done) => {
     api.listApplications({ state: ['draft', 'review'], q: 'foo', limit: 10 }).subscribe((page) => {
       expect(page.total).toBe(1);
@@ -127,7 +128,6 @@ describe('ApiClient', () => {
       done();
     });
     const req = http.expectOne((r) => r.url === '/api/applications');
-    // One `state` per chosen state, repeated.
     expect(req.request.params.getAll('state')).toEqual(['draft', 'review']);
     expect(req.request.params.get('q')).toBe('foo');
     expect(req.request.params.get('limit')).toBe('10');
@@ -216,10 +216,11 @@ describe('ApiClient', () => {
     http.expectOne('/api/applications/app-9/timeline').flush(events);
   });
 
+  /** The first version has no diff. */
   it('maps the version history with its diff into iterable lists', (done) => {
     api.versions('app-7').subscribe((versions) => {
       expect(versions).toHaveLength(2);
-      expect(versions[0].diff).toBeNull(); // the first version has no diff
+      expect(versions[0].diff).toBeNull();
       expect(versions[1].changedBy).toBe('Mia');
       expect(versions[1].diff?.added).toEqual([{ key: 'note', value: 'neu' }]);
       expect(versions[1].diff?.changed).toEqual([

@@ -8,7 +8,6 @@
   container-type: inline-size;
 }
 
-/* The template list beside the editor; one column in a narrow sheet. */
 .mt__layout {
   display: grid;
   grid-template-columns: minmax(12rem, 16rem) minmax(0, 1fr);
@@ -27,9 +26,6 @@
   gap: 2px;
 }
 
-/* Beside the admin navigation the page sits in the sheet of the admin frame, which is a
-   window of fixed height. The page takes the free height of the sheet, and the list and
-   the editor each scroll inside themselves. */
 :host-context(.af--split) {
   display: flex;
   flex: 1 1 0;
@@ -52,14 +48,12 @@
   overflow-y: auto;
   overscroll-behavior: contain;
 }
-/* A dense side list: short names, one or two lines, never cut. */
 .mt__list {
   --li-min-height: 2.75rem;
   --li-pad-y: var(--space-2);
   --li-pad-x: var(--space-3);
   --li-gap: var(--space-2);
 }
-/* "angepasst" (app-status-text) is a status beside the name, so it takes the small size. */
 .mt__list app-status-text,
 .mt__headEnd app-status-text {
   font-size: var(--fs-sm);
@@ -93,7 +87,6 @@
   font-size: var(--fs-sm);
 }
 
-/* A text area as the filled field of the kit, with the label inside. */
 .mt__area {
   display: flex;
   flex-direction: column;
@@ -180,7 +173,6 @@
   margin-inline-start: auto;
 }
 
-/* The shared top and bottom fade: an end fades only while more content lies past it. */
 .mt__list,
 .mt__editor {
   @include fade.fade-y(var(--space-5));

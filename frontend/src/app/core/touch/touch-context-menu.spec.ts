@@ -42,6 +42,7 @@ describe('guardTouchContextMenu', () => {
     expect(TOUCH_SELECTABLE).toContain('.chat__text');
   });
 
+  /** A target that is not an element (the document) is interface too. */
   it('keeps the right click of a mouse and a pen, and still lets a handler of the row see the event', () => {
     down(q('.title'), 'mouse');
     expect(menu(q('.title')).defaultPrevented).toBe(false);
@@ -52,7 +53,6 @@ describe('guardTouchContextMenu', () => {
     down(q('.title'), 'touch');
     menu(q('.title'));
     expect(own).toHaveBeenCalled();
-    // A target that is not an element (the document) is interface too.
     const e = new MouseEvent('contextmenu', { cancelable: true });
     document.dispatchEvent(e);
     expect(e.defaultPrevented).toBe(true);

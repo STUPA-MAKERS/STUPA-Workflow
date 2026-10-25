@@ -13,9 +13,11 @@ describe('HttpCacheService', () => {
     expect(cache.get('/api/budgets', 60_000)).toBeUndefined();
   });
 
+  /**
+   * An entry that is never served again only uses memory, and it makes `size` lie about what the
+   * cache holds.
+   */
   it('misses once the entry is older than the ttl, and forgets it', () => {
-    // Keeping an entry that will never be served again is just memory, and it makes
-    // `size` lie about what the cache holds.
     cache.set('/api/budgets', [1], 0);
     expect(cache.get('/api/budgets', 1_000, 1_001)).toBeUndefined();
     expect(cache.size).toBe(0);
@@ -42,9 +44,11 @@ describe('HttpCacheService', () => {
       expect(cache.get('/api/budgets/b1/fiscal-years', 60_000)).toBeUndefined();
     });
 
+    /**
+     * A plain string prefix `/api/budget` would clear both `/api/budget-transfers` and
+     * `/api/budgets`, so the boundary is a path segment.
+     */
     it('stops at a path segment, so one collection cannot clear another', () => {
-      // A plain string prefix would take `/api/budget-transfers` with `/api/budgets`
-      // out — no, worse: `/api/budget` would take BOTH. The boundary is a segment.
       cache.invalidate('/api/budgets');
       expect(cache.get('/api/budget-transfers', 60_000)).toBe('transfers');
       expect(cache.get('/api/applications', 60_000)).toBe('apps');

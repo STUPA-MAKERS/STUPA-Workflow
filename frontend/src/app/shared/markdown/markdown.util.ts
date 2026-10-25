@@ -115,7 +115,7 @@ function destination(text: string, from: number): { url: string; end: number } |
   return null;
 }
 
-// Callout kinds → title + CSS modifier: the GitHub kinds and the protocol kinds.
+/** Callout kind → title and CSS modifier: the GitHub kinds and the protocol kinds. */
 const CALLOUT_TITLES: Record<string, string> = {
   note: 'Note',
   tip: 'Tip',

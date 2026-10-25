@@ -7,7 +7,6 @@
   container-type: inline-size;
 }
 
-/* The language of the texts: the switch alone, full width on a phone. */
 .br__meta {
   display: flex;
   flex-wrap: wrap;
@@ -20,7 +19,6 @@
   width: 11rem;
 }
 
-/* Two columns side by side; one below the other in a narrow sheet. */
 .br__cols {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -68,7 +66,6 @@
   gap: var(--space-2);
 }
 
-/* Logos: one row per slot. A file dragged over a row marks it. */
 .br__logos {
   margin: 0;
   padding: 0;
@@ -96,7 +93,6 @@
   border-radius: var(--radius-md);
   background: var(--color-surface-3);
 }
-/* The wordmark is wide, so its tile is too. */
 .br__thumb--wide {
   width: 7rem;
   padding: 0 var(--space-2);
@@ -124,7 +120,6 @@
   color: var(--color-text-subtle);
 }
 
-/* The accent: a round swatch that opens the colour picker, the hex field and "Standard". */
 .br__accent {
   display: flex;
   flex-wrap: wrap;
@@ -156,7 +151,6 @@
   flex: 0 1 12rem;
 }
 
-/* A free text: the filled field of the kit, as a text area with the label inside. */
 .br__area {
   display: flex;
   flex-direction: column;
@@ -189,12 +183,10 @@
 .br__areaInput::placeholder {
   color: var(--color-text-subtle);
 }
-/* A one-line text: the same field, without the resize handle. */
 .br__areaInput--line {
   min-height: 1.75rem;
 }
 
-/* A link: the label and the URL as the same fields as every other text, in one row. */
 .br__links {
   display: flex;
   flex-direction: column;

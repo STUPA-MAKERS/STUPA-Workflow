@@ -44,7 +44,7 @@ function draftOf(s: GuestSettings): Draft {
 }
 
 /**
- * "Anträge ohne Konto" on the deadlines page (board Admin-Fristen).
+ * "Anträge ohne Konto" on the deadlines page.
  *
  * Two settings of `GET/PUT /admin/guest-settings` (permission `admin.deadlines`):
  *

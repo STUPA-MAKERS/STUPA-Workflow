@@ -5,7 +5,6 @@
 .bp--sheet {
   @include sc.raised-fields($muted-label: false);
 }
-/* The card is on surface 2: its fields step up one surface, so they stand out from it. */
 .bp__card {
   @include sc.raised-fields($muted-label: false);
   display: flex;

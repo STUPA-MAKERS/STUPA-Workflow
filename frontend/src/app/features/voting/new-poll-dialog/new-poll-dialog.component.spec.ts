@@ -10,6 +10,7 @@ import { NewPollDialogComponent } from './new-poll-dialog.component';
 /** A fixed local "now": 22 Oct 2026, 12:00. */
 const NOW = new Date(2026, 9, 22, 12, 0).getTime();
 
+/** The user has vote.manage in g1 and g2, not in g3. */
 async function setup(
   opts: { gremien?: { value: string; label: string }[]; fail?: boolean; optionsFail?: boolean; gremiumId?: string } = {},
 ) {
@@ -28,7 +29,6 @@ async function setup(
     on: { created, closed },
     providers: [
       { provide: ApiClient, useValue: { createPoll } },
-      // vote.manage in g1 and g2, not in g3.
       { provide: AuthService, useValue: { canInGremium: (id: string) => id !== 'g3' } },
       {
         provide: AdminOptionsService,

@@ -49,6 +49,7 @@ describe('TodoListViewComponent', () => {
     expect(toggleDone).toHaveBeenCalledWith(CARDS[1]);
   });
 
+  /** A done card shows its date without the overdue colour. */
   it('folds the done group until it is opened', async () => {
     const { fixture } = await setup();
     const head = screen.getByRole('button', { name: /^Erledigt/ });
@@ -58,7 +59,6 @@ describe('TodoListViewComponent', () => {
     fixture.detectChanges();
     expect(head).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('checkbox', { name: '„Erledigt eins“ wieder öffnen' })).toHaveAttribute('aria-checked', 'true');
-    // A done card shows its date without the overdue colour.
     expect(screen.getByText('01.10.').closest('.lv__due')).not.toHaveClass('tdu--overdue');
     fireEvent.click(head);
     fixture.detectChanges();

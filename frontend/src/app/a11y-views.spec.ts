@@ -54,6 +54,7 @@ const MEMBER: Principal = {
 };
 
 describe('Kern-Views a11y (axe)', () => {
+  /** The shell holds the update prompt, and the prompt needs SwUpdate. */
   describe('Shell (Landmarks)', () => {
     async function setupShell() {
       const view = await render(ShellComponent, {
@@ -62,7 +63,6 @@ describe('Kern-Views a11y (axe)', () => {
           provideHttpClient(),
           provideHttpClientTesting(),
           { provide: USE_MOCK_API, useValue: false },
-          // The shell holds the update prompt, and the prompt needs SwUpdate.
           { provide: SwUpdate, useValue: { isEnabled: false } },
         ],
       });
@@ -77,12 +77,12 @@ describe('Kern-Views a11y (axe)', () => {
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
+    /** The open account popover is checked too, because it holds a select and a switch. */
     it('authenticated shell (rail and account menu) has no violations', async () => {
       const { view, http } = await setupShell();
       http.expectOne('/api/auth/me').flush(MEMBER);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
-      // The open account popover too: it holds a select and a switch.
       (view.container.querySelector('.am__trigger') as HTMLButtonElement).click();
       view.fixture.detectChanges();
       expect(view.container.querySelector('.am--popover')).not.toBeNull();
@@ -116,6 +116,10 @@ describe('Kern-Views a11y (axe)', () => {
     });
   });
 
+  /**
+   * The wizard constructor calls AuthService.ensureLoaded(), so the fake returns an anonymous
+   * session. The branding info below the type selection stays empty.
+   */
   describe('Apply-Wizard', () => {
     const TYPES: ApplicationType[] = [
       {
@@ -146,9 +150,7 @@ describe('Kern-Views a11y (axe)', () => {
     const fakeApi: Partial<ApiClient> = {
       applicationTypes: () => of(TYPES),
       effectiveForm: () => of(EFF),
-      // The wizard constructor calls AuthService.ensureLoaded(). Return an anonymous session.
       me: (() => of(null)) as unknown as ApiClient['me'],
-      // The branding info below the type selection stays empty in this test.
       publicSiteConfig: () => of({ version: 1, branding: null }),
     };
 
@@ -199,6 +201,7 @@ describe('Kern-Views a11y (axe)', () => {
     })
     class LiveVoteHost {}
 
+    /** The open meeting vote follows its meeting over the live channel. */
     it('open meeting vote (ballot with a represented row) has no violations', async () => {
       const source = new FakeSource();
       const view = await render(LiveVoteHost, {
@@ -249,7 +252,6 @@ describe('Kern-Views a11y (axe)', () => {
           },
         ],
       });
-      // The open meeting vote follows its meeting over the live channel.
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
@@ -262,6 +264,7 @@ describe('Kern-Views a11y (axe)', () => {
     })
     class BeamerHost {}
 
+    /** The open meeting vote follows its meeting over the live channel. */
     it('beamer view (high-contrast/large, read-only) has no violations', async () => {
       const source = new FakeSource();
       const view = await render(BeamerHost, {
@@ -304,16 +307,17 @@ describe('Kern-Views a11y (axe)', () => {
           },
         ],
       });
-      // The open meeting vote follows its meeting over the live channel.
       source.channels[0].subject.next(OPEN_VOTE);
       view.fixture.detectChanges();
       expect(await runAxe(view.container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
   });
 
+  /**
+   * The reads come from admin.mock (USE_MOCK_API) or from a fake. The views must render their full
+   * structure of headings, tables and forms.
+   */
   describe('Admin-Views (Admin/Flow-Editor)', () => {
-    // The reads come from admin.mock (USE_MOCK_API) or from a fake. The views must
-    // render their full structure of headings, tables and forms.
     const adminHttp = [provideHttpClient(), provideHttpClientTesting()];
 
     @Component({
@@ -451,12 +455,12 @@ describe('Kern-Views a11y (axe)', () => {
       expect(await runAxe(container, { rules: { region: { enabled: true } } })).toHaveNoViolations();
     });
 
+    /** The guard labels need cost center names. An empty tree is enough. */
     it('flow-editor has no violations', async () => {
       const { container } = await render(FlowEditorHost, {
         providers: [
           provideRouter([]),
           { provide: AdminApiService, useValue: fakeAdminApi() },
-          // The guard labels need cost center names. An empty tree is enough.
           { provide: BudgetTreeApi, useValue: { tree: () => of([]) } },
         ],
       });

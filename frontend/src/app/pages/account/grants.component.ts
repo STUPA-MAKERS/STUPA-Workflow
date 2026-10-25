@@ -29,7 +29,7 @@ import { scopeLabel } from './scope-labels';
 type Confirm = { kind: 'one'; grant: OAuthGrant } | { kind: 'all' };
 
 /**
- * Account page "API-Zugang" (board Konto-API-Zugang).
+ * Account page "API-Zugang".
  *
  * - "MCP-Server" (only with `mcp.use`): the package download, the steps to install it,
  *   the `mcpServers` entry with "Kopieren", and the platform URL the package is wired to.
@@ -101,14 +101,16 @@ export class AccountGrantsComponent {
   });
 
 
+  /**
+   * Loads the grants and, with `mcp.use`, the MCP setup. A failed setup load is ignored,
+   * because without the snippet the card keeps the download.
+   */
   constructor() {
     this.reload();
     if (this.canUseMcp()) {
       this.api.mcpConfig().subscribe({
         next: (s) => this.setup.set(s),
-        error: () => {
-          /* Without the snippet the card keeps the download. */
-        },
+        error: () => {},
       });
     }
   }

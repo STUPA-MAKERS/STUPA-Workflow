@@ -22,7 +22,6 @@
   padding: 0 var(--space-1);
 }
 
-/* The switches share one rounded box, one row each (frame 25). */
 .ht__rows {
   display: flex;
   flex-direction: column;
@@ -50,7 +49,6 @@
   line-height: var(--lh-body);
 }
 
-/* "Gesperrte Absender": the rows of the switch box, a name and a quiet line each. */
 .ht__blocks,
 .ht__skelBlocks {
   margin: 0;
@@ -68,10 +66,8 @@
   flex: none;
   overflow-wrap: anywhere;
 }
-/* Items with a dot between two of them, also after a wrap. Every part draws its dot in
-   the --ht-sep strip before it. The list starts --ht-sep before the clip edge, so the dot
-   of a part that starts a line (also the first part) is clipped: no line starts or ends
-   with a dot. */
+// Each part draws its dot in the --ht-sep strip before it, and the list starts --ht-sep before
+// the clip edge, so no line starts or ends with a dot.
 .ht__meta {
   --ht-sep: 16px;
   min-width: 0;
@@ -88,8 +84,7 @@
 .ht__link {
   color: var(--color-accent-text);
 }
-/* ------------------------------------------------------------------ loading */
-/* A filled field with its label inside (56px), as `app-input` draws it. */
+// A filled field with its label inside (56px), as `app-input` draws it.
 .ht__skelField {
   display: flex;
   flex-direction: column;
@@ -111,7 +106,7 @@
 .ht__skelFieldValue .skel-text {
   width: 22rem;
 }
-/* The track of `app-switch`. */
+// The track of `app-switch`.
 .ht__skelSwitch {
   width: 44px;
   height: 26px;

@@ -20,6 +20,7 @@ function makeApi(initial: LoginSettings = STORED) {
   };
 }
 
+/** ngModel writes the stored values into the fields after a tick. */
 async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, jest.Mock>; perms?: string[] } = {}) {
   const api = opts.api ?? makeApi();
   const perms = new Set(opts.perms ?? ['admin.users']);
@@ -31,7 +32,6 @@ async function setup(opts: { api?: ReturnType<typeof makeApi> | Record<string, j
       { provide: ToastService, useValue: toast },
     ],
   });
-  // ngModel writes the stored values into the fields after a tick.
   await view.fixture.whenStable();
   view.fixture.detectChanges();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -46,18 +46,21 @@ const saveButton = (): HTMLButtonElement => screen.getByRole('button', { name: '
 describe('LoginSettingsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /**
+   * A setting that nobody changed has no change date. With nothing changed the page shows no
+   * "Speichern".
+   */
   it('shows the stored lifetimes', async () => {
     const { api } = await setup();
     expect(api.getLoginSettings).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('heading', { name: 'Anmeldung' })).toBeInTheDocument();
     expect(webField().value).toBe('90');
     expect(pwaField().value).toBe('180');
-    // A setting that nobody changed has no change date.
     expect(screen.queryByText(/Zuletzt geändert/)).not.toBeInTheDocument();
-    // Nothing changed yet: the page shows no "Speichern".
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
+  /** The saved values are the new baseline. */
   it('saves both lifetimes and shows the change date', async () => {
     const { api, toast } = await setup();
     await userEvent.clear(webField());
@@ -68,7 +71,6 @@ describe('LoginSettingsComponent', () => {
     expect(api.putLoginSettings).toHaveBeenCalledWith({ webSessionDays: 30, pwaSessionDays: 400 });
     expect(toast.success).toHaveBeenCalled();
     expect(screen.getByText(/Zuletzt geändert am/)).toBeInTheDocument();
-    // The saved values are the new baseline.
     expect(screen.queryByRole('button', { name: 'Speichern' })).toBeNull();
   });
 
@@ -120,10 +122,10 @@ describe('LoginSettingsComponent', () => {
     expect(screen.getByText(/Zuletzt geändert am/)).toBeInTheDocument();
   });
 
+  /** Without stored values there is nothing to save. */
   it('asks nothing and shows no form without admin.users', async () => {
     const { api, c } = await setup({ perms: [] });
     expect(api.getLoginSettings).not.toHaveBeenCalled();
-    // Without stored values there is nothing to save.
     expect(c.canSave()).toBe(false);
     expect(screen.getByRole('alert')).toHaveTextContent('Für diese Einstellungen fehlt das Recht');
     expect(screen.queryByRole('button', { name: 'Speichern' })).not.toBeInTheDocument();

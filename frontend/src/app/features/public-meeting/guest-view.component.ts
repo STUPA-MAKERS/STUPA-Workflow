@@ -41,7 +41,7 @@ interface AgendaRow {
 }
 
 /**
- * The participant view of an admitted guest (boards Telefon-Teilnahme): the own
+ * The participant view of an admitted guest: the own
  * status ("Du bist zugelassen" or "Du schaust zu"), the item that runs now, the open
  * vote (or "Keine offene Abstimmung"), and the tabs "Tagesordnung" and "Protokoll".
  *

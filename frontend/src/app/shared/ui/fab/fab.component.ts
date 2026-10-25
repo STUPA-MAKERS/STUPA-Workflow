@@ -4,7 +4,7 @@ import { ButtonComponent, IconComponent, type IconName } from '@stupa-makers/ui-
 
 /**
  * The floating main action of a page: one per page, at the bottom end of the content, on
- * every width (decision P6 "Neu überall bottom floating"). It is the "new" action, or
+ * every width. It is the "new" action, or
  * "Speichern" (`icon="check"`, `[loading]` while the save runs) on an editor or a settings
  * page. "Speichern" shows only while the page has unsaved changes, and it replaces the
  * "new" action of the page then, so a page never shows two floating buttons.

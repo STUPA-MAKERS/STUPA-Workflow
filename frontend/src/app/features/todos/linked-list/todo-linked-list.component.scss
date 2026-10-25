@@ -1,4 +1,4 @@
-/* Without linked cards the host holds only a comment node, so it takes no gap. */
+// Without linked cards the host holds only a comment node, so it takes no gap.
 :host {
   display: block;
   min-width: 0;
@@ -49,7 +49,6 @@
   font-weight: var(--fw-medium);
   text-decoration: none;
 }
-/* The whole row opens the card. */
 .tl__link::after {
   position: absolute;
   inset: 0;

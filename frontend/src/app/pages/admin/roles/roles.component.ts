@@ -42,7 +42,7 @@ interface RoleDraft {
 const FIXED_ROLES = new Set(['admin', 'member']);
 
 /**
- * Roles and rights (boards Admin-Rollen, Admin-Rollen-Dialog). One expandable row per
+ * Roles and rights. One expandable row per
  * global role.
  *
  * The head of a row shows the name, "fest" for the fixed roles `admin` and `member`
@@ -193,7 +193,7 @@ export class AdminRolesComponent {
     this.roles.update((list) => list.map((r) => (r.id === role.id ? { ...r, permissions } : r)));
   }
 
-  // A rename changes the display name only. The key never changes.
+  /** The name drafts per role. A rename changes the display name only; the key never changes. */
   private readonly nameDrafts = signal<Record<string, { de: string; en: string }>>({});
 
   /** The rights of the role differ from the server. */

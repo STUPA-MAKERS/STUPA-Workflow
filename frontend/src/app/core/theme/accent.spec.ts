@@ -24,8 +24,8 @@ describe('accent palette', () => {
     expect(Object.keys(p).sort()).toEqual([...ACCENT_PROPERTIES].sort());
   });
 
+  /** A slightly different green walks the same path as the built-in one. */
   it('keeps the derivation close to the built-in values for the built-in hue', () => {
-    // A slightly different green walks the same path as the built-in one.
     const p = accentPalette('#72a385');
     expect(contrast(p['--c-light-pt'], '#3c6a4d')).toBeLessThan(1.1);
     expect(contrast(p['--c-dark-sel'], '#243129')).toBeLessThan(1.1);

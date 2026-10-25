@@ -280,13 +280,15 @@ describe('StatusTimelineComponent', () => {
     expect(row).toHaveAttribute('aria-describedby', 'sp-locked');
   });
 
+  /**
+   * The focus moves to the title of the edit bar and, after the save, back to the row. File fields
+   * stay out of the edit form.
+   */
   it('edits the answers and saves a new version', async () => {
     const update = jest.fn(() => of({ ...app(true, { title: 'Neu' }), version: 3 }));
     const { comp, toast, fixture } = await setup(fakeApi({ update }));
     await userEvent.click(await screen.findByRole('button', { name: /Angaben bearbeiten/ }));
-    // The focus moves to the title of the edit bar.
     await waitFor(() => expect(document.activeElement?.id).toBe('sp-edit-title'));
-    // File fields stay out of the edit form.
     expect(comp.editFields()[0].fieldGroup?.some((f) => f.key === 'receipt')).toBe(false);
     const input = screen.getByLabelText(/Titel/) as HTMLInputElement;
     await userEvent.clear(input);
@@ -297,7 +299,6 @@ describe('StatusTimelineComponent', () => {
     expect(comp.editing()).toBe(false);
     fixture.detectChanges();
     expect(screen.getByRole('heading', { level: 1, name: 'Neu' })).toBeInTheDocument();
-    // The focus goes back to the row.
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole('button', { name: /Angaben bearbeiten/ })),
     );
@@ -330,6 +331,10 @@ describe('StatusTimelineComponent', () => {
     expect(toast.error).toHaveBeenCalledWith('Bitte prüfe die markierten Felder.');
   });
 
+  /**
+   * The row may go off, so the focus goes to the title of the page. The field error blocks the next
+   * save; a new edit starts clean.
+   */
   it('handles a 409, a 422 on a field and other failures of a save', async () => {
     const update = jest
       .fn()
@@ -347,14 +352,12 @@ describe('StatusTimelineComponent', () => {
     );
     expect(comp.editing()).toBe(false);
     fixture.detectChanges();
-    // The row may go off, so the focus goes to the title of the page.
     await waitFor(() => expect(document.activeElement?.id).toBe('sp-title'));
     expect(getApplication).toHaveBeenCalledTimes(2);
     comp.startEdit();
     fixture.detectChanges();
     comp.save();
     expect(toast.error).toHaveBeenLastCalledWith('Bitte prüfe die markierten Felder.');
-    // The field error blocks the next save; a new edit starts clean.
     comp.startEdit();
     fixture.detectChanges();
     comp.save();
@@ -386,6 +389,7 @@ describe('StatusTimelineComponent', () => {
     expect(comp.filesOpen()).toBe(false);
   });
 
+  /** The open sheet takes its own drop. */
   it('opens the sheet with a file dropped anywhere on the page and uploads it', async () => {
     const uploadAttachment = jest.fn(() =>
       of({ id: 'f2', filename: 'Beleg.pdf', mime: 'application/pdf', size: 10, scanned: false, scanState: 'scanning' as const }),
@@ -408,7 +412,6 @@ describe('StatusTimelineComponent', () => {
     expect(await within(dialog).findByText('Beleg.pdf')).toBeInTheDocument();
     expect(uploadAttachment).toHaveBeenCalledWith(ID, pdf);
     expect(container.querySelector('app-drop-overlay')).toBeNull();
-    // The open sheet takes its own drop.
     expect(fireEvent.dragEnter(page, { dataTransfer: { types: ['Files'] } })).toBe(true);
   });
 
@@ -418,6 +421,7 @@ describe('StatusTimelineComponent', () => {
     expect(screen.queryByText(/Datei/)).toBeNull();
   });
 
+  /** The Gremium is named; an own comment stands right without a name. */
   it('opens the comments in the chat and posts a public comment at once', async () => {
     const created = { ...COMMENTS[1], id: 'c3', body: 'Frage' };
     const addComment = jest.fn(() => of(created));
@@ -427,7 +431,6 @@ describe('StatusTimelineComponent', () => {
     const dialog = await screen.findByRole('dialog', { name: 'Kommentare' });
     expect(within(dialog).getByRole('log')).toBeInTheDocument();
     expect(within(dialog).getByText('Bitte ergänzen.')).toBeInTheDocument();
-    // The Gremium is named; an own comment stands right without a name.
     expect(within(dialog).getByText('Studierendenparlament')).toBeInTheDocument();
     expect(within(dialog).queryByText('Du')).not.toBeInTheDocument();
     const box = within(dialog).getByRole('textbox', { name: 'Nachricht an das Gremium …' });
@@ -452,6 +455,10 @@ describe('StatusTimelineComponent', () => {
     expect(comp.commentsSub()).toBe('1 Kommentar');
   });
 
+  /**
+   * Only the scan state comes from the read; the text on screen stays. An answer for another
+   * application is dropped.
+   */
   it('reads the comments again when the chat asks, quietly, and keeps them on a failure', async () => {
     const file = { id: 'f1', filename: 'a.pdf', mime: 'application/pdf', size: 1 };
     let answer: Observable<ApplicationComment[]> = of([
@@ -463,7 +470,6 @@ describe('StatusTimelineComponent', () => {
     comp.commentsOpen.set(true);
     fixture.detectChanges();
     await screen.findByRole('log');
-    // Only the scan state comes from the read; the text on screen stays.
     answer = of([{ ...COMMENTS[0], body: 'Alt', attachments: [{ ...file, scanState: 'clean' }] }]);
     fixture.debugElement.query((d) => d.name === 'app-chat').triggerEventHandler('refresh');
     expect(comments).toHaveBeenLastCalledWith(ID, { quiet: true });
@@ -472,7 +478,6 @@ describe('StatusTimelineComponent', () => {
     answer = throwError(() => new Error('x'));
     (comp as unknown as { refreshComments(id: string): void }).refreshComments(ID);
     expect(comp.comments().map((c) => c.body)).toEqual(['Neu']);
-    // An answer for another application is dropped.
     answer = of([]);
     (comp as unknown as { refreshComments(id: string): void }).refreshComments('other');
     expect(comp.comments()).toHaveLength(1);
@@ -567,6 +572,7 @@ describe('StatusTimelineComponent', () => {
     expect(comp.comments()).toHaveLength(2);
   });
 
+  /** The chat exists only with an application; a send without one names no id. */
   it('changes no comment before the application loaded', async () => {
     const updateComment = jest.fn();
     const { comp } = await setup(fakeApi({ updateComment, deleteComment: updateComment }));
@@ -575,7 +581,6 @@ describe('StatusTimelineComponent', () => {
     comp.editComment({ id: 'c2', body: 'Neu' });
     comp.deleteComment({ id: 'c2' });
     expect(updateComment).not.toHaveBeenCalled();
-    // The chat exists only with an application; a send without one names no id.
     comp.sendComment({ body: 'x' });
     expect(comp.chatMessages().length).toBeGreaterThan(0);
   });
@@ -598,8 +603,8 @@ describe('StatusTimelineComponent', () => {
     expect(getApplication).toHaveBeenCalledTimes(2);
   });
 
+  /** A staff member who is not the creator gets 403 from the list route. */
   it('offers no action when the server refuses the applicant transitions (403)', async () => {
-    // A staff member who is not the creator gets 403 from the list route.
     const fire = jest.fn();
     const { comp } = await setup(
       fakeApi({
@@ -663,6 +668,7 @@ describe('StatusTimelineComponent', () => {
     expect(screen.queryByText(/unbegrenzt/)).toBeNull();
   });
 
+  /** Without the form there is nothing to edit. */
   it('counts several files and names the changed keys without a form', async () => {
     const two = [0, 1].map((i) => ({
       id: `f${i}`,
@@ -686,7 +692,6 @@ describe('StatusTimelineComponent', () => {
     );
     expect(await screen.findByText('2 Dateien')).toBeInTheDocument();
     expect(comp.historyEntries().map((e) => e.body)).toContain('Geändert: participants');
-    // Without the form there is nothing to edit.
     comp.startEdit();
     expect(comp.editing()).toBe(false);
     comp.effForm.set(EFF);
@@ -739,13 +744,13 @@ describe('StatusTimelineComponent', () => {
     expect(comp.phase()).toBe('error');
   });
 
+  /** The reason is the link, not the status. */
   it('locks the edit for an old view link', async () => {
     const verify = jest.fn(() => of({ application_id: ID, scope: 'view' as const }));
     const { comp } = await setup(fakeApi({ verify: verify as unknown as ApiClient['verifyMagicLink'] }), { t: 'tok', app: ID });
     await screen.findByRole('heading', { level: 1 });
     expect(comp.canEdit()).toBe(false);
     expect(comp.canUploadAttachments()).toBe(false);
-    // The reason is the link, not the status.
     expect(screen.getByText('Mit diesem Link nicht möglich')).toBeInTheDocument();
     expect(screen.queryByText('Im aktuellen Status gesperrt')).toBeNull();
   });

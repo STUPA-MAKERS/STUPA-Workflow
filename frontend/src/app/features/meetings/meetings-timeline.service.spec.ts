@@ -57,6 +57,7 @@ describe('MeetingsTimelineService', () => {
     expect(svc.filterGremien()).toEqual([]);
   });
 
+  /** A Gremium that left the list reads as "Alle Gremien". */
   it('shows the Gremium chip only for more than one Gremium and names the chosen one', () => {
     const one = setup().svc;
     expect(one.showGremiumFilter()).toBe(false);
@@ -72,7 +73,6 @@ describe('MeetingsTimelineService', () => {
     expect(svc.gremiumFilterLabel()).toBe('Alle Gremien');
     svc.gremiumFilter.set('g2');
     expect(svc.gremiumFilterLabel()).toBe('AStA');
-    // A Gremium that left the list reads as "Alle Gremien".
     svc.gremiumFilter.set('gone');
     expect(svc.gremiumFilterLabel()).toBe('Alle Gremien');
   });
@@ -98,6 +98,7 @@ describe('MeetingsTimelineService', () => {
     expect(api.listMeetingsTimeline).not.toHaveBeenCalled();
   });
 
+  /** A second press while one load runs does nothing. */
   it('loads both directions, then more of each, and keeps the order', () => {
     const { svc, calls, answer, fail } = setup();
     svc.loadList();
@@ -113,11 +114,11 @@ describe('MeetingsTimelineService', () => {
     expect(svc.timelineEmpty()).toBe(false);
 
     svc.loadMorePast();
-    svc.loadMorePast(); // a second press while one load runs does nothing
+    svc.loadMorePast();
     expect(calls[2]).toMatchObject({ direction: 'past', cursor: 'cp' });
     answer(2, { items: [m('p0'), m('p-1')], nextCursor: null });
     expect(svc.pastItems().map((x) => x.id)).toEqual(['p-1', 'p0', 'p1', 'p2']);
-    svc.loadMorePast(); // nothing more
+    svc.loadMorePast();
     expect(calls).toHaveLength(3);
 
     svc.loadMoreUpcoming();
@@ -131,6 +132,7 @@ describe('MeetingsTimelineService', () => {
     expect(svc.upcomingHasMore()).toBe(true);
   });
 
+  /** The answer of the g1 load comes late, so it changes nothing. */
   it('keeps the shown meetings while a filter reloads, and drops a late older answer', () => {
     const { svc, answer } = setup();
     svc.loadList();
@@ -144,7 +146,6 @@ describe('MeetingsTimelineService', () => {
     expect(svc.reloadingList()).toBe(true);
     expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u1']);
     svc.selectGremiumFilter('g2');
-    // The answer of the g1 load comes late: it changes nothing.
     answer(2, { items: [m('late')], nextCursor: null });
     answer(3, { items: [], nextCursor: null });
     expect(svc.upcomingItems().map((x) => x.id)).toEqual(['u1']);
@@ -155,6 +156,7 @@ describe('MeetingsTimelineService', () => {
     expect(svc.reloadingList()).toBe(false);
   });
 
+  /** With nothing loaded there is no upcoming page to add to. */
   it('stops loading on errors of the first load and of an older page', () => {
     const { svc, answer, fail } = setup();
     svc.loadList();
@@ -167,7 +169,6 @@ describe('MeetingsTimelineService', () => {
     fail(3);
     expect(svc.loadingList()).toBe(false);
     expect(svc.timelineEmpty()).toBe(true);
-    // Nothing loaded: no upcoming page to add to.
     svc.loadMoreUpcoming();
   });
 
@@ -190,6 +191,11 @@ describe('MeetingsTimelineService', () => {
     expect(calls[3]).toMatchObject({ q: 'fin' });
   });
 
+  /**
+   * A new search that starts before the first answers drops the first answer. A failed search ends
+   * the loading; a late failure of an older search is dropped. An empty query returns to the
+   * timeline. The destroy stops the pending search.
+   */
   it('searches after a pause, pages the hits and drops a late answer', () => {
     jest.useFakeTimers();
     const { svc, calls, answer, fail } = setup();
@@ -201,7 +207,6 @@ describe('MeetingsTimelineService', () => {
     jest.advanceTimersByTime(400);
     expect(calls[2]).toMatchObject({ q: 'finanz', gremiumId: 'g1', cursor: null });
     expect(svc.loadingSearch()).toBe(true);
-    // A new search starts before the first answers: the first answer is dropped.
     svc.selectGremiumFilter('');
     expect(calls[3]).toMatchObject({ q: 'finanz', gremiumId: undefined });
     answer(2, { items: [m('old')], nextCursor: null });
@@ -217,7 +222,6 @@ describe('MeetingsTimelineService', () => {
     svc.loadMoreSearch();
     expect(calls).toHaveLength(5);
 
-    // A failed search ends the loading; a late failure of an older search is dropped.
     svc.onSearch('x');
     jest.advanceTimersByTime(400);
     svc.onSearch('y');
@@ -228,13 +232,12 @@ describe('MeetingsTimelineService', () => {
     expect(svc.loadingSearch()).toBe(false);
     expect(svc.searchEmpty()).toBe(true);
 
-    // An empty query returns to the timeline.
     svc.onSearch('  ');
     jest.advanceTimersByTime(400);
     expect(calls[7].direction).toBe('upcoming');
     expect(calls[7].q).toBeUndefined();
     svc.onSearch('z');
-    TestBed.resetTestingModule(); // the destroy stops the pending search
+    TestBed.resetTestingModule();
     jest.advanceTimersByTime(400);
     expect(calls).toHaveLength(9);
   });

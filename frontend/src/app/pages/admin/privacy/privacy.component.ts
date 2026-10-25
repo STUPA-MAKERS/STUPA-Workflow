@@ -40,7 +40,7 @@ import { personLabel } from '@shared/person-label.util';
 const PERSON_HITS = 6;
 
 /**
- * Privacy (board Admin-Datenschutz, permission `privacy.manage`) for GDPR administration.
+ * Privacy (permission `privacy.manage`) for GDPR administration.
  *
  * - Erasure requests (Art. 17): status as coloured text, subject, e-mail, date. An open
  *   request is rejected (with an optional reason) or executed; executing erases data and

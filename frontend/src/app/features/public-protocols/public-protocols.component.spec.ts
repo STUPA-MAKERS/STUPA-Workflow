@@ -42,6 +42,7 @@ describe('PublicProtocolsComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
+  /** The page shows no raw ids. */
   it('lists the protocols by semester with the agenda, the results and the PDF', async () => {
     const { api } = await setup();
     expect(api.list).toHaveBeenCalledWith({ gremium: [], semester: '', q: '', limit: 20 });
@@ -63,11 +64,11 @@ describe('PublicProtocolsComponent', () => {
     );
     expect(within(card).getByText('PDF · 212 KB · finalisiert 02.10.2026')).toBeInTheDocument();
     expect(screen.getByText('1 Protokolle')).toBeInTheDocument();
-    // No raw ids on the page.
     expect(document.body.textContent).not.toContain('g-1');
     expect(TestBed.inject(Meta).getTag('name="robots"')?.content).toBe('noindex');
   });
 
+  /** A group without a semester count counts its loaded rows. */
   it('words the counts of a protocol without decisions and with several skipped items', async () => {
     const one = summaryFixture({
       hasPdf: false,
@@ -84,13 +85,13 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.getByText('1 Beschluss')).toBeInTheDocument();
     expect(screen.getByText('2 nicht-öffentliche TOPs ausgelassen')).toBeInTheDocument();
     expect(screen.getByText('Ohne Beschluss')).toBeInTheDocument();
-    // A group without a semester count counts its loaded rows.
     expect(screen.getByRole('heading', { level: 2, name: /Wintersemester 2025\/26\s*1/ })).toBeInTheDocument();
     const first = screen.getAllByRole('article')[0];
     expect(within(first).queryByRole('link', { name: /PDF/ })).toBeNull();
     expect(within(first).getByText('PDF')).toBeInTheDocument();
   });
 
+  /** Enter with the same text searches nothing new. */
   it('searches after a pause and on Enter, marks the hits and words the count', async () => {
     const { api } = await setup();
     const box = screen.getByRole('searchbox', { name: 'Titel oder Text suchen' });
@@ -102,13 +103,13 @@ describe('PublicProtocolsComponent', () => {
     expect(await screen.findByText('Haus', { selector: 'mark' })).toBeInTheDocument();
     expect(screen.getByText('1 Treffer')).toBeInTheDocument();
     const calls = api.list.mock.calls.length;
-    // Enter with the same text searches nothing new.
     await userEvent.type(box, '{enter}');
     expect(api.list.mock.calls.length).toBe(calls);
     await userEvent.type(box, 'halt{enter}');
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'Haushalt' }));
   });
 
+  /** The semester counts do not depend on the semester filter. */
   it('filters by several gremien and a semester', async () => {
     const { api } = await setup();
     await userEvent.click(screen.getByRole('button', { name: 'Gremium' }));
@@ -124,7 +125,6 @@ describe('PublicProtocolsComponent', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Semester: Alle' }));
     await userEvent.click(screen.getByRole('option', { name: 'Sommersemester 2026' }));
     expect(api.list).toHaveBeenLastCalledWith(expect.objectContaining({ semester: 'ss-2026' }));
-    // The semester counts do not depend on the semester filter.
     expect(api.semesters.mock.calls.length).toBe(semesterCalls);
     expect(screen.getByRole('button', { name: 'Semester: Sommersemester 2026' })).toBeInTheDocument();
   });
@@ -176,6 +176,7 @@ describe('PublicProtocolsComponent', () => {
     expect(screen.getAllByRole('article')).toHaveLength(1);
   });
 
+  /** A new filter starts while the next page still loads. */
   it('drops the answer of an older request', async () => {
     const first = new Subject<PublicProtocolPage>();
     const more = new Subject<PublicProtocolPage>();
@@ -188,7 +189,6 @@ describe('PublicProtocolsComponent', () => {
     const semesters = jest.fn().mockReturnValueOnce(of([])).mockReturnValue(new Subject());
     const { fixture } = await setup(makeApi({ list, semesters }));
     await userEvent.click(screen.getByRole('button', { name: 'Weitere Protokolle laden' }));
-    // A new filter starts while the next page still loads.
     await userEvent.type(screen.getByRole('searchbox'), 'x{enter}');
     more.next(pageFixture([summaryFixture({ id: 'p-old', title: 'Alt' })], 3));
     more.error(new Error('late'));

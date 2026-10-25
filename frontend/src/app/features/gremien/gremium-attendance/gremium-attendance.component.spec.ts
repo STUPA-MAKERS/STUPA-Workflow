@@ -45,6 +45,7 @@ describe('GremiumAttendanceComponent', () => {
     (downloadBlob as jest.Mock).mockClear();
   });
 
+  /** The quota sorts ascending: 1/2, 2/2, then the person without a meeting. */
   it('shows the matrix with the counts, the marks, the sums and the average', async () => {
     const view = await setup({ fill: true });
     restore = view.restore;
@@ -56,7 +57,6 @@ describe('GremiumAttendanceComponent', () => {
     const heads = within(table).getAllByRole('columnheader').map((h) => h.textContent?.replace(/\s+/g, ' ').trim());
     expect(heads).toEqual(['Mitglied', 'Sep2 Sitzungen', 'Okt0 Sitzungen', 'Gesamt 2 Sitzungen']);
 
-    // Quota ascending: 1/2, 2/2, then the person without a meeting.
     const names = within(table)
       .getAllByRole('rowheader')
       .map((h) => (h.querySelector('.gat__name') ?? h).textContent?.trim());

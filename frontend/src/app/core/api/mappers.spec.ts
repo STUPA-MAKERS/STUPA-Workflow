@@ -87,6 +87,7 @@ describe('mapApplication', () => {
     applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
   };
 
+  /** A field that is absent on the wire means not archived, not "unknown". */
   it('maps every camelCase field into the view model 1:1', () => {
     const view = mapApplication(wire, 'de');
     expect(view).toEqual({
@@ -106,7 +107,6 @@ describe('mapApplication', () => {
       applicant: { email: 'a@b.de', name: 'Max', anonymized: false },
       canEdit: false,
       isOwner: false,
-      // Absent on the wire means not archived, not "unknown".
       archivedAt: null,
       stateSince: null,
       hiddenKeys: [],

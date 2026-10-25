@@ -162,6 +162,7 @@ describe('TodoBoardViewComponent', () => {
     expect(on.dropIn).not.toHaveBeenCalled();
   });
 
+  /** Every list of a writable board reaches the rows; a read-only board reaches none. */
   it('hands a card of another board to the page with the neighbours of its place', async () => {
     const { cmp, on, fixture } = await setup(board(), { connectTo: ['br-list-x-1'] });
     cmp.drop(dropEvent('ghost', 'x-1', 'c-1', 0, 1));
@@ -169,7 +170,6 @@ describe('TodoBoardViewComponent', () => {
     cmp.drop(dropEvent('ghost', 'x-1', 'c-2', 0, 0));
     expect(on.dropIn).toHaveBeenLastCalledWith({ cardId: 'ghost', move: { columnId: 'c-2' } });
     expect(on.moveCard).not.toHaveBeenCalled();
-    // Every list of a writable board reaches the rows; a read-only board reaches none.
     const lists = fixture.debugElement.queryAll(By.directive(CdkDropList)).map((d) => d.injector.get(CdkDropList));
     expect(lists.every((l) => (l.connectedTo as string[]).includes('br-list-x-1'))).toBe(true);
     fixture.componentRef.setInput('board', board({ canWrite: false }));
@@ -178,6 +178,7 @@ describe('TodoBoardViewComponent', () => {
     expect(ro.every((l) => (l.connectedTo as string[]).length === 0)).toBe(true);
   });
 
+  /** A gremium board lets a card of the personal board in. */
   it('lets no card of a shared board into a column of the personal board', async () => {
     const lists = async (b: TodoBoard) => {
       const { fixture } = await setup(b, { connectTo: ['br-list-x-1'] });
@@ -193,11 +194,11 @@ describe('TodoBoardViewComponent', () => {
     expect(personal[0].enterPredicate(from('gremium'), personal[0])).toBe(false);
     expect(personal[0].enterPredicate(from('team'), personal[0])).toBe(false);
     expect(personal[0].enterPredicate(from('personal'), personal[0])).toBe(true);
-    // A gremium board lets a card of the personal board in.
     const gremium = DROP_ENTER.gremium;
     expect(gremium(from('personal'))).toBe(true);
   });
 
+  /** Another card ignores the keys while one is held. */
   it('drags with the keyboard inside and between columns and announces each step', async () => {
     const { cmp, on, key, container } = await setup();
     await key('Raum buchen', 'a');
@@ -206,7 +207,6 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toMatchObject({ cardId: 'k-1', col: 0, index: 0 });
     expect(container.querySelector('[aria-live]')).toHaveTextContent('„Raum buchen“ aufgenommen, Spalte Offen, Position 1 von 2.');
     expect(screen.getByRole('button', { name: 'Raum buchen' }).closest('app-todo-card-tile')).toHaveClass('tt--lifted');
-    // Another card ignores the keys while one is held.
     await key('Haushalt Kapitel 3', 'ArrowDown');
     expect(cmp.kb()?.index).toBe(0);
     await key('Raum buchen', 'ArrowDown');
@@ -231,6 +231,7 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toBeNull();
   });
 
+  /** A Space keyup without a drag still clicks the tile. */
   it('lifts and puts down a card with Space without opening it, as Firefox clicks on keyup', async () => {
     const { cmp, on, fixture } = await setup();
     firefoxSpace('Raum buchen');
@@ -244,7 +245,6 @@ describe('TodoBoardViewComponent', () => {
     expect(cmp.kb()).toBeNull();
     expect(on.moveCard).toHaveBeenCalled();
     expect(on.openCard).not.toHaveBeenCalled();
-    // A Space keyup without a drag still clicks the tile.
     fireEvent.click(screen.getByRole('button', { name: 'Raum buchen' }));
     expect(on.openCard).toHaveBeenCalledWith('k-1');
   });
@@ -256,12 +256,12 @@ describe('TodoBoardViewComponent', () => {
     for (const d of drags) expect(d.injector.get(CdkDrag).dragStartDelay).toEqual({ touch: 400, mouse: 0 });
   });
 
+  /** The browser moves the focus on before the drag ends. */
   it('lets Tab leave a held card: the drag ends and the focus is not pulled back', async () => {
     const { cmp, key } = await setup();
     await key('Raum buchen', ' ');
     const elsewhere = document.createElement('button');
     document.body.appendChild(elsewhere);
-    // The browser moves the focus on before the drag ends.
     const card = screen.getByRole('button', { name: 'Raum buchen' });
     const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true });
     card.dispatchEvent(tab);
@@ -273,6 +273,11 @@ describe('TodoBoardViewComponent', () => {
     elsewhere.remove();
   });
 
+  /**
+   * The refocus after the step lands in the held card and keeps the drag. A pointer on the held
+   * card keeps the drag, and one on another card ends it. Without a drag a pointer or a focus
+   * changes nothing.
+   */
   it('ends a keyboard drag when the focus or a pointer goes elsewhere', async () => {
     const { cmp, on, key, fixture, container } = await setup();
     const elsewhere = document.createElement('button');
@@ -280,7 +285,6 @@ describe('TodoBoardViewComponent', () => {
     await key('Raum buchen', ' ');
     await key('Raum buchen', 'ArrowRight');
     expect(cmp.count(cmp.columns()[1])).toBe(1);
-    // The refocus after the step lands in the held card and keeps the drag.
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Raum buchen' }));
     expect(cmp.kb()).not.toBeNull();
     elsewhere.focus();
@@ -291,17 +295,16 @@ describe('TodoBoardViewComponent', () => {
     expect(container.querySelector('[aria-live]')).toHaveTextContent('Verschieben von „Raum buchen“ abgebrochen.');
 
     await key('Raum buchen', ' ');
-    // A pointer on the held card keeps the drag, one on another card ends it.
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Raum buchen' }));
     expect(cmp.kb()).not.toBeNull();
     fireEvent.pointerDown(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
     expect(cmp.kb()).toBeNull();
-    // Without a drag a pointer or a focus changes nothing.
     fireEvent.pointerDown(document.body);
     expect(on.moveCard).not.toHaveBeenCalled();
     elsewhere.remove();
   });
 
+  /** A held card that the board no longer holds ends without an announcement. */
   it('ends a keyboard drag when a pointer drag starts', async () => {
     const { cmp, key } = await setup();
     await key('Raum buchen', ' ');
@@ -309,7 +312,6 @@ describe('TodoBoardViewComponent', () => {
     cmp.onDragStart(cmp.columns()[0]);
     expect(cmp.kb()).toBeNull();
     expect(cmp.list(cmp.columns()[0]).map((c) => c.id)).toEqual(['k-1', 'k-2']);
-    // A held card that the board no longer holds ends without an announcement.
     cmp.kb.set({ cardId: 'gone', col: 0, index: 0, fromCol: 0, fromIndex: 0 });
     cmp.onDragStart(cmp.columns()[0]);
     expect(cmp.kb()).toBeNull();
@@ -341,6 +343,7 @@ describe('TodoBoardViewComponent', () => {
     expect(host).toHaveClass('bv-host--natural');
   });
 
+  /** Into the done column the whole column shows while the card is held. */
   it('puts the card back when it ends where it started, on Escape and on Tab', async () => {
     const { cmp, on, key, container } = await setup();
     await key('Raum buchen', ' ');
@@ -353,7 +356,6 @@ describe('TodoBoardViewComponent', () => {
     await key('Raum buchen', ' ');
     await key('Raum buchen', 'Tab');
     expect(cmp.kb()).toBeNull();
-    // Into the done column the whole column shows while the card is held.
     await key('Raum buchen', ' ');
     await key('Raum buchen', 'ArrowRight');
     await key('Raum buchen', 'ArrowRight');
@@ -406,6 +408,7 @@ describe('TodoBoardViewComponent', () => {
       button.click();
     }
 
+    /** A swipe over the tile is no long press. */
     it('asks for the "Verschieben" sheet on a long press and does not open the card', async () => {
       const { on, container } = await setup(board(), { phone: true });
       expect(container.querySelector('.tp__page')).not.toHaveAttribute('appScrollFade');
@@ -417,7 +420,6 @@ describe('TodoBoardViewComponent', () => {
         );
         expect(on.menu.mock.calls[0][0].columns.map((c: { id: string }) => c.id)).toEqual(['c-1', 'c-2', 'c-3', 'c-4']);
         expect(on.openCard).not.toHaveBeenCalled();
-        // A swipe over the tile is no long press.
         const button = screen.getByRole('button', { name: 'Raum buchen' });
         button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 0 }));
         button.dispatchEvent(new MouseEvent('pointermove', { bubbles: true, clientX: 40 }));
@@ -440,6 +442,10 @@ describe('TodoBoardViewComponent', () => {
       }
     });
 
+    /**
+     * Every column is a page of the pager, and an empty one says so. The phone has no keyboard
+     * drag.
+     */
     it('shows one column behind tabs with the ink, and its cards', async () => {
       const { cmp, on, fixture, container } = await setup(board(), { phone: true });
       expect(screen.getAllByRole('tab').map((t) => t.textContent?.replace(/\s+/g, '').trim())).toEqual([
@@ -453,7 +459,6 @@ describe('TodoBoardViewComponent', () => {
       expect(container.querySelector('.bv__dots')).toBeNull();
       fireEvent.click(screen.getByRole('button', { name: 'Haushalt Kapitel 3' }));
       expect(on.openCard).toHaveBeenCalledWith('k-2');
-      // Every column is a page of the pager; an empty one says so.
       expect(container.querySelectorAll('.tp__page')).toHaveLength(4);
       expect(container.querySelectorAll('.bv__phoneCards--empty')).toHaveLength(2);
       expect(screen.getAllByText('Keine Karten')).toHaveLength(2);
@@ -463,7 +468,6 @@ describe('TodoBoardViewComponent', () => {
       cmp.selectPhoneColumn('nope');
       cmp.selectPhoneColumn(null);
       expect(cmp.phoneCol()?.id).toBe('c-2');
-      // No keyboard drag on the phone.
       cmp.onTileKey(new KeyboardEvent('keydown', { key: ' ' }), tile(), 0, 0);
       expect(cmp.kb()).toBeNull();
     });

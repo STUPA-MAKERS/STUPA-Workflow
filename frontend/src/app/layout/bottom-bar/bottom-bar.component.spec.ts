@@ -72,6 +72,10 @@ describe('BottomBarComponent', () => {
     expect(within(bar()).queryByRole('link', { name: /^Sitzungen/ })).not.toBeInTheDocument();
   });
 
+  /**
+   * The bar entries are not repeated in the sheet. Tickets show with the count of new ones, and the
+   * help entries follow.
+   */
   it('lists the other areas, the search and the account in the Mehr sheet', async () => {
     const { fixture } = await setup();
     expect(more()).toHaveAttribute('aria-expanded', 'false');
@@ -82,12 +86,10 @@ describe('BottomBarComponent', () => {
     for (const name of ['Abstimmungen', 'Budget', 'Buchungen', 'Rechnungen', 'Verwaltung']) {
       expect(within(sheet).getByRole('link', { name })).toBeInTheDocument();
     }
-    // The bar entries are not repeated in the sheet.
     expect(within(sheet).queryByRole('link', { name: 'Start' })).not.toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Suche' })).toBeInTheDocument();
     expect(within(sheet).getByText('Ada Admin')).toBeInTheDocument();
     expect(within(sheet).getByRole('button', { name: 'Abmelden' })).toBeInTheDocument();
-    // Tickets with the count of new ones, and the help entries.
     const tickets = within(sheet).getByRole('link', { name: 'Tickets 2 neu' });
     expect(tickets.querySelector('.mark__count--inline')).toHaveTextContent('2');
     expect(within(sheet).getByRole('group', { name: 'Hilfe' })).toBeInTheDocument();

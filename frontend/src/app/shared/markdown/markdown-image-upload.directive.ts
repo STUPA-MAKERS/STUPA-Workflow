@@ -54,8 +54,10 @@ let placeholderSeq = 0;
 })
 export class MarkdownImageUploadDirective {
   private readonly el = inject<ElementRef<HTMLTextAreaElement>>(ElementRef);
-  // The service resolves on the first upload, so a host without HttpClient (a test of
-  // the host) does not need it.
+  /**
+   * The service resolves on the first upload, so a host without HttpClient (a test of the
+   * host) does not need it.
+   */
   private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
   private readonly i18n = inject(I18nService);

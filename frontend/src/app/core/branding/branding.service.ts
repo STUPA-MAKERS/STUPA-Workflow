@@ -56,9 +56,11 @@ const ACCENT_KEY = 'ap.accent';
  */
 @Injectable({ providedIn: 'root' })
 export class BrandingService {
-  // Resolve `ApiClient` (→ HttpClient) in `init()`, not in the field initializer.
-  // Otherwise the root `BrandingService` pulls HttpClient into every component
-  // that injects it, and their specs fail with NG0201 (no HttpClient provider).
+  /**
+   * Resolves `ApiClient` (→ HttpClient) in `init()`, not in the field initializer, because
+   * otherwise the root `BrandingService` pulls HttpClient into every component that injects
+   * it, and their specs fail with NG0201 (no HttpClient provider).
+   */
   private readonly injector = inject(Injector);
   private readonly i18n = inject(I18nService);
   private readonly title = inject(Title);
@@ -67,9 +69,12 @@ export class BrandingService {
   /** Configured full name (empty ⇒ fallback). */
   private readonly _configuredName = signal('');
 
-  /* Footer content comes from the PUBLIC config, which needs no session. A logged-out
-     visitor on the landing page or the 404 sees what the admin configured; reading it
-     from `/admin/site-config` would refuse that request and fall back to the defaults. */
+  /**
+   * The footer copyright. Footer content comes from the PUBLIC config, which needs no
+   * session. A logged-out visitor on the landing page or the 404 sees what the admin
+   * configured, because `/admin/site-config` would refuse that request and fall back to the
+   * defaults.
+   */
   private readonly _copyright = signal<I18nMap | null>(null);
   private readonly _legalLinks = signal<PublicFooterLink[]>([]);
 
@@ -233,7 +238,10 @@ export class BrandingService {
     this._logos.set(logos);
   }
 
-  /** Call once at app start. Loads the active branding config and ignores failures. */
+  /**
+   * Call once at app start. Loads the active branding config and ignores failures: a failed
+   * load keeps everything empty, so the i18n default fallbacks stay.
+   */
   init(): void {
     this.injector.get(ApiClient).publicSiteConfig().subscribe({
       next: (cfg) => {
@@ -249,9 +257,7 @@ export class BrandingService {
         this._ticketsPublic.set(cfg.tickets?.publicEnabled === true);
         this._loaded.set(true);
       },
-      error: () => {
-        /* Keep everything empty so the i18n default fallbacks stay. */
-      },
+      error: () => {},
     });
   }
 }

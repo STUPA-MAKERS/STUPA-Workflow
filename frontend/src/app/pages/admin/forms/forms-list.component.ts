@@ -39,7 +39,7 @@ function emptyForm(): NewForm {
 }
 
 /**
- * Overview of the forms and application types (board Admin-Formulare).
+ * Overview of the forms and application types.
  *
  * The table lists all application types: the name, the Gremium, "Mit Budget" or
  * "Ohne Budget", the status as text (Aktiv while a form version is active, else Entwurf)

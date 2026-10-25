@@ -167,6 +167,10 @@ interface SetupOpts {
   phone?: boolean;
 }
 
+/**
+ * The page follows the URL after the first restore, so the stub needs the stream and not only the
+ * snapshot.
+ */
 function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamMap({}))) {
   return [
     provideHttpClient(),
@@ -177,8 +181,6 @@ function providers(opts: SetupOpts, params = new BehaviorSubject(convertToParamM
       provide: ActivatedRoute,
       useValue: {
         snapshot: { queryParamMap: params.value },
-        // The page follows the URL after the first restore, so the stub needs the stream
-        // and not only the snapshot.
         queryParamMap: params,
       },
     },
@@ -227,15 +229,15 @@ describe('BudgetDashboardComponent', () => {
     window.matchMedia = realMatchMedia;
   });
 
-  // ------------------------------------------------------------------ tree
-
   describe('tree', () => {
+    /**
+     * The year, the overview and the search are outside the scrolling list. The pane sits on the
+     * page, so the search field keeps its own surface.
+     */
     it('scrolls only the tree and fades an end only where more rows are', async () => {
       const view = await setup();
       const tree = view.container.querySelector('.bd__pane .bd__tree') as HTMLElement;
-      // The year, the overview and the search are outside the scrolling list.
       expect(tree.querySelector('app-search-pill, .chip')).toBeNull();
-      // The pane sits on the page, so the search field keeps its own surface.
       expect(view.container.querySelector('.bd__pane .bd__paneBody')).not.toHaveClass('bd__paneBody--side');
       const geometry = (scrollHeight: number, scrollTop: number) => {
         Object.defineProperty(tree, 'scrollHeight', { value: scrollHeight, configurable: true });
@@ -254,12 +256,14 @@ describe('BudgetDashboardComponent', () => {
       expect(fades()).toEqual([true, false]);
     });
 
+    /**
+     * The bar stays on top, and the body holds the rest of the content, so the card keeps its
+     * background unmasked.
+     */
     it('scrolls the sheet inside itself on the wide layout and fades only the content', async () => {
       const view = await setup();
       const sheet = view.container.querySelector('article.bd__sheet') as HTMLElement;
       const body = sheet.querySelector(':scope > .bd__sheetBody') as HTMLElement;
-      // The bar stays on top; the body holds the rest of the content, so the card keeps
-      // its background unmasked.
       expect(Array.from(sheet.children).map((el) => el.tagName.toLowerCase())).toEqual(['app-sheet-bar', 'div']);
       expect(body.querySelector('.bd__figs')).toBeTruthy();
       Object.defineProperty(body, 'scrollHeight', { value: 1200, configurable: true });
@@ -280,27 +284,29 @@ describe('BudgetDashboardComponent', () => {
       expect(scroll).toHaveBeenCalledWith({ block: 'nearest' });
     });
 
+    /** 800 is closed, so its child is not in the tree yet. */
     it('shows the root open with its children, each with its allocation', async () => {
       const view = await setup();
       const tree = within(view.container.querySelector('.bd__tree') as HTMLElement);
       expect(tree.getByText('VS-Mittel')).toBeTruthy();
       expect(tree.getByText('Dezentrale Einrichtungen')).toBeTruthy();
       expect(tree.getByText('Rücklage')).toBeTruthy();
-      // 800 is closed, so its child is not in the tree yet.
       expect(tree.queryByText('Werkstatt')).toBeNull();
       expect(tree.getAllByText(/1\.000\s€/).length).toBe(1);
       const current = view.container.querySelector('.tn--on .tn__name');
       expect(current?.textContent).toContain('VS-Mittel');
     });
 
+    /**
+     * A node without a colour takes the colour of the faculty above. With no colour of its own or
+     * above, it takes the palette colour of its position.
+     */
     it('gives a node its own or inherited colour and draws the swatch only then', async () => {
       const view = await setup({ queryParams: { ks: 'b-810' } });
       const rows = view.c.treeRows() as { node: { id: string }; color: string; swatch: boolean }[];
       const row = (id: string) => rows.find((r) => r.node.id === id);
       expect(row('b-800')?.color).toBe('#0075bf');
-      // The colour of the faculty above.
       expect(row('b-810')?.color).toBe('#0075bf');
-      // No colour of its own or above: the palette colour of its position.
       expect(row('b-vs')?.color).toBe(PALETTE[0]);
       expect(row('b-900')?.color).toBe(PALETTE[1]);
       expect(rows.map((r) => [r.node.id, r.swatch])).toEqual([
@@ -312,6 +318,7 @@ describe('BudgetDashboardComponent', () => {
       expect(view.container.querySelectorAll('.tn__swatch').length).toBe(2);
     });
 
+    /** The node without any colour is the case that must match in all three places. */
     it('draws a cost centre in one colour in the tree, the chart and the bars', async () => {
       const { c } = await setup();
       const tree = new Map(
@@ -329,7 +336,6 @@ describe('BudgetDashboardComponent', () => {
         expect(pie.get(id)).toBe(tree.get(id));
         expect(bars.get(id)).toBe(tree.get(id));
       }
-      // The node without any colour is the case that drifted apart before.
       expect(tree.get('b-900')).toBe(PALETTE[1]);
     });
 
@@ -366,12 +372,12 @@ describe('BudgetDashboardComponent', () => {
       expect(screen.getByText('Keine Kostenstelle gefunden.')).toBeTruthy();
     });
 
+    /** 350 committed of 300 is 117 %. */
     it('draws the utilisation bar of a node in red when it is overdrawn', async () => {
       const { c } = await setup();
       const rows = c.treeRows() as { node: { id: string }; segments: { tone: string }[]; percent: number | null }[];
       const r900 = rows.find((r) => r.node.id === 'b-900')!;
       expect(r900.segments[0].tone).toBe('error');
-      // 350 committed of 300 → 117 %.
       expect(r900.percent).toBe(117);
     });
 
@@ -397,10 +403,8 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ figures
-
   describe('figures', () => {
-    it('shows all six figures, Beantragt and Einnahmen included (N28)', async () => {
+    it('shows all six figures, Beantragt and Einnahmen included', async () => {
       const view = await setup();
       const figs = within(view.container.querySelector('.bd__figs') as HTMLElement);
       for (const label of ['Zuteilung', 'Beantragt', 'Gebunden', 'Ausgegeben', 'Einnahmen', 'Verfügbar']) {
@@ -427,14 +431,15 @@ describe('BudgetDashboardComponent', () => {
 
   });
 
-  // ------------------------------------------------------------------ path + actions
-
   describe('header', () => {
+    /**
+     * The bar sits above the scrolling body, so it stays in place. The title is the first line of
+     * the body, below the bar.
+     */
     it('puts the path in the kicker of the shared sheet bar, the actions at its end', async () => {
       const view = await setup({ queryParams: { ks: 'b-810' } });
       const bar = view.container.querySelector('article.bd__sheet > app-sheet-bar') as HTMLElement;
       expect(bar).toBeTruthy();
-      // The bar sits above the scrolling body, so it stays in place.
       expect(bar.nextElementSibling).toHaveClass('bd__sheetBody');
       const kicker = bar.querySelector('.sheet-bar__kicker') as HTMLElement;
       expect(kicker.querySelector('nav.bd__crumbs')).toBeTruthy();
@@ -445,7 +450,6 @@ describe('BudgetDashboardComponent', () => {
       expect(within(actions).getByRole('button', { name: /Exportieren/ })).toBeTruthy();
       expect(within(actions).getByRole('button', { name: 'Buchungen ansehen' })).toBeTruthy();
       expect(bar.firstElementChild).toBe(kicker);
-      // The title is the first line of the body, below the bar.
       expect(view.container.querySelector('.bd__sheetBody')?.firstElementChild?.id).toBe('bd-title');
     });
 
@@ -485,6 +489,7 @@ describe('BudgetDashboardComponent', () => {
       expect(nav).toHaveBeenCalledWith(['/applications'], { queryParams: { budget: 'b-vs' } });
     });
 
+    /** A second click while it runs does nothing. */
     it('exports the selection and resets the flag after the download', async () => {
       (URL as unknown as { createObjectURL?: unknown }).createObjectURL = () => 'blob:mock';
       (URL as unknown as { revokeObjectURL?: unknown }).revokeObjectURL = () => undefined;
@@ -493,7 +498,6 @@ describe('BudgetDashboardComponent', () => {
       const { c, http } = await setup();
       screen.getByRole('button', { name: /Exportieren/ }).click();
       expect(c.exporting()).toBe(true);
-      // A second click while it runs does nothing.
       c.onExport();
       const req = http.expectOne((r) => r.url.includes('/budget/export.xlsx'));
       expect(req.request.params.get('node')).toBe('b-vs');
@@ -515,9 +519,11 @@ describe('BudgetDashboardComponent', () => {
       expect(toast).toHaveBeenCalledWith('Der Export ist fehlgeschlagen.');
     });
 
+    /**
+     * A reader with a scope (viewGremiumId) and no global budget permission gets the sub cost
+     * centres of the scope as roots from the server. Its figures are still there.
+     */
     it('gives a gremium-scoped reader neither the export nor the bookings', async () => {
-      // A reader with a scope (viewGremiumId) and no global budget permission: the server
-      // sends the sub cost centres of the scope as roots.
       const scoped = [
         node({
           id: 'b-800',
@@ -535,14 +541,12 @@ describe('BudgetDashboardComponent', () => {
       expect(c.selectedKsId()).toBe('b-800');
       expect(screen.queryByRole('button', { name: /Exportieren/ })).toBeNull();
       expect(screen.queryByRole('button', { name: 'Buchungen ansehen' })).toBeNull();
-      // Its figures are still there.
       expect(within(view.container.querySelector('.bd__figs') as HTMLElement).getByText(/^400,00\s€$/)).toBeTruthy();
     });
   });
 
-  // ------------------------------------------------------------------ distribution
-
   describe('distribution', () => {
+    /** With no colour of its own or above, a slice takes the palette colour of its position. */
     it('splits the figure over the sub cost centres and adds what the node keeps', async () => {
       const { c } = await setup();
       const slices = c.distribution() as { label: string; value: number; color: string; id?: string }[];
@@ -552,12 +556,12 @@ describe('BudgetDashboardComponent', () => {
         [null, 300],
       ]);
       expect(slices[0].color).toBe('#0075bf');
-      // No colour of its own or above: the palette colour of its position.
       expect(slices[1].color).toBe(PALETTE[1]);
       expect(slices[2].label).toBe('VS-Mittel (nicht verteilt)');
       expect(slices[2].color).toBe('var(--color-text-subtle)');
     });
 
+    /** 800 asks for 20, 900 for nothing, and the root holds 50 more. */
     it('switches the figure and drops empty slices', async () => {
       const view = await setup();
       const c = view.fixture.componentInstance as unknown as Inst;
@@ -568,7 +572,6 @@ describe('BudgetDashboardComponent', () => {
       view.fixture.detectChanges();
       expect(c.metric()).toBe('requested');
       expect(screen.queryByRole('listbox')).toBeNull();
-      // 800 asked for 20, 900 for nothing, the root holds 50 more.
       expect(c.distribution().map((s: { value: number }) => s.value)).toEqual([20, 50]);
     });
 
@@ -607,15 +610,17 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ utilisation
-
   describe('utilisation per budget', () => {
+    /**
+     * 800 has committed 100 of 400, which is 25 %. 900 is overdrawn. The amount shows in the column
+     * and in the line below the name that a phone shows instead. No requested amount reads as a
+     * dash.
+     */
     it('lists the sub cost centres with requested, percent and available', async () => {
       const view = await setup();
       const c = view.fixture.componentInstance as unknown as Inst;
       const rows = c.usageRows();
       expect(rows.map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-800', 'b-900']);
-      // 800: committed 100 of 400 → 25 %.
       expect(rows[0].percent).toBe(25);
       expect(rows[0].segments).toEqual([
         { value: 40, tone: 'filled' },
@@ -623,22 +628,19 @@ describe('BudgetDashboardComponent', () => {
       ]);
       expect(rows[0].total).toBe(400);
       expect(rows[0].color).toBe('#0075bf');
-      // 900 is overdrawn.
       expect(rows[1].segments.map((s: { tone: string }) => s.tone)).toEqual(['error', 'error']);
       const list = within(view.container.querySelector('.bd__usage') as HTMLElement);
-      // The column, and the line below the name that a phone shows instead.
       expect(list.getAllByText(/^20\s€$/)).toHaveLength(2);
       expect(list.getByText('25 %')).toBeTruthy();
       expect(list.getByText(/^-50\s€$/).classList).toContain('bd__neg');
-      // No requested amount reads as a dash.
       expect(list.getAllByText('—').length).toBeGreaterThan(0);
     });
 
+    /** The row takes the inherited colour of the faculty above. */
     it('shows the cost centre itself when it has no sub cost centres', async () => {
       const { c } = await setup({ queryParams: { ks: 'b-810' } });
       const rows = c.usageRows();
       expect(rows.map((r: { node: { id: string } }) => r.node.id)).toEqual(['b-810']);
-      // The inherited colour of the faculty above.
       expect(rows[0].color).toBe('#0075bf');
     });
 
@@ -652,10 +654,10 @@ describe('BudgetDashboardComponent', () => {
       expect(row?.getAttribute('title')).toMatch(expected);
     });
 
-    it('keeps the requested amount on a phone, below the name of the row (N28)', async () => {
+    /** The column and the line below the name both exist; CSS shows the line on a phone. */
+    it('keeps the requested amount on a phone, below the name of the row', async () => {
       const view = await setup({ wide: false, phone: true });
       const row = view.container.querySelector('.bd__usage .bd__urow') as HTMLElement;
-      // The column and the line below the name both exist; CSS shows the line on a phone.
       expect(row.querySelector('.bd__c1')).toBeTruthy();
       const req = row.querySelector('.bd__ucell > .bd__uname + .bd__ureq') as HTMLElement;
       expect(req.textContent).toMatch(/Beantragt:\s*20\s€/);
@@ -692,9 +694,8 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ applications
-
   describe('applications on the cost centre', () => {
+    /** The path joins the keys with "-". */
     it('lists status, path key, cost centre and amount, newest first', async () => {
       const view = await setup({
         apps: [
@@ -717,7 +718,6 @@ describe('BudgetDashboardComponent', () => {
       const first = section.querySelector('app-list-item') as HTMLElement;
       expect(first.querySelector('app-status-text')?.textContent).toContain('Bewilligt');
       expect(first.querySelector('app-status-text')?.classList).toContain('st--accent');
-      // The path joins the keys with "-".
       expect(first.textContent).toContain('VS-800-810');
       expect(first.textContent).toContain('Werkstatt');
       expect(first.textContent).toMatch(/2\.890,00\s€/);
@@ -776,8 +776,6 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ year + roots
-
   describe('fiscal year and roots', () => {
     it('selects the newest fiscal year by default', async () => {
       const view = await setup({ fys: [FY, FY2] });
@@ -798,6 +796,7 @@ describe('BudgetDashboardComponent', () => {
       view.http.match(() => true);
     });
 
+    /** The same year again changes nothing. */
     it('switches the fiscal year from the chip and reloads the applications for it', async () => {
       const view = await setup({ fys: [FY, FY2] });
       const c = view.fixture.componentInstance as unknown as Inst;
@@ -816,11 +815,14 @@ describe('BudgetDashboardComponent', () => {
       const req = view.http.expectOne((r) => r.url.endsWith('/budgets/b-vs/applications'));
       expect(req.request.params.get('fiscalYear')).toBe('fy-1');
       req.flush([]);
-      // The same year again changes nothing.
       c.selectYear('fy-1');
       view.http.expectNone((r) => r.url.endsWith('/applications'));
     });
 
+    /**
+     * The other root has only a 2026 year, so a 2027 selection shows nothing there and a pick falls
+     * back to its first year. The other root shows its 2027 figures in the tree.
+     */
     it('moves to another root with the year of the same start year', async () => {
       const tree = [
         TREE[0],
@@ -833,8 +835,6 @@ describe('BudgetDashboardComponent', () => {
             alloc({ fiscalYearId: 'qs-27', allocated: '700' }),
           ],
         }),
-        // Only a 2026 year: a 2027 selection shows nothing there and a pick falls back
-        // to its first year.
         node({ id: 'b-xs', key: 'XS', name: 'XS-Mittel', byFiscalYear: [alloc({ fiscalYearId: 'xs-26', allocated: '90' })] }),
       ];
       setViewport(true);
@@ -854,7 +854,6 @@ describe('BudgetDashboardComponent', () => {
       jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       c.selectYear('fy-2');
       flushApps(http);
-      // The other root shows its 2027 figures in the tree.
       const qsRow = c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-qs');
       expect(qsRow.allocated).toBe(700);
       const xsRow = c.treeRows().find((r: { node: { id: string } }) => r.node.id === 'b-xs');
@@ -869,9 +868,8 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ narrow layout
-
   describe('narrow layout', () => {
+    /** A pick closes the sheet again. */
     it('puts the tree in a side sheet that the path chip opens', async () => {
       const view = await setup({ wide: false, queryParams: { ks: 'b-800' } });
       const c = view.fixture.componentInstance as unknown as Inst;
@@ -881,13 +879,16 @@ describe('BudgetDashboardComponent', () => {
       chip.click();
       view.fixture.detectChanges();
       expect(c.navOpen()).toBe(true);
-      // A pick closes the sheet again.
       jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
       c.selectKs('b-810');
       expect(c.navOpen()).toBe(false);
       flushApps(view.http);
     });
 
+    /**
+     * The year and the overview sit on the page, so the sheet has only the search and the tree. The
+     * sheet has the background of the search field, so the field takes the next surface there.
+     */
     it('opens the tree in a side sheet from the start that scrolls only the tree', async () => {
       const view = await setup({ wide: false });
       (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
@@ -896,29 +897,25 @@ describe('BudgetDashboardComponent', () => {
       expect(dialog).toHaveClass('ss--start');
       expect(dialog.querySelector('.ss__body')).toHaveClass('ss__body--fill');
       expect(dialog.querySelector('.ss__body > .bd__paneBody .bd__tree')).toBeTruthy();
-      // The year and the overview sit on the page, so the sheet has only the search and
-      // the tree.
       expect(dialog.querySelector('.chip, select')).toBeNull();
-      // The sheet has the background of the search field, so the field takes the next
-      // surface there.
       expect(dialog.querySelector('.bd__paneBody')).toHaveClass('bd__paneBody--side');
     });
 
+    /**
+     * The body passes the height down: the search stays above the tree, which scrolls by itself
+     * down to the bottom padding of the sheet. The close button of the sheet closes it.
+     */
     it('opens the tree in the shared sheet from the bottom on a phone', async () => {
       const view = await setup({ wide: false, phone: true });
       (view.container.querySelector('.bd__pathChip') as HTMLButtonElement).click();
       view.fixture.detectChanges();
       const dialog = view.getByRole('dialog', { name: 'Kostenstellen' });
       expect(dialog).toHaveClass('ss--bottom');
-      // The handle of the sheet.
       expect(dialog.querySelector('.ss__handle')).toBeTruthy();
-      // The body passes the height down: the search stays above the tree, which scrolls
-      // by itself down to the bottom padding of the sheet.
       expect(dialog.querySelector('.ss__body')).toHaveClass('ss__body--fill');
       const pane = dialog.querySelector('.ss__body > .bd__paneBody') as HTMLElement;
       expect(pane).toHaveClass('bd__paneBody--side');
       expect(pane.querySelector(':scope > app-search-pill + .bd__tree')).toBeTruthy();
-      // The close button of the sheet closes it.
       (dialog.querySelector('.ss__close') as HTMLButtonElement).click();
       view.fixture.detectChanges();
       const c = view.fixture.componentInstance as unknown as Inst;
@@ -988,8 +985,6 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ overview
-
   describe('overview (sunburst)', () => {
     it('offers only metrics with data and falls back when the chosen one has none', async () => {
       const { c } = await setup();
@@ -1036,22 +1031,22 @@ describe('BudgetDashboardComponent', () => {
     });
   });
 
-  // ------------------------------------------------------------------ edge cases
-
+  /**
+   * A cost centre that is not in the tree is its own root. With nothing selected there is no
+   * request and no rows, and the URL loses the params.
+   */
   it('copes with an unknown cost centre, an unknown year and an empty selection', async () => {
     const { c, http } = await setup();
     const nav = jest.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
     c.selectedFyId.set('nope');
     expect(c.selectedYear()).toBeNull();
     c.selectedFyId.set('fy-1');
-    // A cost centre that is not in the tree is its own root.
     c.selectKs('ghost');
     expect(c.selectedBudgetId()).toBe('ghost');
     expect(c.breadcrumbs()).toEqual([]);
     expect(c.distribution()).toEqual([]);
     expect(c.usageRows()).toEqual([]);
     flushApps(http);
-    // Nothing selected: no request, no rows, and the URL loses the params.
     c['setSelection']('', '', '');
     http.expectNone((r) => r.url.endsWith('/applications'));
     expect(c.apps()).toEqual([]);
@@ -1061,6 +1056,7 @@ describe('BudgetDashboardComponent', () => {
     }));
   });
 
+  /** An empty label map gives no status either. */
   it('shows an application without state, cost centre or amount', async () => {
     const view = await setup({
       apps: [app({ applicationId: 'a-1', stateLabel: null, budgetId: null, pathKey: null, amount: null })],
@@ -1070,15 +1066,13 @@ describe('BudgetDashboardComponent', () => {
     const row = view.container.querySelector('[aria-labelledby="bd-apps"] app-list-item') as HTMLElement;
     expect(row.querySelector('app-status-text')).toBeNull();
     expect(row.textContent).toContain('—');
-    // An empty label map gives no status either.
     c.apps.set([app({ applicationId: 'a-2', stateLabel: {} })]);
     expect(c.appRows()[0].statusLabel).toBeNull();
     c.apps.set(null);
     expect(c.appRows()).toEqual([]);
   });
 
-  // ------------------------------------------------------------------ formatting
-
+  /** A node without a currency still formats in euro. */
   it('formats money with and without cents', async () => {
     const { c } = await setup();
     expect(c.money(100)).toMatch(/100,00/);
@@ -1087,18 +1081,15 @@ describe('BudgetDashboardComponent', () => {
     expect(c.money('')).toContain('0');
     expect(c.money(5, 'USD')).toMatch(/[$]|USD/);
     expect(c.moneyShort(1234.56)).toMatch(/^1\.235\s€$/);
-    // A node without a currency still formats in euro.
     expect(c.money(1, '')).toContain('€');
     expect(c.moneyShort(1, '')).toContain('€');
   });
 
-  // ------------------------------------------------------------------ load + states
-
+  /** The placeholder has the two columns of the wide layout, so the page does not jump. */
   it('shows the loading state, then the error when the tree request fails', async () => {
     const { c, http, fixture } = await bare();
     fixture.detectChanges();
     expect(c.loading()).toBe(true);
-    // The placeholder has the two columns of the wide layout, so the page does not jump.
     expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toHaveClass('bd--wide');
     expect(fixture.nativeElement.querySelectorAll('main')).toHaveLength(0);
     http.expectOne((r) => r.url.endsWith('/budgets')).flush('x', { status: 500, statusText: 'err' });
@@ -1156,8 +1147,6 @@ describe('BudgetDashboardComponent', () => {
     expect(ids).toEqual(['b-show']);
     expect(c.treeRows().map((r: { node: { id: string } }) => r.node.id)).not.toContain('b-hide');
   });
-
-  // ------------------------------------------------------------------ URL
 
   describe('selection from the URL', () => {
     it('restores budget, cost centre and year from the query params', async () => {
@@ -1223,6 +1212,10 @@ describe('BudgetDashboardComponent', () => {
       expect(c.loading()).toBe(false);
     });
 
+    /**
+     * Only b-b has years so far, so it becomes the default; the later answer for b-a changes
+     * nothing.
+     */
     it('waits for the years of the root the URL names', async () => {
       const tree = [
         node({ id: 'b-a', key: 'A', byFiscalYear: [alloc({ fiscalYearId: 'fy-1', allocated: '10' })] }),
@@ -1230,8 +1223,6 @@ describe('BudgetDashboardComponent', () => {
       ];
       const { c, http, fixture } = await bare();
       http.expectOne((r) => r.url.endsWith('/budgets')).flush(tree);
-      // Only b-b has years so far, so it becomes the default; the later answer for b-a
-      // changes nothing.
       http.expectOne((r) => r.url.endsWith('/budgets/b-b/fiscal-years')).flush([{ ...FY, budgetId: 'b-b' }]);
       http.expectOne((r) => r.url.endsWith('/budgets/b-a/fiscal-years')).flush([{ ...FY, budgetId: 'b-a' }]);
       fixture.detectChanges();
@@ -1246,8 +1237,6 @@ describe('BudgetDashboardComponent', () => {
       expect(c.selectedBudgetId()).toBe('');
     });
   });
-
-  // ------------------------------------------------------------------ empty reasons
 
   describe('empty states', () => {
     it('blames the missing fiscal year, not the cost centres, when only the year is gone', async () => {

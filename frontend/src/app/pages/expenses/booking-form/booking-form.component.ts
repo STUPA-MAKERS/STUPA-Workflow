@@ -51,7 +51,7 @@ export type BookingFormMode = 'create' | 'edit';
  */
 export type FinanceFormLayout = 'pane' | 'page' | 'sheet';
 
-/** The payment methods as chips, "Keine Angabe" first (board Fin-Buchung-Neu). */
+/** The payment methods as chips, "Keine Angabe" first. */
 const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
   '',
   'ueberweisung',
@@ -62,8 +62,7 @@ const PAYMENT_METHODS: readonly ('' | PaymentMethod)[] = [
 ];
 
 /**
- * The booking form (boards "Buchung hinzufügen", "Buchung · Kostenstelle wählen",
- * "Buchung · Handy"): add a booking or edit one. It replaces the detail sheet.
+ * The booking form: add a booking or edit one. It replaces the detail sheet.
  *
  * Two equal columns. Start: the kind (Ausgabe | Einnahme), the amount, the description,
  * then "Zuordnung" with the cost centre (`app-cost-centre-select`: search, grouped by

@@ -52,8 +52,7 @@ interface Member {
 export const MEMBER_PREVIEW = 7;
 
 /**
- * Members of a gremium on its own page (`/admin/gremien/:id/members`, board
- * Admin-Gremium-Mitglieder).
+ * Members of a gremium on its own page (`/admin/gremien/:id/members`).
  *
  * The members come only from the OIDC groups of the IdP, so the list is read-only: avatar,
  * name, e-mail and the gremium role. The note links to the group mappings, where the

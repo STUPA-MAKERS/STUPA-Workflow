@@ -65,12 +65,12 @@ describe('touch styles', () => {
     expect(offenders).toEqual([]);
   });
 
+  /** The panes that scroll inside themselves keep their own overscroll. */
   it('stops the page bounce and the pull-to-refresh only in the installed app', () => {
     const styles = read('../styles.scss');
     expect(styles).toMatch(
       /@media \(display-mode: standalone\), \(display-mode: fullscreen\) \{\s*html,\s*body \{\s*overscroll-behavior-y: none;/,
     );
-    // The panes that scroll inside themselves keep their own overscroll.
     expect(read('shared/ui/_list-pane.scss')).toMatch(/overscroll-behavior: contain;/);
   });
 
@@ -95,6 +95,7 @@ describe('touch styles', () => {
     expect(rule).toMatch(/app-bottom-bar \{\s*display: none;/);
   });
 
+  /** The pill shrinks like a button; the entry keeps its size. */
   it.each([
     ['bottom bar', 'layout/bottom-bar/bottom-bar.component.scss', '.bb'],
     ['navigation rail', 'layout/nav-rail/nav-rail.component.scss', '.rail'],
@@ -103,10 +104,14 @@ describe('touch styles', () => {
     expect(scss).toContain("@use 'press';");
     expect(scss).toContain('@include press.chrome-text;');
     expect(scss).toContain(`${b}__item:active ${b}__ind::after {\n  background: var(--press-tint);`);
-    // The pill shrinks like a button; the entry keeps its size.
     expect(scss).toContain(`${b}__item:active ${b}__ind {\n  @include press.press-scale;`);
   });
 
+  /**
+   * A press state of its own scales too. Two `:active` rules are no press: the canvas of the flow
+   * editor shows the grab cursor, and the rows of the dashboard colour an `app-list-item` that
+   * scales itself.
+   */
   it('shrinks every pressed element of the app and eases it back on the release', () => {
     const files = [...scssFiles(SRC)];
     const offenders = files.flatMap((file) =>
@@ -115,9 +120,6 @@ describe('touch styles', () => {
         .map((u) => `${relative(SRC, file)}: ${u.selector}`),
     );
     expect(offenders).toEqual([]);
-    // A press state of its own scales too. Two `:active` rules are no press: the canvas
-    // of the flow editor shows the grab cursor, and the rows of the dashboard colour an
-    // `app-list-item` that scales itself.
     const own = files
       .filter((file) => {
         const text = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');

@@ -66,6 +66,7 @@ async function settle(detectChanges: () => void) {
 describe('RowTransitionsMenuComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** A rejection and the delete are red. */
   it('loads the transitions only when the menu opens', async () => {
     const { http, trigger, detectChanges } = await setup();
     http.verify();
@@ -86,7 +87,6 @@ describe('RowTransitionsMenuComponent', () => {
       'Status setzen',
       'Löschen',
     ]);
-    // A rejection and the delete are red.
     expect(screen.getByRole('menuitem', { name: 'Ablehnen' })).toHaveClass('rm__item--danger');
     expect(screen.getByRole('menuitem', { name: 'Löschen' })).toHaveClass('rm__item--danger');
     expect(screen.getByRole('menuitem', { name: 'Öffnen' })).not.toHaveClass('rm__item--danger');

@@ -24,11 +24,11 @@ describe('AdminOptionsService — mock mode', () => {
     expect(opts[0]).toEqual(expect.objectContaining({ value: expect.any(String), label: expect.any(String) }));
   });
 
+  /** The value is the type id, and the label is the display name. */
   it('maps application types to {value,label} options', async () => {
     const opts = await firstValueFrom(svc().applicationTypeOptions());
     expect(opts.length).toBe(2);
     expect(opts[0]).toEqual(expect.objectContaining({ value: expect.any(String), label: expect.any(String) }));
-    // The value is the type id. The label is the display name.
     expect(opts.find((o) => o.label === 'Finanzantrag')).toBeTruthy();
   });
 
@@ -43,16 +43,17 @@ describe('AdminOptionsService — mock mode', () => {
     expect(opts.find((o) => o.value === 'status_changed')?.label).toBe('Status changed');
   });
 
+  /** Guard operator values equal their labels. */
   it('provides recipient-kind and guard-operator options', () => {
     const s = svc();
     expect(s.recipientKindOptions().map((o) => o.value)).toEqual(['applicant', 'role', 'group']);
     expect(s.guardOperatorOptions().length).toBeGreaterThan(0);
-    // Guard operator values equal their labels (value == key).
     expect(s.guardOperatorOptions().every((o) => o.value === o.label)).toBe(true);
   });
 });
 
 describe('AdminOptionsService — roleOptions non-empty branch', () => {
+  /** Without a fallback to the seed list only the single API role is present. */
   it('uses the API roles (not the seed fallback) and resolves the locale label', async () => {
     const fakeApi = {
       listRoles: () =>
@@ -69,11 +70,11 @@ describe('AdminOptionsService — roleOptions non-empty branch', () => {
     const s = TestBed.inject(AdminOptionsService);
     const opts = await firstValueFrom(s.roleOptions());
     expect(opts).toEqual([{ value: 'chair', label: expect.any(String) }]);
-    // No fallback to the seed list → only the single API role is present.
     expect(opts).toHaveLength(1);
     TestBed.inject(HttpTestingController).verify();
   });
 
+  /** An empty API list falls back to MOCK_ROLES (member/referent/vorstand/admin). */
   it('falls back to the seed list when the API returns an empty array', async () => {
     const fakeApi = { listRoles: () => of([]) } as unknown as AdminApiService;
     TestBed.configureTestingModule({
@@ -86,7 +87,6 @@ describe('AdminOptionsService — roleOptions non-empty branch', () => {
     });
     const s = TestBed.inject(AdminOptionsService);
     const opts = await firstValueFrom(s.roleOptions());
-    // An empty API list falls back to MOCK_ROLES (member/referent/vorstand/admin).
     expect(opts.map((o) => o.value)).toContain('member');
     expect(opts.length).toBeGreaterThan(1);
     TestBed.inject(HttpTestingController).verify();

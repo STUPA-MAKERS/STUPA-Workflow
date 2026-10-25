@@ -85,7 +85,7 @@ const MID_TABLE_MIN = 700;
 const MAX_CUTOFF_DAY = 28;
 
 /**
- * The cost centres of the admin area (boards Admin-Kostenstellen, Admin-Kostenstelle-Dialog).
+ * The cost centres of the admin area.
  *
  * A toolbar holds the budget-wide actions: the accepted and bound flow states, the
  * fiscal-year cutoff, "Haushaltsjahr anlegen" (with the list of the years to correct or
@@ -609,7 +609,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  // Create a top budget.
+  /** Set a field of the new top budget. */
   patchTop<K extends 'key' | 'name'>(key: K, value: string): void {
     this.newTop.update((t) => ({ ...t, [key]: value }));
   }
@@ -677,8 +677,9 @@ export class BudgetTreeComponent {
     this.stateConfigOpen.set(false);
   }
 
-  // The inline row for a sub cost centre.
   /**
+   * Open the inline row for a sub cost centre.
+   *
    * The focus moves to the key field of the new row, because the row can stand far below the button
    * and the focus scrolls it into view inside the pane.
    */
@@ -724,7 +725,7 @@ export class BudgetTreeComponent {
       });
   }
 
-  // Delete a node after a confirmation.
+  /** Delete a node after a confirmation. */
   askDeleteNode(node: BudgetTreeNode): void {
     this.nodeDeleteBlocked.set(false);
     this.nodeDelete.set(node);
@@ -755,7 +756,7 @@ export class BudgetTreeComponent {
     });
   }
 
-  // The edit dialog with every setting of a node.
+  /** Open the edit dialog with every setting of a node. */
   openEditNode(node: BudgetTreeNode): void {
     this.editNode.set(node);
     this.editKey.set(node.key);
@@ -882,7 +883,7 @@ export class BudgetTreeComponent {
   /** Whether the selected fiscal year is closed. Its limits are then frozen. */
   readonly selectedFyClosed = computed(() => !!this.selectedFy()?.closedAt);
 
-  // Fiscal years, which live inside the budget.
+  /** Set the year of the new fiscal year, which lives inside the budget. */
   patchFyYear(value: string): void {
     const year = Math.trunc(Number(value)) || new Date().getFullYear();
     this.newFy.set({ year });
@@ -913,8 +914,11 @@ export class BudgetTreeComponent {
     });
   }
 
-  // Correct or remove a fiscal year. Each runs in its own dialog. The manage dialog
-  // closes first and opens again afterwards, so no two dialogs stack.
+  /**
+   * Open the dialog that corrects a fiscal year. Correct and remove each run in their own
+   * dialog. The manage dialog closes first and opens again afterwards, so no two dialogs
+   * stack.
+   */
   openFyEdit(fy: FiscalYear): void {
     this.fyOpen.set(false);
     this.fyEdit.set(fy);

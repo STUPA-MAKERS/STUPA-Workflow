@@ -34,13 +34,15 @@ function meeting(over: Partial<MeetingOutWire>): MeetingOutWire {
   };
 }
 
+/**
+ * A planned meeting in the past is still allowed by the server, but is not the suggestion. A broken
+ * date shows no weekday.
+ */
 const MEETINGS: MeetingOutWire[] = [
   meeting({ id: 'm-late', title: '35. Sitzung', date: day(21), agendaItemCount: 1 }),
   meeting({ id: 'm-next', title: '34. Sitzung', date: day(7) }),
-  // A planned meeting in the past: still allowed by the server, but not the suggestion.
   meeting({ id: 'm-past', title: '33. Sitzung', date: day(-3), startTime: null, agendaItemCount: undefined }),
   meeting({ id: 'm-nodate', title: 'Ohne Datum', date: null, startTime: null }),
-  // A broken date shows no weekday.
   meeting({ id: 'm-broken', title: 'Kaputt', date: 'kaputt', startTime: '19:30:00' }),
   meeting({ id: 'm-live', title: 'Läuft', status: 'live', date: day(0) }),
   meeting({ id: 'm-closed', title: 'Zu', status: 'closed', date: day(-10) }),
@@ -75,6 +77,10 @@ const LIST = (r: { url: string; params: { get(k: string): string | null } }) =>
 const FIRE = (r: { url: string }) => r.url === '/api/applications/app-1/transition';
 
 describe('AgendaDialogComponent', () => {
+  /**
+   * The first meeting from today on is the suggestion and starts chosen. The row shows weekday and
+   * time, then the number of agenda items; missing parts leave no dot.
+   */
   it('offers only the planned meetings of the agenda gremium, oldest first', async () => {
     const { http, detectChanges } = await setup();
     http.expectOne(LIST).flush(MEETINGS);
@@ -90,12 +96,10 @@ describe('AgendaDialogComponent', () => {
       'Ohne Datum',
       'Kaputt',
     ]);
-    // The first meeting from today on is the suggestion and starts chosen.
     const next = radios[1];
     expect(next).toBeChecked();
     expect(next.closest('label')?.textContent).toContain('Vorschlag');
     expect(radios[0].closest('label')?.textContent).not.toContain('Vorschlag');
-    // Weekday and time, then the number of agenda items; missing parts leave no dot.
     const sub = (i: number) => radios[i].closest('label')?.querySelector('.agd__sub')?.textContent ?? '';
     expect(sub(1)).toMatch(/^\w{2}, 18:00 · 3 TOPs$/);
     expect(sub(2)).toMatch(/· 1 TOP$/);
@@ -143,6 +147,9 @@ describe('AgendaDialogComponent', () => {
     http.verify();
   });
 
+  /**
+   * The meeting has started meanwhile, so the new list no longer has it and the next one is chosen.
+   */
   it('shows the refusal of the server and offers the meetings that are still planned', async () => {
     const { http, detectChanges, done } = await setup();
     http.expectOne(LIST).flush(MEETINGS);
@@ -154,7 +161,6 @@ describe('AgendaDialogComponent', () => {
     );
     detectChanges();
     expect(screen.getByRole('alert')).toHaveTextContent('Diese Sitzung nimmt keine Anträge mehr an.');
-    // The meeting started meanwhile: the new list no longer has it, the next one is chosen.
     http.expectOne(LIST).flush(MEETINGS.filter((m) => m.id !== 'm-next'));
     detectChanges();
     expect(screen.getByRole('radio', { name: /35\. Sitzung/ })).toBeChecked();
@@ -207,25 +213,27 @@ describe('AgendaDialogComponent', () => {
     http.verify();
   });
 
+  /**
+   * The text does not claim that no meeting exists, because the reader may not see it. "Nicht
+   * öffentlich" needs a chosen meeting. Without `meetingId` the server picks the next planned
+   * meeting after the commit.
+   */
   it('fires without a meeting when no planned meeting is visible', async () => {
     const { http, detectChanges, toast, done, fixture } = await setup();
     http.expectOne(LIST).flush([meeting({ status: 'closed' })]);
     detectChanges();
     const success = jest.spyOn(toast, 'success');
-    // The text does not claim that no meeting exists: the reader may not see it.
     expect(
       screen.getByText(
         'Keine geplante Sitzung sichtbar. Der Antrag kommt automatisch auf die nächste geplante Sitzung des Gremiums, falls es eine gibt.',
       ),
     ).toBeInTheDocument();
-    // "Nicht öffentlich" needs a chosen meeting.
     expect(screen.queryByRole('switch')).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Notiz zum Übergang (optional)'), 'Eilt');
     detectChanges();
     const confirm = screen.getByRole('button', { name: 'Auf Tagesordnung setzen' });
     expect(confirm).toBeEnabled();
     await userEvent.click(confirm);
-    // Without `meetingId` the server picks the next planned meeting after the commit.
     const post = http.expectOne(FIRE);
     expect(post.request.body).toEqual({ transitionId: 'tr-agenda', note: 'Eilt' });
     post.flush({ newStateId: 's2', statusEventId: 'e1', dispatchedActions: [] });
@@ -245,6 +253,7 @@ describe('AgendaDialogComponent', () => {
     http.verify();
   });
 
+  /** The first answer arrives late. */
   it('drops a late answer of an earlier opening', async () => {
     const { http, detectChanges, fixture } = await setup();
     const first = http.expectOne(LIST);
@@ -253,7 +262,6 @@ describe('AgendaDialogComponent', () => {
     fixture.componentInstance.open.set(true);
     detectChanges();
     const second = http.expectOne(LIST);
-    // The first answer arrives late.
     first.flush([meeting({ id: 'stale', title: 'Alt' })]);
     detectChanges();
     expect(screen.queryByText('Alt')).not.toBeInTheDocument();
@@ -284,11 +292,13 @@ describe('AgendaDialogComponent', () => {
     http.verify();
   });
 
+  /**
+   * Without its own label the button says what the dialog does. No meeting is visible, so it fires
+   * without one.
+   */
   it('loads nothing without an agenda gremium; the button names the dialog', async () => {
     const { http } = await setup({ ...AGENDA, agendaGremiumId: null, label: '' });
     http.verify();
-    // Without its own label the button says what the dialog does. No meeting is
-    // visible, so it fires without one.
     expect(screen.getByRole('button', { name: 'Auf Tagesordnung setzen' })).toBeEnabled();
   });
 

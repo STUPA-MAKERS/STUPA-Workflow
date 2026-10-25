@@ -152,6 +152,7 @@ describe('AdminFrameComponent swipe back on a phone', () => {
 describe('AdminFrameComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** The cost centres sit inside the frame. */
   it('lists every admin page in its group for a principal with all rights', async () => {
     await setup(ALL);
     const hrefs = navLinks().map((a) => a.getAttribute('href'));
@@ -167,7 +168,6 @@ describe('AdminFrameComponent', () => {
     ]) {
       expect(screen.getByRole('heading', { name: group, level: 2 })).toBeInTheDocument();
     }
-    // The cost centres sit inside the frame.
     expect(hrefs).toContain('/admin/cost-centres');
   });
 
@@ -184,9 +184,12 @@ describe('AdminFrameComponent', () => {
     expect(active[0]).toHaveClass('af__item--on');
   });
 
+  /**
+   * jsdom has no layout, so the fake puts every entry 40 px under the one before it, and the column
+   * shows 200 px from 0. An entry in view leaves the column as it is. An entry out of view is
+   * scrolled to the middle of the column.
+   */
   it('scrolls the column, not the window, so that the active entry shows', async () => {
-    // jsdom has no layout: every entry sits 40 px under the one before it, the column
-    // shows 200 px and starts at 0.
     const rect = jest
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
       .mockImplementation(function (this: HTMLElement) {
@@ -201,7 +204,6 @@ describe('AdminFrameComponent', () => {
       const view = await setup(ALL, '/admin/users');
       const body = view.container.querySelector<HTMLElement>('.af__navBody')!;
       Object.defineProperty(body, 'clientHeight', { configurable: true, value: 200 });
-      // The first entry is in view: the column stays.
       expect(body.scrollTop).toBe(0);
       await view.fixture.ngZone!.run(() =>
         view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/backups'),
@@ -210,7 +212,6 @@ describe('AdminFrameComponent', () => {
       await view.fixture.whenStable();
       const i = navLinks().findIndex((a) => a.getAttribute('href') === '/admin/backups');
       expect(i).toBeGreaterThan(5);
-      // The entry is out of view: the column puts it in the middle.
       expect(body.scrollTop).toBe(i * 40 - 80);
       expect(scrollWindow).not.toHaveBeenCalled();
     } finally {
@@ -233,16 +234,18 @@ describe('AdminFrameComponent', () => {
     expect(screen.getByText('Keine Einstellung gefunden.')).toBeInTheDocument();
   });
 
+  /**
+   * In one column the navigation is the page, with a description per entry. The search hides the
+   * tiles, because they are no entries. They stay in the DOM, so a cleared search does not load
+   * them again.
+   */
   it('is the overview on the home page: h1, Zustand and a line per entry', async () => {
-    // One column: the navigation is the page, with a description per entry.
     const view = await setup(ALL, '/admin', false);
     expect(screen.getByRole('heading', { name: 'Verwaltung', level: 1 })).toBeInTheDocument();
     expect(view.container.querySelector('app-admin-health')).not.toBeNull();
     expect(screen.getByText('Benutzer und Rollenzuweisungen')).toBeInTheDocument();
     expect(view.container.querySelector('.af__page')).toHaveClass('af__hidden');
     expect(view.container.querySelector('.af')).toHaveClass('af--home');
-    // The search hides the tiles: they are no entries. They stay in the DOM, so a
-    // cleared search does not load them again.
     const api = view.fixture.debugElement.injector.get(AdminApiService) as unknown as {
       listBackups: jest.Mock;
     };
@@ -260,13 +263,15 @@ describe('AdminFrameComponent', () => {
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
   });
 
+  /**
+   * Without the column the breadcrumb "Verwaltung" is the way back. Back on a normal page the
+   * column returns.
+   */
   it('leaves out the navigation for a page with adminNav: false, and keeps the crumb', async () => {
     const view = await setup(ALL, '/admin/flow');
     expect(screen.queryByRole('navigation')).toBeNull();
     expect(view.container.querySelector('.af')).not.toHaveClass('af--split');
-    // Without the column the breadcrumb "Verwaltung" is the way back.
     expect(view.fixture.debugElement.injector.get(PageFrameService).crumbRoot()).toBeNull();
-    // Back on a normal page the column returns.
     await view.fixture.ngZone!.run(() =>
       view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/users'),
     );
@@ -275,6 +280,7 @@ describe('AdminFrameComponent', () => {
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
   });
 
+  /** A full-width page without the flag keeps the page scroll. */
   it('passes the free height to a full-width page with adminPane, only on a wide viewport', async () => {
     const view = await setup(ALL, '/admin/flow');
     const frame = view.container.querySelector('.af');
@@ -283,7 +289,6 @@ describe('AdminFrameComponent', () => {
     expect(frame).toHaveClass('af--pane');
     expect(host).toHaveClass('pane-page');
     expect(pageFrame.fill()).toBe(true);
-    // A full-width page without the flag keeps the page scroll.
     await view.fixture.ngZone!.run(() =>
       view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/plain'),
     );
@@ -306,12 +311,12 @@ describe('AdminFrameComponent', () => {
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
   });
 
+  /** The tiles lead the column, before the first group of entries. */
   it('keeps "Zustand" in the column beside an admin page, in the same order, and marks the open tile', async () => {
     const view = await setup(ALL, '/admin/audit');
     const nav = screen.getByRole('navigation', { name: 'Verwaltungsbereiche' });
     const health = nav.querySelector('app-admin-health');
     expect(health).not.toBeNull();
-    // The tiles lead the column, before the first group of entries.
     expect(nav.querySelector('.af__navBody')?.firstElementChild).toBe(health);
     const tiles = [...health!.querySelectorAll<HTMLAnchorElement>('a.ah__tile')];
     expect(tiles.map((a) => a.getAttribute('href'))).toEqual([
@@ -326,11 +331,11 @@ describe('AdminFrameComponent', () => {
     expect(tiles[1]).not.toHaveClass('ah__tile--on');
   });
 
+  /** The sheet is the window: its body is the scroll container of the page. */
   it('beside an admin page is a pane page: it fills the window, and clears that when it goes', async () => {
     const view = await setup(ALL, '/admin/users');
     const frame = view.fixture.debugElement.injector.get(PageFrameService);
     expect(frame.fill()).toBe(true);
-    // The sheet is the window: its body is the scroll container of the page.
     expect(view.container.querySelector('.af__page > .af__pageBody')).not.toBeNull();
     view.fixture.destroy();
     expect(frame.fill()).toBe(false);
@@ -341,10 +346,10 @@ describe('AdminFrameComponent', () => {
     expect(view.fixture.debugElement.injector.get(PageFrameService).fill()).toBe(false);
   });
 
+  /** jsdom does no layout, so a plain property stands in for the scroll offset. */
   it('starts a new admin page at the top of the sheet', async () => {
     const view = await setup(ALL, '/admin/users');
     const body = view.container.querySelector<HTMLElement>('.af__pageBody')!;
-    // jsdom does no layout: a plain property stands in for the scroll offset.
     Object.defineProperty(body, 'scrollTop', { value: 300, writable: true, configurable: true });
     await view.fixture.ngZone!.run(() =>
       view.fixture.debugElement.injector.get(Router).navigateByUrl('/admin/audit'),
@@ -407,9 +412,11 @@ describe('AdminFrameComponent', () => {
     expect(home.container.querySelector('.af')).not.toHaveClass('af--split');
   });
 
+  /**
+   * Any admin right gives the same split: the empty sheet stands beside the column, which shows the
+   * titles only, as beside an admin page.
+   */
   it('keeps the column and the sheet of every admin page on the wide home page', async () => {
-    // Any admin right gives the same split: the empty sheet stands beside the column,
-    // which shows the titles only, as beside an admin page.
     const view = await setup(['backup.manage'], '/admin');
     expect(view.container.querySelector('.af')).toHaveClass('af--split');
     expect(view.container.querySelector('.af__page')).not.toHaveClass('af__hidden');
@@ -482,6 +489,7 @@ function accountLinks(): string[] {
 describe('AdminFrameComponent in account mode', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** Beside the sheet the entries keep one line, the same as beside an account page. */
   it('lists the account pages under "Konto", without search, tiles and group heading', async () => {
     const view = await setupAccount(['mcp.use']);
     expect(screen.getByRole('heading', { name: 'Konto', level: 1 })).toBeInTheDocument();
@@ -490,7 +498,6 @@ describe('AdminFrameComponent in account mode', () => {
     expect(view.container.querySelector('app-admin-health')).toBeNull();
     expect(view.api.listBackups).not.toHaveBeenCalled();
     expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
-    // Beside the sheet the entries keep one line, the same as beside an account page.
     expect(screen.queryByText('E-Mails je Anlass ein- und ausschalten')).toBeNull();
     expect(view.container.querySelector('.af')).toHaveClass('af--account');
   });

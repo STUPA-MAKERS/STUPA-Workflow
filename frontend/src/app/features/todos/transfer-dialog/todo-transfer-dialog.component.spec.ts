@@ -11,6 +11,7 @@ interface Opts {
   inputs?: Record<string, unknown>;
 }
 
+/** For a card of a personal board every other writable board is a target. */
 async function setup(opts: Opts = {}) {
   const api = {
     boards: jest.fn(() => (opts.boardsFail ? throwError(() => new Error('x')) : of(opts.boards ?? BOARDS))),
@@ -18,7 +19,6 @@ async function setup(opts: Opts = {}) {
   };
   const transferred = jest.fn();
   const view = await render(TodoTransferDialogComponent, {
-    // A card of a personal board: every other writable board is a target.
     inputs: { open: false, boardId: 'b-1', boardKind: 'personal', ...opts.inputs },
     on: { transferred },
     providers: [{ provide: TodosApiService, useValue: api }],
@@ -34,6 +34,7 @@ async function setup(opts: Opts = {}) {
 describe('TodoTransferDialogComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
 
+  /** There is no helper text and no sub line with the card title. */
   it('offers the other writable boards and starts on the first one and its first column', async () => {
     const { cmp, open, api, transferred } = await setup({
       boards: [BOARDS[0], BOARDS[1], { ...BOARDS[2], canWrite: false }, BOARDS[3]],
@@ -41,7 +42,6 @@ describe('TodoTransferDialogComponent', () => {
     expect(api.boards).not.toHaveBeenCalled();
     open();
     expect(screen.getByRole('dialog', { name: 'In anderes Board verschieben' })).toBeInTheDocument();
-    // No helper text and no sub line with the card title.
     expect(screen.queryByText(/Labels, die es im Ziel-Board nicht gibt/)).toBeNull();
     expect(screen.queryByText('Raum buchen')).toBeNull();
     expect(cmp.boardOptions().map((o) => o.value)).toEqual(['b-0', 'b-3']);

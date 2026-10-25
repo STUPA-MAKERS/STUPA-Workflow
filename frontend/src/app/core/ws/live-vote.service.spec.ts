@@ -54,10 +54,10 @@ describe('LiveVoteService', () => {
     expect(s.guestCounts()).toEqual(frame);
   });
 
+  /** Beamer mode sends no cast frame. */
   it('opens the beamer stream read-only when requested', () => {
     const s = svc.open('m-1', { beamer: true });
     expect(source.lastBeamer).toBe(true);
-    // Beamer mode sends no cast frame.
     source.channels[0].subject.next({
       type: 'vote_opened',
       voteId: 'v1',
@@ -115,6 +115,7 @@ describe('LiveVoteService', () => {
     expect(s.result()).toBeNull();
   });
 
+  /** The previous count is carried over from the tally before it. */
   it('mirrors the closing counts into the tally so bars stay final', () => {
     const s = svc.open('m-1');
     const ch = source.channels[0];
@@ -129,14 +130,16 @@ describe('LiveVoteService', () => {
     ch.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 7, no: 1 } });
     expect(s.result()?.result).toBe('passed');
     expect(s.tally()?.counts['yes']).toBe(7);
-    expect(s.tally()?.eligible).toBe(12); // carried over from the tally before it
+    expect(s.tally()?.eligible).toBe(12);
   });
 
+  /**
+   * No vote_tally arrives before vote_closed. The previous tally is null, so the fallback values
+   * apply.
+   */
   it('mirrors closing counts with default tally fields when no prior tally exists', () => {
     const s = svc.open('m-1');
     const ch = source.channels[0];
-    // No vote_tally arrives before vote_closed. The previous tally is null, so the
-    // fallback values apply.
     ch.subject.next({ type: 'vote_closed', voteId: 'v1', result: 'passed', counts: { yes: 5 } });
     expect(s.result()?.result).toBe('passed');
     const t = s.tally();
@@ -146,13 +149,12 @@ describe('LiveVoteService', () => {
     expect(t?.leading).toBeNull();
   });
 
+  /** The armed reconnect timer must be cleared on close, so no reconnect fires. */
   it('clears a pending reconnect timer on explicit close', () => {
     jest.useFakeTimers();
     const s = svc.open('m-1', { reconnectMs: 500 });
-    // Enter the reconnecting state, so the session arms a reconnect timer.
     source.channels[0].subject.complete();
     expect(s.connection()).toBe('reconnecting');
-    // Then close. The armed timer must be cleared, so no reconnect fires.
     s.close();
     jest.advanceTimersByTime(5000);
     expect(source.channels).toHaveLength(1);
@@ -248,6 +250,7 @@ describe('LiveVoteService', () => {
     expect(s.result()).toBeNull();
   });
 
+  /** The cancellation refers to an unrelated vote, so the open vote survives. */
   it('ignores a cancellation for a different vote than the open one', () => {
     const s = svc.open('m-1');
     const ch = source.channels[0];
@@ -258,7 +261,6 @@ describe('LiveVoteService', () => {
       options: ['yes', 'no'],
       closesAt: null,
     });
-    // The cancellation refers to an unrelated vote, so the open vote survives.
     ch.subject.next({ type: 'vote_cancelled', voteId: 'other' });
     expect(s.openVote()?.voteId).toBe('v1');
   });
@@ -279,11 +281,13 @@ describe('LiveVoteService', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * Each connect completes at once, which counts as a failed attempt. The first open used channel
+   * 0. Attempts 1 to 4 reconnect, and the fifth gives up.
+   */
   it('gives up after the max reconnect attempts and reports connection_failed', () => {
     jest.useFakeTimers();
     const s = svc.open('m-1', { reconnectMs: 500 });
-    // Each connect completes at once, which counts as a failed attempt. The first open
-    // used channel 0. Attempts 1 to 4 reconnect, and the fifth gives up.
     for (let i = 0; i < 5; i++) {
       source.channels[source.channels.length - 1].subject.complete();
       jest.advanceTimersByTime(15000);
@@ -293,17 +297,18 @@ describe('LiveVoteService', () => {
     jest.useRealTimers();
   });
 
+  /**
+   * A frame on the new channel resets the attempt counter to zero. Four more failures are now
+   * necessary before the session gives up. One is harmless.
+   */
   it('resets the attempt counter once a frame is received again', () => {
     jest.useFakeTimers();
     const s = svc.open('m-1', { reconnectMs: 100 });
-    // Two failed attempts.
     source.channels[0].subject.complete();
     jest.advanceTimersByTime(100);
     source.channels[1].subject.complete();
     jest.advanceTimersByTime(200);
-    // A frame on the new channel resets the attempt counter to zero.
     source.channels[2].subject.next({ type: 'meeting_state', activeApplicationId: null, status: 'live' });
-    // Four more failures are now necessary before the session gives up. One is harmless.
     source.channels[2].subject.complete();
     jest.advanceTimersByTime(100);
     expect(s.connection()).toBe('open');
@@ -316,11 +321,11 @@ describe('LiveVoteService', () => {
     expect(s.connection()).toBe('open');
   });
 
+  /** A late complete from the closed socket must keep 'closed' and start no reconnect. */
   it('does not reconnect when the stream ends after the user closed it', () => {
     jest.useFakeTimers();
     const s = svc.open('m-1', { reconnectMs: 500 });
     s.close();
-    // A late complete from the closed socket must keep 'closed' and start no reconnect.
     source.channels[0].subject.complete();
     expect(s.connection()).toBe('closed');
     jest.advanceTimersByTime(5000);

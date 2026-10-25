@@ -1,16 +1,6 @@
-// The settings card of the app: a box on surface 2 whose fields step up to surface 3.
-//
-// The filled field of the kit is `--color-surface-sunken`. On a card or a row on surface 2
-// it takes surface 3, so the field stands out from the card. The field label sits on that
-// fill, and the subtle text colour gives less than 4.5:1 on surface 3 (WCAG 1.4.3), so the
-// label takes the muted text colour (`$muted-label`).
-//
-// Use:
-//   @use '../../../shared/ui/surface-card' as sc;
-//   .bk__card { @include sc.card; }
-//   .ar__body { @include sc.raised-fields; display: flex; … }
+// On surface 3 the subtle text gives less than 4.5:1 (WCAG 1.4.3), so a field label on a raised
+// field takes the muted text colour (`$muted-label`).
 
-/// The fields of a container on surface 2 take surface 3.
 @mixin raised-fields($muted-label: true) {
   --color-surface-sunken: var(--color-surface-3);
   @if $muted-label {
@@ -18,7 +8,6 @@
   }
 }
 
-/// A card on surface 2 with raised fields: a column of its parts.
 @mixin card($pad: var(--space-5), $gap: var(--space-3), $direction: column, $muted-label: true) {
   @include raised-fields($muted-label);
   display: flex;

@@ -1,6 +1,6 @@
 @use 'breakpoints' as bp;
 
-/* The geometry of the application detail (applications-detail.component.scss). */
+// The geometry of applications-detail.component.scss.
 
 :host {
   display: flex;
@@ -29,7 +29,6 @@
   margin: var(--space-5) 0;
 }
 
-/* ------------------------------------------------------------------ header */
 .td__line {
   display: flex;
   flex-wrap: wrap;
@@ -53,8 +52,7 @@
   font-weight: var(--fw-semibold);
 }
 
-/* ------------------------------------------------------------------ body */
-/* Two columns: the thread is the wider one. Below about 740px the columns stack. */
+// Below about 740px the columns stack.
 .td__cols {
   display: flex;
   flex: 1 1 auto;
@@ -80,7 +78,6 @@
   --tab-pager-page-top: var(--space-5);
   margin-top: calc(-1 * var(--space-5));
 }
-/* One column: two tabs of equal width that fill the row, and the two actions share it. */
 .td__tabs ::ng-deep .tabs {
   gap: 0;
 }
@@ -125,7 +122,6 @@
   margin-inline-end: 4px;
 }
 
-/* Two fields side by side, each on its own surface like a row of the group. */
 .td__pair {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -151,7 +147,6 @@
 .td__pair time {
   white-space: nowrap;
 }
-/* An e-mail address and a URL are never cut: they wrap and stay selectable. */
 .td__mail,
 .td__url {
   display: inline;
@@ -165,7 +160,6 @@
     text-decoration: underline;
   }
 }
-/* An inline select: the value at the start, the chevron at the end of the field. */
 .td__select {
   display: block;
 }
@@ -185,13 +179,8 @@
   max-width: none;
 }
 
-/* ------------------------------------------------------------------ thread */
-/* Split: the columns fill the card down to its foot, and the thread fills its column.
-   The log takes the height between the heading and the composer and scrolls inside. It
-   adds only its minimum to the height of the card (`--chat-log-basis: 0`), so a long
-   thread does not make the pane scroll, and the composer stays at the foot of the card.
-   A details column taller than the pane makes the card taller, and the log grows with
-   it. */
+// The log adds only its minimum (`--chat-log-basis: 0`), so a long thread does not make the pane
+// scroll and the composer stays at the foot of the card.
 .td--split .td__cols {
   flex: 1 0 auto;
   align-items: stretch;
@@ -211,7 +200,6 @@
   --chat-composer-bleed: var(--space-4);
 }
 
-/* ------------------------------------------------------------------ dialogs */
 .td__closeBox {
   display: flex;
   flex-direction: column;
@@ -223,7 +211,6 @@
 .td__closeLabel {
   font-weight: var(--fw-medium);
 }
-/* The open to-dos: plain lines under the label of the checkbox. */
 .td__closeList {
   margin: 0;
   padding-inline-start: calc(18px + var(--space-2));
@@ -279,10 +266,6 @@
   font-size: var(--fs-small);
 }
 
-/* Phone: the page is as high as the view. The header and the tabs stay at the top, and
-   the tab below them takes the rest down to the bottom navigation. "Verlauf" gives it to
-   the log of the chat, which scrolls inside and opens at the newest message; "Details"
-   scrolls as a whole under the header. */
 @include bp.phone {
   .td:not(.td--split) {
     min-height: 0;
@@ -315,7 +298,6 @@
   }
 }
 
-/* ------------------------------------------------------------------ loading */
 .td__skelIcon {
   display: grid;
   flex: none;
@@ -331,14 +313,13 @@
 .td__skelTitle {
   width: 64%;
 }
-/* One view at a time a title takes two lines. */
 .td__skelTitle--second {
   width: 40%;
 }
 .td__skelLine {
   width: 15rem;
 }
-/* The size of an `app-button` of size md. */
+// The size of an `app-button` of size md.
 .td__skelButton {
   width: 7.5rem;
   height: var(--control-height);
@@ -350,7 +331,6 @@
 .td:not(.td--split) .td__skelButton {
   width: 100%;
 }
-/* The place of "+ To-Do anlegen", a small text button. */
 .td__skelAdd {
   display: flex;
   align-items: center;
@@ -360,9 +340,6 @@
   width: 7rem;
 }
 
-/* Phone, one pane: the rule under the head, the line under the tabs and the pages run
-   over the page gutter (`.page-shell`, --space-4 on a phone) to the screen edges, as on
-   the boards; the head and the tabs keep their place. */
 @include bp.phone {
   .td:not(.td--split) .td__head {
     margin-inline: calc(-1 * var(--space-4));

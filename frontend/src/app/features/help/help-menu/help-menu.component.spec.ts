@@ -35,6 +35,7 @@ describe('HelpMenuComponent', () => {
     jest.useRealTimers();
   });
 
+  /** The second line shows the address without the scheme. */
   it('opens beside the rail with the handbook link and the report entry', async () => {
     const { fixture, container } = await setup();
     const nav = document.createElement('nav');
@@ -55,7 +56,6 @@ describe('HelpMenuComponent', () => {
     expect(wiki).toHaveAttribute('href', WIKI);
     expect(wiki).toHaveAttribute('target', '_blank');
     expect(wiki).toHaveAttribute('rel', 'noopener');
-    // The second line shows the address without the scheme.
     expect(wiki).toHaveTextContent('wiki.example.org/books/stupa');
     expect(document.activeElement).toBe(wiki);
     expect(screen.getByRole('button', { name: 'Problem melden' })).toBeInTheDocument();
@@ -90,12 +90,12 @@ describe('HelpMenuComponent', () => {
     expect(panel()).toBeNull();
   });
 
+  /** The dialog stores this element and focuses it again on close. */
   it('puts the focus on the trigger before the report dialog opens, so it returns there', async () => {
     const { fixture, help } = await setup();
     let focused: Element | null = null;
     const open = help.openReport.bind(help);
     jest.spyOn(help, 'openReport').mockImplementation(() => {
-      // The dialog stores this element and focuses it again on close.
       focused = document.activeElement;
       open();
     });
@@ -119,6 +119,7 @@ describe('HelpMenuComponent', () => {
     expect(panel()).toBeNull();
   });
 
+  /** Escape on a closed menu does nothing. */
   it('toggles, and closes on Escape with the focus back on the trigger', async () => {
     const { fixture } = await setup();
     trigger().click();
@@ -133,7 +134,6 @@ describe('HelpMenuComponent', () => {
     fixture.detectChanges();
     expect(panel()).toBeNull();
     expect(document.activeElement).toBe(trigger());
-    // Escape on a closed menu does nothing.
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   });
 
@@ -142,7 +142,6 @@ describe('HelpMenuComponent', () => {
     const outside = document.createElement('button');
     document.body.appendChild(outside);
 
-    // Nothing to close yet.
     outside.dispatchEvent(new Event('pointerdown', { bubbles: true }));
     outside.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
 

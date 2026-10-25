@@ -1,5 +1,3 @@
-// The trigger of the multiselect: a button in the filled field box, as the native select
-// of the `select` type. The whole box opens the choices.
 .msel__trigger {
   display: flex;
   align-items: center;
@@ -15,7 +13,6 @@
   color: var(--color-text-subtle);
 }
 
-// The choices in the sheet: one row per option, as the "Status" filter of the list.
 .msel__check {
   display: flex;
   align-items: center;

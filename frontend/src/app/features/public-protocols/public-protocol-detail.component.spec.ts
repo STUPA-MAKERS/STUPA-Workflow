@@ -27,6 +27,7 @@ describe('PublicProtocolDetailComponent', () => {
   beforeEach(() => localStorage.setItem('ap.locale', 'de'));
   afterEach(() => localStorage.clear());
 
+  /** There is one download, in the head; the side column repeats none. */
   it('shows the head, the PDF and the attendance as counts', async () => {
     const { api } = await setup();
     expect(api.detail).toHaveBeenCalledWith('p-1');
@@ -36,7 +37,6 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.getByText('Sitzung vom Di, 29.09.2026')).toBeInTheDocument();
     expect(screen.getByText('finalisiert am 02.10.2026')).toBeInTheDocument();
     const pdfs = screen.getAllByRole('link', { name: /PDF \(öffentliche Fassung\)/ });
-    // One download, in the head; the side column repeats none.
     expect(pdfs).toHaveLength(1);
     expect(pdfs[0]).toHaveAttribute('href', '/api/public/protocols/p-1/pdf');
     expect(screen.getByText('PDF · 212 KB')).toBeInTheDocument();
@@ -51,6 +51,7 @@ describe('PublicProtocolDetailComponent', () => {
     );
   });
 
+  /** The order is yes, no, abstain. */
   it('renders the public text, the decisions and the non-public placeholder', async () => {
     await setup();
     const first = screen.getByRole('heading', { level: 3, name: /Begrüßung/ }).closest('li') as HTMLElement;
@@ -58,7 +59,6 @@ describe('PublicProtocolDetailComponent', () => {
     const second = screen.getByRole('heading', { level: 3, name: /Haushalt 2027/ }).closest('li') as HTMLElement;
     const [main, secret, open] = within(second).getAllByRole('figure');
     expect(main).toHaveTextContent('Soll der Haushalt beschlossen werden?');
-    // Yes, no, abstain in this order.
     expect(main.textContent?.replace(/\s+/g, '')).toContain('Ja18Nein3Enthaltung2');
     expect(main).toHaveTextContent('Angenommen');
     expect(main).toHaveTextContent('Einfache Mehrheit · offene Abstimmung');
@@ -70,6 +70,7 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.getByText('Ohne Text und ohne Beschluss.')).toBeInTheDocument();
   });
 
+  /** A PDF without a known size shows no size line. */
   it('names guests as a count and an unknown option as it is', async () => {
     const p = detailFixture({
       attendance: { present: 5, excused: 0, absent: 0, guests: 7 },
@@ -82,10 +83,10 @@ describe('PublicProtocolDetailComponent', () => {
     expect(screen.getByRole('heading', { name: 'Anwesenheit' }).closest('section')).toHaveTextContent('Gäste7');
     expect(screen.getByText('vielleicht')).toBeInTheDocument();
     expect(screen.getByText('Stimmengleichheit')).toBeInTheDocument();
-    // A PDF without a known size shows no size line.
     expect(screen.queryByText(/^PDF ·/)).toBeNull();
   });
 
+  /** There is no raw tally line and no second callout; the note of the callout stays as text. */
   it('shows a vote callout of the text as the decision box, in its place', async () => {
     const p = detailFixture();
     p.tops[1].markdown = 'Vorher.\n\n> [!abstimmung] **Im Text?**\n> ja: 4, nein: 1\n> Gäste stimmten mit.\n\nNachher.';
@@ -100,7 +101,6 @@ describe('PublicProtocolDetailComponent', () => {
     expect(figures[0]).toHaveTextContent('Im Text?');
     expect(figures[0].textContent?.replace(/\s+/g, '')).toContain('Ja4Nein1');
     expect(figures[1]).toHaveTextContent('Separat?');
-    // No raw tally line and no second callout; the note of the callout stays as text.
     expect(second).not.toHaveTextContent('ja: 4');
     expect(second.querySelector('.callout')).toBeNull();
     const text = second.textContent ?? '';

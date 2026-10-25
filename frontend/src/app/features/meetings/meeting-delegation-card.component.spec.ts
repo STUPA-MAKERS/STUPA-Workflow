@@ -181,12 +181,12 @@ describe('MeetingDelegationCardComponent', () => {
     expect(screen.queryByRole('button', { name: 'Vertretung widerrufen' })).toBeNull();
   });
 
+  /** A second click while the revoke runs sends nothing. */
   it('revokes the own delegation and reads the context again', async () => {
     const { flush, http, changed } = await setup('box');
     const own = delegation();
     flush(ctx({ myDelegation: own }));
     await userEvent.click(screen.getByRole('button', { name: 'Vertretung widerrufen' }));
-    // A second click while the revoke runs sends nothing.
     await userEvent.click(screen.getByRole('button', { name: 'Vertretung widerrufen' }));
     const del = http.expectOne(`${BASE}/delegations/d-1`);
     expect(del.request.method).toBe('DELETE');

@@ -35,12 +35,12 @@ describe('chat mentions', () => {
   });
 
   describe('mentionQuery', () => {
+    /** The caret decides, not the end of the text. */
     it('finds the "@" search before the caret at the start of a word', () => {
       expect(mentionQuery('@', 1)).toEqual({ start: 0, query: '' });
       expect(mentionQuery('Hallo @Jo', 9)).toEqual({ start: 6, query: 'Jo' });
       expect(mentionQuery('(@Jo', 4)).toEqual({ start: 1, query: 'Jo' });
       expect(mentionQuery('@Anna Ma', 8)).toEqual({ start: 0, query: 'Anna Ma' });
-      // The caret decides, not the end of the text.
       expect(mentionQuery('@Jo und mehr', 3)).toEqual({ start: 0, query: 'Jo' });
     });
 
@@ -62,13 +62,13 @@ describe('chat mentions', () => {
       expect(matchPeople(PEOPLE, 'rüg').map((p) => p.principalId)).toEqual(['p-4']);
     });
 
+    /** One letter matches only the start of a word, not the middle. */
     it('ignores case and accents and caps the list', () => {
       expect(matchPeople(PEOPLE, 'yil').map((p) => p.principalId)).toEqual(['p-2']);
       expect(matchPeople(PEOPLE, 'YILDIZ').map((p) => p.principalId)).toEqual(['p-2']);
       expect(matchPeople(PEOPLE, 'kruger').map((p) => p.principalId)).toEqual(['p-4']);
       expect(matchPeople(PEOPLE, '')).toHaveLength(5);
       expect(matchPeople(PEOPLE, '', 2)).toHaveLength(2);
-      // One letter matches only the start of a word, not the middle.
       expect(matchPeople(PEOPLE, 'z')).toEqual([]);
     });
 
@@ -173,6 +173,7 @@ describe('chat mentions', () => {
       expect(p.open()).toBe(false);
     });
 
+    /** The same search keeps the row; a new one starts at the top. */
     it('moves with the arrows, wraps around and starts again on a new search', () => {
       const p = picker();
       p.update('@a', 2);
@@ -183,7 +184,6 @@ describe('chat mentions', () => {
       expect(p.active()).toBe(0);
       p.key(key('ArrowUp'));
       expect(p.active()).toBe(2);
-      // The same search keeps the row; a new one starts at the top.
       p.update('@a', 2);
       expect(p.active()).toBe(2);
       p.update('@ann', 4);
@@ -222,12 +222,12 @@ describe('chat mentions', () => {
       expect(p.picked()).toEqual([]);
     });
 
+    /** "Anna" is a whole name, so the list closes after it. */
     it('treats "@Name " after a whole name as done, and "@Anna " as a search for more', () => {
       const p = picker();
       p.update('@Jonas Weber ', 13);
       expect(p.open()).toBe(false);
       p.update('@Anna ', 6);
-      // "Anna" is a whole name, so the list closes after it.
       expect(p.open()).toBe(false);
       p.update('@Selin ', 7);
       expect(p.options().map((o) => o.principalId)).toEqual(['p-2']);

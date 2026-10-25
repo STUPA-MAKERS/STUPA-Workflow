@@ -127,6 +127,7 @@ describe('GroupMappingsComponent', () => {
     expect(api.listGremiumRoles).toHaveBeenCalledWith('g2', { quiet: true });
   });
 
+  /** The reserved prefix stands once at the foot of the page. */
   it('shows each section as rows "group → target", a gremium role after its gremium', async () => {
     const { c } = await setup();
     expect(c.sections().map((sec: { kind: string }) => sec.kind)).toEqual(['global', 'membership', 'role']);
@@ -139,7 +140,6 @@ describe('GroupMappingsComponent', () => {
     });
     const role = screen.getByRole('region', { name: 'Gremien-Rollen' });
     expect(within(role).getByText('Präsidium').tagName).toBe('STRONG');
-    // The reserved prefix stands once at the foot of the page.
     expect(screen.getByText('Das Präfix „vote:“ ist reserviert.')).toBeInTheDocument();
   });
 
@@ -197,8 +197,6 @@ describe('GroupMappingsComponent', () => {
     expect(screen.getByText(/Noch keine OIDC-Gruppe einem Gremium zugeordnet/)).toBeInTheDocument();
     expect(screen.getByText('Noch keine OIDC-Gruppe einer Gremien-Rolle zugeordnet.')).toBeInTheDocument();
   });
-
-  // --- dialogs -----------------------------------------------------------------
 
   it('the global dialog has a role select and no gremium field', async () => {
     await setup();
@@ -260,6 +258,10 @@ describe('GroupMappingsComponent', () => {
     expect(c.dialog()).toBeNull();
   });
 
+  /**
+   * The same gremium again keeps the role. g1 and g2 come with the mappings already, so only g3
+   * loads. Clearing the gremium loads nothing.
+   */
   it('the gremium select of the role dialog loads that gremium roles and clears the role', async () => {
     const { c, api } = await setup();
     c.openAdd('role');
@@ -269,14 +271,11 @@ describe('GroupMappingsComponent', () => {
     expect(c.dialogGremiumRoles()).toEqual([]);
     c.onDialogGremium('g1');
     c.gremiumRoleId.set('gr1');
-    // The same gremium again keeps the role.
     c.onDialogGremium('g1');
     expect(c.gremiumRoleId()).toBe('gr1');
     c.onDialogGremium('g2');
     expect(c.gremiumRoleId()).toBe('');
-    // g1 and g2 came with the mappings already. Only g3 was new.
     expect(api.listGremiumRoles).toHaveBeenCalledTimes(3);
-    // Clearing the gremium loads nothing.
     c.onDialogGremium('');
     expect(api.listGremiumRoles).toHaveBeenCalledTimes(3);
   });
@@ -309,7 +308,7 @@ describe('GroupMappingsComponent', () => {
 
   it('validates the group name and the select of each kind', async () => {
     const { c } = await setup();
-    expect(c.valid()).toBe(false); // no dialog
+    expect(c.valid()).toBe(false);
     c.openAdd('global');
     c.oidcGroup.set('  ');
     c.roleId.set('r1');
@@ -416,8 +415,6 @@ describe('GroupMappingsComponent', () => {
     expect(c.dialog()).toBeNull();
   });
 
-  // --- delete ------------------------------------------------------------------
-
   it.each([
     ['global', 'm1', 'deleteGroupMapping', 'listGroupMappings'],
     ['membership', 'mm1', 'deleteMembershipMapping', 'listMembershipMappings'],
@@ -449,9 +446,9 @@ describe('GroupMappingsComponent', () => {
     expect(c.confirm()).toEqual({ kind: 'role', id: 'rm1' });
   });
 
+  /** The add buttons all read "Zuordnung anlegen"; the section heading names the kind. */
   it('a click on the row opens the edit dialog, the ⋮ menu the delete confirmation', async () => {
     const { c } = await setup();
-    // The add buttons all read "Zuordnung anlegen"; the section heading names the kind.
     expect(screen.getAllByText('Zuordnung anlegen')).toHaveLength(3);
     await userEvent.click(screen.getByRole('button', { name: 'Bearbeiten: stupa-praesidium' }));
     expect(screen.getByRole('dialog', { name: 'Gremien-Rolle bearbeiten' })).toBeInTheDocument();

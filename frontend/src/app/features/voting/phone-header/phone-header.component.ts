@@ -4,7 +4,7 @@ import { TranslatePipe } from '@core/i18n/translate.pipe';
 import { IconComponent } from '@stupa-makers/ui-kit';
 
 /**
- * The phone header of a vote (board Telefon-Abstimmen): the way back, "Abstimmung" and
+ * The phone header of a vote: the way back, "Abstimmung" and
  * the meeting line "TOP 3 · 34. Sitzung". With `subtitleLink` the line is a link, for
  * example to the meeting or to the application of the vote. A menu goes into the
  * content at the end.

@@ -21,7 +21,6 @@
   padding: var(--space-2) var(--space-3) var(--space-2) var(--space-4);
 }
 
-/* Version and state, time and person, then the actions at the end of the line. */
 .vh__row {
   display: grid;
   grid-template-columns: minmax(8rem, auto) minmax(0, 1fr) auto;
@@ -59,14 +58,13 @@
   gap: var(--space-2);
 }
 
-/* The disclosure of the diff: a text button with a chevron, as wide as its words. */
 .vh__toggle {
   --button-padding-inline: var(--space-2);
   --button-font-size: var(--fs-sm);
   --button-hover-bg: var(--color-surface-3);
 }
-/* The chevron trails the words. The text sits in a span, because the kit button floats a
-   first-child icon to the start; the span drops the template space, so the gap is a margin. */
+// The kit button floats a first-child icon to the start, so the text sits in a span; the span
+// drops the template space, so the gap is a margin.
 .vh__toggle app-icon {
   margin-inline-start: var(--space-1);
 }
@@ -77,10 +75,6 @@
   border-top: 1px solid var(--color-border);
 }
 
-/* A narrow sheet (a phone) or a narrow column (the side column of the form editor, the
-   inspector of the flow editor): one column. Version and state, then time and person,
-   then the actions, each on a line of its own; "Version 2" and the time never break
-   inside. */
 @container (max-width: 34rem) {
   .vh__row {
     grid-template-columns: minmax(0, 1fr);
