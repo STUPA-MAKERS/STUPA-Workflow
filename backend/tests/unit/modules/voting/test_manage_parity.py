@@ -193,3 +193,15 @@ async def test_run_vote_needs_the_protokollant_for_a_meeting_vote(
 
     monkeypatch.setattr(VotingService, "meeting_id_of", _loose)
     await svc.assert_can_run_vote(uuid4(), object())  # type: ignore[arg-type]
+
+
+async def test_admin_votes_token_may_close_the_vote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An admin token with `vote.manage` but no `session.manage` passes the gremium rule."""
+    _patch_gremium_perms(monkeypatch, {})
+    meeting = _meeting(protokollant_id=uuid4())
+    principal = Principal(
+        sub="ops", roles=["admin"], scope_permissions=frozenset({"vote.manage"})
+    )
+    assert await _parity(meeting, principal) is True

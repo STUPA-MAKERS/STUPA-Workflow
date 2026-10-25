@@ -265,7 +265,9 @@ class ListingOps(PermissionOps, VoteReadOps):
             else {}
         )
         # The same rules as `PermissionOps.can_manage`, `can_write`,
-        # `can_manage_votes` and `can_finalize`, batched. Each of these rules has
+        # `can_manage_votes` and `can_finalize`, batched. `votes_mgmt_ids` is the
+        # session lead plus the gremium rule `manages_votes_in_gremium` (its
+        # `session.manage` part sits in `manage_ids`). Each of these rules has
         # the admin bypass. Each right applies the OAuth scope cap, the admin bypass
         # included; a raw role read would hand a narrowly scoped token the full
         # cross-gremium view. Keep this block and `PermissionOps` in step: the router
